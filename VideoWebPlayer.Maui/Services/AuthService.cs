@@ -1,4 +1,3 @@
-using Microsoft.Maui.Storage;
 using VideoWebPlayer.Client;
 using VideoWebPlayer.Client.Models;
 
@@ -7,9 +6,6 @@ namespace VideoWebPlayer.Maui.Services;
 public class AuthService : IAuthService
 {
     private readonly ISettingsService _settings;
-
-    private const string UserKey = "Username";
-    private const string PasswordKey = "Passkey";
 
 	public AuthService() : this(new SettingsService())
 	{
@@ -22,35 +18,22 @@ public class AuthService : IAuthService
 
     public bool HasCredentials()
     {
-        var username = Preferences.Default.Get(UserKey, string.Empty);
-        var password = GetStoredPassword();
-        return !string.IsNullOrWhiteSpace(username) && !string.IsNullOrWhiteSpace(password);
+        return _settings.HasCredentials();
     }
     
     public (string username, string password) GetCredentials()
     {
-        var username = Preferences.Default.Get(UserKey, string.Empty);
-        var password = GetStoredPassword();
-        return (username, password);
+        return (_settings.GetUsername(), _settings.GetPassword());
     }
 
     public void SaveCredentials(string username, string password)
     {
-        Preferences.Default.Set(UserKey, username ?? string.Empty);
-        if (string.IsNullOrEmpty(password))
-        {
-            SecureStorage.Default.Remove(PasswordKey);
-            return;
-        }
-
-        SecureStorage.Default.SetAsync(PasswordKey, password).GetAwaiter().GetResult();
+        _settings.SetCredentials(username, password);
     }
 
     public void ClearCredentials()
     {
-        Preferences.Default.Remove(UserKey);
-        SecureStorage.Default.Remove(PasswordKey);
-		_settings.ClearAuthToken();
+        _settings.ClearCredentials();
     }
 
     public async Task<(bool success, string? errorMessage)> LoginAsync(string username, string password, CancellationToken cancellationToken = default)
@@ -99,16 +82,4 @@ public class AuthService : IAuthService
         }
     }
 
-    private static string GetStoredPassword()
-    {
-        try
-        {
-            return SecureStorage.Default.GetAsync(PasswordKey).GetAwaiter().GetResult() ?? string.Empty;
-        }
-        catch (Exception ex)
-        {
-            System.Diagnostics.Debug.WriteLine($"Could not read secure password storage: {ex.Message}");
-            return string.Empty;
-        }
-    }
 }

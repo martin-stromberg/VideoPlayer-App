@@ -1,5 +1,4 @@
 using System.Net.Http;
-using Microsoft.Maui.Storage;
 using VideoWebPlayer.Client;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.DependencyInjection;
@@ -8,8 +7,6 @@ namespace VideoWebPlayer.Maui.Services;
 
 public class ConnectionService : IConnectionService
 {
-    private const string TokenKey = "AuthToken";
-
     public ConnectionService()
     {
     }
@@ -29,7 +26,8 @@ public class ConnectionService : IConnectionService
             var httpClient = new HttpClient { BaseAddress = new Uri(addr), Timeout = TimeSpan.FromSeconds(8) };
 
             // Versuche JWT Token zu laden (wenn der Benutzer angemeldet ist)
-            var jwtToken = Preferences.Default.Get(TokenKey, string.Empty);
+            var settings = App.ServiceProvider?.GetService<ISettingsService>() ?? new SettingsService();
+            var jwtToken = settings.GetAuthToken();
             if (!string.IsNullOrWhiteSpace(jwtToken))
             {
                 // Verwende Bearer Token für authentifizierte Requests

@@ -7,18 +7,20 @@ namespace VideoWebPlayer.Maui;
 public partial class LoginPage : ContentPage
 {
     private readonly IAuthService _auth;
+    private readonly ISettingsService _settings;
 
-    public LoginPage(IAuthService? auth)
+    public LoginPage(IAuthService? auth, ISettingsService? settings = null)
     {
         InitializeComponent();
         // tolerate null auth service when constructed outside DI
         _auth = auth ?? new Services.AuthService();
+        _settings = settings ?? App.ServiceProvider?.GetService<ISettingsService>() ?? new Services.SettingsService();
 
         if (_auth.HasCredentials())
         {
             // prefill
             // not exposing stored password in this placeholder
-            UserEntry.Text = Microsoft.Maui.Storage.Preferences.Default.Get("Username", string.Empty);
+            UserEntry.Text = _settings.GetUsername();
         }
     }
 

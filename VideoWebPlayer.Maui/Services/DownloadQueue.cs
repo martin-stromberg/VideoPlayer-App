@@ -85,7 +85,8 @@ public class DownloadQueue
         {
             // Download-Logik
             using var httpClient = new HttpClient();
-            var token = Preferences.Default.Get("AuthToken", string.Empty);
+            var settings = App.ServiceProvider?.GetService<ISettingsService>() ?? new SettingsService();
+            var token = settings.GetAuthToken();
             if (!string.IsNullOrEmpty(token))
             {
                 httpClient.DefaultRequestHeaders.Authorization = 

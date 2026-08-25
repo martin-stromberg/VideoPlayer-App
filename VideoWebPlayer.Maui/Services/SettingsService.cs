@@ -9,6 +9,8 @@ public class SettingsService : ISettingsService
 {
     private const string ServerKey = "ServerAddress";
     private const string AuthTokenKey = "AuthToken";
+    private const string UserKey = "Username";
+    private const string PasswordKey = "Passkey";
 
     private const string PlaybackCacheDaysKey = "PlaybackCacheRetentionDays";
     private const string WatchlistCacheDaysKey = "WatchlistCacheRetentionDays";
@@ -18,6 +20,53 @@ public class SettingsService : ISettingsService
     {
         var prefix = ProfileManager.Instance.GetPreferencesPrefix();
         return prefix + key;
+    }
+
+    private static string ReadSecureValue(string key)
+    {
+        try
+        {
+            return SecureStorage.Default.GetAsync(key).GetAwaiter().GetResult() ?? string.Empty;
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"Could not read secure storage key '{key}': {ex.Message}");
+            return string.Empty;
+        }
+    }
+
+    private static void WriteSecureValue(string key, string? value)
+    {
+        try
+        {
+            if (string.IsNullOrEmpty(value))
+            {
+                SecureStorage.Default.Remove(key);
+                return;
+            }
+
+            SecureStorage.Default.SetAsync(key, value).GetAwaiter().GetResult();
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"Could not write secure storage key '{key}': {ex.Message}");
+        }
+    }
+
+    private string GetMigratedSecureValue(string key)
+    {
+        var prefixedKey = GetPrefixedKey(key);
+        var secureValue = ReadSecureValue(prefixedKey);
+        if (!string.IsNullOrEmpty(secureValue))
+            return secureValue;
+
+        var legacyValue = Preferences.Default.Get(prefixedKey, string.Empty);
+        if (string.IsNullOrEmpty(legacyValue))
+            return string.Empty;
+
+        WriteSecureValue(prefixedKey, legacyValue);
+        Preferences.Default.Remove(prefixedKey);
+        return legacyValue;
     }
 
     public string? ServerAddress => Preferences.Default.Get(GetPrefixedKey(ServerKey), string.Empty);
@@ -63,12 +112,40 @@ public class SettingsService : ISettingsService
         Preferences.Default.Remove(GetPrefixedKey(ServerKey));
     }
 
+    public string GetUsername()
+    {
+        return Preferences.Default.Get(GetPrefixedKey(UserKey), string.Empty);
+    }
+
+    public string GetPassword()
+    {
+        return GetMigratedSecureValue(PasswordKey);
+    }
+
+    public bool HasCredentials()
+    {
+        return !string.IsNullOrWhiteSpace(GetUsername()) && !string.IsNullOrWhiteSpace(GetPassword());
+    }
+
+    public void SetCredentials(string username, string password)
+    {
+        Preferences.Default.Set(GetPrefixedKey(UserKey), username ?? string.Empty);
+        WriteSecureValue(GetPrefixedKey(PasswordKey), password);
+    }
+
+    public void ClearCredentials()
+    {
+        Preferences.Default.Remove(GetPrefixedKey(UserKey));
+        WriteSecureValue(GetPrefixedKey(PasswordKey), null);
+        ClearAuthToken();
+    }
+
     /// <summary>
     /// Gets the authentication token for the current profile.
     /// </summary>
     public string? GetAuthToken()
     {
-        return Preferences.Default.Get(GetPrefixedKey(AuthTokenKey), string.Empty);
+        return GetMigratedSecureValue(AuthTokenKey);
     }
 
     /// <summary>
@@ -76,7 +153,8 @@ public class SettingsService : ISettingsService
     /// </summary>
     public void SetAuthToken(string token)
     {
-        Preferences.Default.Set(GetPrefixedKey(AuthTokenKey), token ?? string.Empty);
+        WriteSecureValue(GetPrefixedKey(AuthTokenKey), token);
+        Preferences.Default.Remove(GetPrefixedKey(AuthTokenKey));
     }
 
     /// <summary>
@@ -85,6 +163,7 @@ public class SettingsService : ISettingsService
     public void ClearAuthToken()
     {
         Preferences.Default.Remove(GetPrefixedKey(AuthTokenKey));
+        WriteSecureValue(GetPrefixedKey(AuthTokenKey), null);
     }
 
     // mDNS Discovery (Zeroconf)

@@ -211,7 +211,8 @@ public class DownloadManager
     {
         videoType = NormalizeVideoType(videoType);
 
-        var serverAddress = Preferences.Default.Get("ServerAddress", string.Empty);
+        var settings = ResolveSettingsService();
+        var serverAddress = settings.ServerAddress ?? string.Empty;
         if (!serverAddress.StartsWith("http"))
         {
             serverAddress = $"http://{serverAddress}";
@@ -219,8 +220,7 @@ public class DownloadManager
         
         serverAddress = serverAddress.TrimEnd('/');
         
-        // Hole Auth-Token
-        var authToken = Preferences.Default.Get("AuthToken", string.Empty);
+        var authToken = settings.GetAuthToken();
         
         string streamUrl;
         if (videoType.Equals(MediaTypes.Movie, StringComparison.OrdinalIgnoreCase))
@@ -370,7 +370,8 @@ public class DownloadManager
                 return null;
             }
             
-            var serverAddress = Preferences.Default.Get("ServerAddress", string.Empty);
+            var settings = ResolveSettingsService();
+            var serverAddress = settings.ServerAddress ?? string.Empty;
             if (string.IsNullOrWhiteSpace(serverAddress))
                 return null;
             
@@ -541,7 +542,7 @@ public class DownloadManager
         try
         {
             using var httpClient = new HttpClient();
-            var token = Preferences.Default.Get("AuthToken", string.Empty);
+            var token = ResolveSettingsService().GetAuthToken();
             if (!string.IsNullOrEmpty(token))
             {
                 httpClient.DefaultRequestHeaders.Authorization = 
@@ -570,6 +571,11 @@ public class DownloadManager
             System.Diagnostics.Debug.WriteLine($"Error downloading image {imageUrl}: {ex.Message}");
             return null;
         }
+    }
+
+    private static ISettingsService ResolveSettingsService()
+    {
+        return App.ServiceProvider?.GetService<ISettingsService>() ?? new SettingsService();
     }
     
     public async Task UpdatePlaybackPositionAsync(long videoId, string videoType, double positionSeconds, double durationSeconds)

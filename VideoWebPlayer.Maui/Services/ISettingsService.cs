@@ -7,6 +7,12 @@ public interface ISettingsService
     void SetServerAddress(string address);
     void ClearServerAddress();
 
+    string GetUsername();
+    string GetPassword();
+    bool HasCredentials();
+    void SetCredentials(string username, string password);
+    void ClearCredentials();
+
 	string? GetAuthToken();
 	void SetAuthToken(string token);
 	void ClearAuthToken();
