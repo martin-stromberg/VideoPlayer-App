@@ -45,7 +45,7 @@ Das Web-Repository besitzt die verbindliche API-Dokumentation unter `docs/API.md
 
 ## Secrets und Client-Gate
 
-Der Platzhalter `<MAUI_CLIENT_API_TOKEN>` im Client ist kein produktiv verwendbarer Wert. Er markiert den nicht geheimen Client-Gate-Wert für initiale Health- und Login-Aufrufe. Die eigentliche Benutzerautorisierung erfolgt über JWTs nach erfolgreicher Anmeldung.
+Der Platzhalter `<MAUI_CLIENT_API_TOKEN>` im Client ist kein produktiv verwendbarer Wert. Er markiert den Client-Gate-Wert für initiale Health- und Login-Aufrufe. Dieser Wert ist kein Ersatz für Benutzer-Authentifizierung und kann in einem ausgelieferten Client grundsätzlich ausgelesen werden; der korrespondierende Backendwert ist dennoch als sensibler Konfigurationswert zu schützen. Die eigentliche Benutzerautorisierung erfolgt über JWTs nach erfolgreicher Anmeldung.
 
 Produktive Werte werden zentral über `VideoWebPlayer.Maui/Services/MauiClientConfiguration.cs` gelesen. Unterstützte Quellen sind:
 
