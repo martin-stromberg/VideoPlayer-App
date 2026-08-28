@@ -22,5 +22,5 @@ Branch: `task/issue-1-24bdcfb8f0b34e2297b0dc68fb24e51b-staging-branch`
 | [x] | 9b | README aktualisieren | `README.md` |
 | [x] | 9c | Release Notes aktualisieren | – |
 | [ ] | 10 | Nacharbeiten abschließen (offene Punkte aus `continue.md`) | `continue-done.md` |
-| [ ] | – | Feature-Verzeichnis löschen | – |
-| [ ] | – | Commit durchführen | – |
+| [ ] | – | Feature-Verzeichnis löschen (verbleibt wegen offener Punkten) | – |
+| [x] | – | Commit durchführen | – |
