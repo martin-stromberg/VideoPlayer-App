@@ -58,9 +58,9 @@ public partial class MediaBannerPlayer : ContentView
     private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
         System.Diagnostics.Debug.WriteLine($"[MediaBannerPlayer] PropertyChanged event received: {e.PropertyName} from {sender?.GetType().Name}");
-        
+
         // Wenn sich SelectedMovie, SelectedMovieIndex oder SelectedEpisode ändert, stoppe die Wiedergabe
-        if (e.PropertyName == "SelectedMovie" || 
+        if (e.PropertyName == "SelectedMovie" ||
             e.PropertyName == "SelectedMovieIndex" ||
             e.PropertyName == "SelectedEpisode" ||
             e.PropertyName == "SelectedEpisodeIndex")
@@ -147,7 +147,7 @@ public partial class MediaBannerPlayer : ContentView
 
     private async void OnPlayTapped(object? sender, TappedEventArgs e)
     {
-        if (BindingContext == null) 
+        if (BindingContext == null)
         {
             System.Diagnostics.Debug.WriteLine("[MediaBannerPlayer] BindingContext is null");
             return;
@@ -161,18 +161,18 @@ public partial class MediaBannerPlayer : ContentView
         }
 
         System.Diagnostics.Debug.WriteLine("[MediaBannerPlayer] Calling GetVideoInfoForPlaybackAsync...");
-        
+
         // Hole Video-Info vom ViewModel
         var videoInfo = await viewModel.GetVideoInfoForPlaybackAsync();
-        
+
         System.Diagnostics.Debug.WriteLine($"[MediaBannerPlayer] GetVideoInfoForPlaybackAsync returned: {videoInfo?.ToString() ?? "null"}");
-        
+
         if (videoInfo == null)
         {
             System.Diagnostics.Debug.WriteLine("[MediaBannerPlayer] videoInfo is null!");
             await Application.Current!.MainPage!.DisplayAlert(
-                "Keine Auswahl", 
-                "Bitte wählen Sie ein Medium aus.", 
+                "Keine Auswahl",
+                "Bitte wählen Sie ein Medium aus.",
                 "OK");
             return;
         }

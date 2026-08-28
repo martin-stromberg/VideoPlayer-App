@@ -13,6 +13,6 @@ namespace VideoWebPlayer.Controllers.Models
         public DateTime CreatedAt { get; set; }
         public long? PictureId { get; set; } // oder PosterPictureId
         public int ItemCount { get; set; }
-        
+
     }
 }

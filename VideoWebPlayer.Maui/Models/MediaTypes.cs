@@ -9,7 +9,7 @@ public static class MediaTypes
     /// Movie media type (entspricht VideoWebPlayer.Data.Movie)
     /// </summary>
     public const string Movie = "movie";
-    
+
     /// <summary>
     /// TV Show Episode media type (entspricht VideoWebPlayer.Data.TVShowEpisode)
     /// </summary>

@@ -1,0 +1,22 @@
+{
+  "branches": [
+    "main",
+    {
+      "name": "staging",
+      "prerelease": "RC"
+    }
+  ],
+  "plugins": [
+    "@semantic-release/commit-analyzer",
+    "@semantic-release/release-notes-generator",
+    [
+      "@semantic-release/github",
+      {
+        "assets": [],
+        "successComment": false,
+        "failComment": false,
+        "releasedLabels": false
+      }
+    ]
+  ]
+}

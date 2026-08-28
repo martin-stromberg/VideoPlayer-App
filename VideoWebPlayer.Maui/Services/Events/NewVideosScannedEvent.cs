@@ -3,7 +3,7 @@ namespace VideoWebPlayer.Maui.Services.Events;
 /// <summary>
 /// Event raised when the status of a background operation changes, such as scanning for new videos or downloading content.
 /// </summary>
-public class StatusChangedEvent: NotificationEvent
+public class StatusChangedEvent : NotificationEvent
 {
     public string Message { get; }
     public StatusChangedEvent(string message)

@@ -13,9 +13,9 @@ public interface ISettingsService
     void SetCredentials(string username, string password);
     void ClearCredentials();
 
-	string? GetAuthToken();
-	void SetAuthToken(string token);
-	void ClearAuthToken();
+    string? GetAuthToken();
+    void SetAuthToken(string token);
+    void ClearAuthToken();
 
     int PlaybackCacheRetentionDays { get; set; }
     int WatchlistCacheRetentionDays { get; set; }

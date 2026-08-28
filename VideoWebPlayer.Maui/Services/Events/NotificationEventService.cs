@@ -43,14 +43,14 @@ public class NotificationEventService : IPublishNotificationEvent, ISubscribeNot
             throw new ArgumentNullException(nameof(notificationEvent));
 
         var eventType = typeof(TEvent);
-        
+
         System.Diagnostics.Debug.WriteLine($"[NotificationEventService] Publishing event: {eventType.Name}");
 
         if (_subscribers.TryGetValue(eventType, out var handlers))
         {
             // Create a copy of handlers to avoid modification during iteration
             var handlersCopy = handlers.ToList();
-            
+
             foreach (var handler in handlersCopy)
             {
                 try
@@ -92,7 +92,7 @@ public class NotificationEventService : IPublishNotificationEvent, ISubscribeNot
             }
 
             _subscribers[eventType].Add(handler);
-            
+
             System.Diagnostics.Debug.WriteLine($"[NotificationEventService] Subscribed to {eventType.Name}. Total subscribers: {_subscribers[eventType].Count}");
         }
         finally
@@ -119,7 +119,7 @@ public class NotificationEventService : IPublishNotificationEvent, ISubscribeNot
             if (_subscribers.TryGetValue(eventType, out var handlers))
             {
                 handlers.Remove(handler);
-                
+
                 System.Diagnostics.Debug.WriteLine($"[NotificationEventService] Unsubscribed from {eventType.Name}. Remaining subscribers: {handlers.Count}");
 
                 if (handlers.Count == 0)

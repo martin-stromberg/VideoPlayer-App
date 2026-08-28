@@ -1,6 +1,6 @@
 ﻿namespace VideoWebPlayer.Client.Models
 {
-    public class DtoMediaSource: DtoMediaEntry
+    public class DtoMediaSource : DtoMediaEntry
     {
         /// <summary>
         /// Eindeutige ID des Eintrags.
@@ -22,10 +22,10 @@
         public bool Changed { get; set; }
         public DateTime? LastScannedAt { get; set; }
 
-		/// <summary>
-		/// Optional uploaded icon image (stored in `MediaSourceIcons` table).
-		/// </summary>
-		public long? IconPictureId { get; set; }
+        /// <summary>
+        /// Optional uploaded icon image (stored in `MediaSourceIcons` table).
+        /// </summary>
+        public long? IconPictureId { get; set; }
     }
     public class SourceGenresDto
     {
