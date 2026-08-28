@@ -106,15 +106,18 @@ jobs:
       - name: Set application version
         run: pwsh .github/scripts/Set-Version.ps1 -Version '${{ needs.release.outputs.tag }}'
 
-      - name: Publish iOS
-        run: dotnet publish VideoWebPlayer.Maui/VideoWebPlayer.Maui.csproj --configuration Release --framework net10.0-ios --runtime iossimulator-arm64
+      - name: Build iOS
+        run: dotnet build VideoWebPlayer.Maui/VideoWebPlayer.Maui.csproj --configuration Release --framework net10.0-ios --runtime iossimulator-arm64
 
       - name: Upload iOS artifact
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           app=$(find VideoWebPlayer.Maui/bin/Release/net10.0-ios -name '*.app' -type d | head -n 1)
-          if [ -n "$app" ]; then gh release upload '${{ needs.release.outputs.tag }}' "$app" --clobber; fi
+          if [ -n "$app" ]; then
+            zip -r "${app}.zip" "$app"
+            gh release upload '${{ needs.release.outputs.tag }}' "${app}.zip" --clobber
+          fi
         shell: bash
 
   draft-pr:
