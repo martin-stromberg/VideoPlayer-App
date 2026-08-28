@@ -41,7 +41,7 @@ jobs:
         run: dotnet test VideoWebPlayer.Maui.Tests/VideoWebPlayer.Maui.Tests.csproj --no-build --configuration Release
 
       - name: Lint
-        run: dotnet format --verify-no-changes --no-restore
+        run: dotnet format whitespace --verify-no-changes --no-restore
 
       - name: Validate source branch for main
         if: github.base_ref == 'main' && github.head_ref != 'staging'

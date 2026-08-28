@@ -16,7 +16,7 @@ public class DownloadManager
     private readonly string _downloadDirectory;
     private SemaphoreSlim _dbLock => ClientDatabase.Instance.Lock;
     private IPublishNotificationEvent? _eventPublisher;
-    
+
     public static DownloadManager Instance => _instance ??= new DownloadManager();
 
     /// <summary>
@@ -28,7 +28,7 @@ public class DownloadManager
         _eventPublisher = eventPublisher;
         System.Diagnostics.Debug.WriteLine("[DownloadManager] Event publisher configured");
     }
-    
+
     private DownloadManager()
     {
         var profile = ProfileManager.Instance.CurrentProfile;
@@ -73,16 +73,16 @@ public class DownloadManager
         {
             // Überprüfe ob die Spalten existieren, falls nicht füge sie hinzu
             var tableInfo = await _database.GetTableInfoAsync(nameof(DownloadedVideo));
-            
+
             var hasLocalPosterPath = tableInfo.Any(c => c.Name == nameof(DownloadedVideo.LocalPosterImagePath));
             var hasLocalBannerPath = tableInfo.Any(c => c.Name == nameof(DownloadedVideo.LocalBannerImagePath));
-            
+
             if (!hasLocalPosterPath)
             {
                 await _database.ExecuteAsync($"ALTER TABLE {nameof(DownloadedVideo)} ADD COLUMN {nameof(DownloadedVideo.LocalPosterImagePath)} TEXT");
                 System.Diagnostics.Debug.WriteLine("[DownloadManager] Added LocalPosterImagePath column");
             }
-            
+
             if (!hasLocalBannerPath)
             {
                 await _database.ExecuteAsync($"ALTER TABLE {nameof(DownloadedVideo)} ADD COLUMN {nameof(DownloadedVideo.LocalBannerImagePath)} TEXT");
@@ -98,7 +98,7 @@ public class DownloadManager
             System.Diagnostics.Debug.WriteLine($"[DownloadManager] Migration error: {ex.Message}");
         }
     }
-    
+
     public async Task<VideoRequest> RequestVideoAsync(long videoId, string videoType, string title)
     {
         var request = new VideoRequest
@@ -107,20 +107,20 @@ public class DownloadManager
             VideoType = videoType,
             Title = title
         };
-        
+
         // Starte Hintergrund-Task zur Quelle-Ermittlung
         _ = Task.Run(async () => await ResolveVideoSourceAsync(request));
-        
+
         return request;
     }
-    
+
     private async Task ResolveVideoSourceAsync(VideoRequest request)
     {
         try
         {
             // Prüfe ob lokale Datei vorhanden
             var download = await GetDownloadAsync(request.VideoId, request.VideoType);
-            
+
             if (download != null && download.Status == DownloadStatus.Completed && File.Exists(download.LocalFilePath))
             {
                 // Lokale Datei verfügbar mit gespeicherter Position
@@ -128,27 +128,27 @@ public class DownloadManager
                 {
                     SourcePath = download.LocalFilePath,
                     SourceType = VideoSourceType.LocalFile,
-                    ResumePosition = download.PlaybackPositionSeconds > 0 
-                        ? TimeSpan.FromSeconds(download.PlaybackPositionSeconds) 
+                    ResumePosition = download.PlaybackPositionSeconds > 0
+                        ? TimeSpan.FromSeconds(download.PlaybackPositionSeconds)
                         : null,
-                    Duration = download.DurationSeconds > 0 
-                        ? TimeSpan.FromSeconds(download.DurationSeconds) 
+                    Duration = download.DurationSeconds > 0
+                        ? TimeSpan.FromSeconds(download.DurationSeconds)
                         : null
                 });
                 return;
             }
-            
+
             // Stream-URL vom Server - hole Position vom Server
             var streamUrl = BuildStreamUrl(request.VideoId, request.VideoType);
             var resumePosition = await FetchResumePositionFromServerAsync(request.VideoId, request.VideoType);
-            
+
             request.SetSource(new VideoSourceInfo
             {
                 SourcePath = streamUrl,
                 SourceType = VideoSourceType.StreamUrl,
                 ResumePosition = resumePosition
             });
-            
+
             // Füge zur Download-Queue hinzu (Cache) - nur wenn noch nicht vorhanden
             if (download == null)
             {
@@ -160,7 +160,7 @@ public class DownloadManager
             System.Diagnostics.Debug.WriteLine($"Error resolving video source: {ex.Message}");
         }
     }
-    
+
     private async Task<TimeSpan?> FetchResumePositionFromServerAsync(long videoId, string videoType)
     {
         try
@@ -171,24 +171,24 @@ public class DownloadManager
                 System.Diagnostics.Debug.WriteLine("VideoWebPlayerClient not available");
                 return null;
             }
-            
+
             // Hole Continue-Watching Liste
             var entries = await client.GetContinueWatchingAsync();
             if (entries == null || entries.Count == 0)
                 return null;
-            
+
             // Suche nach passendem Eintrag basierend auf MediaType und Entry.Id
-            var entry = entries.FirstOrDefault(e => 
-                e.MediaType.Equals(videoType, StringComparison.OrdinalIgnoreCase) && 
+            var entry = entries.FirstOrDefault(e =>
+                e.MediaType.Equals(videoType, StringComparison.OrdinalIgnoreCase) &&
                 e.Entry?.Id == videoId
             );
-            
+
             if (entry != null && entry.PositionSeconds > 0)
             {
                 System.Diagnostics.Debug.WriteLine($"Found resume position from server: {entry.PositionSeconds}s for {videoType} {videoId}");
                 return TimeSpan.FromSeconds(entry.PositionSeconds);
             }
-            
+
             return null;
         }
         catch (Exception ex)
@@ -197,7 +197,7 @@ public class DownloadManager
             return null;
         }
     }
-    
+
     // Helper-Klasse für Deserialisierung
     private class ContinueWatchingEntry
     {
@@ -206,7 +206,7 @@ public class DownloadManager
         public long PositionSeconds { get; set; }
         public long DurationSeconds { get; set; }
     }
-    
+
     private string BuildStreamUrl(long videoId, string videoType)
     {
         videoType = NormalizeVideoType(videoType);
@@ -217,11 +217,11 @@ public class DownloadManager
         {
             serverAddress = $"http://{serverAddress}";
         }
-        
+
         serverAddress = serverAddress.TrimEnd('/');
-        
+
         var authToken = settings.GetAuthToken();
-        
+
         string streamUrl;
         if (videoType.Equals(MediaTypes.Movie, StringComparison.OrdinalIgnoreCase))
         {
@@ -235,16 +235,16 @@ public class DownloadManager
         {
             throw new ArgumentException($"Unknown video type: {videoType}", nameof(videoType));
         }
-        
+
         // Füge Auth-Token als Query-Parameter hinzu (falls vorhanden)
         if (!string.IsNullOrEmpty(authToken))
         {
             streamUrl += $"?access_token={Uri.EscapeDataString(authToken)}";
         }
-        
+
         return streamUrl;
     }
-    
+
     public async Task<DownloadedVideo?> GetDownloadAsync(long videoId, string videoType)
     {
         videoType = NormalizeVideoType(videoType);
@@ -265,7 +265,7 @@ public class DownloadManager
             _dbLock.Release();
         }
     }
-    
+
     public async Task<List<DownloadedVideo>> GetAllDownloadsAsync()
     {
         await _dbLock.WaitAsync();
@@ -281,7 +281,7 @@ public class DownloadManager
             _dbLock.Release();
         }
     }
-    
+
     public async Task QueueDownloadAsync(VideoRequest request, DownloadRetentionType retentionType)
     {
         request.VideoType = NormalizeVideoType(request.VideoType);
@@ -307,18 +307,18 @@ public class DownloadManager
                 _dbLock.Release();
             }
         }
-        
+
         // Prüfe ob bereits in Queue (Arbeitsspeicher)
         if (DownloadQueue.Instance.IsInQueue(request.VideoId, request.VideoType))
         {
             System.Diagnostics.Debug.WriteLine($"Download already in queue: {request.Title}");
             return;
         }
-        
+
         // Erstelle Download-Task (NUR im Arbeitsspeicher)
         var fileName = $"{request.VideoType}_{request.VideoId}_{DateTime.Now.Ticks}.mp4";
         var localPath = Path.Combine(_downloadDirectory, fileName);
-        
+
         var settings = App.ServiceProvider?.GetService<ISettingsService>();
         var playbackCacheDays = settings?.PlaybackCacheRetentionDays ?? 1;
         var watchlistCacheDays = settings?.WatchlistCacheRetentionDays ?? 3;
@@ -330,12 +330,12 @@ public class DownloadManager
             DownloadRetentionType.Watchlist => DateTime.Now.AddDays(watchlistCacheDays),
             _ => DateTime.Now.AddDays(downloadDays)
         };
-        
+
         var streamUrl = BuildStreamUrl(request.VideoId, request.VideoType);
-        
+
         // Lade Metadaten vom Server
         var metadata = await FetchVideoMetadataAsync(request.VideoId, request.VideoType);
-        
+
         var downloadTask = new DownloadTask
         {
             VideoId = request.VideoId,
@@ -354,11 +354,11 @@ public class DownloadManager
             PosterImageUrl = metadata?.PosterImageUrl,
             BannerImageUrl = metadata?.BannerImageUrl
         };
-        
+
         // Zur Queue hinzufügen (nur Arbeitsspeicher)
         DownloadQueue.Instance.EnqueueDownload(downloadTask);
     }
-    
+
     private async Task<VideoMetadata?> FetchVideoMetadataAsync(long videoId, string videoType)
     {
         try
@@ -369,20 +369,20 @@ public class DownloadManager
                 System.Diagnostics.Debug.WriteLine("VideoWebPlayerClient not available");
                 return null;
             }
-            
+
             var settings = ResolveSettingsService();
             var serverAddress = settings.ServerAddress ?? string.Empty;
             if (string.IsNullOrWhiteSpace(serverAddress))
                 return null;
-            
+
             if (!serverAddress.StartsWith("http"))
             {
                 serverAddress = $"http://{serverAddress}";
             }
             serverAddress = serverAddress.TrimEnd('/');
-            
+
             var metadata = new VideoMetadata();
-            
+
             if (videoType.Equals(MediaTypes.Movie, StringComparison.OrdinalIgnoreCase))
             {
                 // Lade Movie Details
@@ -393,12 +393,12 @@ public class DownloadManager
                     {
                         metadata.Plot = movie.Plot;
                         metadata.GenreNames = movie.GenreNames;
-                        
+
                         if (movie.ReleaseDate != null)
                         {
                             metadata.ReleaseYear = movie.ReleaseDate?.Year.ToString();
                         }
-                        
+
                         // Nutze Fanart > Banner > Poster für Poster (in dieser Reihenfolge)
                         if (movie.FanartPictureId.HasValue)
                         {
@@ -430,7 +430,7 @@ public class DownloadManager
                     {
                         metadata.Plot = episode.Plot;
                         metadata.EpisodeNumber = episode.Number;
-                        
+
                         // Nutze Fanart für Episodes (nicht Poster)
                         if (episode.FanartPictureId.HasValue)
                         {
@@ -440,7 +440,7 @@ public class DownloadManager
                         {
                             metadata.BannerImageUrl = $"{serverAddress}/api/pictures/{episode.PosterPictureId}";
                         }
-                        
+
                         // Versuche Season-Information zu laden
                         if (episode.Season != null)
                         {
@@ -457,7 +457,7 @@ public class DownloadManager
                     }
                 }
             }
-            
+
             return metadata;
         }
         catch (Exception ex)
@@ -466,7 +466,7 @@ public class DownloadManager
             return null;
         }
     }
-    
+
     private class VideoMetadata
     {
         public string? Plot { get; set; }
@@ -478,7 +478,7 @@ public class DownloadManager
         public string? PosterImageUrl { get; set; }
         public string? BannerImageUrl { get; set; }
     }
-    
+
     public async Task SaveCompletedDownloadAsync(DownloadTask task, long fileSizeBytes)
     {
         await _dbLock.WaitAsync();
@@ -487,20 +487,20 @@ public class DownloadManager
             // Lade und speichere Bilder lokal
             string? localPosterPath = null;
             string? localBannerPath = null;
-            
+
             var imagesDirectory = Path.Combine(FileSystem.AppDataDirectory, "images");
             Directory.CreateDirectory(imagesDirectory);
-            
+
             if (!string.IsNullOrEmpty(task.PosterImageUrl))
             {
                 localPosterPath = await DownloadImageAsync(task.PosterImageUrl, imagesDirectory, $"poster_{task.VideoType}_{task.VideoId}");
             }
-            
+
             if (!string.IsNullOrEmpty(task.BannerImageUrl))
             {
                 localBannerPath = await DownloadImageAsync(task.BannerImageUrl, imagesDirectory, $"banner_{task.VideoType}_{task.VideoId}");
             }
-            
+
             var download = new DownloadedVideo
             {
                 VideoId = task.VideoId,
@@ -524,7 +524,7 @@ public class DownloadManager
                 LocalPosterImagePath = localPosterPath,
                 LocalBannerImagePath = localBannerPath
             };
-            
+
             await _database.InsertAsync(download);
             System.Diagnostics.Debug.WriteLine($"Saved completed download to database with metadata: {task.Title}");
 
@@ -536,7 +536,7 @@ public class DownloadManager
             _dbLock.Release();
         }
     }
-    
+
     private async Task<string?> DownloadImageAsync(string imageUrl, string directory, string baseFileName)
     {
         try
@@ -545,24 +545,24 @@ public class DownloadManager
             var token = ResolveSettingsService().GetAuthToken();
             if (!string.IsNullOrEmpty(token))
             {
-                httpClient.DefaultRequestHeaders.Authorization = 
+                httpClient.DefaultRequestHeaders.Authorization =
                     new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
             }
-            
+
             var imageBytes = await httpClient.GetByteArrayAsync(imageUrl);
-            
+
             // Bestimme Dateiendung aus URL oder Content-Type
             var extension = Path.GetExtension(imageUrl);
             if (string.IsNullOrEmpty(extension) || extension.Contains('?'))
             {
                 extension = ".jpg"; // Default
             }
-            
+
             var fileName = $"{baseFileName}{extension}";
             var localPath = Path.Combine(directory, fileName);
-            
+
             await File.WriteAllBytesAsync(localPath, imageBytes);
-            
+
             System.Diagnostics.Debug.WriteLine($"Downloaded image to: {localPath}");
             return localPath;
         }
@@ -577,11 +577,11 @@ public class DownloadManager
     {
         return App.ServiceProvider?.GetService<ISettingsService>() ?? new SettingsService();
     }
-    
+
     public async Task UpdatePlaybackPositionAsync(long videoId, string videoType, double positionSeconds, double durationSeconds)
     {
         System.Diagnostics.Debug.WriteLine($"[DownloadManager] UpdatePlaybackPositionAsync called: {videoType} {videoId} - {positionSeconds}s / {durationSeconds}s");
-        
+
         // Speichere Position lokal
         await _dbLock.WaitAsync();
         try
@@ -589,7 +589,7 @@ public class DownloadManager
             var download = await _database.Table<DownloadedVideo>()
                 .Where(d => d.VideoId == videoId && d.VideoType == videoType)
                 .FirstOrDefaultAsync();
-            
+
             if (download != null)
             {
                 download.PlaybackPositionSeconds = positionSeconds;
@@ -632,13 +632,13 @@ public class DownloadManager
             // Nicht werfen - dies ist ein non-blocking Operation
         }
     }
-    
+
     public async Task<double?> GetPlaybackPositionAsync(long videoId, string videoType)
     {
         var download = await GetDownloadAsync(videoId, videoType);
         return download?.PlaybackPositionSeconds;
     }
-    
+
     /// <summary>
     /// Deletes a download and all associated files.
     /// </summary>
@@ -710,7 +710,7 @@ public class DownloadManager
             _dbLock.Release();
         }
     }
-    
+
     public async Task CleanupExpiredDownloadsAsync()
     {
         await _dbLock.WaitAsync();
@@ -719,9 +719,9 @@ public class DownloadManager
             var expired = await _database.Table<DownloadedVideo>()
                 .Where(d => d.ExpiresAt < DateTime.Now && d.Status == DownloadStatus.Completed)
                 .ToListAsync();
-            
+
             System.Diagnostics.Debug.WriteLine($"Cleaning up {expired.Count} expired downloads");
-            
+
             foreach (var download in expired)
             {
                 try
@@ -736,19 +736,19 @@ public class DownloadManager
                     {
                         File.Delete(download.LocalFilePath);
                     }
-                    
+
                     // Lösche Poster-Bild
                     if (!string.IsNullOrEmpty(download.LocalPosterImagePath) && File.Exists(download.LocalPosterImagePath))
                     {
                         File.Delete(download.LocalPosterImagePath);
                     }
-                    
+
                     // Lösche Banner-Bild
                     if (!string.IsNullOrEmpty(download.LocalBannerImagePath) && File.Exists(download.LocalBannerImagePath))
                     {
                         File.Delete(download.LocalBannerImagePath);
                     }
-                    
+
                     await _database.DeleteAsync(download);
                     System.Diagnostics.Debug.WriteLine($"Cleaned up expired download: {title}");
 
@@ -766,7 +766,7 @@ public class DownloadManager
             _dbLock.Release();
         }
     }
-    
+
     private async Task SchedulePeriodicCleanupAsync()
     {
         while (true)

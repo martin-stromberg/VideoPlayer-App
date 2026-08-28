@@ -41,7 +41,7 @@ public sealed class MediaMetadataUpdateRequest
     public string? Plot { get; set; }
     public string[] GenreNames { get; set; } = [];
 }
-public class DtoMovie: DtoMediaEntry
+public class DtoMovie : DtoMediaEntry
 {
     public string? GenreNames { get; set; }
     public string? Plot { get; set; }
@@ -85,7 +85,7 @@ public class DtoPicture
     public string ContentType { get; set; } = string.Empty;
 }
 [AttributeUsage(AttributeTargets.Property | AttributeTargets.Field, AllowMultiple = false)]
-public class IgnoreAssignPropertyAttribute: Attribute
+public class IgnoreAssignPropertyAttribute : Attribute
 {
     // Dieses Attribut kann verwendet werden, um bestimmte Eigenschaften bei der Serialisierung zu ignorieren
 }

@@ -20,10 +20,10 @@ public class AuthorizedImageHttpClientHandler : HttpClientHandler
         CancellationToken cancellationToken)
     {
         // Füge Bearer Token zu jedem Request hinzu
-        if (!string.IsNullOrWhiteSpace(_bearerToken) && 
+        if (!string.IsNullOrWhiteSpace(_bearerToken) &&
             !request.Headers.Contains("Authorization"))
         {
-            request.Headers.Authorization = 
+            request.Headers.Authorization =
                 new AuthenticationHeaderValue("Bearer", _bearerToken);
         }
 

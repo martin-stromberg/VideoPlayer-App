@@ -7,6 +7,6 @@ namespace VideoWebPlayer.Data
         public long Id { get; set; }
         public DtoMediaEntry Entry { get; set; }
         public DateTime CreatedAt { get; set; }
-        
+
     }
 }

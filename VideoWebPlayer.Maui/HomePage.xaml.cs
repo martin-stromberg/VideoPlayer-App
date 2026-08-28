@@ -92,7 +92,7 @@ public partial class HomePage : ContentPage
             // Debug: Zeige Anzahl der Downloads in DB
             var allDownloads = await Services.DownloadManager.Instance.GetAllDownloadsAsync();
             System.Diagnostics.Debug.WriteLine($"[HomePage] Database has {allDownloads.Count} completed downloads");
-            
+
             foreach (var download in allDownloads)
             {
                 System.Diagnostics.Debug.WriteLine($"[HomePage] - {download.Title} ({download.VideoType}) - Status: {download.Status}");
@@ -101,7 +101,7 @@ public partial class HomePage : ContentPage
             // Lade Downloads immer (unabhängig vom Modus)
             // Andere Daten nur wenn Online
             await _viewModel.LoadDataAsync();
-            
+
             // Debug: Zeige Anzahl der Items im ViewModel
             System.Diagnostics.Debug.WriteLine($"[HomePage] ViewModel Downloads.Items.Count = {_viewModel.Downloads.Items.Count}");
         }
@@ -118,7 +118,7 @@ public partial class HomePage : ContentPage
         try
         {
             var success = await _viewModel.TryReconnectAsync();
-            
+
             if (success)
             {
                 await DisplayAlert("Verbindung wiederhergestellt", "Die Verbindung zum Server wurde erfolgreich wiederhergestellt.", "OK");
@@ -143,24 +143,24 @@ public partial class HomePage : ContentPage
         }
     }
 
-	private async void OnSettingsClicked(object sender, EventArgs e)
-	{
-		try
-		{
-			var settings = App.ServiceProvider?.GetService<Services.ISettingsService>();
-			var page = App.ServiceProvider?.GetService<SettingsPage>() ?? new SettingsPage(settings);
-			await Navigation.PushAsync(page);
-		}
-		catch (Exception ex)
-		{
-			System.Diagnostics.Debug.WriteLine($"[HomePage] Error opening settings: {ex.Message}");
-		}
-	}
-    
+    private async void OnSettingsClicked(object sender, EventArgs e)
+    {
+        try
+        {
+            var settings = App.ServiceProvider?.GetService<Services.ISettingsService>();
+            var page = App.ServiceProvider?.GetService<SettingsPage>() ?? new SettingsPage(settings);
+            await Navigation.PushAsync(page);
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[HomePage] Error opening settings: {ex.Message}");
+        }
+    }
+
     private async void OnContinueWatchingUpdated(ContinueWatchingUpdatedEvent e)
     {
         System.Diagnostics.Debug.WriteLine("[HomePage] Event: Continue-Watching updated - refreshing list");
-        
+
         await MainThread.InvokeOnMainThreadAsync(async () =>
         {
             try
@@ -173,16 +173,16 @@ public partial class HomePage : ContentPage
             }
         });
     }
-    
+
     private async void OnFavoritesChanged(FavoritesChangedEvent e)
     {
         System.Diagnostics.Debug.WriteLine("[HomePage] Event: Favorites changed - refreshing list");
-        
+
         await MainThread.InvokeOnMainThreadAsync(async () =>
         {
             try
             {
-				await _viewModel.RefreshFavoritesAsync();
+                await _viewModel.RefreshFavoritesAsync();
             }
             catch (Exception ex)
             {
@@ -190,11 +190,11 @@ public partial class HomePage : ContentPage
             }
         });
     }
-    
+
     private async void OnNewVideosScanned(NewVideosScannedEvent e)
     {
         System.Diagnostics.Debug.WriteLine($"[HomePage] Event: New videos scanned (Source {e.SourceId}, Count {e.Count}) - refreshing recent entries");
-        
+
         await MainThread.InvokeOnMainThreadAsync(async () =>
         {
             try
@@ -211,7 +211,7 @@ public partial class HomePage : ContentPage
     private async void OnDownloadCompleted(DownloadCompletedEvent e)
     {
         System.Diagnostics.Debug.WriteLine($"[HomePage] Event: Download completed - {e.Download.Title}");
-        
+
         await MainThread.InvokeOnMainThreadAsync(() =>
         {
             try
@@ -224,11 +224,11 @@ public partial class HomePage : ContentPage
                         ? ImageSource.FromFile(e.Download.LocalPosterImagePath)
                         : ImageSource.FromFile("dotnet_bot.png"),
                     EntryId = e.Download.VideoId,
-                    MediaType = e.Download.VideoType.Equals(Models.MediaTypes.Movie, StringComparison.OrdinalIgnoreCase) 
-                        ? Models.MediaTypes.Movie 
+                    MediaType = e.Download.VideoType.Equals(Models.MediaTypes.Movie, StringComparison.OrdinalIgnoreCase)
+                        ? Models.MediaTypes.Movie
                         : Models.MediaTypes.Episode
                 };
-                
+
                 _viewModel.Downloads.Items.Insert(0, mediaItem); // Füge am Anfang ein
                 System.Diagnostics.Debug.WriteLine($"[HomePage] Added new download to list: {e.Download.Title}");
             }
@@ -242,7 +242,7 @@ public partial class HomePage : ContentPage
     private async void OnDownloadDeleted(DownloadDeletedEvent e)
     {
         System.Diagnostics.Debug.WriteLine($"[HomePage] Event: Download deleted - {e.Title}");
-        
+
         await MainThread.InvokeOnMainThreadAsync(() =>
         {
             try

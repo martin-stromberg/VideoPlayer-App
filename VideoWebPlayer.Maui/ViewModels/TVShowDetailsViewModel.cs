@@ -18,7 +18,7 @@ public class TVShowDetailsViewModel : INotifyPropertyChanged, IMediaBannerViewMo
     private string? _plot;
     private string? _genreNames;
     private string? _releaseYear;
-    
+
     private ImageSource? _showBannerSource;
     private ImageSource? _displayBannerSource;
     private Color _displayBannerBackgroundColor = Colors.Transparent;
@@ -30,45 +30,45 @@ public class TVShowDetailsViewModel : INotifyPropertyChanged, IMediaBannerViewMo
     private DtoTVShow? _tvShow;
     private bool _isShowFavorite;
     private bool _isSelectedSeasonFavorite;
-	private bool _isSelectionFavorite;
+    private bool _isSelectionFavorite;
 
     public long TVShowId { get; }
 
-	public int SelectedSeasonIndex
-	{
-		get => _selectedSeasonIndex;
-		set
-		{
-			if (_selectedSeasonIndex != value)
-			{
-				_selectedSeasonIndex = value;
-				OnPropertyChanged();
+    public int SelectedSeasonIndex
+    {
+        get => _selectedSeasonIndex;
+        set
+        {
+            if (_selectedSeasonIndex != value)
+            {
+                _selectedSeasonIndex = value;
+                OnPropertyChanged();
 
-				UpdateSelectedSeasonFavorite();
-				UpdateSelectionFavorite();
+                UpdateSelectedSeasonFavorite();
+                UpdateSelectionFavorite();
 
-				// Wenn Staffel wechselt: Episode-Liste aktualisieren und automatisch Episode 1 auswählen
-				SelectedEpisodeIndex = -1;
-				OnPropertyChanged(nameof(Episodes));
-				if (Episodes.Count > 0)
-					SelectedEpisodeIndex = 0;
+                // Wenn Staffel wechselt: Episode-Liste aktualisieren und automatisch Episode 1 auswählen
+                SelectedEpisodeIndex = -1;
+                OnPropertyChanged(nameof(Episodes));
+                if (Episodes.Count > 0)
+                    SelectedEpisodeIndex = 0;
 
-				// Lade Staffel-Banner wenn nicht die erste Staffel ist
-				if (!_isInitialLoad && value > 0)
-				{
-					_ = LoadSeasonBannerAsync();
-				}
-				else if (value == 0)
-				{
-					// Erste Staffel: zeige Show-Banner
-					_ = MainThread.InvokeOnMainThreadAsync(() =>
-					{
-						DisplayBannerSource = _showBannerSource;
-					});
-				}
-			}
-		}
-	}
+                // Lade Staffel-Banner wenn nicht die erste Staffel ist
+                if (!_isInitialLoad && value > 0)
+                {
+                    _ = LoadSeasonBannerAsync();
+                }
+                else if (value == 0)
+                {
+                    // Erste Staffel: zeige Show-Banner
+                    _ = MainThread.InvokeOnMainThreadAsync(() =>
+                    {
+                        DisplayBannerSource = _showBannerSource;
+                    });
+                }
+            }
+        }
+    }
 
     public int SelectedEpisodeIndex
     {
@@ -80,14 +80,14 @@ public class TVShowDetailsViewModel : INotifyPropertyChanged, IMediaBannerViewMo
                 _selectedEpisodeIndex = value;
                 OnPropertyChanged();
                 OnPropertyChanged(nameof(SelectedEpisode));
-                
+
                 // Wenn Episode ausgewählt, lade Episode-Banner und -Informationen
                 if (SelectedEpisode != null && !_isInitialLoad)
                 {
                     _ = LoadEpisodeBannerAndInfoAsync(SelectedEpisode);
                 }
 
-				UpdateSelectionFavorite();
+                UpdateSelectionFavorite();
             }
         }
     }
@@ -98,7 +98,7 @@ public class TVShowDetailsViewModel : INotifyPropertyChanged, IMediaBannerViewMo
             ? Episodes[_selectedEpisodeIndex]
             : null;
     }
-    
+
     public string? SelectedEpisodeName
     {
         get => _selectedEpisodeName;
@@ -204,9 +204,9 @@ public class TVShowDetailsViewModel : INotifyPropertyChanged, IMediaBannerViewMo
     }
 
     public ObservableCollection<DtoTVShowSeason> Seasons { get; } = new();
-    
-    public DtoTVShowSeason? SelectedSeason => SelectedSeasonIndex >= 0 && SelectedSeasonIndex < Seasons.Count 
-        ? Seasons[SelectedSeasonIndex] 
+
+    public DtoTVShowSeason? SelectedSeason => SelectedSeasonIndex >= 0 && SelectedSeasonIndex < Seasons.Count
+        ? Seasons[SelectedSeasonIndex]
         : null;
 
     public bool IsShowFavorite
@@ -219,28 +219,28 @@ public class TVShowDetailsViewModel : INotifyPropertyChanged, IMediaBannerViewMo
                 _isShowFavorite = value;
                 OnPropertyChanged();
                 OnPropertyChanged(nameof(ShowFavoriteStarText));
-				UpdateSelectionFavorite();
+                UpdateSelectionFavorite();
             }
         }
     }
 
     public string ShowFavoriteStarText => IsShowFavorite ? "★" : "☆";
 
-	public bool IsSelectionFavorite
-	{
-		get => _isSelectionFavorite;
-		private set
-		{
-			if (_isSelectionFavorite != value)
-			{
-				_isSelectionFavorite = value;
-				OnPropertyChanged();
-				OnPropertyChanged(nameof(SelectionFavoriteStarText));
-			}
-		}
-	}
+    public bool IsSelectionFavorite
+    {
+        get => _isSelectionFavorite;
+        private set
+        {
+            if (_isSelectionFavorite != value)
+            {
+                _isSelectionFavorite = value;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(SelectionFavoriteStarText));
+            }
+        }
+    }
 
-	public string SelectionFavoriteStarText => IsSelectionFavorite ? "★" : "☆";
+    public string SelectionFavoriteStarText => IsSelectionFavorite ? "★" : "☆";
 
     public bool IsSelectedSeasonFavorite
     {
@@ -252,59 +252,59 @@ public class TVShowDetailsViewModel : INotifyPropertyChanged, IMediaBannerViewMo
                 _isSelectedSeasonFavorite = value;
                 OnPropertyChanged();
                 OnPropertyChanged(nameof(SelectedSeasonFavoriteStarText));
-				UpdateSelectionFavorite();
+                UpdateSelectionFavorite();
             }
         }
     }
 
     public string SelectedSeasonFavoriteStarText => IsSelectedSeasonFavorite ? "★" : "☆";
 
-	private enum FavoriteTarget
-	{
-		Episode,
-		Season,
-		Show
-	}
+    private enum FavoriteTarget
+    {
+        Episode,
+        Season,
+        Show
+    }
 
-	private FavoriteTarget GetSelectionFavoriteTarget()
-	{
-		var episode = SelectedEpisode;
-		if (episode == null)
-			return FavoriteTarget.Show;
+    private FavoriteTarget GetSelectionFavoriteTarget()
+    {
+        var episode = SelectedEpisode;
+        if (episode == null)
+            return FavoriteTarget.Show;
 
-		if (episode.EpisodeNumber == 1)
-		{
-			if (TryParseSeasonNumber(SelectedSeason?.Name) == 1)
-				return FavoriteTarget.Show;
+        if (episode.EpisodeNumber == 1)
+        {
+            if (TryParseSeasonNumber(SelectedSeason?.Name) == 1)
+                return FavoriteTarget.Show;
 
-			return FavoriteTarget.Season;
-		}
+            return FavoriteTarget.Season;
+        }
 
-		return FavoriteTarget.Episode;
-	}
+        return FavoriteTarget.Episode;
+    }
 
-	private static int? TryParseSeasonNumber(string? seasonName)
-	{
-		if (string.IsNullOrWhiteSpace(seasonName))
-			return null;
+    private static int? TryParseSeasonNumber(string? seasonName)
+    {
+        if (string.IsNullOrWhiteSpace(seasonName))
+            return null;
 
-		var match = System.Text.RegularExpressions.Regex.Match(seasonName, @"\d+");
-		return match.Success && int.TryParse(match.Value, out var n) ? n : null;
-	}
+        var match = System.Text.RegularExpressions.Regex.Match(seasonName, @"\d+");
+        return match.Success && int.TryParse(match.Value, out var n) ? n : null;
+    }
 
-	private void UpdateSelectionFavorite()
-	{
-		var target = GetSelectionFavoriteTarget();
-		IsSelectionFavorite = target switch
-		{
-			FavoriteTarget.Episode => SelectedEpisode?.IsFavorite ?? false,
-			FavoriteTarget.Season => SelectedSeason?.IsFavorite ?? false,
-			FavoriteTarget.Show => IsShowFavorite,
-			_ => false
-		};
-	}
+    private void UpdateSelectionFavorite()
+    {
+        var target = GetSelectionFavoriteTarget();
+        IsSelectionFavorite = target switch
+        {
+            FavoriteTarget.Episode => SelectedEpisode?.IsFavorite ?? false,
+            FavoriteTarget.Season => SelectedSeason?.IsFavorite ?? false,
+            FavoriteTarget.Show => IsShowFavorite,
+            _ => false
+        };
+    }
 
-    public ObservableCollection<TVShowEpisodeViewModel> Episodes => 
+    public ObservableCollection<TVShowEpisodeViewModel> Episodes =>
         SelectedSeason != null ? GetEpisodesForSeason(SelectedSeason) : new();
 
     private readonly Dictionary<long, ObservableCollection<TVShowEpisodeViewModel>> _episodeCache = new();
@@ -328,7 +328,7 @@ public class TVShowDetailsViewModel : INotifyPropertyChanged, IMediaBannerViewMo
         try
         {
             var tvShow = await _client.RequestTVShowAsync(TVShowId) as DtoTVShow;
-            
+
             if (tvShow != null)
             {
                 _tvShow = tvShow;
@@ -336,7 +336,7 @@ public class TVShowDetailsViewModel : INotifyPropertyChanged, IMediaBannerViewMo
                 Plot = tvShow.Plot;
                 GenreNames = tvShow.GenreNames;
                 IsShowFavorite = tvShow.IsFavorite;
-                
+
                 // Setze Erscheinungsjahr (PremieredAt oder ReleaseDate)
                 if (tvShow.PremieredAt.HasValue)
                 {
@@ -375,7 +375,7 @@ public class TVShowDetailsViewModel : INotifyPropertyChanged, IMediaBannerViewMo
                             _isInitialLoad = false;
                         }
                         SelectedSeasonIndex = seasonIndex >= 0 ? seasonIndex : 0;
-                        
+
                         if (!_isInitialLoad)
                         {
                             await LoadSeasonBannerAsync();
@@ -443,30 +443,30 @@ public class TVShowDetailsViewModel : INotifyPropertyChanged, IMediaBannerViewMo
         }
     }
 
-	public async Task ToggleSelectionFavoriteAsync()
-	{
-		var target = GetSelectionFavoriteTarget();
-		try
-		{
-			switch (target)
-			{
-				case FavoriteTarget.Episode:
-					if (SelectedEpisode != null)
-						await ToggleEpisodeFavoriteAsync(SelectedEpisode);
-					break;
-				case FavoriteTarget.Season:
-					await ToggleSelectedSeasonFavoriteAsync();
-					break;
-				case FavoriteTarget.Show:
-					await ToggleShowFavoriteAsync();
-					break;
-			}
-		}
-		finally
-		{
-			UpdateSelectionFavorite();
-		}
-	}
+    public async Task ToggleSelectionFavoriteAsync()
+    {
+        var target = GetSelectionFavoriteTarget();
+        try
+        {
+            switch (target)
+            {
+                case FavoriteTarget.Episode:
+                    if (SelectedEpisode != null)
+                        await ToggleEpisodeFavoriteAsync(SelectedEpisode);
+                    break;
+                case FavoriteTarget.Season:
+                    await ToggleSelectedSeasonFavoriteAsync();
+                    break;
+                case FavoriteTarget.Show:
+                    await ToggleShowFavoriteAsync();
+                    break;
+            }
+        }
+        finally
+        {
+            UpdateSelectionFavorite();
+        }
+    }
 
     public async Task ToggleSelectedSeasonFavoriteAsync()
     {
@@ -479,7 +479,7 @@ public class TVShowDetailsViewModel : INotifyPropertyChanged, IMediaBannerViewMo
             var isFav = await _client.ToggleFavorite(new DtoTVShowSeason { Id = seasonId, Name = SelectedSeason.Name });
             SelectedSeason.IsFavorite = isFav;
             IsSelectedSeasonFavorite = isFav;
-			UpdateSelectionFavorite();
+            UpdateSelectionFavorite();
         }
         catch (Exception ex)
         {
@@ -496,8 +496,8 @@ public class TVShowDetailsViewModel : INotifyPropertyChanged, IMediaBannerViewMo
         {
             var isFav = await _client.ToggleFavorite(new DtoTVShowEpisode { Id = episode.EpisodeId, Name = episode.Title ?? string.Empty });
             episode.IsFavorite = isFav;
-			if (ReferenceEquals(episode, SelectedEpisode))
-				UpdateSelectionFavorite();
+            if (ReferenceEquals(episode, SelectedEpisode))
+                UpdateSelectionFavorite();
         }
         catch (Exception ex)
         {
@@ -550,7 +550,7 @@ public class TVShowDetailsViewModel : INotifyPropertyChanged, IMediaBannerViewMo
         {
             using var stream = new MemoryStream(imageBytes);
             using var bitmap = SKBitmap.Decode(stream);
-            
+
             if (bitmap == null || bitmap.Width == 0 || bitmap.Height == 0)
                 return Colors.Transparent;
 
@@ -577,7 +577,7 @@ public class TVShowDetailsViewModel : INotifyPropertyChanged, IMediaBannerViewMo
                 byte avgR = (byte)(totalR / pixelCount);
                 byte avgG = (byte)(totalG / pixelCount);
                 byte avgB = (byte)(totalB / pixelCount);
-                
+
                 return Color.FromRgb(avgR, avgG, avgB);
             }
         }
@@ -585,7 +585,7 @@ public class TVShowDetailsViewModel : INotifyPropertyChanged, IMediaBannerViewMo
         {
             System.Diagnostics.Debug.WriteLine($"Error extracting pixel color: {ex.Message}");
         }
-        
+
         return Colors.Transparent;
     }
 
@@ -675,7 +675,7 @@ public class TVShowDetailsViewModel : INotifyPropertyChanged, IMediaBannerViewMo
             });
         }
     }
-    
+
     private async Task LoadEpisodeBannerAndInfoAsync(TVShowEpisodeViewModel episode)
     {
         try
@@ -684,11 +684,11 @@ public class TVShowDetailsViewModel : INotifyPropertyChanged, IMediaBannerViewMo
             await MainThread.InvokeOnMainThreadAsync(() =>
             {
                 Plot = episode.Plot;
-                SelectedEpisodeName = episode.EpisodeNumber > 0 
-                    ? $"E{episode.EpisodeNumber:D2}: {episode.Title}" 
+                SelectedEpisodeName = episode.EpisodeNumber > 0
+                    ? $"E{episode.EpisodeNumber:D2}: {episode.Title}"
                     : episode.Title;
             });
-            
+
             // Lade Episode Banner (wenn vorhanden, sonst Season/Show Banner)
             if (episode.PosterPictureId.HasValue && _client != null)
             {
@@ -725,7 +725,7 @@ public class TVShowDetailsViewModel : INotifyPropertyChanged, IMediaBannerViewMo
         }
 
         var episodes = new ObservableCollection<TVShowEpisodeViewModel>();
-        
+
         if (season.Episodes != null)
         {
             foreach (var episode in season.Episodes.OrderBy(e => e.Number))
@@ -783,12 +783,12 @@ public class TVShowDetailsViewModel : INotifyPropertyChanged, IMediaBannerViewMo
     }
 
     public bool ShouldShowPlayButton => true;
-    
+
     public async Task<(long VideoId, string VideoType, string Title)?> GetVideoInfoForPlaybackAsync()
     {
         // Spiele ausgewählte Episode oder erste Episode
         var episode = SelectedEpisode ?? Episodes.FirstOrDefault();
-        
+
         if (episode == null)
             return null;
 

@@ -123,12 +123,12 @@ public class HomePageViewModel : INotifyPropertyChanged
     public async Task LoadDataAsync()
     {
         System.Diagnostics.Debug.WriteLine("LoadDataAsync started");
-        
+
         // Lade Downloads immer (auch ohne Server)
         await LoadDownloadsAsync();
-        
+
         System.Diagnostics.Debug.WriteLine($"Downloads loaded. Count: {Downloads.Items.Count}");
-        
+
         if (_client == null)
         {
             System.Diagnostics.Debug.WriteLine("No client or base address - switching to offline mode");
@@ -155,14 +155,14 @@ public class HomePageViewModel : INotifyPropertyChanged
             Favorites.BeginUpdate();
             RecentEntries.BeginUpdate();
             Sources.Clear();
-            
+
             await Task.WhenAll(
                 LoadContinueWatchingAsync(),
                 LoadFavoritesAsync(),
                 LoadRecentEntriesAsync(),
                 LoadSourcesAsync()
             );
-            
+
             _isLoaded = true;
             IsOfflineMode = false;
         }
@@ -189,12 +189,12 @@ public class HomePageViewModel : INotifyPropertyChanged
         await LoadDataAsync();
     }
 
-	public async Task RefreshFavoritesAsync()
-	{
-		Favorites.BeginUpdate();
-		await LoadFavoritesAsync();
-	}
-    
+    public async Task RefreshFavoritesAsync()
+    {
+        Favorites.BeginUpdate();
+        await LoadFavoritesAsync();
+    }
+
     public void RefreshData()
     {
         _isLoaded = false;
@@ -211,12 +211,12 @@ public class HomePageViewModel : INotifyPropertyChanged
             return false;
 
         IsLoading = true;
-        
+
         try
         {
             // Versuche einen einfachen Health Check
             var connected = await _client.HealthCheckAsync();
-            
+
             if (connected)
             {
                 // Verbindung erfolgreich - lade Daten
@@ -234,7 +234,7 @@ public class HomePageViewModel : INotifyPropertyChanged
         {
             IsLoading = false;
         }
-        
+
         return false;
     }
 
@@ -502,7 +502,7 @@ public class HomePageViewModel : INotifyPropertyChanged
             Downloads.IsLoading = false;
         }
     }
-    
+
     private async Task LoadLocalImageAsync(string imagePath, MediaItemViewModel mediaItem)
     {
         try
@@ -512,12 +512,12 @@ public class HomePageViewModel : INotifyPropertyChanged
             {
                 Stream = (token) => Task.FromResult((Stream)new MemoryStream(imageBytes))
             };
-            
+
             await MainThread.InvokeOnMainThreadAsync(() =>
             {
                 mediaItem.ImageSource = imageSource;
             });
-            
+
             System.Diagnostics.Debug.WriteLine($"[LoadLocalImageAsync] Loaded image for: {mediaItem.Title}");
         }
         catch (Exception ex)
@@ -567,112 +567,112 @@ public class HomePageViewModel : INotifyPropertyChanged
         }
     }
 
-	private async Task LoadSourceIconAsync(long pictureId, MediaSourceViewModel source)
-	{
-		try
-		{
-			if (pictureId <= 0 || _client is null)
-				return;
+    private async Task LoadSourceIconAsync(long pictureId, MediaSourceViewModel source)
+    {
+        try
+        {
+            if (pictureId <= 0 || _client is null)
+                return;
 
-			var imageBytes = await _client.GetSourcePictureAsync(pictureId);
-			var imageSource = new StreamImageSource
-			{
-				Stream = (token) => Task.FromResult((Stream)new MemoryStream(imageBytes))
-			};
+            var imageBytes = await _client.GetSourcePictureAsync(pictureId);
+            var imageSource = new StreamImageSource
+            {
+                Stream = (token) => Task.FromResult((Stream)new MemoryStream(imageBytes))
+            };
 
-			await MainThread.InvokeOnMainThreadAsync(() =>
-			{
-				source.IconImageSource = imageSource;
-			});
-		}
-		catch (Exception ex)
-		{
-			System.Diagnostics.Debug.WriteLine($"Error loading source icon {pictureId}: {ex.Message}");
-		}
-	}
+            await MainThread.InvokeOnMainThreadAsync(() =>
+            {
+                source.IconImageSource = imageSource;
+            });
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"Error loading source icon {pictureId}: {ex.Message}");
+        }
+    }
 
-	/// <summary>
-	/// Bestimmt das Navigationsziel und den MediaType für einen Entry.
-	/// Für Episoden und Seasons wird zur Show navigiert, für Movies zur Collection.
-	/// </summary>
-	private (long targetId, string? mediaType, string? posterUrl, string title, long? seasonId, long? episodeId) GetEntryDetails(object entry, long? pictureId)
-	{
-		string? mediaType = null;
-		long targetId = 0;
-		string title = string.Empty;
-		long? seasonId = null;
-		long? episodeId = null;
-		var posterUrl = pictureId.HasValue ? $"api/pictures/{pictureId}" : null;
+    /// <summary>
+    /// Bestimmt das Navigationsziel und den MediaType für einen Entry.
+    /// Für Episoden und Seasons wird zur Show navigiert, für Movies zur Collection.
+    /// </summary>
+    private (long targetId, string? mediaType, string? posterUrl, string title, long? seasonId, long? episodeId) GetEntryDetails(object entry, long? pictureId)
+    {
+        string? mediaType = null;
+        long targetId = 0;
+        string title = string.Empty;
+        long? seasonId = null;
+        long? episodeId = null;
+        var posterUrl = pictureId.HasValue ? $"api/pictures/{pictureId}" : null;
 
-		if (entry is DtoTVShow show)
-		{
-			mediaType = "show";
-			targetId = show.Id;
-			title = show.Name;
-		}
-		else if (entry is DtoMovieCollection collection)
-		{
-			mediaType = "collection";
-			targetId = collection.Id;
-			title = collection.Name;
-		}
-		else if (entry is DtoTVShowSeason season)
-		{
-			if (season.Show != null)
-			{
-				mediaType = "show";
-				targetId = season.Show.Id;
-				title = season.Show.Name;
-				seasonId = season.Id;
-				// Verwende Show-Poster nur als Fallback, wenn die Staffel kein eigenes Poster hat
-				if (!posterUrl?.Contains("pictures") == true && season.Show.PosterPictureId.HasValue)
-				{
-					posterUrl = $"api/pictures/{season.Show.PosterPictureId}";
-				}
-			}
-		}
-		else if (entry is DtoTVShowEpisode episode)
-		{
-			if (episode.Season?.Show != null)
-			{
-				mediaType = "show";
-				targetId = episode.Season.Show.Id;
-				title = episode.Season.Show.Name;
-				seasonId = episode.Season.Id;
-				episodeId = episode.Id;
-				// Verwende Show-Poster nur als Fallback, wenn die Episode kein eigenes Poster hat
-				if (!posterUrl?.Contains("pictures") == true && episode.Season.Show.PosterPictureId.HasValue)
-				{
-					posterUrl = $"api/pictures/{episode.Season.Show.PosterPictureId}";
-				}
-			}
-		}
-		else if (entry is DtoMovie movie)
-		{
-			if (movie.Collection != null)
-			{
-				mediaType = "collection";
-				targetId = movie.Collection.Id;
-				title = movie.Collection.Name;
-				if (movie.Collection.PosterPictureId.HasValue)
-				{
-					posterUrl = $"api/pictures/{movie.Collection.PosterPictureId}";
-				}
-			}
-			else
-			{
-				mediaType = "movie";
-				targetId = movie.Id;
-				title = movie.Name;
-			}
-		}
+        if (entry is DtoTVShow show)
+        {
+            mediaType = "show";
+            targetId = show.Id;
+            title = show.Name;
+        }
+        else if (entry is DtoMovieCollection collection)
+        {
+            mediaType = "collection";
+            targetId = collection.Id;
+            title = collection.Name;
+        }
+        else if (entry is DtoTVShowSeason season)
+        {
+            if (season.Show != null)
+            {
+                mediaType = "show";
+                targetId = season.Show.Id;
+                title = season.Show.Name;
+                seasonId = season.Id;
+                // Verwende Show-Poster nur als Fallback, wenn die Staffel kein eigenes Poster hat
+                if (!posterUrl?.Contains("pictures") == true && season.Show.PosterPictureId.HasValue)
+                {
+                    posterUrl = $"api/pictures/{season.Show.PosterPictureId}";
+                }
+            }
+        }
+        else if (entry is DtoTVShowEpisode episode)
+        {
+            if (episode.Season?.Show != null)
+            {
+                mediaType = "show";
+                targetId = episode.Season.Show.Id;
+                title = episode.Season.Show.Name;
+                seasonId = episode.Season.Id;
+                episodeId = episode.Id;
+                // Verwende Show-Poster nur als Fallback, wenn die Episode kein eigenes Poster hat
+                if (!posterUrl?.Contains("pictures") == true && episode.Season.Show.PosterPictureId.HasValue)
+                {
+                    posterUrl = $"api/pictures/{episode.Season.Show.PosterPictureId}";
+                }
+            }
+        }
+        else if (entry is DtoMovie movie)
+        {
+            if (movie.Collection != null)
+            {
+                mediaType = "collection";
+                targetId = movie.Collection.Id;
+                title = movie.Collection.Name;
+                if (movie.Collection.PosterPictureId.HasValue)
+                {
+                    posterUrl = $"api/pictures/{movie.Collection.PosterPictureId}";
+                }
+            }
+            else
+            {
+                mediaType = "movie";
+                targetId = movie.Id;
+                title = movie.Name;
+            }
+        }
 
-		return (targetId, mediaType, posterUrl, title, seasonId, episodeId);
-	}
+        return (targetId, mediaType, posterUrl, title, seasonId, episodeId);
+    }
 
-	
 
-	private async Task LoadImageAsync(long pictureId, MediaItemViewModel mediaItem)
+
+    private async Task LoadImageAsync(long pictureId, MediaItemViewModel mediaItem)
     {
         try
         {

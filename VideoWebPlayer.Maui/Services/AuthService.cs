@@ -7,20 +7,20 @@ public class AuthService : IAuthService
 {
     private readonly ISettingsService _settings;
 
-	public AuthService() : this(new SettingsService())
-	{
-	}
+    public AuthService() : this(new SettingsService())
+    {
+    }
 
-	public AuthService(ISettingsService settings)
-	{
-		_settings = settings;
-	}
+    public AuthService(ISettingsService settings)
+    {
+        _settings = settings;
+    }
 
     public bool HasCredentials()
     {
         return _settings.HasCredentials();
     }
-    
+
     public (string username, string password) GetCredentials()
     {
         return (_settings.GetUsername(), _settings.GetPassword());
@@ -54,7 +54,7 @@ public class AuthService : IAuthService
                 var logger = new Microsoft.Extensions.Logging.Abstractions.NullLogger<VideoWebPlayerClient>();
                 client = new VideoWebPlayerClient(httpClient, logger);
             }
-            
+
             var token = await client.AuthenticateAsync(username, password);
             if (token != null && !string.IsNullOrWhiteSpace(token.token))
             {

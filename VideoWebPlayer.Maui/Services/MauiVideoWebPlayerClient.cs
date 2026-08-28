@@ -7,22 +7,22 @@ namespace VideoWebPlayer.Maui.Services;
 /// <summary>
 /// MAUI-spezifische VideoWebPlayerClient, die Token-Verwaltung mit Preferences übernimmt.
 /// </summary>
-    public class MauiVideoWebPlayerClient : VideoWebPlayerClient
-    {
-        private readonly ILogger<MauiVideoWebPlayerClient> _logger;
+public class MauiVideoWebPlayerClient : VideoWebPlayerClient
+{
+    private readonly ILogger<MauiVideoWebPlayerClient> _logger;
     private readonly IAuthService _authService;
     private readonly ISettingsService _settings;
 
-        public MauiVideoWebPlayerClient(HttpClient httpClient, ISettingsService settings, ILogger<MauiVideoWebPlayerClient> logger, IAuthService authService)
-            : base(httpClient, logger)
-        {
-            _logger = logger;
+    public MauiVideoWebPlayerClient(HttpClient httpClient, ISettingsService settings, ILogger<MauiVideoWebPlayerClient> logger, IAuthService authService)
+        : base(httpClient, logger)
+    {
+        _logger = logger;
         _authService = authService;
         _settings = settings;
 
-            // Lade den gespeicherten Token beim Starten
-            LoadAuthTokenFromSettings();
-        }
+        // Lade den gespeicherten Token beim Starten
+        LoadAuthTokenFromSettings();
+    }
 
     protected override async Task<bool> HandleUnauthorized()
     {
@@ -64,7 +64,7 @@ namespace VideoWebPlayer.Maui.Services;
             if (!string.IsNullOrWhiteSpace(token))
             {
                 SetAuthorizationToken(new AuthorizationToken { token = token });
-				// Intentionally no persistence here (SetAuthorizationToken is overridden below).
+                // Intentionally no persistence here (SetAuthorizationToken is overridden below).
                 _logger?.LogInformation("Authorization Token aus Settings geladen.");
             }
         }
@@ -73,7 +73,7 @@ namespace VideoWebPlayer.Maui.Services;
             _logger?.LogWarning(ex, "Fehler beim Laden des Authorization Token aus Settings.");
         }
     }
-    
+
     /// <summary>
     /// Lädt den Token neu aus Preferences (z.B. nach Login).
     /// </summary>
@@ -88,17 +88,17 @@ namespace VideoWebPlayer.Maui.Services;
     public override void SetAuthorizationToken(AuthorizationToken token)
     {
         base.SetAuthorizationToken(token);
-        
+
         if (token is not null)
         {
             try
             {
-				_settings.SetAuthToken(token.token);
-				_logger?.LogInformation("Authorization Token in Settings gespeichert.");
+                _settings.SetAuthToken(token.token);
+                _logger?.LogInformation("Authorization Token in Settings gespeichert.");
             }
             catch (Exception ex)
             {
-				_logger?.LogWarning(ex, "Fehler beim Speichern des Authorization Token in Settings.");
+                _logger?.LogWarning(ex, "Fehler beim Speichern des Authorization Token in Settings.");
             }
         }
     }

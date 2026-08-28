@@ -99,7 +99,7 @@ public class SignalRService : IAsyncDisposable
             {
                 _isConnected = false;
                 System.Diagnostics.Debug.WriteLine($"[SignalR] Connection closed. Error: {error?.Message}");
-                
+
                 // Versuche automatisch zu reconnecten
                 await Task.Delay(TimeSpan.FromSeconds(5));
                 try
@@ -117,7 +117,7 @@ public class SignalRService : IAsyncDisposable
 
             await _connection.StartAsync();
             _isConnected = true;
-            
+
             System.Diagnostics.Debug.WriteLine($"[SignalR] Connected successfully. ConnectionId: {_connection.ConnectionId}");
         }
         catch (Exception ex)
@@ -163,13 +163,13 @@ public class SignalRService : IAsyncDisposable
     public async ValueTask DisposeAsync()
     {
         await DisconnectAsync();
-        
+
         if (_connection != null)
         {
             await _connection.DisposeAsync();
             _connection = null;
         }
-        
+
         _connectionLock.Dispose();
     }
 }
@@ -191,7 +191,7 @@ public class NewVideosScannedEventArgs : EventArgs
 /// <summary>
 /// Event-Args für StatusChanged Event.
 /// </summary>
-public class StatusChangedEventArgs: EventArgs
+public class StatusChangedEventArgs : EventArgs
 {
     public StatusChangedEventArgs(string message)
     {

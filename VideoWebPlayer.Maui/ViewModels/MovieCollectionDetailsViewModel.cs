@@ -127,7 +127,7 @@ public class MovieCollectionDetailsViewModel : INotifyPropertyChanged, IMediaBan
                 OnPropertyChanged(nameof(SelectedMovie));
 
                 UpdateSelectedMovieFavorite();
-                
+
                 if (_selectedMovieIndex >= 0)
                 {
                     _ = LoadMovieBannerAsync();
@@ -153,9 +153,9 @@ public class MovieCollectionDetailsViewModel : INotifyPropertyChanged, IMediaBan
     public string SelectedMovieFavoriteStarText => IsSelectedMovieFavorite ? "★" : "☆";
 
     public ObservableCollection<MediaItemViewModel> Movies { get; } = new();
-    
-    public MediaItemViewModel? SelectedMovie => SelectedMovieIndex >= 0 && SelectedMovieIndex < Movies.Count 
-        ? Movies[SelectedMovieIndex] 
+
+    public MediaItemViewModel? SelectedMovie => SelectedMovieIndex >= 0 && SelectedMovieIndex < Movies.Count
+        ? Movies[SelectedMovieIndex]
         : null;
 
     public bool ShowMoviesList => Movies.Count > 1;
@@ -179,7 +179,7 @@ public class MovieCollectionDetailsViewModel : INotifyPropertyChanged, IMediaBan
         try
         {
             var collection = await _client.RequestMovieCollectionAsync(CollectionId) as DtoMovieCollection;
-            
+
             if (collection != null)
             {
                 Title = collection.Name;
@@ -210,7 +210,7 @@ public class MovieCollectionDetailsViewModel : INotifyPropertyChanged, IMediaBan
                         }
 
                         Movies.Add(movieVm);
-                        
+
                         // Cache movie details
                         _movieDetailsCache[movie.Id] = movie;
                     }
@@ -295,7 +295,7 @@ public class MovieCollectionDetailsViewModel : INotifyPropertyChanged, IMediaBan
         {
             using var stream = new MemoryStream(imageBytes);
             using var bitmap = SKBitmap.Decode(stream);
-            
+
             if (bitmap == null || bitmap.Width == 0 || bitmap.Height == 0)
                 return Colors.Transparent;
 
@@ -320,7 +320,7 @@ public class MovieCollectionDetailsViewModel : INotifyPropertyChanged, IMediaBan
                 byte avgR = (byte)(totalR / pixelCount);
                 byte avgG = (byte)(totalG / pixelCount);
                 byte avgB = (byte)(totalB / pixelCount);
-                
+
                 return Color.FromRgb(avgR, avgG, avgB);
             }
         }
@@ -328,7 +328,7 @@ public class MovieCollectionDetailsViewModel : INotifyPropertyChanged, IMediaBan
         {
             System.Diagnostics.Debug.WriteLine($"Error extracting pixel color: {ex.Message}");
         }
-        
+
         return Colors.Transparent;
     }
 
@@ -378,7 +378,7 @@ public class MovieCollectionDetailsViewModel : INotifyPropertyChanged, IMediaBan
             {
                 Plot = movie.Plot;
                 GenreNames = movie.GenreNames;
-                
+
                 // Setze Erscheinungsjahr
                 if (movie.ReleaseDate.HasValue)
                 {
@@ -396,7 +396,7 @@ public class MovieCollectionDetailsViewModel : INotifyPropertyChanged, IMediaBan
 
             // Versuche Banner, dann Fanart, dann Poster
             long? imageId = movie.BannerPictureId ?? movie.FanartPictureId ?? movie.PosterPictureId;
-            
+
             if (imageId.HasValue)
             {
                 if (_client == null)
@@ -467,24 +467,24 @@ public class MovieCollectionDetailsViewModel : INotifyPropertyChanged, IMediaBan
     }
 
     public bool ShouldShowPlayButton => SelectedMovie != null;
-    
+
     public async Task<(long VideoId, string VideoType, string Title)?> GetVideoInfoForPlaybackAsync()
     {
         var movie = SelectedMovie;
-        
+
         System.Diagnostics.Debug.WriteLine($"[MovieCollectionDetailsViewModel] GetVideoInfoForPlaybackAsync called");
         System.Diagnostics.Debug.WriteLine($"[MovieCollectionDetailsViewModel] SelectedMovie: {movie?.Title ?? "null"}");
         System.Diagnostics.Debug.WriteLine($"[MovieCollectionDetailsViewModel] SelectedMovieIndex: {SelectedMovieIndex}");
         System.Diagnostics.Debug.WriteLine($"[MovieCollectionDetailsViewModel] Movies.Count: {Movies.Count}");
-        
+
         if (movie == null)
         {
             System.Diagnostics.Debug.WriteLine($"[MovieCollectionDetailsViewModel] SelectedMovie is null!");
             return null;
         }
-        
+
         System.Diagnostics.Debug.WriteLine($"[MovieCollectionDetailsViewModel] EntryId: {movie.EntryId}");
-        
+
         if (!movie.EntryId.HasValue)
         {
             System.Diagnostics.Debug.WriteLine($"[MovieCollectionDetailsViewModel] EntryId has no value!");
@@ -493,7 +493,7 @@ public class MovieCollectionDetailsViewModel : INotifyPropertyChanged, IMediaBan
 
         var result = (movie.EntryId.Value, Models.MediaTypes.Movie, movie.Title ?? "Unknown Movie");
         System.Diagnostics.Debug.WriteLine($"[MovieCollectionDetailsViewModel] Returning: VideoId={result.Item1}, VideoType={result.Item2}, Title={result.Item3}");
-        
+
         return result;
     }
 
