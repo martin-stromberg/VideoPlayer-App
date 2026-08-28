@@ -83,14 +83,14 @@ public class SourceOverviewViewModel : INotifyPropertyChanged
             var sourceGenres = await _client.RequestSourceGenresAsync(SourceId);
 
             Genres.Clear();
-            
+
             // Füge "Alle" als ersten Eintrag hinzu (mit ID = 0)
             Genres.Add(new GenreViewModel
             {
                 Id = 0,
                 Name = "Alle"
             });
-            
+
             if (sourceGenres?.Genres != null)
             {
                 foreach (var genre in sourceGenres.Genres)
@@ -131,7 +131,7 @@ public class SourceOverviewViewModel : INotifyPropertyChanged
         try
         {
             Items.Clear();
-            
+
             // Lade direkt 3 Seiten nacheinander
             for (int i = 0; i < 3 && _hasMoreItems; i++)
             {
@@ -159,7 +159,7 @@ public class SourceOverviewViewModel : INotifyPropertyChanged
         {
             // Wenn "Alle" ausgewählt ist (ID = 0), lade ohne Genre-Filter
             var genreId = SelectedGenre.Id == 0 ? 0 : SelectedGenre.Id;
-            
+
             var items = await _client.RequestSourceItems(SourceId, _currentPage, PageSize, "", genreId);
 
             if (items == null || items.Count == 0)
@@ -212,7 +212,7 @@ public class SourceOverviewViewModel : INotifyPropertyChanged
         {
             using var stream = new MemoryStream(imageBytes);
             using var bitmap = SKBitmap.Decode(stream);
-            
+
             if (bitmap == null || bitmap.Width == 0 || bitmap.Height == 0)
                 return Colors.Transparent;
 
@@ -237,7 +237,7 @@ public class SourceOverviewViewModel : INotifyPropertyChanged
                 byte avgR = (byte)(totalR / pixelCount);
                 byte avgG = (byte)(totalG / pixelCount);
                 byte avgB = (byte)(totalB / pixelCount);
-                
+
                 return Color.FromRgb(avgR, avgG, avgB);
             }
         }
@@ -245,7 +245,7 @@ public class SourceOverviewViewModel : INotifyPropertyChanged
         {
             System.Diagnostics.Debug.WriteLine($"Error extracting pixel color: {ex.Message}");
         }
-        
+
         return Colors.Transparent;
     }
 

@@ -13,7 +13,7 @@ public partial class MovieCollectionDetailsPage : ContentPage
         InitializeComponent();
         _viewModel = new MovieCollectionDetailsViewModel(collectionId);
         BindingContext = _viewModel;
-        
+
         // Registriere Download-Completed Event
         DownloadQueue.Instance.DownloadCompleted += OnDownloadCompleted;
     }
@@ -38,16 +38,16 @@ public partial class MovieCollectionDetailsPage : ContentPage
         DownloadQueue.Instance.DownloadCompleted -= OnDownloadCompleted;
     }
 
-	private async void OnBackClicked(object? sender, EventArgs e)
-	{
-		if (Navigation.NavigationStack.Count > 1)
-			await Navigation.PopAsync();
-	}
+    private async void OnBackClicked(object? sender, EventArgs e)
+    {
+        if (Navigation.NavigationStack.Count > 1)
+            await Navigation.PopAsync();
+    }
 
-	private async void OnToggleMovieFavoriteClicked(object? sender, EventArgs e)
-	{
-		await _viewModel.ToggleSelectedMovieFavoriteAsync();
-	}
+    private async void OnToggleMovieFavoriteClicked(object? sender, EventArgs e)
+    {
+        await _viewModel.ToggleSelectedMovieFavoriteAsync();
+    }
 
     private void OnMovieSelected(object? sender, SelectionChangedEventArgs e)
     {
@@ -86,8 +86,8 @@ public partial class MovieCollectionDetailsPage : ContentPage
 
             await DownloadManager.Instance.QueueDownloadAsync(videoRequest, DownloadRetentionType.Cache);
 
-            await DisplayAlert("Download gestartet", 
-                $"'{movie.Title}' wird heruntergeladen und 7 Tage lang gespeichert.", 
+            await DisplayAlert("Download gestartet",
+                $"'{movie.Title}' wird heruntergeladen und 7 Tage lang gespeichert.",
                 "OK");
         }
         catch (Exception ex)

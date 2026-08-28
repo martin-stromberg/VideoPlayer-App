@@ -138,12 +138,12 @@ public class MediaItemViewModel : INotifyPropertyChanged
 
     private async Task OnDeleteDownloadAsync()
     {
-		// Zeige Bestätigungsdialog
-		var result = await VideoWebPlayer.Maui.App.SafeDisplayAlertAsync(
-			"Download löschen?",
-			$"'{Title}' und die lokalen Dateien werden gelöscht.",
-			"Löschen",
-			"Abbrechen");
+        // Zeige Bestätigungsdialog
+        var result = await VideoWebPlayer.Maui.App.SafeDisplayAlertAsync(
+            "Download löschen?",
+            $"'{Title}' und die lokalen Dateien werden gelöscht.",
+            "Löschen",
+            "Abbrechen");
 
         if (result)
         {
@@ -158,10 +158,10 @@ public class MediaItemViewModel : INotifyPropertyChanged
             }
             catch (Exception ex)
             {
-				await VideoWebPlayer.Maui.App.SafeDisplayAlertAsync(
-					"Fehler",
-					$"Download konnte nicht gelöscht werden: {ex.Message}",
-					"OK");
+                await VideoWebPlayer.Maui.App.SafeDisplayAlertAsync(
+                    "Fehler",
+                    $"Download konnte nicht gelöscht werden: {ex.Message}",
+                    "OK");
             }
         }
     }

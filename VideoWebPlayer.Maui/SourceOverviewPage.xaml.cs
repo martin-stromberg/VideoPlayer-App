@@ -35,7 +35,7 @@ public partial class SourceOverviewPage : ContentPage
     protected override void OnSizeAllocated(double width, double height)
     {
         base.OnSizeAllocated(width, height);
-        
+
         // Span wird bei Größenänderung angepasst (z.B. Maximieren, Rotation)
         CalculateAndSetSpan();
     }
@@ -43,11 +43,11 @@ public partial class SourceOverviewPage : ContentPage
     private void CalculateAndSetSpan()
     {
         var availableWidth = Width - 200 - 20;
-        
+
         if (availableWidth > 0 && ItemsCollectionView?.ItemsLayout is GridItemsLayout gridLayout)
         {
             var columns = Math.Max(2, (int)(availableWidth / (ItemWidth + 15)));
-            
+
             if (columns != _currentSpan)
             {
                 gridLayout.Span = columns;
@@ -84,7 +84,7 @@ public partial class SourceOverviewPage : ContentPage
             return;
 
         _isLoadingInProgress = true;
-        
+
         try
         {
             // Lade 3 Seiten hintereinander ohne zu prüfen
@@ -92,7 +92,7 @@ public partial class SourceOverviewPage : ContentPage
             for (int i = 0; i < 3; i++)
             {
                 await _viewModel.LoadMoreItemsAsync();
-                
+
                 // Sehr kurze Pause zwischen den Loads
                 await Task.Delay(100);
             }
@@ -101,7 +101,7 @@ public partial class SourceOverviewPage : ContentPage
         {
             // Kürzere Verzögerung vor erneutem Triggern
             await Task.Delay(200);
-            _isLoadingInProgress = false;            
+            _isLoadingInProgress = false;
         }
     }
 

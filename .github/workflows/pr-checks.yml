@@ -1,0 +1,51 @@
+name: PR Checks
+
+on:
+  pull_request:
+    branches: [main, staging]
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Install .NET MAUI workload
+        run: dotnet workload install maui
+
+      - name: Restore
+        run: dotnet restore
+
+      - name: Build Client
+        run: dotnet build VideoWebPlayer.Client/VideoWebPlayer.Client.csproj --no-restore --configuration Release
+
+      - name: Build Tests
+        run: dotnet build VideoWebPlayer.Maui.Tests/VideoWebPlayer.Maui.Tests.csproj --no-restore --configuration Release
+
+      - name: Build MAUI Android
+        run: dotnet build VideoWebPlayer.Maui/VideoWebPlayer.Maui.csproj --no-restore --configuration Release --framework net10.0-android
+
+      - name: Build MAUI Windows
+        run: dotnet build VideoWebPlayer.Maui/VideoWebPlayer.Maui.csproj --configuration Release --framework net10.0-windows10.0.19041.0
+
+      - name: Test
+        run: dotnet test VideoWebPlayer.Maui.Tests/VideoWebPlayer.Maui.Tests.csproj --no-build --configuration Release
+
+      - name: Lint
+        run: dotnet format whitespace --verify-no-changes --no-restore
+
+      - name: Validate source branch for main
+        if: github.base_ref == 'main' && github.head_ref != 'staging'
+        run: |
+          Write-Error 'Pull requests to main must originate from the staging branch.'
+          exit 1
+        shell: pwsh

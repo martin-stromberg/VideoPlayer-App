@@ -106,7 +106,7 @@ public partial class NotificationTicker : ContentView
 
         // Nur bei Ganzzahl-Änderung
         var wholePercent = (int)Math.Floor(e.ProgressPercent);
-        
+
         if (wholePercent != _lastReportedPercent)
         {
             _lastReportedPercent = wholePercent;
@@ -125,7 +125,7 @@ public partial class NotificationTicker : ContentView
             return $"{(double)bytes / GB:F1} GB";
         if (bytes >= MB)
             return $"{(double)bytes / MB:F1} MB";
-        
+
         return $"{bytes / 1024} KB";
     }
 

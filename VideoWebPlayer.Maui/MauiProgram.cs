@@ -22,8 +22,8 @@ namespace VideoWebPlayer.Maui
             builder.Services.AddHttpClient<MauiVideoWebPlayerClient>((sp, client) =>
             {
                 // Versuche die BaseAddress aus SettingsService (profil-/umgebungsabhängig) zu laden
-				var settings = sp.GetRequiredService<Services.ISettingsService>();
-				var serverAddress = settings.ServerAddress?.ToLower() ?? string.Empty;
+                var settings = sp.GetRequiredService<Services.ISettingsService>();
+                var serverAddress = settings.ServerAddress?.ToLower() ?? string.Empty;
                 if (!string.IsNullOrWhiteSpace(serverAddress))
                 {
                     // Stelle sicher, dass die URL mit http:// oder https:// beginnt
@@ -31,10 +31,10 @@ namespace VideoWebPlayer.Maui
                     {
                         serverAddress = $"http://{serverAddress}";
                     }
-                    
+
                     client.BaseAddress = new Uri(serverAddress);
                 }
-                
+
                 MauiClientConfiguration.ApplyClientGateHeader(client);
             });
 
@@ -46,8 +46,8 @@ namespace VideoWebPlayer.Maui
             builder.Services.AddSingleton<Services.IConnectionService, Services.ConnectionService>();
             builder.Services.AddSingleton<Services.IAuthService, Services.AuthService>();
             builder.Services.AddSingleton<Services.SignalRService>();
-			builder.Services.AddSingleton<Services.WatchlistDownloadCoordinatorService>();
-            
+            builder.Services.AddSingleton<Services.WatchlistDownloadCoordinatorService>();
+
             // Register Notification Event Service
             builder.Services.AddSingleton<NotificationEventService>(sp =>
             {
@@ -71,7 +71,7 @@ namespace VideoWebPlayer.Maui
             });
 
 #if DEBUG
-    		builder.Logging.AddDebug();
+            builder.Logging.AddDebug();
 #endif
 
             var mauiApp = builder.Build();
