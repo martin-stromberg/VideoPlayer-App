@@ -27,6 +27,14 @@ dotnet restore VideoPlayer.App.sln
 dotnet test VideoWebPlayer.Maui.Tests/VideoWebPlayer.Maui.Tests.csproj
 ```
 
+## Branching und CI/CD
+
+- `staging` ist der Integrationsbranch. Pull Requests gegen `staging` müssen Tests und Linter bestehen.
+- `main` darf ausschließlich von `staging` über Pull Requests aktualisiert werden.
+- Nach einem Merge auf `staging` entsteht ein Draft-PR gegen `main` und ein Prerelease mit RC-Version.
+- Nach einem Merge auf `main` entsteht ein Semantic-Release sowie ein Back-Merge-PR auf `staging`.
+- Details befinden sich in `docs/help/staging-branch.md`.
+
 Windows:
 
 ```powershell
