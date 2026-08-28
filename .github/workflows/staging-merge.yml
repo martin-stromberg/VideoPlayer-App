@@ -64,10 +64,10 @@ jobs:
         run: pwsh .github/scripts/Set-Version.ps1 -Version '${{ needs.release.outputs.tag }}'
 
       - name: Publish Android
-        run: dotnet publish VideoWebPlayer.Maui/VideoWebPlayer.Maui.csproj --no-restore --configuration Release --framework net10.0-android
+        run: dotnet publish VideoWebPlayer.Maui/VideoWebPlayer.Maui.csproj --configuration Release --framework net10.0-android
 
       - name: Publish Windows
-        run: dotnet publish VideoWebPlayer.Maui/VideoWebPlayer.Maui.csproj --no-restore --configuration Release --framework net10.0-windows10.0.19041.0
+        run: dotnet publish VideoWebPlayer.Maui/VideoWebPlayer.Maui.csproj --configuration Release --framework net10.0-windows10.0.19041.0 --runtime win-x64
 
       - name: Upload Android artifact
         env:
@@ -106,7 +106,7 @@ jobs:
         run: pwsh .github/scripts/Set-Version.ps1 -Version '${{ needs.release.outputs.tag }}'
 
       - name: Publish iOS
-        run: dotnet publish VideoWebPlayer.Maui/VideoWebPlayer.Maui.csproj --no-restore --configuration Release --framework net10.0-ios
+        run: dotnet publish VideoWebPlayer.Maui/VideoWebPlayer.Maui.csproj --configuration Release --framework net10.0-ios --runtime ios-arm64
 
       - name: Upload iOS artifact
         env:
