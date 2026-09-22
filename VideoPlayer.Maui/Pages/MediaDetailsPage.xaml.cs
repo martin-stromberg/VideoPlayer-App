@@ -125,13 +125,17 @@ public partial class MediaDetailsPage : ContentPage
         HeaderImage.PictureId = details.PosterPictureId ?? details.BannerPictureId;
 
         FavoriteButton.Text = details.FavoriteStarText;
-        FavoriteButton.IsEnabled = !state.IsFavoriteUpdating;
+        // Die Favoriten-Umschaltung braucht den Server — im Offline-
+        // Snapshot wird der Stern deaktiviert statt zu fehlschlagen.
+        FavoriteButton.IsEnabled = !state.IsFavoriteUpdating && !details.IsOfflineSnapshot;
 
         // „Abspielen" und „Herunterladen" nur für direkt abspielbare
         // Medientypen (Film, Episode) — Serien/Staffeln/Kollektionen
-        // nutzen ihre Episoden- bzw. Film-Einträge.
-        PlayButton.IsVisible = details.IsPlayable;
-        DownloadButton.IsVisible = details.IsPlayable;
+        // nutzen ihre Episoden- bzw. Film-Einträge. Offline ist
+        // „Abspielen" nur bei vorhandener lokaler Datei verfügbar und
+        // „Herunterladen" gar nicht.
+        PlayButton.IsVisible = details.IsPlayable && (!details.IsOfflineSnapshot || details.HasLocalFile);
+        DownloadButton.IsVisible = details.IsPlayable && !details.IsOfflineSnapshot;
 
         // Hinweis der letzten Download-Anforderung dieser Identität.
         DownloadNoticeLabel.IsVisible = isRequested && state.DownloadNotice is not null;
@@ -193,8 +197,9 @@ public partial class MediaDetailsPage : ContentPage
         {
             collectionView.SelectedItem = null;
         }
-        if (episode is null)
+        if (episode is null || episode.IsPlaceholder)
         {
+            // Platzhalter fehlender Offline-Episoden sind nicht auswählbar.
             return;
         }
 
@@ -257,7 +262,7 @@ public partial class MediaDetailsPage : ContentPage
 
     private void OnEpisodePlayClicked(object? sender, EventArgs e)
     {
-        if ((sender as Element)?.BindingContext is not EpisodeItem episode)
+        if ((sender as Element)?.BindingContext is not EpisodeItem episode || episode.IsPlaceholder)
         {
             return;
         }
@@ -278,26 +283,68 @@ public partial class MediaDetailsPage : ContentPage
         }
 
         // Bei einer navigierten Episode ist der Episodentitel
-        // aussagekräftiger als der Serienname des Kopfbereichs.
-        _ = mvuHost.DispatchAsync(new DownloadRequestedMessage(
+        // aussagekräftiger als der Serienname des Kopfbereichs; der
+        // Serienkontext geht ins Download-Manifest (Offline-Platzhalter).
+        var message = new DownloadRequestedMessage(
             details.MediaType, details.MediaId,
-            details.HighlightedEpisodeTitle ?? details.Title));
+            details.HighlightedEpisodeTitle ?? details.Title);
+        if (MediaTypeNames.Normalize(details.MediaType) == "tvshowepisode")
+        {
+            var (seasonNumber, episodeNumber) = FindEpisodeNumbers(details, details.MediaId);
+            message = message with
+            {
+                ShowId = details.ShowId,
+                ShowTitle = details.Title,
+                SeasonNumber = seasonNumber,
+                EpisodeNumber = episodeNumber
+            };
+        }
+
+        _ = mvuHost.DispatchAsync(message);
     }
 
     private void OnEpisodeDownloadClicked(object? sender, EventArgs e)
     {
-        if ((sender as Element)?.BindingContext is not EpisodeItem episode)
+        if ((sender as Element)?.BindingContext is not EpisodeItem episode || episode.IsPlaceholder)
         {
             return;
         }
 
         // „Herunterladen" direkt aus der Episodenliste — Titel mit
-        // Seriennamen für die Downloads-Liste.
+        // Seriennamen für die Downloads-Liste; Serienkontext für das
+        // Manifest (Offline-Platzhalter fehlender Folge-Episoden).
         var details = mvuHost.Model.MediaDetails.Details;
         var title = details is null || string.IsNullOrWhiteSpace(details.Title)
             ? episode.Title
             : $"{details.Title} – {episode.Title}";
         _ = mvuHost.DispatchAsync(new DownloadRequestedMessage(
-            "tvshowepisode", episode.Id, title));
+            "tvshowepisode", episode.Id, title)
+        {
+            ShowId = details?.ShowId,
+            ShowTitle = details?.Title,
+            SeasonNumber = details?.SelectedSeason?.Number,
+            EpisodeNumber = episode.Number
+        });
+    }
+
+    /// <summary>
+    /// Sucht Staffel- und Episodennummer einer Episode im geladenen
+    /// Serienkontext der Detailansicht.
+    /// </summary>
+    /// <param name="details">Das geladene Detailmodell.</param>
+    /// <param name="episodeId">Id der gesuchten Episode.</param>
+    /// <returns>Tupel aus Staffel- und Episodennummer; beide Elemente <c>null</c>, wenn die Episode nicht gefunden wurde.</returns>
+    private static (int?, int?) FindEpisodeNumbers(MediaDetailsView details, long episodeId)
+    {
+        foreach (var season in details.Seasons)
+        {
+            var episode = season.Episodes.FirstOrDefault(e => e.Id == episodeId);
+            if (episode is not null)
+            {
+                return (season.Number, episode.Number);
+            }
+        }
+
+        return (null, null);
     }
 }

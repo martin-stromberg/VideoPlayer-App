@@ -221,8 +221,13 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
         string? error = null;
         try
         {
+            // Im Offline-Zustand werden nur lokale Dateien aufgelöst —
+            // eine unerreichbare Stream-URL würde erst im Player
+            // fehlschlagen.
+            var allowServerStream = !services.GetRequiredService<MvuHost>().Model.IsOffline;
             source = await services.GetRequiredService<PlaybackSourceService>()
-                .ResolveAsync(resolve.MediaType, resolve.MediaId, cancellationToken);
+                .ResolveAsync(resolve.MediaType, resolve.MediaId, cancellationToken,
+                    allowServerStream: allowServerStream);
             if (source is null)
             {
                 error = AppUpdate.PlaybackUnavailableError;
@@ -349,7 +354,12 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
         HomeLists lists;
         try
         {
-            lists = await services.GetRequiredService<HomeListService>().LoadHomeListsAsync();
+            // Offline bildet „Weiterschauen" aus den lokalen Downloads
+            // (mit Platzhaltern fehlender Folge-Episoden); online kommt
+            // die Liste wie bisher aus dem synchronisierten Cache-Stand.
+            lists = services.GetRequiredService<MvuHost>().Model.IsOffline
+                ? await services.GetRequiredService<OfflineContinueWatchingService>().LoadHomeListsAsync()
+                : await services.GetRequiredService<HomeListService>().LoadHomeListsAsync();
         }
         catch (Exception ex)
         {
@@ -627,8 +637,11 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
         DownloadEnqueueResult result;
         try
         {
+            var seriesContext = enqueue.ShowId is null && enqueue.SeasonNumber is null && enqueue.EpisodeNumber is null
+                ? null
+                : new DownloadSeriesContext(enqueue.ShowId, enqueue.ShowTitle, enqueue.SeasonNumber, enqueue.EpisodeNumber);
             result = await downloads.EnqueueAsync(
-                enqueue.MediaType, enqueue.MediaId, enqueue.Title, enqueue.Settings, cancellationToken);
+                enqueue.MediaType, enqueue.MediaId, enqueue.Title, enqueue.Settings, seriesContext, cancellationToken);
         }
         catch (Exception ex)
         {
@@ -791,18 +804,45 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
     private async Task InitializeStorageAsync()
     {
         // Fehler der Ablage-Initialisierung dürfen den Start nicht blockieren —
-        // die App läuft mit Standardwerten weiter.
+        // die App läuft mit Standardwerten weiter. Beschädigte Datenbanken
+        // werden neu angelegt (alte Datei als *.corrupt-* beiseitegelegt)
+        // und der Nutzer darüber informiert.
+        var recovered = false;
+        var failed = false;
         try
         {
             // Die Auflösung des Layouts legt die Verzeichnisse an und wendet den
             // plattformseitigen Backup-Ausschluss an (AppStorageLayoutProvider).
             _ = services.GetRequiredService<AppStorageLayout>();
-            await services.GetRequiredService<BackupDatabase>().InitializeAsync();
-            await services.GetRequiredService<CacheDatabase>().InitializeAsync();
+            recovered |= await services.GetRequiredService<BackupDatabase>().InitializeWithRecoveryAsync();
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"[ShellAppEffectHandler] Ablage-Initialisierung fehlgeschlagen: {ex.Message}");
+            failed = true;
+            System.Diagnostics.Debug.WriteLine($"[ShellAppEffectHandler] Backup-Ablage-Initialisierung fehlgeschlagen: {ex.Message}");
+        }
+
+        try
+        {
+            recovered |= await services.GetRequiredService<CacheDatabase>().InitializeWithRecoveryAsync();
+        }
+        catch (Exception ex)
+        {
+            failed = true;
+            System.Diagnostics.Debug.WriteLine($"[ShellAppEffectHandler] Cache-Ablage-Initialisierung fehlgeschlagen: {ex.Message}");
+        }
+
+        if (recovered)
+        {
+            await DispatchMessageAsync(new StorageRecoveredMessage(
+                "Die lokalen Daten waren beschädigt und wurden neu initialisiert. " +
+                "Zwischengespeicherte Inhalte werden neu synchronisiert."));
+        }
+        else if (failed)
+        {
+            await DispatchMessageAsync(new StorageRecoveredMessage(
+                "Ein Teil der lokalen Daten konnte nicht gelesen werden. " +
+                "Die App läuft mit eingeschränkten lokalen Daten weiter."));
         }
     }
 

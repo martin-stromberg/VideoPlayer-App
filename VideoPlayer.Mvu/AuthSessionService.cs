@@ -65,8 +65,11 @@ public sealed class AuthSessionService
 
     /// <summary>
     /// Automatische Anmeldung beim Start bzw. nach einem Serverwechsel:
-    /// nutzt die gespeicherten Zugangsdaten; <see cref="AuthAttemptStatus.MissingCredentials"/>,
-    /// wenn keine vorhanden sind (z. B. nach einer Backup-Wiederherstellung).
+    /// nutzt zuerst ein noch gültiges gespeichertes Token (direkter
+    /// Einstieg ohne Anmeldemaske), sonst die gespeicherten Zugangsdaten;
+    /// <see cref="AuthAttemptStatus.MissingCredentials"/>, wenn beides
+    /// fehlt (z. B. nach einer Backup-Wiederherstellung — Geheimnisse
+    /// gelangen nicht ins Cloud-Backup).
     /// Der gelieferte <see cref="AuthAttempt.Username"/> ist der gespeicherte,
     /// nicht geheime Benutzername (Vorbefüllung der Anmeldemaske).
     /// </summary>
@@ -78,6 +81,20 @@ public sealed class AuthSessionService
         ArgumentNullException.ThrowIfNull(serverAddress);
 
         var username = secrets.GetUsername();
+
+        // Direkter Einstieg: ein noch gültiges Token erspart die
+        // Anmeldemaske; ein abgelaufenes Token fällt auf die
+        // Zugangsdaten zurück.
+        var storedToken = await secrets.GetAuthTokenAsync();
+        if (!string.IsNullOrWhiteSpace(storedToken))
+        {
+            var tokenAttempt = await TryStoredTokenAsync(serverAddress, storedToken, cancellationToken);
+            if (tokenAttempt is not null)
+            {
+                return tokenAttempt with { Username = EmptyToNull(username) };
+            }
+        }
+
         if (!await secrets.HasCredentialsAsync())
         {
             return new AuthAttempt(AuthAttemptStatus.MissingCredentials, EmptyToNull(username));
@@ -132,6 +149,49 @@ public sealed class AuthSessionService
             // nicht — der Client ist bereits freigegeben; Reste werden
             // bei der nächsten Anmeldung überschrieben.
             System.Diagnostics.Debug.WriteLine($"[AuthSessionService] Zugangsdaten entfernen fehlgeschlagen: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Direkter Einstieg über ein gespeichertes Anmelde-Token: der Token
+    /// wird mit einer leichtgewichtigen authentifizierten Anfrage
+    /// (<c>api/favorites</c>) validiert. Ein abgelaufenes Token kann die
+    /// verdrahtete stille Neuanmeldung dabei direkt erneuern.
+    /// </summary>
+    /// <param name="serverAddress">Adresse des Servers.</param>
+    /// <param name="token">Das gespeicherte Anmelde-Token.</param>
+    /// <param name="cancellationToken">Bricht die Validierung ab.</param>
+    /// <returns>
+    /// Das Ergebnis des Versuchs; <c>null</c>, wenn der Token abgelehnt
+    /// wurde und der Zugangsdaten-Pfad greifen soll.
+    /// </returns>
+    private async Task<AuthAttempt?> TryStoredTokenAsync(
+        Uri serverAddress,
+        string token,
+        CancellationToken cancellationToken)
+    {
+        var client = CreateClient(serverAddress);
+        client.SetAccessToken(new AuthToken { Token = token });
+        try
+        {
+            await client.GetFavoritesAsync(cancellationToken);
+            Client = client;
+            ClientBaseAddress = serverAddress.ToString();
+            return new AuthAttempt(AuthAttemptStatus.Succeeded);
+        }
+        catch (ApiException ex) when (ex.StatusCode is HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden)
+        {
+            // Token endgültig abgelehnt → verwerfen und auf die
+            // Zugangsdaten zurückfallen.
+            await secrets.ClearAuthTokenAsync();
+            return null;
+        }
+        catch (Exception ex) when (ex is ApiException or HttpRequestException or TaskCanceledException)
+        {
+            // Transport-/Serverfehler → der Aufrufer erhält
+            // „nicht erreichbar" und weicht auf den Offline-Pfad aus.
+            System.Diagnostics.Debug.WriteLine($"[AuthSessionService] Token-Validierung fehlgeschlagen: {ex.Message}");
+            return new AuthAttempt(AuthAttemptStatus.ServerUnreachable);
         }
     }
 

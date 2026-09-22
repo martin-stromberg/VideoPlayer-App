@@ -1,3 +1,4 @@
+#pragma warning disable xUnit1051 // Kurzlebige Unit-Tests: TestContext-CancellationToken nicht erforderlich
 using VideoPlayer.Storage;
 using VideoPlayer.Storage.Entities;
 
@@ -200,6 +201,104 @@ public class LocalDatabaseTests : IDisposable
 
         // Idempotent: ein zweites Initialize läuft fehlerfrei.
         await db.InitializeAsync();
+    }
+
+    /// <summary>Prüft CacheDatabase: migriert den Serienkontext auf einer vorhandenen Manifest-Tabelle.</summary>
+    [Fact]
+    public async Task CacheDatabase_MigratesSeriesContextOntoExistingManifest()
+    {
+        // Bestehende Installation (Schritt-11-Schema): Manifest ohne die
+        // Serienkontext-Spalten anlegen und eine Zeile befüllen.
+        var layout = CreateLayout();
+        SqliteBootstrap.EnsureInitialized();
+        var legacy = new SQLite.SQLiteAsyncConnection(layout.CacheDatabasePath);
+        await legacy.ExecuteAsync(
+            "CREATE TABLE download_manifest (" +
+            "Id integer primary key autoincrement, " +
+            "VideoId integer not null, " +
+            "VideoType varchar not null, " +
+            "FilePath varchar not null, " +
+            "SizeBytes bigint not null, " +
+            "Title varchar not null, " +
+            "DownloadedBytes bigint not null, " +
+            "TotalBytes bigint not null, " +
+            "Error varchar null, " +
+            "State varchar not null, " +
+            "UpdatedAtUtc datetime not null)");
+        await legacy.ExecuteAsync(
+            "INSERT INTO download_manifest (VideoId, VideoType, FilePath, SizeBytes, Title, " +
+            "DownloadedBytes, TotalBytes, State, UpdatedAtUtc) " +
+            "VALUES (31, 'tvshowepisode', 'videos/31.mp4', 100, 'Ep', 100, 100, 'completed', '2026-01-01 00:00:00')");
+        SQLite.SQLiteAsyncConnection.ResetPool();
+
+        var db = new CacheDatabase(layout);
+        await db.InitializeAsync();
+
+        var entry = Assert.Single(await db.Connection.Table<DownloadManifestEntry>().ToListAsync());
+        Assert.Equal(31, entry.VideoId);
+        // Neue Spalten vorhanden und beschreibbar.
+        entry.ShowId = 11;
+        entry.SeasonNumber = 1;
+        entry.EpisodeNumber = 2;
+        entry.ShowTitle = "Serie";
+        await db.Connection.UpdateAsync(entry);
+        var reloaded = await db.Connection.Table<DownloadManifestEntry>().FirstAsync();
+        Assert.Equal(11, reloaded.ShowId);
+        Assert.Equal(2, reloaded.EpisodeNumber);
+    }
+
+    /// <summary>Prüft BackupDatabase: eine beschädigte Datei wird beiseitegelegt und neu initialisiert.</summary>
+    [Fact]
+    public async Task BackupDatabase_RecoversCorruptFile()
+    {
+        var layout = CreateLayout();
+        await File.WriteAllBytesAsync(layout.DataDatabasePath, [1, 2, 3, 4, 5]); // keine SQLite-Datei
+
+        var db = new BackupDatabase(layout);
+        var recovered = await db.InitializeWithRecoveryAsync();
+
+        Assert.True(recovered);
+        // Die beschädigte Datei liegt als *.corrupt-* beiseite; die neue
+        // Datenbank ist nutzbar.
+        Assert.Single(Directory.GetFiles(Path.GetDirectoryName(layout.DataDatabasePath)!, "*.corrupt-*"));
+        Assert.Empty(await db.Connection.Table<KnownServerEntry>().ToListAsync());
+    }
+
+    /// <summary>Prüft CacheDatabase: eine beschädigte Datei wird beiseitegelegt und neu initialisiert.</summary>
+    [Fact]
+    public async Task CacheDatabase_RecoversCorruptFile()
+    {
+        var layout = CreateLayout();
+        await File.WriteAllTextAsync(layout.CacheDatabasePath, "definitiv-keine-datenbank");
+
+        var db = new CacheDatabase(layout);
+        var recovered = await db.InitializeWithRecoveryAsync();
+
+        Assert.True(recovered);
+        Assert.Single(Directory.GetFiles(Path.GetDirectoryName(layout.CacheDatabasePath)!, "*.corrupt-*"));
+        Assert.Empty(await db.Connection.Table<DownloadManifestEntry>().ToListAsync());
+    }
+
+    /// <summary>Prüft Databases: eine intakte Datei löst keine Wiederherstellung aus.</summary>
+    [Fact]
+    public async Task Databases_IntactFile_NoRecovery()
+    {
+        var layout = CreateLayout();
+        var db = new CacheDatabase(layout);
+        await db.InitializeAsync();
+        await db.Connection.InsertAsync(new CachedListEntry
+        {
+            Key = "home:recentlyAdded",
+            Json = "[]",
+            UpdatedAtUtc = DateTime.UtcNow
+        });
+        SQLite.SQLiteAsyncConnection.ResetPool();
+
+        var second = new CacheDatabase(layout);
+        var recovered = await second.InitializeWithRecoveryAsync();
+
+        Assert.False(recovered);
+        Assert.Single(await second.Connection.Table<CachedListEntry>().ToListAsync());
     }
 
     /// <summary>Prüft Databases: landen in den klassifizierten Verzeichnissen.</summary>

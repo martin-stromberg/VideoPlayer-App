@@ -206,6 +206,51 @@ public class PlaybackSourceServiceTests : IDisposable
         Assert.Equal(PlaybackSourceKind.ServerStream, source.Kind);
     }
 
+    /// <summary>PrÃ¼ft ResolveAsync: im Offline-Modus (allowServerStream=false) wird die lokale Datei ohne Server-Aufruf geliefert.</summary>
+    [Fact]
+    public async Task ResolveAsync_OfflineMode_ReturnsLocalFileWithoutServerCall()
+    {
+        // Angemeldeter Client vorhanden — der Offline-Pfad darf trotzdem
+        // keinen Server-Request (Weiterschauen-Liste) auslösen.
+        await LoginAsync();
+        await SeedCachedContinueWatchingAsync(new ContinueWatchingEntry
+        {
+            MediaType = "episode",
+            PositionSeconds = 45,
+            Entry = new TvShowEpisode { Id = 31, Name = "Pilot" }
+        });
+        await SeedDownloadAsync(31, "tvshowepisode", "completed", @"C:\downloads\ep31.mp4");
+
+        var source = await CreateService(fileExists: _ => true)
+            .ResolveAsync("tvshowepisode", 31, TestContext.Current.CancellationToken,
+                allowServerStream: false);
+
+        Assert.NotNull(source);
+        Assert.Equal(PlaybackSourceKind.LocalFile, source.Kind);
+        Assert.Equal(TimeSpan.FromSeconds(45), source.ResumePosition);
+        Assert.Empty(handler.Requests);
+    }
+
+    /// <summary>PrÃ¼ft ResolveAsync: im Offline-Modus ohne lokale Datei wird keine Stream-URL erzeugt.</summary>
+    [Fact]
+    public async Task ResolveAsync_OfflineModeWithoutLocalFile_ReturnsNull()
+    {
+        await LoginAsync();
+        await SeedCachedContinueWatchingAsync(new ContinueWatchingEntry
+        {
+            MediaType = "movie",
+            PositionSeconds = 10,
+            Entry = new Movie { Id = 42, Name = "Film" }
+        });
+
+        var source = await CreateService(fileExists: _ => false)
+            .ResolveAsync("movie", 42, TestContext.Current.CancellationToken,
+                allowServerStream: false);
+
+        Assert.Null(source);
+        Assert.Empty(handler.Requests);
+    }
+
     /// <summary>PrÃ¼ft ResolveAsync: weder Datei noch Server â†’ keine Quelle.</summary>
     [Fact]
     public async Task ResolveAsync_NoSource_ReturnsNull()

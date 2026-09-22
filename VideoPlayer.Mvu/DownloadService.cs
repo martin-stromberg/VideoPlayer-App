@@ -218,6 +218,7 @@ public sealed class DownloadService
     /// <param name="mediaId">Id des Mediums.</param>
     /// <param name="title">Anzeigetitel des Downloads; <c>null</c> = Fallback.</param>
     /// <param name="settings">Aktuelle App-Einstellungen (Kontingent, WLAN-Bedingung).</param>
+    /// <param name="seriesContext">Optionaler Serienkontext eines Episoden-Downloads (Grundlage des Offline-„Weiterschauen").</param>
     /// <param name="cancellationToken">Bricht die Manifest-Operation ab (nicht den Transfer).</param>
     /// <returns>Das Einreihe-Ergebnis mit Snapshot und Hinweistext.</returns>
     public async Task<DownloadEnqueueResult> EnqueueAsync(
@@ -225,6 +226,7 @@ public sealed class DownloadService
         long mediaId,
         string? title,
         AppSettings settings,
+        DownloadSeriesContext? seriesContext = null,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(settings);
@@ -270,6 +272,7 @@ public sealed class DownloadService
                 {
                     existing.Title = title;
                 }
+                ApplySeriesContext(existing, seriesContext);
                 existing.UpdatedAtUtc = DateTime.UtcNow;
                 await cache.Connection.UpdateAsync(existing);
                 entry = existing;
@@ -285,6 +288,7 @@ public sealed class DownloadService
                     State = DownloadStateNames.ToPersisted(DownloadState.Queued),
                     UpdatedAtUtc = DateTime.UtcNow
                 };
+                ApplySeriesContext(entry, seriesContext);
                 await cache.Connection.InsertAsync(entry);
             }
         }
@@ -309,6 +313,26 @@ public sealed class DownloadService
         RaiseItemChanged(ToItem(entry));
         PumpQueue(settings);
         return new DownloadEnqueueResult { Item = ToItem(entry), Notice = NoticeEnqueued };
+    }
+
+    /// <summary>
+    /// Überträgt den mitgegebenen Serienkontext in den Manifesteintrag —
+    /// nur für Episoden-Downloads und nur, wenn Werte bekannt sind
+    /// (vorhandene Werte eines Re-Enqueue werden nicht zurückgesetzt).
+    /// </summary>
+    /// <param name="entry">Der zu ergänzende Manifesteintrag.</param>
+    /// <param name="seriesContext">Der Serienkontext; <c>null</c> = keine Änderung.</param>
+    private static void ApplySeriesContext(DownloadManifestEntry entry, DownloadSeriesContext? seriesContext)
+    {
+        if (seriesContext is null || entry.VideoType != "tvshowepisode")
+        {
+            return;
+        }
+
+        entry.ShowId ??= seriesContext.ShowId;
+        entry.ShowTitle ??= seriesContext.ShowTitle;
+        entry.SeasonNumber ??= seriesContext.SeasonNumber;
+        entry.EpisodeNumber ??= seriesContext.EpisodeNumber;
     }
 
     /// <summary>

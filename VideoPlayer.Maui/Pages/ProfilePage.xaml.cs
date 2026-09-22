@@ -21,14 +21,31 @@ public partial class ProfilePage : ContentPage
         InitializeComponent();
         this.mvuHost = mvuHost;
         BindingContext = mvuHost;
+        mvuHost.ModelChanged += OnModelChanged;
+        UpdateUi(mvuHost.Model);
     }
 
     /// <inheritdoc/>
     protected override void OnAppearing()
     {
         base.OnAppearing();
-        // Beim Öffnen die Profilinformationen (erneut) ermitteln.
+        // Beim Öffnen die Profilinformationen (erneut) ermitteln —
+        // offline greift die Einschränkung des MVU-Updates.
         _ = mvuHost.DispatchAsync(new ProfilePageOpenedMessage());
+    }
+
+    private void OnModelChanged(object? sender, EventArgs e)
+    {
+        var model = mvuHost.Model;
+        MainThread.BeginInvokeOnMainThread(() => UpdateUi(model));
+    }
+
+    private void UpdateUi(AppModel model)
+    {
+        // Ohne Serververbindung: Hinweis statt Benutzerbereich — lokale
+        // Installationsdaten und „Abmelden" bleiben verfügbar.
+        ProfileOfflineBanner.IsVisible = model.IsOffline;
+        UserInfoBorder.IsVisible = !model.IsOffline;
     }
 
     private void OnLogoutClicked(object? sender, EventArgs e)

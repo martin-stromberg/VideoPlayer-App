@@ -26,6 +26,9 @@ public static class AppUpdate
     /// <summary>Fehlertext der Anmeldemaske bei sonstigen Anmeldefehlern.</summary>
     public const string LoginFailedError = "Anmeldung fehlgeschlagen. Bitte erneut versuchen.";
 
+    /// <summary>Hinweis nach einer Wiederherstellung: Geheimnisse wurden nicht gesichert — erneute Anmeldung erforderlich.</summary>
+    public const string ReloginRequiredNotice = "Die gespeicherte Anmeldung ist nicht mehr verfügbar. Bitte melde dich erneut an.";
+
     /// <summary>Hinweistext der Anmeldemaske nach abgelaufener Sitzung.</summary>
     public const string SessionExpiredError = "Die Anmeldung ist abgelaufen. Bitte erneut anmelden.";
 
@@ -73,6 +76,7 @@ public static class AppUpdate
             SynchronizationCompletedMessage => UpdateSynchronizationCompleted(model),
             CachedListsChangedMessage => UpdateCachedListsChanged(model),
             HomeListsLoadedMessage loaded => UpdateHomeListsLoaded(model, loaded),
+            StorageRecoveredMessage recovered => UpdateStorageRecovered(model, recovered),
             MediaItemSelectedMessage selected => UpdateMediaItemSelected(model, selected),
             SourcesPageOpenedMessage => UpdateSourcesPageOpened(model),
             SourcesLoadedMessage loaded => UpdateSourcesLoaded(model, loaded),
@@ -366,7 +370,10 @@ public static class AppUpdate
             IsServerCheckRunning = false,
             IsLoginRunning = false,
             LoginUsername = message.Username ?? model.LoginUsername,
-            LoginError = LoginErrorFor(message.Status),
+            // Fehlende Zugangsdaten (z. B. nach einer Wiederherstellung
+            // aus dem Cloud-Backup — Geheimnisse werden nicht gesichert)
+            // erhalten einen erklärenden Hinweis statt eines Fehlers.
+            LoginError = LoginErrorFor(message.Status) ?? ReloginRequiredNotice,
             ConnectionState = ConnectionState.NeedsLogin,
             CurrentPage = AppPage.Login
         };
@@ -603,22 +610,35 @@ public static class AppUpdate
 
     private static AppTransition UpdateHomeListsLoaded(AppModel model, HomeListsLoadedMessage message)
     {
-        return new AppTransition(
-            model with
-            {
-                ContinueWatching = message.Lists.ContinueWatching,
-                Favorites = message.Lists.Favorites,
-                RecentEntries = message.Lists.Recent
-            },
-            []);
+        var updated = model with
+        {
+            ContinueWatching = message.Lists.ContinueWatching,
+            Favorites = message.Lists.Favorites,
+            RecentEntries = message.Lists.Recent
+        };
+
+        // Verworfene (beschädigte) Caches werden bei bestehender
+        // Verbindung neu synchronisiert — der Sync schreibt die
+        // Cache-Schlüssel anschließend frisch.
+        return message.Lists.DiscardedCaches.Count > 0
+            && model.ConnectionState == ConnectionState.Connected
+            && !model.IsSyncRunning
+            ? new AppTransition(updated with { IsSyncRunning = true }, [new RunFullSyncEffect()])
+            : new AppTransition(updated, []);
+    }
+
+    private static AppTransition UpdateStorageRecovered(AppModel model, StorageRecoveredMessage message)
+    {
+        return new AppTransition(model with { StorageNotice = message.Notice }, []);
     }
 
     private static AppTransition UpdateMediaItemSelected(AppModel model, MediaItemSelectedMessage message)
     {
         var item = message.Item;
-        if (item.Id <= 0 || string.IsNullOrWhiteSpace(item.MediaType))
+        if (item.Id <= 0 || string.IsNullOrWhiteSpace(item.MediaType) || !item.IsSelectable)
         {
-            // Ohne identifizierbares Medium keine Navigation.
+            // Ohne identifizierbares Medium keine Navigation; Platzhalter
+            // fehlender Offline-Episoden sind nicht auswählbar.
             return AppTransition.Unchanged(model);
         }
 
@@ -1140,6 +1160,17 @@ public static class AppUpdate
 
     private static AppTransition UpdateProfilePageOpened(AppModel model)
     {
+        if (model.IsOffline)
+        {
+            // Kein Profilabruf ohne Serververbindung — die Seite zeigt
+            // den Offline-Hinweis (gebunden über IsOffline).
+            return model.Profile.Attempted
+                ? AppTransition.Unchanged(model)
+                : new AppTransition(
+                    model with { Profile = ProfilePageState.Initial with { Attempted = true } },
+                    []);
+        }
+
         if (model.Profile.IsLoading)
         {
             return AppTransition.Unchanged(model);
@@ -1630,7 +1661,13 @@ public static class AppUpdate
 
         return new AppTransition(
             model,
-            [new EnqueueDownloadEffect(mediaType, message.MediaId, message.Title, model.Settings)]);
+            [new EnqueueDownloadEffect(mediaType, message.MediaId, message.Title, model.Settings)
+            {
+                ShowId = message.ShowId,
+                ShowTitle = message.ShowTitle,
+                SeasonNumber = message.SeasonNumber,
+                EpisodeNumber = message.EpisodeNumber
+            }]);
     }
 
     private static AppTransition UpdateDownloadEnqueueCompleted(AppModel model, DownloadEnqueueCompletedMessage message)

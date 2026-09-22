@@ -21,7 +21,7 @@ public partial class HomePage : ContentPage
         this.mvuHost = mvuHost;
         BindingContext = mvuHost;
         mvuHost.ModelChanged += OnModelChanged;
-        UpdateOfflineBanner(mvuHost.Model);
+        UpdateBanners(mvuHost.Model);
     }
 
     private void OnModelChanged(object? sender, EventArgs e)
@@ -29,12 +29,13 @@ public partial class HomePage : ContentPage
         // UI-Anpassungen auf dem Hauptthread; die Listen binden über
         // BindingContext an das MVU-Modell.
         var model = mvuHost.Model;
-        MainThread.BeginInvokeOnMainThread(() => UpdateOfflineBanner(model));
+        MainThread.BeginInvokeOnMainThread(() => UpdateBanners(model));
     }
 
-    private void UpdateOfflineBanner(AppModel model)
+    private void UpdateBanners(AppModel model)
     {
         OfflineBanner.IsVisible = model.IsOffline;
+        StorageNoticeBanner.IsVisible = model.StorageNotice is not null;
     }
 
     private void OnMediaItemTapped(object? sender, HomeMediaItem item)

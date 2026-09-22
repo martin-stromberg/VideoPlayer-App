@@ -101,6 +101,15 @@
                                         Margin="0,0,0,8"
                                         StrokeShape="RoundRectangle 8"
                                         BackgroundColor="#23232a">
+                                    <Border.Triggers>
+                                        <!-- Platzhalter fehlender Offline-Episoden:
+                                             abgedunkelt, ohne Aktions-Schalter. -->
+                                        <DataTrigger TargetType="Border"
+                                                     Binding="{Binding IsPlaceholder}"
+                                                     Value="True">
+                                            <Setter Property="Opacity" Value="0.55" />
+                                        </DataTrigger>
+                                    </Border.Triggers>
                                     <Grid ColumnDefinitions="110,*,Auto,Auto"
                                           ColumnSpacing="10">
                                         <controls:CachedPosterImage PictureId="{Binding PosterPictureId}"
@@ -117,6 +126,12 @@
                                                    FontSize="12"
                                                    MaxLines="3"
                                                    LineBreakMode="TailTruncation" />
+                                            <!-- Platzhalter-Hinweis (nur im
+                                                 Offline-Snapshot sichtbar). -->
+                                            <Label Text="Nicht heruntergeladen"
+                                                   FontSize="11"
+                                                   TextColor="#BBBBBB"
+                                                   IsVisible="{Binding ShowUnavailable}" />
                                         </VerticalStackLayout>
                                         <Button Grid.Column="2"
                                                 Text="⤓"
@@ -124,14 +139,30 @@
                                                 WidthRequest="44"
                                                 HeightRequest="44"
                                                 VerticalOptions="Center"
-                                                Clicked="OnEpisodeDownloadClicked" />
+                                                Clicked="OnEpisodeDownloadClicked">
+                                            <Button.Triggers>
+                                                <DataTrigger TargetType="Button"
+                                                             Binding="{Binding IsPlaceholder}"
+                                                             Value="True">
+                                                    <Setter Property="IsVisible" Value="False" />
+                                                </DataTrigger>
+                                            </Button.Triggers>
+                                        </Button>
                                         <Button Grid.Column="3"
                                                 Text="▶"
                                                 FontSize="16"
                                                 WidthRequest="44"
                                                 HeightRequest="44"
                                                 VerticalOptions="Center"
-                                                Clicked="OnEpisodePlayClicked" />
+                                                Clicked="OnEpisodePlayClicked">
+                                            <Button.Triggers>
+                                                <DataTrigger TargetType="Button"
+                                                             Binding="{Binding IsPlaceholder}"
+                                                             Value="True">
+                                                    <Setter Property="IsVisible" Value="False" />
+                                                </DataTrigger>
+                                            </Button.Triggers>
+                                        </Button>
                                     </Grid>
                                 </Border>
                             </DataTemplate>

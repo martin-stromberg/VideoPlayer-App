@@ -9,9 +9,9 @@
 - [x] Implementierung (Schritt 6)
 - [x] Plan-Review (`review.md`)
 - [x] Usability-Review (`review-usability.md`) — UI-Änderungen vorhanden
-- [x] Code-Review (`review-code.md`)
-- [x] Tests ausgeführt (`test-results.md`, `final-dotnet-test.log`)
-- [x] Hilfe-Doku (`docs/help/`) aktualisiert
+- [x] Code-Review (`review-code.md`) — Befund `KeyFor` im sqlite-net-Prädikat behoben
+- [x] Tests ausgeführt (`test-results.md`, `final-dotnet-test.log`) — 623 Tests, 0 Fehler
+- [x] Hilfe-Doku (`docs/help/offline-wiederherstellung.md` + Index) aktualisiert
 - [x] `README.md` aktualisiert
 - [x] `docs/RELEASE_NOTES.md` aktualisiert
 - [ ] Abschlusscommit `feat: Offlinebetrieb und Wiederherstellung`

@@ -66,6 +66,7 @@ namespace VideoPlayer.Maui
             // Vorschaubilder (api/pictures/{id}) mit lokaler Ablage im
             // nicht backup-pflichtigen Previews-Verzeichnis.
             builder.Services.AddSingleton<HomeListService>();
+            builder.Services.AddSingleton<OfflineContinueWatchingService>();
             builder.Services.AddSingleton<PosterImageService>();
 
             // Quellen-Browsing, Medien-Details und Favoriten-Umschaltung

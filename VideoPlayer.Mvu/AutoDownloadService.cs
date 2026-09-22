@@ -28,6 +28,7 @@ public sealed class AutoDownloadService
     private readonly HomeListService homeLists;
     private readonly DownloadService downloads;
     private readonly INetworkStatusMonitor networkMonitor;
+    private readonly CacheDatabase cache;
     private readonly Func<DateTime> utcNow;
 
     private DateTime lastRunUtc = DateTime.MinValue;
@@ -38,12 +39,14 @@ public sealed class AutoDownloadService
     /// <param name="homeLists">Lesedienst der gecachten Startseiten-Listen (Weiterschauen-Stand).</param>
     /// <param name="downloads">Download-Verwaltung (Einreihen/Dedup).</param>
     /// <param name="networkMonitor">Netzwerkstatus-Erkennung (WLAN-Bedingung).</param>
+    /// <param name="cache">Cache-Ablage für die Serienstruktur (Offline-Serienkontext).</param>
     public AutoDownloadService(
         AuthSessionService authSession,
         HomeListService homeLists,
         DownloadService downloads,
-        INetworkStatusMonitor networkMonitor)
-        : this(authSession, homeLists, downloads, networkMonitor, null)
+        INetworkStatusMonitor networkMonitor,
+        CacheDatabase cache)
+        : this(authSession, homeLists, downloads, networkMonitor, cache, null)
     {
     }
 
@@ -52,18 +55,21 @@ public sealed class AutoDownloadService
     /// <param name="homeLists">Lesedienst der gecachten Startseiten-Listen.</param>
     /// <param name="downloads">Download-Verwaltung (Einreihen/Dedup).</param>
     /// <param name="networkMonitor">Netzwerkstatus-Erkennung (WLAN-Bedingung).</param>
+    /// <param name="cache">Cache-Ablage für die Serienstruktur.</param>
     /// <param name="utcNow">Zeitquelle für den Throttle; <c>null</c> = <see cref="DateTime.UtcNow"/>.</param>
     internal AutoDownloadService(
         AuthSessionService authSession,
         HomeListService homeLists,
         DownloadService downloads,
         INetworkStatusMonitor networkMonitor,
+        CacheDatabase cache,
         Func<DateTime>? utcNow)
     {
         this.authSession = authSession ?? throw new ArgumentNullException(nameof(authSession));
         this.homeLists = homeLists ?? throw new ArgumentNullException(nameof(homeLists));
         this.downloads = downloads ?? throw new ArgumentNullException(nameof(downloads));
         this.networkMonitor = networkMonitor ?? throw new ArgumentNullException(nameof(networkMonitor));
+        this.cache = cache ?? throw new ArgumentNullException(nameof(cache));
         this.utcNow = utcNow ?? (() => DateTime.UtcNow);
     }
 
@@ -112,7 +118,7 @@ public sealed class AutoDownloadService
                 {
                     if (type == "movie")
                     {
-                        await downloads.EnqueueAsync("movie", item.Id, item.Title, settings, cancellationToken);
+                        await downloads.EnqueueAsync("movie", item.Id, item.Title, settings, cancellationToken: cancellationToken);
                     }
                     else if (type == "tvshowepisode" && item.ShowId is > 0)
                     {
@@ -157,23 +163,31 @@ public sealed class AutoDownloadService
         }
 
         var show = await client.GetTvShowAsync(item.ShowId.Value, cancellationToken);
+
+        // Die Serienstruktur im Cache ablegen — Grundlage der
+        // Offline-Platzhalter fehlender Folge-Episoden.
+        await ShowDetailsCache.WriteAsync(cache, show, cancellationToken);
+
         var episodes = show.Seasons
             .OrderBy(s => s.Number)
-            .SelectMany(s => s.Episodes.OrderBy(e => e.Number))
+            .SelectMany(s => s.Episodes.OrderBy(e => e.Number).Select(e => (Season: s, Episode: e)))
             .ToList();
-        var index = episodes.FindIndex(e => e.Id == item.Id);
+        var index = episodes.FindIndex(e => e.Episode.Id == item.Id);
         if (index < 0)
         {
             return;
         }
 
         var showName = show.Name;
-        foreach (var episode in episodes.Skip(index + 1).Take(settings.PreloadEpisodeCount))
+        foreach (var (season, episode) in episodes.Skip(index + 1).Take(settings.PreloadEpisodeCount))
         {
             var title = string.IsNullOrWhiteSpace(episode.Name)
                 ? $"{showName} – Episode {episode.Number}"
                 : $"{showName} – {episode.Name}";
-            await downloads.EnqueueAsync("tvshowepisode", episode.Id, title, settings, cancellationToken);
+            await downloads.EnqueueAsync(
+                "tvshowepisode", episode.Id, title, settings,
+                new DownloadSeriesContext(show.Id, showName, season.Number, episode.Number),
+                cancellationToken);
         }
     }
 }

@@ -33,7 +33,10 @@ public sealed class HomeListService
     /// <summary>
     /// Liest alle drei Startseiten-Listen aus dem Cache. Fehlende oder
     /// beschädigte Einträge ergeben leere Teillisten — die Startseite bleibt
-    /// damit in jedem Fall anzeigbar.
+    /// damit in jedem Fall anzeigbar. Beschädigte Cache-Zeilen werden
+    /// verworfen (gelöscht) und über <see cref="HomeLists.DiscardedCaches"/>
+    /// gemeldet, damit sie bei bestehender Verbindung neu synchronisiert
+    /// werden.
     /// </summary>
     /// <param name="cancellationToken">Bricht das Lesen ab.</param>
     /// <returns>Die drei Startseiten-Listen aus dem Cache.</returns>
@@ -43,12 +46,53 @@ public sealed class HomeListService
         var favorites = await ReadFavoritesAsync();
         var recent = await ReadListAsync<RecentEntry>(ServerSyncService.RecentCacheKey);
 
+        var discarded = new List<string>(3);
+        if (continueWatching.Discarded)
+        {
+            discarded.Add(ServerSyncService.ContinueWatchingCacheKey);
+        }
+        if (favorites.Discarded)
+        {
+            discarded.Add(FavoritesCacheName);
+        }
+        if (recent.Discarded)
+        {
+            discarded.Add(ServerSyncService.RecentCacheKey);
+        }
+
         return new HomeLists
         {
-            ContinueWatching = MapAll(continueWatching, MapContinueWatching),
-            Favorites = MapAll(favorites, f => MapEntry(f.Entry)),
-            Recent = MapAll(recent, r => MapEntry(r.Entry))
+            ContinueWatching = MapAll(continueWatching.Items, MapContinueWatching),
+            Favorites = MapAll(favorites.Items, f => MapEntry(f.Entry)),
+            Recent = MapAll(recent.Items, r => MapEntry(r.Entry)),
+            DiscardedCaches = discarded
         };
+    }
+
+    /// <summary>
+    /// Liest die Favoriten-Kopie <c>cached_favorites</c> als anzeigefertige
+    /// Einträge der Startseiten-Liste — Grundlage auch der
+    /// Offline-Startseite (<see cref="OfflineContinueWatchingService"/>).
+    /// </summary>
+    /// <param name="cancellationToken">Bricht das Lesen ab.</param>
+    /// <returns>Die Favoriten-Einträge aus der lokalen Kopie.</returns>
+    public async Task<IReadOnlyList<HomeMediaItem>> LoadFavoritesAsync(CancellationToken cancellationToken = default)
+    {
+        var favorites = await ReadFavoritesAsync();
+        return MapAll(favorites.Items, f => MapEntry(f.Entry));
+    }
+
+    /// <summary>
+    /// Liest die „Neu im Programm"-Kopie (<c>cached_lists</c>-Schlüssel
+    /// <c>recent</c>) als anzeigefertige Einträge — Grundlage auch der
+    /// Offline-Startseite (<see cref="OfflineContinueWatchingService"/>).
+    /// </summary>
+    /// <param name="cancellationToken">Bricht das Lesen ab.</param>
+    /// <returns>Die Neuheiten-Einträge aus der lokalen Kopie.</returns>
+    public async Task<IReadOnlyList<HomeMediaItem>> LoadRecentAsync(CancellationToken cancellationToken = default)
+    {
+        var recent = await ReadListAsync<RecentEntry>(ServerSyncService.RecentCacheKey);
+        return MapAll(recent.Items, r => MapEntry(r.Entry));
     }
 
     /// <summary>
@@ -64,8 +108,8 @@ public sealed class HomeListService
     public async Task<IReadOnlyList<FavoriteListItem>> LoadFavoriteItemsAsync(CancellationToken cancellationToken = default)
     {
         var favorites = await ReadFavoritesAsync();
-        var items = new List<FavoriteListItem>(favorites.Count);
-        foreach (var favorite in favorites)
+        var items = new List<FavoriteListItem>(favorites.Items.Count);
+        foreach (var favorite in favorites.Items)
         {
             // Einträge ohne identifizierbares Medium werden übersprungen —
             // die Auswahl muss das Medium eindeutig bestimmen können.
@@ -79,7 +123,10 @@ public sealed class HomeListService
         return items;
     }
 
-    private async Task<IReadOnlyList<T>> ReadListAsync<T>(string key)
+    /// <summary>Cache-Bereichsname der Favoriten-Kopie (für <see cref="HomeLists.DiscardedCaches"/>).</summary>
+    internal const string FavoritesCacheName = "cached_favorites";
+
+    private async Task<(IReadOnlyList<T> Items, bool Discarded)> ReadListAsync<T>(string key)
     {
         try
         {
@@ -88,25 +135,29 @@ public sealed class HomeListService
                 .FirstOrDefaultAsync();
             if (entry?.Json is not { Length: > 0 } json)
             {
-                return [];
+                return ([], false);
             }
 
-            return JsonSerializer.Deserialize<List<T>>(json, JsonOptions) ?? [];
+            return (JsonSerializer.Deserialize<List<T>>(json, JsonOptions) ?? [], false);
         }
         catch (Exception ex)
         {
-            // Beschädigter oder nicht lesbarer Cache → leere Liste statt Fehler.
+            // Beschädigter oder nicht lesbarer Cache → Eintrag verwerfen
+            // und leere Liste zurückgeben; die Neu-Synchronisation baut
+            // den Cache bei bestehender Verbindung wieder auf.
             System.Diagnostics.Debug.WriteLine($"[HomeListService] Lesen der Liste '{key}' fehlgeschlagen: {ex.Message}");
-            return [];
+            var discarded = await DiscardListEntryAsync(key);
+            return ([], discarded);
         }
     }
 
-    private async Task<IReadOnlyList<FavoriteEntry>> ReadFavoritesAsync()
+    private async Task<(IReadOnlyList<FavoriteEntry> Items, bool Discarded)> ReadFavoritesAsync()
     {
         try
         {
             var rows = await cache.Connection.Table<CachedFavoritesEntry>().ToListAsync();
             var favorites = new List<FavoriteEntry>(rows.Count);
+            var discarded = false;
             foreach (var row in rows.OrderByDescending(r => r.UpdatedAtUtc))
             {
                 try
@@ -119,16 +170,55 @@ public sealed class HomeListService
                 }
                 catch (JsonException ex)
                 {
-                    System.Diagnostics.Debug.WriteLine($"[HomeListService] Favorit '{row.Key}' nicht lesbar: {ex.Message}");
+                    System.Diagnostics.Debug.WriteLine($"[HomeListService] Favorit '{row.Key}' nicht lesbar — wird verworfen: {ex.Message}");
+                    discarded |= await DiscardRowAsync(row);
                 }
             }
 
-            return favorites;
+            return (favorites, discarded);
         }
         catch (Exception ex)
         {
             System.Diagnostics.Debug.WriteLine($"[HomeListService] Lesen der Favoriten fehlgeschlagen: {ex.Message}");
-            return [];
+            return ([], false);
+        }
+    }
+
+    /// <summary>
+    /// Verwirft einen beschädigten <c>cached_lists</c>-Eintrag.
+    /// </summary>
+    /// <param name="key">Schlüssel des beschädigten Eintrags.</param>
+    /// <returns><c>true</c>, wenn ein Eintrag gelöscht wurde; sonst <c>false</c>.</returns>
+    private async Task<bool> DiscardListEntryAsync(string key)
+    {
+        try
+        {
+            var deleted = await cache.Connection.Table<CachedListEntry>()
+                .DeleteAsync(e => e.Key == key);
+            return deleted > 0;
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[HomeListService] Verwerfen der Liste '{key}' fehlgeschlagen: {ex.Message}");
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Verwirft eine beschädigte <c>cached_favorites</c>-Zeile.
+    /// </summary>
+    /// <param name="row">Die beschädigte Zeile.</param>
+    /// <returns><c>true</c>, wenn die Zeile gelöscht wurde; sonst <c>false</c>.</returns>
+    private async Task<bool> DiscardRowAsync(CachedFavoritesEntry row)
+    {
+        try
+        {
+            return await cache.Connection.DeleteAsync(row) > 0;
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[HomeListService] Verwerfen des Favoriten '{row.Key}' fehlgeschlagen: {ex.Message}");
+            return false;
         }
     }
 

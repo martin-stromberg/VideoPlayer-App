@@ -49,6 +49,22 @@ public sealed class DownloadManifestEntry
     /// </summary>
     public string State { get; set; } = string.Empty;
 
+    /// <summary>
+    /// Id der zugehörigen Serie (nur Episoden-Downloads, beim Einreihen
+    /// mitgegeben); <c>null</c> = kein Serienkontext bekannt. Grundlage
+    /// des Offline-Serienkontexts (Platzhalter fehlender Folge-Episoden).
+    /// </summary>
+    public long? ShowId { get; set; }
+
+    /// <summary>Anzeigetitel der Serie (nur Episoden-Downloads); <c>null</c> = unbekannt.</summary>
+    public string? ShowTitle { get; set; }
+
+    /// <summary>Staffelnummer der Episode (nur Episoden-Downloads); <c>null</c> = unbekannt.</summary>
+    public int? SeasonNumber { get; set; }
+
+    /// <summary>Episodennummer innerhalb der Staffel (nur Episoden-Downloads); <c>null</c> = unbekannt.</summary>
+    public int? EpisodeNumber { get; set; }
+
     /// <summary>Zeitpunkt der letzten Aktualisierung (UTC).</summary>
     public DateTime UpdatedAtUtc { get; set; }
 }

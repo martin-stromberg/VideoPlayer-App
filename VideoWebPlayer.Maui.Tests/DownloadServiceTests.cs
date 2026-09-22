@@ -145,6 +145,29 @@ public class DownloadServiceTests : IDisposable
         Assert.Equal(DownloadState.Completed, changed.Last().State);
     }
 
+    /// <summary>Prüft Enqueue: der Serienkontext einer Episode landet im Manifest.</summary>
+    [Fact]
+    public async Task Enqueue_WithSeriesContext_PersistsContextInManifest()
+    {
+        await LoginAsync();
+        EnqueueStream(32);
+        var service = CreateService();
+
+        await service.EnqueueAsync(
+            "tvshowepisode", 31, "Serie – Pilot", Settings(),
+            seriesContext: new DownloadSeriesContext(
+                ShowId: 11,
+                ShowTitle: "Serie",
+                SeasonNumber: 1,
+                EpisodeNumber: 1));
+
+        var entry = await WaitForStateAsync(() => ReadEntryAsync("tvshowepisode", 31), "completed");
+        Assert.Equal(11, entry.ShowId);
+        Assert.Equal("Serie", entry.ShowTitle);
+        Assert.Equal(1, entry.SeasonNumber);
+        Assert.Equal(1, entry.EpisodeNumber);
+    }
+
     /// <summary>Prüft Enqueue: abgeschlossener Download mit Datei wird dedupliziert.</summary>
     [Fact]
     public async Task Enqueue_CompletedExisting_ReturnsAlreadyPresent()

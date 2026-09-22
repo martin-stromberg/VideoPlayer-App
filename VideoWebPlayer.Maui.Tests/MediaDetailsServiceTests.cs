@@ -11,18 +11,33 @@ namespace VideoWebPlayer.Maui.Tests;
 /// Detail-Dienst (Schritt 8): Filme, Filmkollektionen (mit 404-Fallback
 /// auf den Einzelfilm), Serien mit eingebetteten Staffeln/Episoden und
 /// Episoden-Aufrufe mit Serienkontext-Auflösung — Abbild der
-/// Detailseiten des Altbestands.
+/// Detailseiten des Altbestands. Schritt 12 ergänzt den
+/// Offline-Snapshot ohne angemeldeten Client — mit echter
+/// SQLite-Ablage (Manifest, Serienstruktur, Favoriten-Kopie).
 /// </summary>
-public class MediaDetailsServiceTests
+[Collection("SqliteDatabase")]
+public class MediaDetailsServiceTests : IDisposable
 {
     private static readonly Uri Server = new("http://testserver/videoplayer/");
 
+    private readonly string root;
     private readonly StubHttpMessageHandler handler = new();
     private readonly AuthSessionService authSession;
+    private readonly CacheDatabase cache;
 
     /// <summary>Initialisiert eine neue Instanz der Testklasse <c>MediaDetailsServiceTests</c>.</summary>
     public MediaDetailsServiceTests()
     {
+        root = Path.Combine(Path.GetTempPath(), "videoplayer-mediadetails-tests", Guid.NewGuid().ToString("N"));
+        var layout = new AppStorageLayout(
+            backupRoot: Path.Combine(root, "backup"),
+            noBackupRoot: Path.Combine(root, "nobackup"),
+            cacheRoot: Path.Combine(root, "cache"),
+            profile: AppProfile.Create(null));
+        layout.EnsureDirectoriesExist();
+        cache = new CacheDatabase(layout);
+        cache.InitializeAsync().Wait();
+
         var secrets = new AppSecretsService(
             new InMemorySettingsStore(), new InMemorySecretStore(), AppProfile.Create(null));
         authSession = new AuthSessionService(
@@ -31,7 +46,17 @@ public class MediaDetailsServiceTests
             new RecordingDelays().Delay);
     }
 
-    private MediaDetailsService CreateService() => new(authSession);
+    /// <inheritdoc/>
+    public void Dispose()
+    {
+        SQLite.SQLiteAsyncConnection.ResetPool();
+        if (Directory.Exists(root))
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    private MediaDetailsService CreateService() => new(authSession, cache);
 
     private async Task LoginAsync()
     {
@@ -271,12 +296,43 @@ public class MediaDetailsServiceTests
             () => CreateService().LoadAsync("video", 1, null, null, null, null));
     }
 
-    /// <summary>Prüft Load: ohne Client → wirft.</summary>
+    /// <summary>Prüft Load: ohne Client und nicht unterstützten Typ → wirft (kein HTTP).</summary>
     [Fact]
-    public async Task Load_WithoutClient_Throws()
+    public async Task Load_WithoutClient_UnsupportedType_Throws()
     {
         await Assert.ThrowsAsync<InvalidOperationException>(
-            () => CreateService().LoadAsync("movie", 42, null, null, null, null));
+            () => CreateService().LoadAsync("video", 1, null, null, null, null));
+        Assert.Empty(handler.Requests);
+    }
+
+    /// <summary>Prüft Load: ohne Client bei einem Film → liefert den Offline-Snapshot aus Manifest/Favoriten-Kopie.</summary>
+    [Fact]
+    public async Task Load_WithoutClient_Movie_BuildsOfflineSnapshot()
+    {
+        await cache.Connection.InsertAsync(new VideoPlayer.Storage.Entities.DownloadManifestEntry
+        {
+            VideoId = 42,
+            VideoType = "movie",
+            Title = "Matrix",
+            FilePath = "/downloads/movie-42.mp4",
+            State = "completed",
+            UpdatedAtUtc = DateTime.UtcNow
+        });
+
+        var details = await CreateService().LoadAsync("movie", 42, null, null, null, null);
+
+        Assert.True(details.IsOfflineSnapshot);
+        Assert.Equal("movie", details.MediaType);
+        Assert.Equal("Matrix", details.Title);
+        Assert.Empty(handler.Requests);
+    }
+
+    /// <summary>Prüft Load: ohne Client bei einer Serie ohne gecachte Struktur → wirft.</summary>
+    [Fact]
+    public async Task Load_WithoutClient_ShowWithoutCache_Throws()
+    {
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => CreateService().LoadAsync("tvshow", 11, null, null, null, null));
         Assert.Empty(handler.Requests);
     }
 }

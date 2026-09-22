@@ -48,6 +48,19 @@ public sealed record HomeMediaItem
     /// <summary>Id der Episode selbst bei Episoden-Einträgen; sonst <c>null</c>.</summary>
     public long? EpisodeId { get; init; }
 
+    /// <summary>
+    /// Platzhalter-Eintrag der Offline-„Weiterschauen"-Liste: das Medium
+    /// ist nicht heruntergeladen und damit nicht abspielbar — die Karte
+    /// wird abgedunkelt und mit einem Hinweis markiert.
+    /// </summary>
+    public bool IsPlaceholder { get; init; }
+
+    /// <summary>Der Eintrag ist auswählbar (Platzhalter sind es nicht).</summary>
+    public bool IsSelectable => !IsPlaceholder;
+
+    /// <summary>Deckkraft der Karte (Platzhalter abgedunkelt).</summary>
+    public double CardOpacity => IsPlaceholder ? 0.55 : 1.0;
+
     /// <summary>Ein Poster kann geladen werden.</summary>
     public bool HasPoster => PosterPictureId is > 0;
 
