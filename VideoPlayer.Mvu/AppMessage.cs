@@ -359,3 +359,77 @@ public sealed record ProfileInfoLoadedMessage(ProfileInfo Info) : AppMessage;
 /// Logout-Endpunkt (zustandslose JWT).
 /// </summary>
 public sealed record LogoutRequestedMessage : AppMessage;
+
+/// <summary>
+/// Der Anwender startet die Wiedergabe eines Mediums („Abspielen" auf der
+/// Detailseite) — der Player-State wird gesetzt, zur Wiedergabeseite
+/// navigiert und die Quelle aufgelöst. Abspielbar sind nur
+/// <c>movie</c> und <c>tvshowepisode</c>.
+/// </summary>
+/// <param name="MediaType">Medientyp (wird normalisiert).</param>
+/// <param name="MediaId">Id des Mediums.</param>
+/// <param name="Title">Anzeigetitel des Mediums.</param>
+/// <returns>Nachricht für die Wiedergabe-Anforderung.</returns>
+public sealed record PlayRequestedMessage(
+    string MediaType,
+    long MediaId,
+    string? Title) : AppMessage;
+
+/// <summary>Die Wiedergabeseite ist erschienen (einmalig pro Öffnen).</summary>
+public sealed record PlayerPageOpenedMessage : AppMessage;
+
+/// <summary>
+/// Ergebnis der Quellauflösung: bei Erfolg trägt die Nachricht die
+/// aufgelöste Quelle; bei Fehlschlag <paramref name="Error"/>
+/// (Rückfall auf die nächste Episode, falls vorhanden).
+/// </summary>
+/// <param name="MediaType">Medientyp der angefragten Identität.</param>
+/// <param name="MediaId">Medien-Id der angefragten Identität.</param>
+/// <param name="Source">Aufgelöste Quelle; <c>null</c> bei Fehlschlag.</param>
+/// <param name="Error">Fehlertext bei Fehlschlag; <c>null</c> bei Erfolg.</param>
+/// <returns>Nachricht mit dem Ergebnis der Quellauflösung.</returns>
+public sealed record PlaybackSourceResolvedMessage(
+    string MediaType,
+    long MediaId,
+    PlaybackSource? Source,
+    string? Error) : AppMessage;
+
+/// <summary>
+/// Positions-Takt der Wiedergabeseite (Seiten-Timer während der
+/// Wiedergabe bzw. Zustandswechsel des MediaElement): aktualisiert
+/// Position/Dauer/Pufferung und prüft die „angesehen"-Schwelle und die
+/// Auto-Fortsetzung.
+/// </summary>
+/// <param name="Position">Aktuelle Wiedergabeposition.</param>
+/// <param name="Duration">Gesamtdauer des Mediums.</param>
+/// <param name="IsPlaying"><c>true</c>, wenn die Wiedergabe läuft.</param>
+/// <param name="IsBuffering"><c>true</c>, wenn der Player puffert.</param>
+/// <returns>Nachricht mit dem Wiedergabe-Takt.</returns>
+public sealed record PlaybackProgressMessage(
+    TimeSpan Position,
+    TimeSpan Duration,
+    bool IsPlaying,
+    bool IsBuffering) : AppMessage;
+
+/// <summary>Die Wiedergabe ist regulär zu Ende (Medium abgespielt).</summary>
+public sealed record PlaybackEndedMessage : AppMessage;
+
+/// <summary>Die Wiedergabe ist fehlgeschlagen (MediaElement <c>MediaFailed</c>).</summary>
+public sealed record PlaybackFailedMessage : AppMessage;
+
+/// <summary>Der Picture-in-Picture-/Mini-Player-Modus soll umgeschaltet werden.</summary>
+public sealed record PictureInPictureRequestedMessage : AppMessage;
+
+/// <summary>
+/// Ergebnis der PiP-Umschaltung: der Plattform-Dienst meldet den neuen
+/// Modus zurück (Grundlage der Overlay-Ausblendung im Mini-Player).
+/// </summary>
+/// <param name="IsActive"><c>true</c> = kompaktes Overlay aktiv.</param>
+/// <returns>Nachricht mit dem neuen PiP-Zustand.</returns>
+public sealed record PictureInPictureChangedMessage(bool IsActive) : AppMessage;
+
+/// <summary>
+/// Die Wiedergabeseite wird verlassen — Abschluss-Fortschritt melden
+/// und den Player-Zustand zurücksetzen.
+/// </summary>
+public sealed record PlayerClosedMessage : AppMessage;

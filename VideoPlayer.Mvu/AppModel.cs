@@ -127,6 +127,9 @@ public sealed record AppModel
     /// <summary>Zustand der Profil-Seite (Menüseite „Profil").</summary>
     public ProfilePageState Profile { get; init; } = ProfilePageState.Initial;
 
+    /// <summary>Zustand der Wiedergabeseite (Shell-Route „player").</summary>
+    public PlayerState Player { get; init; } = PlayerState.Empty;
+
     /// <summary>Dem Anwender anzeigbarer Text zum Serverstatus.</summary>
     public string ServerHealthText => ServerHealth switch
     {

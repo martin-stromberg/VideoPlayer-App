@@ -29,6 +29,9 @@ public static class AppUpdate
     /// <summary>Hinweistext der Anmeldemaske nach abgelaufener Sitzung.</summary>
     public const string SessionExpiredError = "Die Anmeldung ist abgelaufen. Bitte erneut anmelden.";
 
+    /// <summary>Fehlertext der Wiedergabeseite bei nicht verfügbarer/abspielbarer Quelle.</summary>
+    public const string PlaybackUnavailableError = "Das Video kann nicht abgespielt werden.";
+
     /// <summary>
     /// Wendet eine Nachricht auf das übergebene Model an und liefert den
     /// Übergang: das neue Model plus die daraus resultierenden Effekte.
@@ -97,6 +100,15 @@ public static class AppUpdate
             FavoriteRemoveCompletedMessage completed => UpdateFavoriteRemoveCompleted(model, completed),
             ProfilePageOpenedMessage => UpdateProfilePageOpened(model),
             ProfileInfoLoadedMessage loaded => UpdateProfileInfoLoaded(model, loaded),
+            PlayRequestedMessage play => UpdatePlayRequested(model, play),
+            PlayerPageOpenedMessage => UpdatePlayerPageOpened(model),
+            PlaybackSourceResolvedMessage resolved => UpdatePlaybackSourceResolved(model, resolved),
+            PlaybackProgressMessage progress => UpdatePlaybackProgress(model, progress),
+            PlaybackEndedMessage => UpdatePlaybackEnded(model),
+            PlaybackFailedMessage => UpdatePlaybackFailed(model),
+            PictureInPictureRequestedMessage => UpdatePictureInPictureRequested(model),
+            PictureInPictureChangedMessage changed => UpdatePictureInPictureChanged(model, changed),
+            PlayerClosedMessage => UpdatePlayerClosed(model),
             LogoutRequestedMessage => UpdateLogoutRequested(model),
             _ => AppTransition.Unchanged(model)
         };
@@ -1137,7 +1149,8 @@ public static class AppUpdate
             SourceBrowser = SourceBrowserState.Empty,
             MediaDetails = MediaDetailsState.Empty,
             FavoritesPage = FavoritesPageState.Initial,
-            Profile = ProfilePageState.Initial
+            Profile = ProfilePageState.Initial,
+            Player = PlayerState.Empty
         };
 
         var effects = new List<AppEffect>
@@ -1162,6 +1175,329 @@ public static class AppUpdate
             AuthAttemptStatus.Failed => LoginFailedError,
             _ => null
         };
+    }
+
+    /// <summary>
+    /// Wiedergabe-Start („Abspielen"): Player-State mit dem Medium und
+    /// der aus dem Serienkontext ermittelten Fortsetzungsliste belegen,
+    /// zur Wiedergabeseite navigieren und die Quelle auflösen. Nur
+    /// abspielbare Typen (<c>movie</c>/<c>tvshowepisode</c>) mit
+    /// gültiger Id werden angenommen.
+    /// </summary>
+    /// <param name="model">Aktuelles App-Model.</param>
+    /// <param name="message">Die Wiedergabe-Anforderung.</param>
+    /// <returns>Übergang mit belegtem Player-State, Navigations- und Auflösungs-Effekt.</returns>
+    private static AppTransition UpdatePlayRequested(AppModel model, PlayRequestedMessage message)
+    {
+        var mediaType = MediaTypeNames.Normalize(message.MediaType);
+        if (message.MediaId <= 0 || mediaType is not ("movie" or "tvshowepisode"))
+        {
+            return AppTransition.Unchanged(model);
+        }
+
+        return new AppTransition(
+            model with
+            {
+                Player = new PlayerState
+                {
+                    MediaType = mediaType,
+                    MediaId = message.MediaId,
+                    Title = message.Title,
+                    IsResolving = true,
+                    Attempted = true,
+                    UpcomingEpisodes = NextEpisodeQueue(model, message.MediaId)
+                }
+            },
+            [new NavigateToPlayerEffect(), new ResolvePlaybackSourceEffect(mediaType, message.MediaId)]);
+    }
+
+    /// <summary>
+    /// Folge-Episoden des Mediums aus dem Serienkontext der Detailseite:
+    /// alle Episoden nach <paramref name="mediaId"/>, staffelübergreifend
+    /// nach Staffel-/Episodennummer sortiert. Ohne Serienkontext oder bei
+    /// nicht enthaltener Episode bleibt die Liste leer (kein Rückfall).
+    /// </summary>
+    /// <param name="model">Aktuelles App-Model.</param>
+    /// <param name="mediaId">Id der gestarteten Episode.</param>
+    /// <returns>Die geordnete Fortsetzungsliste (leer ohne Folge-Episoden).</returns>
+    private static IReadOnlyList<PlayerEpisodeRef> NextEpisodeQueue(AppModel model, long mediaId)
+    {
+        var details = model.MediaDetails.Details;
+        if (details?.HasSeasons != true)
+        {
+            return [];
+        }
+
+        var episodes = details.Seasons
+            .OrderBy(s => s.Number)
+            .SelectMany(s => s.Episodes.OrderBy(e => e.Number))
+            .ToList();
+        var index = episodes.FindIndex(e => e.Id == mediaId);
+        if (index < 0)
+        {
+            return [];
+        }
+
+        return episodes
+            .Skip(index + 1)
+            .Select(e => new PlayerEpisodeRef { MediaId = e.Id, Title = e.Title })
+            .ToList();
+    }
+
+    private static AppTransition UpdatePlayerPageOpened(AppModel model)
+    {
+        var player = model.Player;
+        return player.IsActive && !player.Attempted
+            ? new AppTransition(model with { Player = player with { Attempted = true } }, [])
+            : AppTransition.Unchanged(model);
+    }
+
+    private static AppTransition UpdatePlaybackSourceResolved(AppModel model, PlaybackSourceResolvedMessage message)
+    {
+        var player = model.Player;
+        if (!player.IsActive
+            || player.MediaId != message.MediaId
+            || player.MediaType != MediaTypeNames.Normalize(message.MediaType))
+        {
+            // Antwort einer inzwischen abgelösten Identität verwerfen.
+            return AppTransition.Unchanged(model);
+        }
+
+        if (message.Source is { } source)
+        {
+            return new AppTransition(
+                model with
+                {
+                    Player = player with
+                    {
+                        Source = source,
+                        IsResolving = false,
+                        Error = null
+                    }
+                },
+                []);
+        }
+
+        // Quelle nicht verfügbar → Fehler anzeigen und auf die nächste
+        // Episode zurückfallen (ohne Folge-Episode bleibt der Fehlerzustand).
+        return AdvanceToNextEpisode(model, player, message.Error ?? PlaybackUnavailableError);
+    }
+
+    /// <summary>
+    /// Wechsel zur nächsten Episode der Fortsetzungsliste (Fehler-Rückfall
+    /// und Auto-Fortsetzung): der State übernimmt Medium/Titel der
+    /// wartenden Episode, Wiedergabe-Werte werden zurückgesetzt und die
+    /// Quelle neu aufgelöst; ein etwaiger Fehlertext bleibt als Hinweis
+    /// sichtbar. Ohne Folge-Episode wird der Fehlerzustand gezeigt.
+    /// </summary>
+    /// <param name="model">Aktuelles App-Model.</param>
+    /// <param name="player">Bisheriger Player-Zustand.</param>
+    /// <param name="error">Fehlertext; <c>null</c> beim regulären Fortsetzen.</param>
+    /// <returns>Übergang zur nächsten Episode bzw. zum Fehlerzustand.</returns>
+    private static AppTransition AdvanceToNextEpisode(AppModel model, PlayerState player, string? error)
+    {
+        if (!player.HasNextEpisode)
+        {
+            return new AppTransition(
+                model with
+                {
+                    Player = player with
+                    {
+                        Source = null,
+                        IsResolving = false,
+                        IsPlaying = false,
+                        IsBuffering = false,
+                        Error = error ?? player.Error
+                    }
+                },
+                []);
+        }
+
+        var next = player.UpcomingEpisodes[0];
+        return new AppTransition(
+            model with
+            {
+                Player = player with
+                {
+                    MediaType = "tvshowepisode",
+                    MediaId = next.MediaId,
+                    Title = next.Title,
+                    Source = null,
+                    IsResolving = true,
+                    IsPlaying = false,
+                    IsBuffering = false,
+                    IsWatched = false,
+                    IsPictureInPicture = false,
+                    Position = TimeSpan.Zero,
+                    Duration = TimeSpan.Zero,
+                    LastReportedPositionSeconds = -1,
+                    UpcomingEpisodes = player.UpcomingEpisodes.Skip(1).ToList(),
+                    Error = error
+                }
+            },
+            [new ResolvePlaybackSourceEffect("tvshowepisode", next.MediaId)]);
+    }
+
+    /// <summary>
+    /// Positions-Takt der Wiedergabeseite: Position/Dauer/Laufzustand
+    /// übernehmen, geänderte Position melden (Throttling über die zuletzt
+    /// gemeldete Position), die „angesehen"-Schwelle
+    /// (<see cref="AppSettings.WatchedEndWindowSeconds"/>) setzen und die
+    /// Auto-Fortsetzung prüfen (Restlaufzeit &lt;
+    /// <see cref="AppSettings.AutoResumeRemainingSeconds"/> → nächste
+    /// Episode). Medien kürzer als das jeweilige Fenster greifen ab dem
+    /// ersten Takt (Restlaufzeit liegt dann von Anfang an im Fenster).
+    /// </summary>
+    /// <param name="model">Aktuelles App-Model.</param>
+    /// <param name="message">Der Wiedergabe-Takt der Seite.</param>
+    /// <returns>Übergang mit aktualisiertem Player-State und Effekten.</returns>
+    private static AppTransition UpdatePlaybackProgress(AppModel model, PlaybackProgressMessage message)
+    {
+        var player = model.Player;
+        if (!player.IsActive)
+        {
+            return AppTransition.Unchanged(model);
+        }
+
+        var updated = player with
+        {
+            Position = message.Position,
+            Duration = message.Duration,
+            IsPlaying = message.IsPlaying,
+            IsBuffering = message.IsBuffering
+        };
+
+        var effects = new List<AppEffect>();
+        if (message.Duration > TimeSpan.Zero
+            && message.Position >= TimeSpan.Zero
+            && Math.Abs(message.Position.TotalSeconds - updated.LastReportedPositionSeconds) > 0.5)
+        {
+            // Fortschritt nur bei geänderter Position melden (Muster des
+            // Altbestands: Schwellenwert 0,5 s gegen Doppelmeldungen).
+            updated = updated with { LastReportedPositionSeconds = message.Position.TotalSeconds };
+            effects.Add(new ReportPlaybackProgressEffect(
+                updated.MediaType!, updated.MediaId, message.Position, message.Duration));
+        }
+
+        if (message.Duration > TimeSpan.Zero)
+        {
+            var remaining = message.Duration - message.Position;
+
+            // „Angesehen": Ende abzüglich des eingestellten Fensters erreicht.
+            if (!updated.IsWatched
+                && remaining <= TimeSpan.FromSeconds(model.Settings.WatchedEndWindowSeconds))
+            {
+                updated = updated with { IsWatched = true };
+            }
+
+            // Auto-Fortsetzung: Restlaufzeit unterschreitet das Fenster
+            // → die nächste Episode startet (bei aktiviertem Schalter).
+            // Nur bei laufender Wiedergabe — ein Takt im Pausenzustand
+            // (StateChanged) darf nicht zum nächsten Titel weiterschalten.
+            if (model.Settings.AutoResumeEnabled
+                && message.IsPlaying
+                && updated.HasNextEpisode
+                && remaining <= TimeSpan.FromSeconds(model.Settings.AutoResumeRemainingSeconds))
+            {
+                var transition = AdvanceToNextEpisode(model, updated, null);
+                return new AppTransition(
+                    transition.Model,
+                    [.. effects, .. transition.Effects]);
+            }
+        }
+
+        return new AppTransition(model with { Player = updated }, effects);
+    }
+
+    private static AppTransition UpdatePlaybackEnded(AppModel model)
+    {
+        var player = model.Player;
+        if (!player.IsActive)
+        {
+            return AppTransition.Unchanged(model);
+        }
+
+        // Abschluss: als „angesehen" markieren und die Endposition melden
+        // (Position = Dauer — das Medium wurde vollständig gespielt).
+        var finalPosition = player.Duration > TimeSpan.Zero ? player.Duration : player.Position;
+        var updated = player with
+        {
+            IsPlaying = false,
+            IsBuffering = false,
+            IsWatched = true,
+            Position = finalPosition,
+            LastReportedPositionSeconds = finalPosition.TotalSeconds
+        };
+
+        var effects = new List<AppEffect>
+        {
+            new ReportPlaybackProgressEffect(
+                updated.MediaType!, updated.MediaId, finalPosition, updated.Duration)
+        };
+
+        // Am Ende liegt die Restlaufzeit bei 0 — die Auto-Fortsetzung
+        // greift damit wie im Takt (Fenster ist stets > 0).
+        if (model.Settings.AutoResumeEnabled && updated.HasNextEpisode)
+        {
+            var transition = AdvanceToNextEpisode(model, updated, null);
+            return new AppTransition(
+                transition.Model,
+                [.. effects, .. transition.Effects]);
+        }
+
+        return new AppTransition(model with { Player = updated }, effects);
+    }
+
+    private static AppTransition UpdatePlaybackFailed(AppModel model)
+    {
+        var player = model.Player;
+        if (!player.IsActive)
+        {
+            return AppTransition.Unchanged(model);
+        }
+
+        // Abspielfehler → Fehlermeldung und Rückfall auf die nächste
+        // Episode (ohne Folge-Episode bleibt der Fehlerzustand stehen).
+        return AdvanceToNextEpisode(model, player, PlaybackUnavailableError);
+    }
+
+    private static AppTransition UpdatePictureInPictureRequested(AppModel model)
+    {
+        return model.Player.IsActive
+            ? new AppTransition(model, [new TogglePictureInPictureEffect()])
+            : AppTransition.Unchanged(model);
+    }
+
+    private static AppTransition UpdatePictureInPictureChanged(AppModel model, PictureInPictureChangedMessage message)
+    {
+        var player = model.Player;
+        return player.IsActive
+            ? new AppTransition(model with { Player = player with { IsPictureInPicture = message.IsActive } }, [])
+            : AppTransition.Unchanged(model);
+    }
+
+    private static AppTransition UpdatePlayerClosed(AppModel model)
+    {
+        var player = model.Player;
+        if (!player.IsActive)
+        {
+            return AppTransition.Unchanged(model);
+        }
+
+        // Abschluss-Fortschritt melden und den Player-Zustand leeren;
+        // ein aktives kompaktes Overlay wird vorher wieder verlassen.
+        var effects = new List<AppEffect>();
+        if (player.IsPictureInPicture)
+        {
+            effects.Add(new TogglePictureInPictureEffect());
+        }
+        if (player.Position > TimeSpan.Zero)
+        {
+            effects.Add(new ReportPlaybackProgressEffect(
+                player.MediaType!, player.MediaId, player.Position, player.Duration));
+        }
+
+        return new AppTransition(model with { Player = PlayerState.Empty }, effects);
     }
 
     private static AppTransition UpdateNavigateTo(AppModel model, NavigateToMessage message)

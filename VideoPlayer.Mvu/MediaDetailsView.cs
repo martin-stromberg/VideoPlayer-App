@@ -156,6 +156,9 @@ public sealed record MediaDetailsView
     /// <summary>Stern-Beschriftung des Favoriten-Schalters (★ markiert / ☆ unmarkiert).</summary>
     public string FavoriteStarText => IsFavorite ? "★" : "☆";
 
+    /// <summary>Das Medium ist direkt abspielbar (Film oder Episode).</summary>
+    public bool IsPlayable => MediaType is "movie" or "tvshowepisode";
+
     /// <summary>Übersetzte Medientyp-Bezeichnung.</summary>
     public string MediaTypeText => MediaType switch
     {

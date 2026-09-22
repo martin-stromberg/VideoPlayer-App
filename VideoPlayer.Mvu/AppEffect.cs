@@ -242,3 +242,46 @@ public sealed record LoadProfileInfoEffect : AppEffect;
 /// Verwerfen der lokalen Geheimnisse.
 /// </summary>
 public sealed record LogoutEffect : AppEffect;
+
+/// <summary>
+/// Zur Wiedergabeseite navigieren (Shell-Route <c>player</c>,
+/// geschoben auf den Navigationsstack).
+/// </summary>
+public sealed record NavigateToPlayerEffect : AppEffect;
+
+/// <summary>
+/// Wiedergabequelle eines Mediums auflösen: lokale Datei aus dem
+/// Download-Manifest bevorzugt, sonst Stream-URL mit Zugriffstoken,
+/// jeweils mit Fortsetzungsposition (Ergebnis:
+/// <c>PlaybackSourceResolvedMessage</c>).
+/// </summary>
+/// <param name="MediaType">Medientyp (normalisiert, CLR-Konvention).</param>
+/// <param name="MediaId">Id des Mediums.</param>
+/// <returns>Effekt-Datensatz für die Quellauflösung.</returns>
+public sealed record ResolvePlaybackSourceEffect(
+    string MediaType,
+    long MediaId) : AppEffect;
+
+/// <summary>
+/// Wiedergabefortschritt eines Mediums an den Server melden — online
+/// sofort, sonst verlustfrei über die persistente Warteschlange
+/// <c>pending_progress</c> (Nachsendung bei Online-Rückkehr über den
+/// Synchronisationslauf).
+/// </summary>
+/// <param name="MediaType">Medientyp (normalisiert, CLR-Konvention).</param>
+/// <param name="MediaId">Id des Mediums.</param>
+/// <param name="Position">Zu meldende Wiedergabeposition.</param>
+/// <param name="Duration">Gesamtdauer des Mediums.</param>
+/// <returns>Effekt-Datensatz für die Fortschrittsmeldung.</returns>
+public sealed record ReportPlaybackProgressEffect(
+    string MediaType,
+    long MediaId,
+    TimeSpan Position,
+    TimeSpan Duration) : AppEffect;
+
+/// <summary>
+/// Picture-in-Picture-/Mini-Player-Modus umschalten (Ergebnis:
+/// <c>PictureInPictureChangedMessage</c>). Auf Plattformen ohne
+/// umschaltbaren PiP bleibt der Effekt wirkungslos.
+/// </summary>
+public sealed record TogglePictureInPictureEffect : AppEffect;

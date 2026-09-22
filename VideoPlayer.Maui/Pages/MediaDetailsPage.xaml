@@ -45,6 +45,12 @@
                                    FontAttributes="Bold"
                                    TextColor="#FFDDAA"
                                    VerticalOptions="Center" />
+                            <Button x:Name="PlayButton"
+                                    Text="Abspielen"
+                                    FontSize="13"
+                                    HeightRequest="40"
+                                    IsVisible="False"
+                                    Clicked="OnPlayClicked" />
                             <Button x:Name="FavoriteButton"
                                     Text="☆"
                                     FontSize="20"
@@ -83,7 +89,7 @@
                                         Margin="0,0,0,8"
                                         StrokeShape="RoundRectangle 8"
                                         BackgroundColor="#23232a">
-                                    <Grid ColumnDefinitions="110,*"
+                                    <Grid ColumnDefinitions="110,*,Auto"
                                           ColumnSpacing="10">
                                         <controls:CachedPosterImage PictureId="{Binding PosterPictureId}"
                                                                     Grid.Column="0"
@@ -100,6 +106,13 @@
                                                    MaxLines="3"
                                                    LineBreakMode="TailTruncation" />
                                         </VerticalStackLayout>
+                                        <Button Grid.Column="2"
+                                                Text="▶"
+                                                FontSize="16"
+                                                WidthRequest="44"
+                                                HeightRequest="44"
+                                                VerticalOptions="Center"
+                                                Clicked="OnEpisodePlayClicked" />
                                     </Grid>
                                 </Border>
                             </DataTemplate>

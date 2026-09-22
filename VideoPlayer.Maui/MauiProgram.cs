@@ -1,3 +1,4 @@
+using CommunityToolkit.Maui;
 using Microsoft.Extensions.Logging;
 using VideoPlayer.Maui.Services;
 using VideoPlayer.Mvu;
@@ -21,6 +22,11 @@ namespace VideoPlayer.Maui
         {
             var builder = MauiApp.CreateBuilder();
             builder.UseMauiApp<App>();
+
+            // Videowiedergabe (MediaElement) — registriert die plattform-
+            // spezifischen Player (iOS: AVPlayerViewController mit nativem
+            // PiP; Windows: MediaPlayerElement).
+            builder.UseMauiCommunityToolkitMediaElement(true);
 
             // MVU-Zyklus: Host hält das unveränderliche App-Model, der Effekt-Handler
             // führt Navigation und Server-Erreichbarkeitsprüfung am App-Rand aus.
@@ -71,6 +77,12 @@ namespace VideoPlayer.Maui
             // Anmelde-Kennung plus aktives lokales Profil.
             builder.Services.AddSingleton<ProfileInfoService>();
 
+            // Wiedergabe: Quellauflösung (Stream/lokale Datei) und
+            // Picture-in-Picture (Windows: kompaktes Overlay des
+            // App-Fensters; iOS: nativer PiP der Transportsteuerung).
+            builder.Services.AddSingleton<PlaybackSourceService>();
+            builder.Services.AddSingleton<IPictureInPictureService, PictureInPictureService>();
+
             builder.Services.AddSingleton<AppShell>();
             builder.Services.AddTransient<Pages.LoadingPage>();
             builder.Services.AddTransient<Pages.HomePage>();
@@ -85,6 +97,8 @@ namespace VideoPlayer.Maui
             // Quellen-Browsing-Seite (Shell-Route „sourceoverview").
             builder.Services.AddTransient<Pages.MediaDetailsPage>();
             builder.Services.AddTransient<Pages.SourceOverviewPage>();
+            // Wiedergabeseite (Shell-Route „player").
+            builder.Services.AddTransient<Pages.PlayerPage>();
 
             builder.ConfigureFonts(fonts =>
             {
