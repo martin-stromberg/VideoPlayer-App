@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>Projektstatus – Design-Angleichung an Webanwendung</title>
+<style>
+body { font-family: sans-serif; max-width: 900px; margin: 2rem auto; padding: 0 1rem; color: #e5e2e1; background: #131313; }
+h1 { font-size: 1.4rem; }
+.meta { color: #bda9a6; font-size: .9rem; }
+.bar { background: #2a2a2a; border-radius: 8px; height: 18px; overflow: hidden; margin: 1rem 0; }
+.bar > div { background: #e50914; height: 100%; width: 0%; transition: width .3s; }
+table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
+th, td { text-align: left; padding: .5rem .6rem; border-bottom: 1px solid rgba(255,255,255,.1); }
+th { color: #bda9a6; font-weight: 600; font-size: .85rem; }
+.status-offen { color: #bda9a6; }
+.status-arbeit { color: #83cfff; }
+.status-fertig { color: #9ccc65; }
+.status-blockiert { color: #ffb4ab; font-weight: 700; }
+code { font-size: .8rem; color: #83cfff; }
+</style>
+</head>
+<body>
+<h1>Projekt „Design-Angleichung an Webanwendung" (Kundenfeedback Issue #9)</h1>
+<p class="meta">Basisbranch: <code>task/issue-9-cebc7d86f7084dc687e7f5bccf5f678a-neugestaltung-der-app</code><br>
+Stand: Planung abgeschlossen, Entwicklungsschleife steht bevor.</p>
+<div class="bar"><div style="width:0%"></div></div>
+<p class="meta">0 / 7 Schritte fertig (0 %)</p>
+<table>
+<tr><th>#</th><th>Titel</th><th>Abhängigkeiten</th><th>Status</th></tr>
+<tr><td>1</td><td>Einheitliches Erscheinungsbild nach Web-Vorbild</td><td>Keine</td><td class="status-offen">Offen</td></tr>
+<tr><td>2</td><td>Downloads-Übersicht ohne Flackern bei der Fortschrittsanzeige</td><td>Keine</td><td class="status-offen">Offen</td></tr>
+<tr><td>3</td><td>Videoplayer: Steuerelemente in der Vollansicht bedienbar</td><td>Keine</td><td class="status-offen">Offen</td></tr>
+<tr><td>4</td><td>Videoplayer: wiederholte Wiedergabe ohne Absturz</td><td>Keine</td><td class="status-offen">Offen</td></tr>
+<tr><td>5</td><td>Startseite: Hero-Kopfbereich mit ausblendbarer Einstellung</td><td>1</td><td class="status-offen">Offen</td></tr>
+<tr><td>6</td><td>Detailseiten: Vollbreiten-Header mit Hintergrundgrafik</td><td>1</td><td class="status-offen">Offen</td></tr>
+<tr><td>7</td><td>Episodenlisten: Angesehen-Symbol bei gesehenen Episoden</td><td>6</td><td class="status-offen">Offen</td></tr>
+</table>
+</body>
+</html>
