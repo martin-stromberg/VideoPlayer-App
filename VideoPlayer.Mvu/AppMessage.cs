@@ -85,3 +85,27 @@ public sealed record OfflineDataCheckCompletedMessage(bool HasOfflineData) : App
 /// Zugangsdaten — die App wechselt in den Zustand <c>NeedsLogin</c>.
 /// </summary>
 public sealed record SessionExpiredMessage : AppMessage;
+
+/// <summary>
+/// Der Netzwerkstatus hat sich geändert (oder wird beim Monitoring-Start
+/// mit dem Ist-Wert gemeldet).
+/// </summary>
+public sealed record NetworkAvailabilityChangedMessage(bool IsOnline) : AppMessage;
+
+/// <summary>
+/// Ein Server-Ereignis wurde über die Echtzeit-Verbindung empfangen
+/// (Weiterschauen aktualisiert, Favoriten geändert, neue Inhalte
+/// eingescannt).
+/// </summary>
+public sealed record ServerEventReceivedMessage(
+    ServerEventKind Kind,
+    long? SourceId = null) : AppMessage;
+
+/// <summary>
+/// Die Ereignisverbindung wurde endgültig getrennt (die automatische
+/// Wiederverbindung des Transports ist ausgeschöpft).
+/// </summary>
+public sealed record ServerEventsConnectionClosedMessage : AppMessage;
+
+/// <summary>Die vollständige Synchronisation wurde abgeschlossen.</summary>
+public sealed record SynchronizationCompletedMessage(SyncResult Result) : AppMessage;

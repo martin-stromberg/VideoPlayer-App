@@ -16,19 +16,32 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
     private readonly IServiceProvider services;
     private readonly IServerHealthProbe healthProbe;
     private readonly AuthSessionService authSession;
+    private readonly INetworkStatusMonitor networkMonitor;
+    private readonly ServerEventsService serverEvents;
 
     public ShellAppEffectHandler(
         IServiceProvider services,
         IServerHealthProbe healthProbe,
-        AuthSessionService authSession)
+        AuthSessionService authSession,
+        INetworkStatusMonitor networkMonitor,
+        ServerEventsService serverEvents)
     {
         this.services = services;
         this.healthProbe = healthProbe;
         this.authSession = authSession;
+        this.networkMonitor = networkMonitor;
+        this.serverEvents = serverEvents;
 
         // Endgültig abgelehnte stille Neuanmeldung (401 ohne gültige
         // Zugangsdaten) → die App wechselt in den Anmeldezustand.
         this.authSession.SessionExpired += OnSessionExpired;
+
+        // Netzwerkwechsel und Server-Ereignisse laufen auf beliebigen
+        // Threads — die Messages gehen über den MainThread in den
+        // MVU-Zyklus.
+        this.networkMonitor.AvailabilityChanged += OnNetworkAvailabilityChanged;
+        this.serverEvents.EventReceived += OnServerEventReceived;
+        this.serverEvents.ConnectionClosed += OnServerEventsConnectionClosed;
     }
 
     public async Task HandleAsync(AppEffect effect, CancellationToken cancellationToken = default)
@@ -71,6 +84,119 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
             case CheckOfflineDataEffect:
                 await CheckOfflineDataAsync();
                 break;
+            case StartNetworkMonitoringEffect:
+                await StartNetworkMonitoringAsync();
+                break;
+            case ConnectServerEventsEffect connect:
+                await ConnectServerEventsAsync(connect.ServerAddress, cancellationToken);
+                break;
+            case DisconnectServerEventsEffect:
+                await DisconnectServerEventsAsync();
+                break;
+            case RunFullSyncEffect:
+                await RunFullSyncAsync(cancellationToken);
+                break;
+            case SyncContinueWatchingEffect:
+                await RunPartialSyncAsync(s => s.SyncContinueWatchingAsync(cancellationToken));
+                break;
+            case SyncFavoritesEffect:
+                await RunPartialSyncAsync(s => s.SyncFavoritesAsync(cancellationToken));
+                break;
+            case SyncMetadataEffect:
+                await RunPartialSyncAsync(s => s.SyncMetadataAsync(cancellationToken));
+                break;
+        }
+    }
+
+    private async Task StartNetworkMonitoringAsync()
+    {
+        try
+        {
+            networkMonitor.Start();
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[ShellAppEffectHandler] Netzwerk-Monitoring fehlgeschlagen: {ex.Message}");
+        }
+
+        // Ist-Wert in den MVU-Zyklus melden (ConnectivityChanged meldet
+        // nur Wechsel — der Startzustand ginge sonst verloren).
+        await DispatchMessageAsync(new NetworkAvailabilityChangedMessage(networkMonitor.IsOnline));
+    }
+
+    private async Task ConnectServerEventsAsync(string serverAddress, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await serverEvents.ConnectAsync(new Uri(serverAddress), cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            // Ein Fehlschlag ist nicht fatal — der nächste Netzwerkwechsel
+            // oder das nächste Ereignis bietet eine neue Gelegenheit.
+            System.Diagnostics.Debug.WriteLine($"[ShellAppEffectHandler] Ereignisverbindung fehlgeschlagen: {ex.Message}");
+        }
+    }
+
+    private async Task DisconnectServerEventsAsync()
+    {
+        try
+        {
+            await serverEvents.DisconnectAsync();
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[ShellAppEffectHandler] Trennen der Ereignisverbindung fehlgeschlagen: {ex.Message}");
+        }
+    }
+
+    private async Task RunFullSyncAsync(CancellationToken cancellationToken)
+    {
+        SyncResult result;
+        try
+        {
+            result = await services.GetRequiredService<ServerSyncService>().SynchronizeAsync(cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[ShellAppEffectHandler] Synchronisation fehlgeschlagen: {ex.Message}");
+            result = new SyncResult(0, 0, false, false, false);
+        }
+
+        await DispatchMessageAsync(new SynchronizationCompletedMessage(result));
+    }
+
+    private async Task RunPartialSyncAsync(Func<ServerSyncService, Task> sync)
+    {
+        try
+        {
+            await sync(services.GetRequiredService<ServerSyncService>());
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[ShellAppEffectHandler] Teil-Synchronisation fehlgeschlagen: {ex.Message}");
+        }
+    }
+
+    private void OnNetworkAvailabilityChanged(object? sender, bool isOnline) =>
+        _ = DispatchMessageAsync(new NetworkAvailabilityChangedMessage(isOnline));
+
+    private void OnServerEventReceived(object? sender, ServerEventReceivedEventArgs e) =>
+        _ = DispatchMessageAsync(new ServerEventReceivedMessage(e.Kind, e.SourceId));
+
+    private void OnServerEventsConnectionClosed(object? sender, EventArgs e) =>
+        _ = DispatchMessageAsync(new ServerEventsConnectionClosedMessage());
+
+    private async Task DispatchMessageAsync(AppMessage message)
+    {
+        try
+        {
+            var host = services.GetRequiredService<MvuHost>();
+            await MainThread.InvokeOnMainThreadAsync(() => host.DispatchAsync(message));
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[ShellAppEffectHandler] Dispatch von {message.GetType().Name} fehlgeschlagen: {ex.Message}");
         }
     }
 

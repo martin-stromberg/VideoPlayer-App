@@ -19,5 +19,12 @@ public sealed class PendingProgressSyncEntry
 
     public long PositionTicks { get; set; }
 
+    /// <summary>
+    /// Gesamtdauer des Mediums (die Server-API verlangt die Dauer bei jeder
+    /// Fortschrittsmeldung). In bestehenden Datenbanken per Migration
+    /// nachgezogen (<see cref="BackupDatabase.InitializeAsync"/>).
+    /// </summary>
+    public long DurationTicks { get; set; }
+
     public DateTime UpdatedAtUtc { get; set; }
 }

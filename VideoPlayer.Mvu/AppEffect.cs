@@ -58,3 +58,34 @@ public sealed record AttemptLoginEffect(
 /// (Ergebnis: <c>OfflineDataCheckCompletedMessage</c>).
 /// </summary>
 public sealed record CheckOfflineDataEffect : AppEffect;
+
+/// <summary>
+/// Netzwerkstatus-Überwachung starten (idempotent). Der Handler meldet den
+/// Ist-Wert als <c>NetworkAvailabilityChangedMessage</c> zurück.
+/// </summary>
+public sealed record StartNetworkMonitoringEffect : AppEffect;
+
+/// <summary>
+/// Echtzeit-Verbindung für Server-Ereignisse zum Server aufbauen
+/// (SignalR-Hub <c>hubs/mediaupdate</c>).
+/// </summary>
+public sealed record ConnectServerEventsEffect(string ServerAddress) : AppEffect;
+
+/// <summary>Ereignisverbindung trennen (Offline-Übergang).</summary>
+public sealed record DisconnectServerEventsEffect : AppEffect;
+
+/// <summary>
+/// Vollständige Synchronisation ausführen: wartende Fortschritte
+/// nachsenden, Metadaten-Caches und Weiterschauen-Liste aktualisieren
+/// (Ergebnis: <c>SynchronizationCompletedMessage</c>).
+/// </summary>
+public sealed record RunFullSyncEffect : AppEffect;
+
+/// <summary>Weiterschauen-Liste vom Server neu laden und cachen.</summary>
+public sealed record SyncContinueWatchingEffect : AppEffect;
+
+/// <summary>Favoriten vom Server neu laden und als lokale Kopie ersetzen.</summary>
+public sealed record SyncFavoritesEffect : AppEffect;
+
+/// <summary>Quellen und „Neu im Programm" vom Server neu laden und cachen.</summary>
+public sealed record SyncMetadataEffect : AppEffect;

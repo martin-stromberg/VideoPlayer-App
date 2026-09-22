@@ -37,6 +37,15 @@ namespace VideoPlayer.Maui
             builder.Services.AddSingleton<VideoPlayer.ApiClient.Discovery.ServerDiscoveryService>(
                 _ => VideoPlayer.ApiClient.Discovery.ServerDiscoveryService.CreateDefault());
 
+            // Netzwerkstatus, Ereignisverbindung (SignalR) und Synchronisation.
+            builder.Services.AddSingleton<INetworkStatusMonitor, ConnectivityNetworkStatusMonitor>();
+            builder.Services.AddSingleton<Func<IServerEventsConnection>>(
+                _ => () => new SignalRServerEventsConnection());
+            builder.Services.AddSingleton<ServerEventsService>();
+            builder.Services.AddSingleton<PendingProgressSyncService>();
+            builder.Services.AddSingleton<ProgressReportService>();
+            builder.Services.AddSingleton<ServerSyncService>();
+
             builder.Services.AddSingleton<AppShell>();
             builder.Services.AddTransient<Pages.LoadingPage>();
             builder.Services.AddTransient<Pages.HomePage>();

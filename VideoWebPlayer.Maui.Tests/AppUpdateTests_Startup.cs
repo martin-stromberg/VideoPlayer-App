@@ -13,12 +13,14 @@ public class AppUpdateTests_Startup
         Assert.True(transition.Model.IsStartupRunning);
         Assert.Equal(ServerHealthStatus.Checking, transition.Model.ServerHealth);
         Assert.Equal(AppPage.Loading, transition.Model.CurrentPage);
-        // Start löst Ablage-Initialisierung, Einstellungs-Laden und das Laden der
-        // Serververwaltung aus; der Health-Check folgt auf ServersLoadedMessage.
-        Assert.Equal(3, transition.Effects.Count);
+        // Start löst Ablage-Initialisierung, Einstellungs-Laden, das Laden der
+        // Serververwaltung und das Netzwerk-Monitoring aus; der Health-Check
+        // folgt auf ServersLoadedMessage.
+        Assert.Equal(4, transition.Effects.Count);
         Assert.IsType<InitializeStorageEffect>(transition.Effects[0]);
         Assert.IsType<LoadSettingsEffect>(transition.Effects[1]);
         Assert.IsType<LoadServersEffect>(transition.Effects[2]);
+        Assert.IsType<StartNetworkMonitoringEffect>(transition.Effects[3]);
     }
 
     [Fact]
