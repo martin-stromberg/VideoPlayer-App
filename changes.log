@@ -1,5 +1,14 @@
 # Änderungsprotokoll
 
+## 2026-09-22 — Quellen-Browsing und Medien-Detailseiten (Neugestaltung, Schritt 8)
+
+- Menüseite „Quellen" ausgebaut: Liste der serverseitig freigegebenen Medienbereiche (`api/Sources`) mit Icon (`api/sourceicons/{id}`) und Name; im Offline-Zustand klarer Hinweis statt leerer Liste, Ladefehler mit „Erneut laden", leere Antwort als eigener Leerzustand.
+- Neue Seite `SourceOverviewPage` (Shell-Route `sourceoverview`): horizontale Genre-Leiste mit „Alle"-Eintrag (`api/SourceGenres/{id}`), Textsuche über den `search`-Parameter und dreispaltiges Medien-Raster mit seitenweisem Nachladen (`api/items`, Seitengröße 20) samt Fehler-Retry — Zustand in `SourceBrowserState` (MVU), Filter-/Suchwechsel laden ab Seite 0 neu, veraltete Anhänge-Antworten werden verworfen.
+- `MediaDetailsPage` ausgebaut (Route `mediadetails` um die Serienkontext-Parameter `show`/`season`/`episode` erweitert): Basisdetails für Filme und Episoden, Filmkollektionen mit enthaltenen Filmen (Tap öffnet die Film-Detailseite; 404-Fallback auf den Einzelfilm), Serien mit Staffel-Picker und Episodenliste — Episoden-/Staffel-Aufrufe lösen über den `show`-Hint oder den eingebetteten `Season.Show`-Bezug zur Serienansicht mit Vorwahl auf.
+- Favoriten-Markierung auf der Detailseite (Stern `☆`/`★`): Umschalten über `api/favorites/toggle` mit dem Server als führendem System; danach wird die lokale Kopie `cached_favorites` (nicht backup-pflichtig) über `ServerSyncService.SyncFavoritesAsync` autoritativ erneuert und die Startseiten-Favoritenliste aktualisiert sich über `CachedListsChangedMessage` ohne manuelle Aktualisierung; Fehlschlag lässt den Stern unverändert und zeigt einen Hinweis.
+- Neue plattformneutrale Bausteine in `VideoPlayer.Mvu`: `SourceBrowserService`, `MediaDetailsService`, `FavoritesService` sowie die Zustands-Records `SourcesOverviewState`, `SourceBrowserState`, `MediaDetailsState`/`MediaDetailsView`; `HomeMediaItem`/`HomeListService` liefern Serienkontext-Hints (`ShowId`/`SeasonId`/`EpisodeId`) für Episoden- und Staffel-Einträge.
+- 75 neue xUnit-Tests für MVU-Übergänge (Quellen, Browser, Details, Favoriten), Dienst-Mappings gegen den simulierten Server, Favoriten-Cache (reale SQLite-Ablage) und Oberflächen-Verträge (insgesamt 425 Tests).
+
 ## 2026-09-22 — Serververwaltung und Erststart-Einrichtung (Neugestaltung, Schritt 4)
 
 - Mehr-Server-Verwaltung auf der backup-pflichtigen Ablage: `KnownServersService` (VideoPlayer.Storage) verwaltet die Liste bekannter Server (`known_servers`) und den zuletzt verbundenen Server (`backup_state`-Schlüssel `LastConnectedServer`); `ServerAddress` normalisiert Adressen in die kanonische Form `scheme://host[:port][/pfad]/`.

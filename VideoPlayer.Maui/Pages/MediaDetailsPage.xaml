@@ -1,18 +1,145 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:controls="clr-namespace:VideoPlayer.Maui.Controls"
+             xmlns:mvu="clr-namespace:VideoPlayer.Mvu;assembly=VideoPlayer.Mvu"
              x:Class="VideoPlayer.Maui.Pages.MediaDetailsPage"
-             Title="Details">
-    <ScrollView>
-        <VerticalStackLayout Padding="20" Spacing="12">
-            <Label x:Name="MediaTitleLabel"
-                   FontSize="24"
-                   FontAttributes="Bold" />
-            <Label x:Name="MediaTypeLabel"
-                   FontSize="14"
-                   Opacity="0.7" />
-            <Label Text="Die Detailseite dieses Mediums wird in einem späteren Entwicklungsschritt ergänzt."
-                   FontSize="14" />
+             Title="Details"
+             x:DataType="mvu:MvuHost">
+
+    <Grid Padding="16"
+          RowDefinitions="Auto,Auto,*"
+          RowSpacing="10">
+
+        <ActivityIndicator x:Name="LoadingIndicator"
+                           Grid.Row="0"
+                           IsRunning="{Binding Model.MediaDetails.IsLoading}"
+                           IsVisible="{Binding Model.MediaDetails.IsLoading}"
+                           Color="#FFB84D" />
+
+        <VerticalStackLayout x:Name="ErrorPanel"
+                             Grid.Row="1"
+                             Spacing="8"
+                             IsVisible="False">
+            <Label x:Name="ErrorLabel" TextColor="Red" />
         </VerticalStackLayout>
-    </ScrollView>
+
+        <!-- Detail-Ansicht (Layout je nach Medientyp über IsVisible) -->
+        <ScrollView x:Name="DetailsScroll"
+                    Grid.Row="2"
+                    IsVisible="False">
+            <VerticalStackLayout Spacing="12">
+
+                <!-- Kopfbereich: Bild + Titel + Favorit -->
+                <Grid ColumnDefinitions="140,*"
+                      ColumnSpacing="14">
+                    <controls:CachedPosterImage x:Name="HeaderImage"
+                                                Grid.Column="0"
+                                                HeightRequest="200"
+                                                WidthRequest="140"
+                                                Aspect="AspectFill" />
+                    <VerticalStackLayout Grid.Column="1" Spacing="8">
+                        <HorizontalStackLayout Spacing="8">
+                            <Label x:Name="TitleLabel"
+                                   FontSize="22"
+                                   FontAttributes="Bold"
+                                   TextColor="#FFDDAA"
+                                   VerticalOptions="Center" />
+                            <Button x:Name="FavoriteButton"
+                                    Text="☆"
+                                    FontSize="20"
+                                    WidthRequest="44"
+                                    HeightRequest="44"
+                                    Clicked="OnFavoriteClicked" />
+                        </HorizontalStackLayout>
+                        <Label x:Name="MetaLabel"
+                               FontSize="12"
+                               TextColor="#BBBBBB" />
+                        <Label x:Name="GenreLabel"
+                               FontSize="12"
+                               TextColor="#BBBBBB" />
+                    </VerticalStackLayout>
+                </Grid>
+
+                <!-- Handlung -->
+                <Label x:Name="PlotLabel"
+                       FontSize="14"
+                       LineBreakMode="WordWrap" />
+
+                <!-- Serienansicht: Staffel-Picker + Episodenliste -->
+                <VerticalStackLayout x:Name="SeasonSection"
+                                     Spacing="8"
+                                     IsVisible="False">
+                    <Picker x:Name="SeasonPicker"
+                            Title="Staffel"
+                            ItemDisplayBinding="{Binding Name}"
+                            SelectedIndexChanged="OnSeasonSelected" />
+                    <CollectionView x:Name="EpisodesCollection"
+                                    SelectionMode="Single"
+                                    SelectionChanged="OnEpisodeSelected">
+                        <CollectionView.ItemTemplate>
+                            <DataTemplate x:DataType="mvu:EpisodeItem">
+                                <Border Padding="10"
+                                        Margin="0,0,0,8"
+                                        StrokeShape="RoundRectangle 8"
+                                        BackgroundColor="#23232a">
+                                    <Grid ColumnDefinitions="110,*"
+                                          ColumnSpacing="10">
+                                        <controls:CachedPosterImage PictureId="{Binding PosterPictureId}"
+                                                                    Grid.Column="0"
+                                                                    HeightRequest="62"
+                                                                    WidthRequest="110"
+                                                                    Aspect="AspectFill" />
+                                        <VerticalStackLayout Grid.Column="1" Spacing="2">
+                                            <Label Text="{Binding DisplayTitle}"
+                                                   FontSize="14"
+                                                   FontAttributes="Bold"
+                                                   TextColor="#FFDDAA" />
+                                            <Label Text="{Binding Plot}"
+                                                   FontSize="12"
+                                                   MaxLines="3"
+                                                   LineBreakMode="TailTruncation" />
+                                        </VerticalStackLayout>
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </CollectionView.ItemTemplate>
+                    </CollectionView>
+                </VerticalStackLayout>
+
+                <!-- Sammelansicht: enthaltene Filme -->
+                <VerticalStackLayout x:Name="CollectionSection"
+                                     Spacing="8"
+                                     IsVisible="False">
+                    <Label Text="Enthaltene Filme"
+                           FontSize="16"
+                           FontAttributes="Bold"
+                           TextColor="#FFDDAA" />
+                    <CollectionView x:Name="CollectionCollection"
+                                    SelectionMode="Single"
+                                    SelectionChanged="OnCollectionMovieSelected">
+                        <CollectionView.ItemsLayout>
+                            <GridItemsLayout Orientation="Vertical" Span="3" VerticalItemSpacing="10" HorizontalItemSpacing="10" />
+                        </CollectionView.ItemsLayout>
+                        <CollectionView.ItemTemplate>
+                            <DataTemplate x:DataType="mvu:CollectionMovieItem">
+                                <VerticalStackLayout Spacing="4">
+                                    <controls:CachedPosterImage PictureId="{Binding PosterPictureId}"
+                                                                Aspect="AspectFill"
+                                                                HeightRequest="150" />
+                                    <Label Text="{Binding Title}"
+                                           FontSize="12"
+                                           TextColor="#FFDDAA"
+                                           LineBreakMode="TailTruncation"
+                                           MaxLines="2" />
+                                </VerticalStackLayout>
+                            </DataTemplate>
+                        </CollectionView.ItemTemplate>
+                    </CollectionView>
+                </VerticalStackLayout>
+
+            </VerticalStackLayout>
+        </ScrollView>
+    </Grid>
+
 </ContentPage>

@@ -111,6 +111,15 @@ public sealed record AppModel
     /// <summary>Mindestens eine Startseiten-Liste enthält Einträge.</summary>
     public bool HasHomeContent => HasContinueWatching || HasFavorites || HasRecentEntries;
 
+    /// <summary>Zustand der Quellen-Übersicht (Menüseite „Quellen").</summary>
+    public SourcesOverviewState SourcesOverview { get; init; } = SourcesOverviewState.Initial;
+
+    /// <summary>Zustand der Quellen-Browsing-Seite (geöffnete Quelle, Filter, Paging).</summary>
+    public SourceBrowserState SourceBrowser { get; init; } = SourceBrowserState.Empty;
+
+    /// <summary>Zustand der Medien-Detailseite.</summary>
+    public MediaDetailsState MediaDetails { get; init; } = MediaDetailsState.Empty;
+
     /// <summary>Dem Anwender anzeigbarer Text zum Serverstatus.</summary>
     public string ServerHealthText => ServerHealth switch
     {

@@ -127,6 +127,7 @@ public sealed class HomeListService
             return null;
         }
 
+        var (showId, seasonId, episodeId) = MediaHints(media);
         return new HomeMediaItem
         {
             Id = media.Id,
@@ -135,7 +136,10 @@ public sealed class HomeListService
             PosterPictureId = entry.PosterPictureId ?? media.PosterPictureId,
             Progress = entry.DurationSeconds is > 0
                 ? Math.Clamp((double)entry.PositionSeconds / entry.DurationSeconds.Value, 0d, 1d)
-                : null
+                : null,
+            ShowId = showId,
+            SeasonId = seasonId,
+            EpisodeId = episodeId
         };
     }
 
@@ -146,12 +150,31 @@ public sealed class HomeListService
             return null;
         }
 
+        var (showId, seasonId, episodeId) = MediaHints(media);
         return new HomeMediaItem
         {
             Id = media.Id,
             MediaType = MediaTypeOf(null, media),
             Title = media.Name,
-            PosterPictureId = media.PosterPictureId
+            PosterPictureId = media.PosterPictureId,
+            ShowId = showId,
+            SeasonId = seasonId,
+            EpisodeId = episodeId
+        };
+    }
+
+    /// <summary>
+    /// Serienkontext-Hints aus dem eingebetteten Objektgraph — Grundlage
+    /// der Detail-Navigation (Episoden/Staffeln öffnen die Serienansicht
+    /// mit Vorwahl, wie im Altbestand).
+    /// </summary>
+    private static (long? ShowId, long? SeasonId, long? EpisodeId) MediaHints(MediaEntry media)
+    {
+        return media switch
+        {
+            TvShowEpisode episode => (episode.Season?.Show?.Id, episode.Season?.Id, episode.Id),
+            TvShowSeason season => (season.Show?.Id, season.Id, null),
+            _ => (null, null, null)
         };
     }
 

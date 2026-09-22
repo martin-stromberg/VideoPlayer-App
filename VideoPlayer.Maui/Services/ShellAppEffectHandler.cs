@@ -111,6 +111,24 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
             case NavigateToMediaDetailsEffect details:
                 await MainThread.InvokeOnMainThreadAsync(() => NavigateToMediaDetailsAsync(details));
                 break;
+            case LoadSourcesEffect:
+                await LoadSourcesAsync(cancellationToken);
+                break;
+            case NavigateToSourceOverviewEffect overview:
+                await MainThread.InvokeOnMainThreadAsync(() => NavigateToSourceOverviewAsync(overview));
+                break;
+            case LoadSourceGenresEffect genres:
+                await LoadSourceGenresAsync(genres, cancellationToken);
+                break;
+            case LoadSourceItemsEffect items:
+                await LoadSourceItemsAsync(items, cancellationToken);
+                break;
+            case LoadMediaDetailsEffect loadDetails:
+                await LoadMediaDetailsAsync(loadDetails, cancellationToken);
+                break;
+            case ToggleFavoriteEffect toggle:
+                await ToggleFavoriteAsync(toggle, cancellationToken);
+                break;
         }
     }
 
@@ -218,11 +236,148 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
             var route = $"mediadetails?mediaType={Uri.EscapeDataString(details.MediaType)}" +
                 $"&id={details.MediaId}" +
                 $"&title={Uri.EscapeDataString(details.Title ?? string.Empty)}";
+            // Serienkontext-Hints (Episoden-/Staffel-Einträge) nur anhängen,
+            // wenn belegt — sie lösen die Serienansicht mit Vorwahl auf.
+            if (details.ShowId is > 0)
+            {
+                route += $"&show={details.ShowId}";
+            }
+            if (details.SeasonId is > 0)
+            {
+                route += $"&season={details.SeasonId}";
+            }
+            if (details.EpisodeId is > 0)
+            {
+                route += $"&episode={details.EpisodeId}";
+            }
             await Shell.Current.GoToAsync(route);
         }
         catch (Exception ex)
         {
             System.Diagnostics.Debug.WriteLine($"[ShellAppEffectHandler] Detail-Navigation fehlgeschlagen: {ex.Message}");
+        }
+    }
+
+    private async Task NavigateToSourceOverviewAsync(NavigateToSourceOverviewEffect overview)
+    {
+        if (Shell.Current is null)
+        {
+            return;
+        }
+
+        try
+        {
+            var route = $"sourceoverview?id={overview.SourceId}" +
+                $"&name={Uri.EscapeDataString(overview.SourceName ?? string.Empty)}";
+            await Shell.Current.GoToAsync(route);
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[ShellAppEffectHandler] Quellen-Navigation fehlgeschlagen: {ex.Message}");
+        }
+    }
+
+    private async Task LoadSourcesAsync(CancellationToken cancellationToken)
+    {
+        IReadOnlyList<SourceItem> sources = [];
+        string? error = null;
+        try
+        {
+            sources = await services.GetRequiredService<SourceBrowserService>()
+                .LoadSourcesAsync(cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[ShellAppEffectHandler] Quellen laden fehlgeschlagen: {ex.Message}");
+            error = "Die Quellen konnten nicht geladen werden.";
+        }
+
+        await DispatchMessageAsync(new SourcesLoadedMessage(sources, error));
+    }
+
+    private async Task LoadSourceGenresAsync(LoadSourceGenresEffect genres, CancellationToken cancellationToken)
+    {
+        IReadOnlyList<SourceGenreItem> items;
+        try
+        {
+            items = await services.GetRequiredService<SourceBrowserService>()
+                .LoadGenresAsync(genres.SourceId, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            // Genre-Ladefehler sind nicht fatal — die Leiste zeigt dann
+            // nur „Alle" (kein Filter).
+            System.Diagnostics.Debug.WriteLine($"[ShellAppEffectHandler] Genres laden fehlgeschlagen: {ex.Message}");
+            items = [new SourceGenreItem { Id = 0, Name = SourceBrowserService.AllGenresName, IsSelected = true }];
+        }
+
+        await DispatchMessageAsync(new SourceGenresLoadedMessage(genres.SourceId, items));
+    }
+
+    private async Task LoadSourceItemsAsync(LoadSourceItemsEffect items, CancellationToken cancellationToken)
+    {
+        SourceItemsPage page;
+        string? error = null;
+        try
+        {
+            page = await services.GetRequiredService<SourceBrowserService>()
+                .LoadItemsAsync(items.SourceId, items.Page, items.SearchText, items.GenreId, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[ShellAppEffectHandler] Quelleneinträge laden fehlgeschlagen: {ex.Message}");
+            page = new SourceItemsPage(items.Page, [], HasMore: false);
+            error = "Die Einträge konnten nicht geladen werden.";
+        }
+
+        await DispatchMessageAsync(new SourceItemsLoadedMessage(
+            items.SourceId, page.Page, page.Items, page.HasMore, items.Append, error));
+    }
+
+    private async Task LoadMediaDetailsAsync(LoadMediaDetailsEffect loadDetails, CancellationToken cancellationToken)
+    {
+        MediaDetailsView? details = null;
+        string? error = null;
+        try
+        {
+            details = await services.GetRequiredService<MediaDetailsService>()
+                .LoadAsync(
+                    loadDetails.MediaType, loadDetails.MediaId, loadDetails.Title,
+                    loadDetails.ShowId, loadDetails.SeasonId, loadDetails.EpisodeId,
+                    cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[ShellAppEffectHandler] Detail-Ladung fehlgeschlagen: {ex.Message}");
+            error = "Die Details konnten nicht geladen werden.";
+        }
+
+        await DispatchMessageAsync(new MediaDetailsLoadedMessage(
+            loadDetails.MediaType, loadDetails.MediaId, details, error));
+    }
+
+    private async Task ToggleFavoriteAsync(ToggleFavoriteEffect toggle, CancellationToken cancellationToken)
+    {
+        bool? isFavorite = null;
+        try
+        {
+            isFavorite = await services.GetRequiredService<FavoritesService>()
+                .ToggleAsync(toggle.MediaType, toggle.MediaId, toggle.Title, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[ShellAppEffectHandler] Favoriten-Umschaltung fehlgeschlagen: {ex.Message}");
+        }
+
+        await DispatchMessageAsync(new FavoriteToggleCompletedMessage(
+            isFavorite, toggle.MediaType, toggle.MediaId));
+
+        if (isFavorite is not null)
+        {
+            // Die lokale Favoriten-Kopie wurde aktualisiert — die
+            // Startseiten-Liste lädt den neuen Stand ohne manuelle
+            // Aktualisierung nach.
+            await DispatchMessageAsync(new CachedListsChangedMessage());
         }
     }
 

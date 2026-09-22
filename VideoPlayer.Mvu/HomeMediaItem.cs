@@ -35,6 +35,19 @@ public sealed record HomeMediaItem
     /// </summary>
     public double? Progress { get; init; }
 
+    /// <summary>
+    /// Id der zugehörigen Serie (Episoden-/Staffel-Einträge, aus dem
+    /// eingebetteten Objektgraph); <c>null</c> = kein Serienkontext
+    /// bekannt.
+    /// </summary>
+    public long? ShowId { get; init; }
+
+    /// <summary>Id der zugehörigen Staffel (Episoden-Einträge bzw. die Staffel selbst).</summary>
+    public long? SeasonId { get; init; }
+
+    /// <summary>Id der Episode selbst bei Episoden-Einträgen; sonst <c>null</c>.</summary>
+    public long? EpisodeId { get; init; }
+
     /// <summary>Ein Poster kann geladen werden.</summary>
     public bool HasPoster => PosterPictureId is > 0;
 

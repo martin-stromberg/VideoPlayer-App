@@ -1,0 +1,126 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:controls="clr-namespace:VideoPlayer.Maui.Controls"
+             xmlns:mvu="clr-namespace:VideoPlayer.Mvu;assembly=VideoPlayer.Mvu"
+             x:Class="VideoPlayer.Maui.Pages.SourceOverviewPage"
+             x:Name="SourceOverviewRoot"
+             x:DataType="mvu:MvuHost">
+
+    <Grid Padding="12"
+          RowDefinitions="Auto,Auto,Auto,Auto,*"
+          RowSpacing="10">
+
+        <!-- Suchfeld: Abschicken über Return/Suchen-Taste -->
+        <SearchBar x:Name="MediaSearchBar"
+                   Grid.Row="0"
+                   Placeholder="Suchen"
+                   SearchButtonPressed="OnSearchButtonPressed" />
+
+        <!-- Genre-Leiste: horizontal, „Alle" als erster Eintrag -->
+        <CollectionView x:Name="GenresCollection"
+                        Grid.Row="1"
+                        ItemsSource="{Binding Model.SourceBrowser.Genres}"
+                        SelectionMode="Single"
+                        SelectionChanged="OnGenreSelected">
+            <CollectionView.ItemsLayout>
+                <LinearItemsLayout Orientation="Horizontal" ItemSpacing="8" />
+            </CollectionView.ItemsLayout>
+            <CollectionView.ItemTemplate>
+                <DataTemplate x:DataType="mvu:SourceGenreItem">
+                    <Border Padding="12,6"
+                            StrokeShape="RoundRectangle 14"
+                            BackgroundColor="#23232a">
+                        <Label Text="{Binding Name}"
+                               FontSize="13"
+                               TextColor="#FFDDAA" />
+                        <Border.Triggers>
+                            <DataTrigger TargetType="Border"
+                                         Binding="{Binding IsSelected}"
+                                         Value="True">
+                                <Setter Property="BackgroundColor" Value="#FFB84D" />
+                            </DataTrigger>
+                        </Border.Triggers>
+                        <Label.Triggers>
+                            <DataTrigger TargetType="Label"
+                                         Binding="{Binding IsSelected}"
+                                         Value="True">
+                                <Setter Property="TextColor" Value="Black" />
+                                <Setter Property="FontAttributes" Value="Bold" />
+                            </DataTrigger>
+                        </Label.Triggers>
+                    </Border>
+                </DataTemplate>
+            </CollectionView.ItemTemplate>
+        </CollectionView>
+
+        <ActivityIndicator x:Name="InitialLoadingIndicator"
+                           Grid.Row="2"
+                           IsRunning="{Binding Model.SourceBrowser.IsLoading}"
+                           IsVisible="{Binding Model.SourceBrowser.IsLoading}"
+                           Color="#FFB84D" />
+
+        <!-- Fehler beim Erstladen: Meldung + erneut versuchen -->
+        <VerticalStackLayout x:Name="ErrorPanel"
+                             Grid.Row="2"
+                             Spacing="8"
+                             IsVisible="False">
+            <Label x:Name="ErrorLabel" TextColor="Red" />
+            <Button Text="Erneut versuchen"
+                    Clicked="OnRetryClicked"
+                    HorizontalOptions="Start" />
+        </VerticalStackLayout>
+
+        <Label x:Name="EmptyLabel"
+               Grid.Row="2"
+               Text="Keine Einträge gefunden."
+               IsVisible="False" />
+
+        <!-- Medien-Raster mit seitenweisem Nachladen -->
+        <CollectionView x:Name="ItemsCollection"
+                        Grid.Row="4"
+                        ItemsSource="{Binding Model.SourceBrowser.Items}"
+                        SelectionMode="Single"
+                        SelectionChanged="OnMediaItemSelected"
+                        RemainingItemsThreshold="6"
+                        RemainingItemsThresholdReached="OnRemainingItemsThresholdReached">
+            <CollectionView.ItemsLayout>
+                <GridItemsLayout Orientation="Vertical" Span="3" VerticalItemSpacing="10" HorizontalItemSpacing="10" />
+            </CollectionView.ItemsLayout>
+            <CollectionView.ItemTemplate>
+                <DataTemplate x:DataType="mvu:SourceMediaItem">
+                    <VerticalStackLayout Spacing="4">
+                        <controls:CachedPosterImage PictureId="{Binding PosterPictureId}"
+                                                    Aspect="AspectFill"
+                                                    HeightRequest="150" />
+                        <Label Text="{Binding Title}"
+                               FontSize="12"
+                               TextColor="#FFDDAA"
+                               LineBreakMode="TailTruncation"
+                               MaxLines="2" />
+                    </VerticalStackLayout>
+                </DataTemplate>
+            </CollectionView.ItemTemplate>
+            <CollectionView.Footer>
+                <Grid Padding="0,8">
+                    <!-- Fehler beim Nachladen einer Folgeseite -->
+                    <HorizontalStackLayout x:Name="FooterErrorPanel"
+                                           Spacing="8"
+                                           IsVisible="False">
+                        <Label Text="Fehler beim Laden weiterer Einträge"
+                               TextColor="Red"
+                               VerticalOptions="Center" />
+                        <Button Text="Erneut versuchen"
+                                FontSize="12"
+                                Clicked="OnRetryClicked" />
+                    </HorizontalStackLayout>
+                    <ActivityIndicator x:Name="FooterLoadingIndicator"
+                                       IsRunning="{Binding Model.SourceBrowser.IsLoadingMore}"
+                                       IsVisible="{Binding Model.SourceBrowser.IsLoadingMore}"
+                                       Color="#FFB84D" />
+                </Grid>
+            </CollectionView.Footer>
+        </CollectionView>
+    </Grid>
+
+</ContentPage>
