@@ -22,6 +22,7 @@ public partial class SettingsPage : ContentPage
         this.mvuHost = mvuHost;
         BindingContext = mvuHost;
 
+        HomeHeroSwitch.Toggled += OnHomeHeroToggled;
         AutoDownloadSwitch.Toggled += OnAutoDownloadToggled;
         WifiOnlySwitch.Toggled += OnWifiOnlyToggled;
         AutoDeleteWatchedSwitch.Toggled += OnAutoDeleteWatchedToggled;
@@ -63,6 +64,7 @@ public partial class SettingsPage : ContentPage
         suppressEvents = true;
         try
         {
+            HomeHeroSwitch.IsToggled = settings.HomeHeroEnabled;
             AutoDownloadSwitch.IsToggled = settings.AutoDownloadEnabled;
             WifiOnlySwitch.IsToggled = settings.WifiOnlyDownloads;
             AutoDeleteWatchedSwitch.IsToggled = settings.AutoDeleteWatchedEpisodes;
@@ -85,6 +87,11 @@ public partial class SettingsPage : ContentPage
         {
             entry.Text = value.ToString(System.Globalization.CultureInfo.InvariantCulture);
         }
+    }
+
+    private void OnHomeHeroToggled(object? sender, ToggledEventArgs e)
+    {
+        Save(s => s with { HomeHeroEnabled = e.Value });
     }
 
     private void OnAutoDownloadToggled(object? sender, ToggledEventArgs e)

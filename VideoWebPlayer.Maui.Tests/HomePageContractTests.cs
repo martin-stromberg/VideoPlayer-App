@@ -33,6 +33,98 @@ public class HomePageContractTests
         Assert.Contains("ServerStatusLabel", xaml, StringComparison.Ordinal);
     }
 
+    /// <summary>Prüft HomePage: enthält den Hero-Kopfbereich nach Web-Vorbild oberhalb der Listen.</summary>
+    [Fact]
+    public void HomePage_ContainsHeroSection_AboveLists()
+    {
+        var xaml = Read("VideoPlayer.Maui", "Pages", "HomePage.xaml");
+
+        // Der Hero steht vor den Medienlisten (Reihenfolge im Markup).
+        var heroIndex = xaml.IndexOf("HeroSection", StringComparison.Ordinal);
+        var carouselIndex = xaml.IndexOf("MediaCarousel", StringComparison.Ordinal);
+        Assert.True(heroIndex >= 0);
+        Assert.True(carouselIndex > heroIndex);
+
+        // Web-Markup: Kicker-Chip, Titel, Beschreibung; Sichtbarkeit über
+        // die positiv formulierte Einstellung im MVU-Model.
+        Assert.Contains("PRIVATE MEDIA LIBRARY", xaml, StringComparison.Ordinal);
+        Assert.Contains("{Binding Model.HeroTitle}", xaml, StringComparison.Ordinal);
+        Assert.Contains("IsVisible=\"{Binding Model.ShowHomeHero}\"", xaml, StringComparison.Ordinal);
+        // Cover-Darstellung und geschichtete Gradienten.
+        Assert.Contains("AspectFill", xaml, StringComparison.Ordinal);
+        Assert.Contains("LinearGradientBrush", xaml, StringComparison.Ordinal);
+        Assert.Contains("RadialGradientBrush", xaml, StringComparison.Ordinal);
+        Assert.Contains("VpHeroSideStrong", xaml, StringComparison.Ordinal);
+        // Trennlinie und Bild ohne dauerhafte Ablage.
+        Assert.Contains("VpBorder", xaml, StringComparison.Ordinal);
+        Assert.DoesNotContain("WriteAllBytes", xaml, StringComparison.Ordinal);
+    }
+
+    /// <summary>Prüft HomePage-Code: wandelt die Hero-Bytes in eine ImageSource um und koppelt die Höhe an die Breite.</summary>
+    [Fact]
+    public void HomePage_CodeBehind_UpdatesHeroImageAndResponsiveHeight()
+    {
+        var code = Read("VideoPlayer.Maui", "Pages", "HomePage.xaml.cs");
+
+        // Flüchtige Umwandlung byte[] → ImageSource (keine Dateiablage).
+        Assert.Contains("ImageSource.FromStream", code, StringComparison.Ordinal);
+        Assert.Contains("model.HomeHero.ImageBytes", code, StringComparison.Ordinal);
+        Assert.DoesNotContain("WriteAllBytes", code, StringComparison.Ordinal);
+        // clamp-Äquivalent der Web-Höhe (260px … 42vw … 520px).
+        Assert.Contains("Math.Clamp(Width * 0.42, 260, 520)", code, StringComparison.Ordinal);
+        Assert.Contains("SizeChanged", code, StringComparison.Ordinal);
+    }
+
+    /// <summary>Prüft ShellAppEffectHandler: führt den Hero-Ladeeffekt über den angemeldeten Client aus.</summary>
+    [Fact]
+    public void ShellAppEffectHandler_HandlesHeroLoadEffect()
+    {
+        var handler = Read("VideoPlayer.Maui", "Services", "ShellAppEffectHandler.cs");
+
+        Assert.Contains("LoadHeroBackgroundEffect", handler, StringComparison.Ordinal);
+        Assert.Contains("GetHeroBackgroundAsync", handler, StringComparison.Ordinal);
+        Assert.Contains("HeroBackgroundLoadedMessage", handler, StringComparison.Ordinal);
+        Assert.Contains("authSession.Client", handler, StringComparison.Ordinal);
+    }
+
+    /// <summary>Prüft VideoPlayerApiClient: ruft den Hero-Endpunkt mit der gemeinsamen Sende-Pipeline ab.</summary>
+    [Fact]
+    public void ApiClient_HeroEndpoint_UsesSendPipeline()
+    {
+        var client = Read("VideoPlayer.ApiClient", "VideoPlayerApiClient.cs");
+
+        Assert.Contains("GetHeroBackgroundAsync", client, StringComparison.Ordinal);
+        Assert.Contains("api/pictures/hero-background", client, StringComparison.Ordinal);
+    }
+
+    /// <summary>Prüft SettingsPage: enthält den positiv formulierten Schalter für den Kopfbereich.</summary>
+    [Fact]
+    public void SettingsPage_ContainsHeroToggle_PositiveWording()
+    {
+        var xaml = Read("VideoPlayer.Maui", "Pages", "SettingsPage.xaml");
+        var code = Read("VideoPlayer.Maui", "Pages", "SettingsPage.xaml.cs");
+
+        // Positiv formuliert: „Kopfbereich anzeigen" (kein „ausblenden").
+        Assert.Contains("Kopfbereich anzeigen", xaml, StringComparison.Ordinal);
+        Assert.Contains("HomeHeroSwitch", xaml, StringComparison.Ordinal);
+        Assert.Contains("HomeHeroEnabled", code, StringComparison.Ordinal);
+        Assert.Contains("OnHomeHeroToggled", code, StringComparison.Ordinal);
+        Assert.Contains("settings.HomeHeroEnabled", code, StringComparison.Ordinal);
+    }
+
+    /// <summary>Prüft Colors: definiert die Hero-Gradienten als transluzente Ableitungen der Design-Tokens.</summary>
+    [Fact]
+    public void Colors_DefinesHeroGradientTokens()
+    {
+        var colors = Read("VideoPlayer.Maui", "Resources", "Styles", "Colors.xaml");
+
+        Assert.Contains("VpHeroSideStrong", colors, StringComparison.Ordinal);
+        Assert.Contains("VpHeroAccentPrimary", colors, StringComparison.Ordinal);
+        Assert.Contains("VpHeroAccentSecondary", colors, StringComparison.Ordinal);
+        // Die Tokenfarbe selbst bleibt unverändert die Web-Farbe.
+        Assert.Contains("#e50914", colors, StringComparison.OrdinalIgnoreCase);
+    }
+
     /// <summary>Prüft MediaCarousel: Einträge sind tippbar und Poster werden über den Cache geladen.</summary>
     [Fact]
     public void MediaCarousel_ItemsAreTappable_PostersViaCache()

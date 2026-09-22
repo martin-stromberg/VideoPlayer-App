@@ -85,15 +85,16 @@ public class AppUpdateTests_Connection
         Assert.Equal(AppPage.Home, transition.Model.CurrentPage);
         // Verbundener Zustand: Quellen-Laden fürs Menü +
         // Ereignisverbindung + Voll-Sync + Download-Wiederaufnahme +
-        // Navigation.
+        // Hero-Hintergrund (Einstellung standardmäßig aktiv) + Navigation.
         Assert.True(transition.Model.IsSyncRunning);
         Assert.True(transition.Model.SourcesOverview.IsLoading);
-        Assert.Equal(5, transition.Effects.Count);
+        Assert.Equal(6, transition.Effects.Count);
         Assert.IsType<LoadSourcesEffect>(transition.Effects[0]);
         Assert.IsType<ConnectServerEventsEffect>(transition.Effects[1]);
         Assert.IsType<RunFullSyncEffect>(transition.Effects[2]);
         Assert.IsType<ResumeDownloadsEffect>(transition.Effects[3]);
-        var navigate = Assert.IsType<NavigateToPageEffect>(transition.Effects[4]);
+        Assert.IsType<LoadHeroBackgroundEffect>(transition.Effects[4]);
+        var navigate = Assert.IsType<NavigateToPageEffect>(transition.Effects[5]);
         Assert.Equal(AppPage.Home, navigate.Page);
     }
 
@@ -231,12 +232,13 @@ public class AppUpdateTests_Connection
         Assert.Equal(ConnectionState.Connected, transition.Model.ConnectionState);
         Assert.Equal(AppPage.Home, transition.Model.CurrentPage);
         Assert.True(transition.Model.IsSyncRunning);
-        Assert.Equal(5, transition.Effects.Count);
+        Assert.Equal(6, transition.Effects.Count);
         Assert.IsType<LoadSourcesEffect>(transition.Effects[0]);
         Assert.IsType<ConnectServerEventsEffect>(transition.Effects[1]);
         Assert.IsType<RunFullSyncEffect>(transition.Effects[2]);
         Assert.IsType<ResumeDownloadsEffect>(transition.Effects[3]);
-        var navigate = Assert.IsType<NavigateToPageEffect>(transition.Effects[4]);
+        Assert.IsType<LoadHeroBackgroundEffect>(transition.Effects[4]);
+        var navigate = Assert.IsType<NavigateToPageEffect>(transition.Effects[5]);
         Assert.Equal(AppPage.Home, navigate.Page);
     }
 

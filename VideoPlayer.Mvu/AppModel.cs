@@ -113,6 +113,36 @@ public sealed record AppModel
     public bool HasHomeContent => HasContinueWatching || HasFavorites || HasRecentEntries;
 
     /// <summary>
+    /// Zustand des Hero-Kopfbereichs der Startseite (Ladezustand und
+    /// Bilddaten des servergenerierten Hintergrunds — flüchtig, keine
+    /// dauerhafte Ablage).
+    /// </summary>
+    public HomeHeroState HomeHero { get; init; } = HomeHeroState.Empty;
+
+    /// <summary>
+    /// Der Hero-Kopfbereich der Startseite wird angezeigt — gesteuert
+    /// über die positiv formulierte Einstellung
+    /// <see cref="AppSettings.HomeHeroEnabled"/> (Standard: aktiviert).
+    /// Ein fehlendes Bild lässt den Bereich bestehen (Gradienten/Texte).
+    /// </summary>
+    public bool ShowHomeHero => Settings.HomeHeroEnabled;
+
+    /// <summary>
+    /// Titelzeile des Hero-Kopfbereichs: der Anzeigename des aktiven
+    /// Servers (<see cref="KnownServer.NameOrAddress"/>), ohne aktiven
+    /// Server der App-Name. Entspricht dem Anwendungstitel
+    /// (<c>applicationTitle</c>) des Web-Heros.
+    /// </summary>
+    public string HeroTitle =>
+        ActiveServerAddress is null
+            ? "VideoPlayer"
+            : KnownServers
+                .FirstOrDefault(s => string.Equals(
+                    s.Address, ActiveServerAddress, StringComparison.OrdinalIgnoreCase))
+                ?.NameOrAddress
+            ?? ActiveServerAddress;
+
+    /// <summary>
     /// Freigegebene Quellen des angemeldeten Benutzers — Träger der
     /// dynamischen Quellen-Einträge im Navigationsmenü. Die Befüllung ist
     /// zustandsgesteuert (Verbindungsaufbau, Synchronisation) und erfolgt

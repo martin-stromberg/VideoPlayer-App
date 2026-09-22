@@ -15,6 +15,16 @@
                    TextColor="{StaticResource VpDanger}"
                    IsVisible="False" />
 
+            <!-- Darstellung -->
+            <Label Text="Darstellung" FontAttributes="Bold" FontSize="16" />
+
+            <HorizontalStackLayout Spacing="10">
+                <Switch x:Name="HomeHeroSwitch"
+                        AutomationId="HomeHeroSwitch"
+                        VerticalOptions="Center" />
+                <Label Text="Kopfbereich anzeigen" VerticalOptions="Center" />
+            </HorizontalStackLayout>
+
             <!-- Downloads -->
             <Label Text="Downloads" FontAttributes="Bold" FontSize="16" />
 

@@ -40,4 +40,15 @@
     <Color x:Key="VpOverlay">#80000000</Color>
     <Color x:Key="VpShadow">#000000</Color>
     <SolidColorBrush x:Key="VpShadowBrush" Color="{StaticResource VpShadow}"/>
+
+    <!-- Hero-Kopfbereich der Startseite: transluzente Ableitungen der
+         Tokens für die geschichteten Gradienten des Web-Heros
+         (seitlicher Verlauf rgba(19,19,19,.98→.76→.18) über VpBg,
+         radiale Akzente rgba(229,9,20,.3)/rgba(0,168,232,.22)). -->
+    <Color x:Key="VpHeroSideStrong">#FA131313</Color>
+    <Color x:Key="VpHeroSideMid">#C2131313</Color>
+    <Color x:Key="VpHeroSideSoft">#2E131313</Color>
+    <Color x:Key="VpHeroFadeClear">#00131313</Color>
+    <Color x:Key="VpHeroAccentPrimary">#4DE50914</Color>
+    <Color x:Key="VpHeroAccentSecondary">#3800A8E8</Color>
 </ResourceDictionary>

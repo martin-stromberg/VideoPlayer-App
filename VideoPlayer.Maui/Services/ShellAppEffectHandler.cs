@@ -129,6 +129,9 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
             case LoadHomeListsEffect:
                 await LoadHomeListsAsync();
                 break;
+            case LoadHeroBackgroundEffect:
+                await LoadHeroBackgroundAsync(cancellationToken);
+                break;
             case NavigateToMediaDetailsEffect details:
                 await MainThread.InvokeOnMainThreadAsync(() => NavigateToMediaDetailsAsync(details));
                 break;
@@ -370,6 +373,34 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
         }
 
         await DispatchMessageAsync(new HomeListsLoadedMessage(lists));
+    }
+
+    private async Task LoadHeroBackgroundAsync(CancellationToken cancellationToken)
+    {
+        byte[]? imageBytes = null;
+        try
+        {
+            // Der angemeldete Client liefert das servergenerierte Bild
+            // (Bearer + stille Token-Erneuerung in der Sende-Pipeline).
+            // Ohne Sitzung bzw. bei Fehlschlag bleibt das Bild aus — der
+            // Kopfbereich zeigt dann nur Gradienten und Texte.
+            var client = authSession.Client;
+            if (client is not null)
+            {
+                var bytes = await client.GetHeroBackgroundAsync(cancellationToken);
+                imageBytes = bytes.Length > 0 ? bytes : null;
+            }
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[ShellAppEffectHandler] Hero-Hintergrund laden fehlgeschlagen: {ex.Message}");
+        }
+
+        await DispatchMessageAsync(new HeroBackgroundLoadedMessage(imageBytes));
     }
 
     private async Task NavigateToMediaDetailsAsync(NavigateToMediaDetailsEffect details)
