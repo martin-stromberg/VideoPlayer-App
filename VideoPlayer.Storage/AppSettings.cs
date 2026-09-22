@@ -41,6 +41,13 @@ public sealed record AppSettings
     /// <summary>Gesehene Episoden automatisch löschen an/aus.</summary>
     public bool AutoDeleteWatchedEpisodes { get; init; }
 
+    /// <summary>
+    /// Hero-Kopfbereich der Startseite anzeigen (positiv formuliert —
+    /// <c>true</c> = der Kopfbereich mit dem servergenerierten Bild wird
+    /// gezeigt; Standard: aktiviert).
+    /// </summary>
+    public bool HomeHeroEnabled { get; init; } = true;
+
     /// <summary>Liefert eine Kopie mit auf die zulässigen Schranken geklammerten Werten.</summary>
     /// <returns>Eine Kopie der Einstellungen mit normalisierten Werten.</returns>
     public AppSettings Normalize() => this with

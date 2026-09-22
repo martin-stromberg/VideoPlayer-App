@@ -41,9 +41,9 @@ public class MvuHostTests
         // Start (Ablage, Einstellungen, Serverliste, Netzwerk-Monitoring,
         // gecachte Startseiten-Listen), Health-Check, automatische
         // Anmeldung, dann Quellen-Laden fürs Menü + Ereignisverbindung +
-        // Synchronisation + Download-Wiederaufnahme + Navigation zur
-        // Startseite.
-        Assert.Equal(12, handler.Effects.Count);
+        // Synchronisation + Download-Wiederaufnahme + Hero-Hintergrund +
+        // Navigation zur Startseite.
+        Assert.Equal(13, handler.Effects.Count);
         Assert.IsType<InitializeStorageEffect>(handler.Effects[0]);
         Assert.IsType<LoadSettingsEffect>(handler.Effects[1]);
         Assert.IsType<LoadServersEffect>(handler.Effects[2]);
@@ -55,7 +55,8 @@ public class MvuHostTests
         Assert.IsType<ConnectServerEventsEffect>(handler.Effects[8]);
         Assert.IsType<RunFullSyncEffect>(handler.Effects[9]);
         Assert.IsType<ResumeDownloadsEffect>(handler.Effects[10]);
-        Assert.IsType<NavigateToPageEffect>(handler.Effects[11]);
+        Assert.IsType<LoadHeroBackgroundEffect>(handler.Effects[11]);
+        Assert.IsType<NavigateToPageEffect>(handler.Effects[12]);
     }
 
     /// <summary>Prüft DispatchAsync: löst die ModelChanged- und PropertyChanged-Ereignisse aus.</summary>

@@ -116,6 +116,14 @@ public sealed record SyncMetadataEffect : AppEffect;
 public sealed record LoadHomeListsEffect : AppEffect;
 
 /// <summary>
+/// Servergeneriertes Hero-Hintergrundbild der Startseite vom
+/// angemeldeten API-Client laden (<c>api/pictures/hero-background</c>;
+/// Ergebnis: <c>HeroBackgroundLoadedMessage</c>). Fehlschlag ist kein
+/// Fehlerzustand — der Kopfbereich zeigt dann nur Gradienten und Texte.
+/// </summary>
+public sealed record LoadHeroBackgroundEffect : AppEffect;
+
+/// <summary>
 /// Zur Detailseite eines Mediums navigieren (Shell-Route
 /// <c>mediadetails</c>, geschoben auf den Navigationsstack). Die
 /// optionalen Hints lösen Episoden/Staffeln zum Serienkontext auf.

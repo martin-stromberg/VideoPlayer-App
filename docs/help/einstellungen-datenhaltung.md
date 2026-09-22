@@ -8,6 +8,12 @@ strukturierte lokale Datenablage mit klarer Backup-Trennung.
 Die Seite „Einstellungen" ist über das Seitenmenü erreichbar. Alle Werte werden
 sofort übernommen und bleiben nach dem Neustart der App erhalten.
 
+### Darstellung
+
+- **Kopfbereich anzeigen** — blendet den Hero-Kopfbereich der Startseite
+  (servergeneriertes Hintergrundbild mit Titel) ein oder aus
+  (Standard: ein).
+
 ### Downloads
 
 - **Automatische Downloads** — schaltet den automatischen Abruf neuer Episoden

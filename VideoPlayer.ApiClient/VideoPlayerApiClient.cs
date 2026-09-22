@@ -417,6 +417,23 @@ public class VideoPlayerApiClient
         return await response.Content.ReadAsByteArrayAsync(cancellationToken);
     }
 
+    /// <summary>
+    /// Lädt das servergenerierte Hero-Hintergrundbild der Startseite
+    /// (<c>GET api/pictures/hero-background</c>). Der Server liefert ein
+    /// generiertes JPEG bzw. einen serverseitigen Platzhalter.
+    /// </summary>
+    /// <param name="cancellationToken">Abbruchtoken.</param>
+    /// <returns>Die Bilddaten als Byte-Array.</returns>
+    public async Task<byte[]> GetHeroBackgroundAsync(CancellationToken cancellationToken = default)
+    {
+        using var response = await SendWithPolicyAsync(
+            "api/pictures/hero-background",
+            () => new HttpRequestMessage(HttpMethod.Get, "api/pictures/hero-background"),
+            allowReauth: true,
+            cancellationToken);
+        return await response.Content.ReadAsByteArrayAsync(cancellationToken);
+    }
+
     #endregion
 
     #region Send pipeline

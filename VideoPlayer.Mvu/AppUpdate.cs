@@ -76,6 +76,7 @@ public static class AppUpdate
             SynchronizationCompletedMessage => UpdateSynchronizationCompleted(model),
             CachedListsChangedMessage => UpdateCachedListsChanged(model),
             HomeListsLoadedMessage loaded => UpdateHomeListsLoaded(model, loaded),
+            HeroBackgroundLoadedMessage loaded => UpdateHeroBackgroundLoaded(model, loaded),
             StorageRecoveredMessage recovered => UpdateStorageRecovered(model, recovered),
             MediaItemSelectedMessage selected => UpdateMediaItemSelected(model, selected),
             SourcesLoadedMessage loaded => UpdateSourcesLoaded(model, loaded),
@@ -168,7 +169,11 @@ public static class AppUpdate
             effects.Add(new RunAutoDownloadsEffect(normalized, Force: true));
         }
 
-        return new AppTransition(model with { Settings = normalized }, effects);
+        // Beim Einschalten des Kopfbereichs (bzw. bei jeder Speicherung,
+        // falls nach einem Fehlschlag noch kein Bild vorliegt) wird das
+        // Hero-Bild nachgeladen — nur bei bestehender Verbindung.
+        var updated = WithHeroLoad(model with { Settings = normalized }, effects);
+        return new AppTransition(updated, effects);
     }
 
     private static AppTransition UpdateServersLoaded(AppModel model, ServersLoadedMessage message)
@@ -300,7 +305,11 @@ public static class AppUpdate
                 ServerHealth = ServerHealthStatus.Reachable,
                 ConnectionState = ConnectionState.Connecting,
                 SourcesOverview = SourcesOverviewState.Initial,
-                SourceBrowser = SourceBrowserState.Empty
+                SourceBrowser = SourceBrowserState.Empty,
+                // Auch das servergenerierte Hero-Bild gehört zum
+                // bisherigen Server — der neue Stand folgt über
+                // EnterConnected.
+                HomeHero = HomeHeroState.Empty
             },
             [new PersistActiveServerEffect(normalized, message.DisplayName), new AttemptAutoLoginEffect(normalized)]);
     }
@@ -464,6 +473,11 @@ public static class AppUpdate
         // liegt persistent im Manifest.
         effects.Add(new ResumeDownloadsEffect(model.Settings));
 
+        // Der Hero-Kopfbereich der Startseite lädt sein servergeneriertes
+        // Hintergrundbild einmalig je Verbindung — sofern die Einstellung
+        // aktiviert ist und noch kein Bild vorliegt.
+        updated = WithHeroLoad(updated, effects);
+
         if (IsWorkflowPage(model.CurrentPage))
         {
             updated = updated with { CurrentPage = AppPage.Home };
@@ -591,6 +605,65 @@ public static class AppUpdate
         };
     }
 
+    /// <summary>
+    /// Reiht das Laden des Hero-Hintergrundbilds ein, wenn die App
+    /// verbunden ist, der Kopfbereich aktiviert ist und weder ein
+    /// Ladevorgang läuft noch ein Bild vorliegt:
+    /// <see cref="HomeHeroState"/> erhält <c>IsLoading = true</c> und ein
+    /// <see cref="LoadHeroBackgroundEffect"/> wird an
+    /// <paramref name="effects"/> angehängt. Nach einem Fehlschlag greift
+    /// die Bedingung beim nächsten Verbindungsaufbau erneut.
+    /// </summary>
+    /// <param name="model">Aktuelles App-Model.</param>
+    /// <param name="effects">Effektliste des Übergangs, an die der Ladeeffekt angehängt wird.</param>
+    /// <returns>Das ggf. aktualisierte Model; unverändert, wenn kein Ladevorgang angestoßen wird.</returns>
+    private static AppModel WithHeroLoad(AppModel model, List<AppEffect> effects)
+    {
+        if (model.ConnectionState != ConnectionState.Connected
+            || !model.Settings.HomeHeroEnabled
+            || model.HomeHero.IsLoading
+            || model.HomeHero.HasImage)
+        {
+            return model;
+        }
+
+        effects.Add(new LoadHeroBackgroundEffect());
+        return model with
+        {
+            HomeHero = model.HomeHero with { IsLoading = true }
+        };
+    }
+
+    private static AppTransition UpdateHeroBackgroundLoaded(AppModel model, HeroBackgroundLoadedMessage message)
+    {
+        // Verspätete Antworten eines abgelösten Ladevorgangs (Abmeldung,
+        // Sitzungsablauf, Serverwechsel — der Zustand wurde dort bereits
+        // zurückgesetzt) dürfen kein sitzungsfremdes Bild hinterlassen.
+        // Ohne laufenden Ladevorgang ist die Nachricht überholt; im
+        // Offline-Übergang bleibt <c>IsLoading</c> bestehen, sodass ein
+        // dort eintreffendes Ergebnis noch gilt.
+        if (!model.HomeHero.IsLoading)
+        {
+            return AppTransition.Unchanged(model);
+        }
+
+        // Ein Fehlschlag (null) löscht kein vorhandenes Bild — und ist
+        // ohnehin kein Fehlerzustand: der Kopfbereich zeigt dann nur
+        // Gradienten und Texte (Web-Verhalten).
+        return new AppTransition(
+            model with
+            {
+                HomeHero = model.HomeHero with
+                {
+                    IsLoading = false,
+                    ImageBytes = message.ImageBytes is { Length: > 0 }
+                        ? message.ImageBytes
+                        : model.HomeHero.ImageBytes
+                }
+            },
+            []);
+    }
+
     private static AppTransition UpdateServerEventReceived(AppModel model, ServerEventReceivedMessage message)
     {
         if (model.ConnectionState != ConnectionState.Connected)
@@ -635,9 +708,11 @@ public static class AppUpdate
             CurrentPage = AppPage.Login,
             // Quellen und Browsing-Zustand gehören zur abgelaufenen
             // Sitzung — sie dürfen für den nächsten Benutzer nicht
-            // sichtbar bleiben.
+            // sichtbar bleiben. Das benutzerbezogen generierte
+            // Hero-Bild ebenfalls nicht.
             SourcesOverview = SourcesOverviewState.Initial,
-            SourceBrowser = SourceBrowserState.Empty
+            SourceBrowser = SourceBrowserState.Empty,
+            HomeHero = HomeHeroState.Empty
         };
         // Zur Anmeldemaske — die Ereignisverbindung wird getrennt (das
         // abgelaufene Token kann ohnehin nicht mehr autorisiert werden).
@@ -1294,7 +1369,10 @@ public static class AppUpdate
             MediaDetails = MediaDetailsState.Empty,
             FavoritesPage = FavoritesPageState.Initial,
             Profile = ProfilePageState.Initial,
-            Player = PlayerState.Empty
+            Player = PlayerState.Empty,
+            // Der Hero-Hintergrund wird benutzerbezogen generiert — er
+            // gehört zur beendeten Sitzung.
+            HomeHero = HomeHeroState.Empty
         };
 
         var effects = new List<AppEffect>

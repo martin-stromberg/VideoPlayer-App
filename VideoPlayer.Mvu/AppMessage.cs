@@ -163,6 +163,17 @@ public sealed record SynchronizationCompletedMessage(SyncResult Result) : AppMes
 public sealed record HomeListsLoadedMessage(HomeLists Lists) : AppMessage;
 
 /// <summary>
+/// Der Abruf des servergenerierten Hero-Hintergrundbilds
+/// (<c>api/pictures/hero-background</c>) ist abgeschlossen (Antwort auf
+/// <c>LoadHeroBackgroundEffect</c>). <paramref name="ImageBytes"/> ist
+/// <c>null</c>, wenn kein Bild verfügbar ist (offline, keine Sitzung,
+/// Serverfehler) — der Kopfbereich zeigt dann nur Gradienten und Texte.
+/// </summary>
+/// <param name="ImageBytes">Die Bilddaten (JPEG) oder <c>null</c> bei Fehlschlag.</param>
+/// <returns>Nachricht mit dem Ladeergebnis des Hero-Hintergrunds.</returns>
+public sealed record HeroBackgroundLoadedMessage(byte[]? ImageBytes) : AppMessage;
+
+/// <summary>
 /// Eine lokale Datenbank war beschädigt und wurde neu initialisiert —
 /// die alte Datei wurde beiseitegelegt (<c>*.corrupt-*</c>). Der Nutzer
 /// wird über <paramref name="Notice"/> informiert; verworfene Caches

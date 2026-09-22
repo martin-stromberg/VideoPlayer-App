@@ -20,6 +20,9 @@ public class AppSettingsTests
         Assert.Equal(5, settings.DownloadQuotaGb);
         Assert.Equal(AppSettings.DefaultDownloadQuotaGb, settings.DownloadQuotaGb);
         Assert.False(settings.AutoDeleteWatchedEpisodes);
+        // Positiv formulierte Einstellung: der Hero-Kopfbereich ist
+        // standardmäßig aktiviert.
+        Assert.True(settings.HomeHeroEnabled);
     }
 
     /// <summary>Prüft Normalize: begrenzt die Preload-Episodenanzahl.</summary>

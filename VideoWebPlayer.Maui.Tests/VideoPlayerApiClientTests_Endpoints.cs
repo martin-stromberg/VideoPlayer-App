@@ -233,4 +233,41 @@ public class VideoPlayerApiClientTests_Endpoints
 
         Assert.Equal([9, 8, 7], bytes);
     }
+
+    /// <summary>Prüft GetHeroBackgroundAsync: ruft den Hero-Endpunkt auf und gibt die Bilddaten zurück.</summary>
+    [Fact]
+    public async Task GetHeroBackgroundAsync_RequestsHeroEndpoint_AndReturnsBytes()
+    {
+        var handler = new StubHttpMessageHandler();
+        handler.Enqueue(_ => new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new ByteArrayContent([1, 2, 3, 4])
+        });
+        var client = ApiClientTestFactory.CreateClient(handler);
+
+        var bytes = await client.GetHeroBackgroundAsync();
+
+        Assert.Equal([1, 2, 3, 4], bytes);
+        var request = Assert.Single(handler.Requests);
+        Assert.Equal(HttpMethod.Get, request.Method);
+        Assert.Equal("/api/pictures/hero-background", request.PathAndQuery);
+    }
+
+    /// <summary>Prüft GetHeroBackgroundAsync: sendet den Bearer-Token der angemeldeten Sitzung.</summary>
+    [Fact]
+    public async Task GetHeroBackgroundAsync_SendsBearerToken()
+    {
+        var handler = new StubHttpMessageHandler();
+        handler.EnqueueJson(HttpStatusCode.OK, new { token = "jwt-hero", expires = "2030-01-01T00:00:00Z" });
+        handler.Enqueue(_ => new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new ByteArrayContent([5])
+        });
+        var client = ApiClientTestFactory.CreateClient(handler);
+
+        await client.LoginAsync("user@example.com", "secret");
+        await client.GetHeroBackgroundAsync();
+
+        Assert.Equal("Bearer jwt-hero", handler.Requests[1].Authorization);
+    }
 }

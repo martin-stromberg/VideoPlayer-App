@@ -38,13 +38,40 @@ public class AppSettingsServiceTests
             WifiOnlyDownloads = false,
             WatchedEndWindowSeconds = 120,
             DownloadQuotaGb = 42,
-            AutoDeleteWatchedEpisodes = true
+            AutoDeleteWatchedEpisodes = true,
+            HomeHeroEnabled = false
         };
 
         service.Save(settings);
         var loaded = service.Load();
 
         Assert.Equal(settings, loaded);
+    }
+
+    /// <summary>Prüft Load: ohne gespeicherten Hero-Schlüssel → der Kopfbereich bleibt aktiviert (positiver Standard).</summary>
+    [Fact]
+    public void Load_WithoutHomeHeroKey_KeepsHeroEnabled()
+    {
+        var service = CreateService(new InMemorySettingsStore());
+
+        var loaded = service.Load();
+
+        Assert.True(loaded.HomeHeroEnabled);
+    }
+
+    /// <summary>Prüft Save/Load: ein ausgeschalteter Kopfbereich übersteht das erneute Laden (Neustart).</summary>
+    [Fact]
+    public void Save_HomeHeroDisabled_PersistsAcrossLoad()
+    {
+        var store = new InMemorySettingsStore();
+        var service = CreateService(store);
+
+        service.Save(new AppSettings { HomeHeroEnabled = false });
+        var loaded = service.Load();
+
+        Assert.False(loaded.HomeHeroEnabled);
+        // Der Schlüssel wurde tatsächlich in der Ablage geschrieben.
+        Assert.False(store.GetBool(AppSettingsService.HomeHeroEnabledKey, true));
     }
 
     /// <summary>Prüft Load: begrenzt gespeicherte Werte außerhalb des gültigen Bereichs.</summary>

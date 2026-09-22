@@ -14,9 +14,10 @@ public class SettingsStorageContractTests
     private static readonly string Root = RepositoryRoot.Find();
     private static readonly XNamespace MauiNs = "http://schemas.microsoft.com/dotnet/2021/maui";
 
-    /// <summary>AutomationIds der acht Einstellungs-Bedienelemente + Fehlerhinweis.</summary>
+    /// <summary>AutomationIds der neun Einstellungs-Bedienelemente + Fehlerhinweis.</summary>
     private static readonly string[] ExpectedAutomationIds =
     [
+        "HomeHeroSwitch",
         "AutoDownloadSwitch",
         "PreloadEpisodeCountEntry",
         "WifiOnlySwitch",
@@ -50,8 +51,8 @@ public class SettingsStorageContractTests
             Assert.Contains(id, automationIds);
         }
 
-        // Vier Switches + vier numerische Eingabefelder für die acht Einstellungen.
-        Assert.Equal(4, page.Descendants(MauiNs + "Switch").Count());
+        // Fünf Switches + vier numerische Eingabefelder für die neun Einstellungen.
+        Assert.Equal(5, page.Descendants(MauiNs + "Switch").Count());
         Assert.Equal(4, page.Descendants(MauiNs + "Entry").Count());
         Assert.All(page.Descendants(MauiNs + "Entry"), e =>
             Assert.Equal("Numeric", (string?)e.Attribute("Keyboard")));

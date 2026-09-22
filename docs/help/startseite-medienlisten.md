@@ -7,6 +7,32 @@ das Cache-First-Prinzip: beim Öffnen erscheint sofort der zuletzt
 bekannte Stand aus der lokalen Ablage; sobald aktuelle Serverdaten
 eintreffen, aktualisieren sich die Listen von selbst.
 
+## Hero-Kopfbereich
+
+Oberhalb der Listen zeigt die Startseite einen vollbreiten
+Kopfbereich nach Web-Vorbild: das servergenerierte Hintergrundbild
+(Endpunkt `api/pictures/hero-background`, Abruf über den angemeldeten
+API-Client mit Bearer-Token) liegt unter geschichteten
+Dunkelgradienten — seitlicher Verlauf, Bottom-Fade in den
+Seitenhintergrund und dezente Primär-/Sekundär-Akzente. Unten links
+stehen ein Kicker-Chip („Private Media Library"), der Anzeigename des
+aktiven Servers als Titel und ein Beschreibungstext; eine Trennlinie
+bildet den Abschluss nach unten. Die Höhe folgt der Fensterbreite
+(mindestens 260, höchstens 520 — das App-Gegenstück zum Web-CSS
+`clamp(260px, 42vw, 520px)`).
+
+Das Bild wird einmalig je Verbindung geladen und nur flüchtig im
+Arbeitsspeicher gehalten — keine Dateiablage. Ist kein Bild verfügbar
+(offline, fehlgeschlagener Abruf), zeigt der Bereich nur Gradienten
+und Texte; die Seite bleibt stabil. Der Bereich wird bei Abmeldung,
+Sitzungsablauf und Serverwechsel zurückgesetzt.
+
+Der Kopfbereich lässt sich über die Einstellung **„Kopfbereich
+anzeigen"** (Einstellungsseite, Abschnitt „Darstellung") ein- und
+ausblenden. Die Einstellung ist positiv formuliert und standardmäßig
+aktiviert; sie wird wie alle App-Einstellungen lokal persistiert und
+übersteht einen Neustart.
+
 ## Die drei Listen
 
 | Liste | Inhalt | Datenquelle (Cache) |

@@ -31,6 +31,9 @@ public sealed class AppSettingsService
     /// <summary>Ablageschlüssel für <see cref="AppSettings.AutoDeleteWatchedEpisodes"/>.</summary>
     public const string AutoDeleteWatchedEpisodesKey = "AutoDeleteWatchedEpisodes";
 
+    /// <summary>Ablageschlüssel für <see cref="AppSettings.HomeHeroEnabled"/>.</summary>
+    public const string HomeHeroEnabledKey = "HomeHeroEnabled";
+
     private readonly ISettingsStore store;
     private readonly AppProfile profile;
 
@@ -57,7 +60,8 @@ public sealed class AppSettingsService
             WifiOnlyDownloads = store.GetBool(Key(WifiOnlyDownloadsKey), defaults.WifiOnlyDownloads),
             WatchedEndWindowSeconds = store.GetInt(Key(WatchedEndWindowSecondsKey), defaults.WatchedEndWindowSeconds),
             DownloadQuotaGb = store.GetInt(Key(DownloadQuotaGbKey), defaults.DownloadQuotaGb),
-            AutoDeleteWatchedEpisodes = store.GetBool(Key(AutoDeleteWatchedEpisodesKey), defaults.AutoDeleteWatchedEpisodes)
+            AutoDeleteWatchedEpisodes = store.GetBool(Key(AutoDeleteWatchedEpisodesKey), defaults.AutoDeleteWatchedEpisodes),
+            HomeHeroEnabled = store.GetBool(Key(HomeHeroEnabledKey), defaults.HomeHeroEnabled)
         }.Normalize();
     }
 
@@ -76,6 +80,7 @@ public sealed class AppSettingsService
         store.Set(Key(WatchedEndWindowSecondsKey), normalized.WatchedEndWindowSeconds);
         store.Set(Key(DownloadQuotaGbKey), normalized.DownloadQuotaGb);
         store.Set(Key(AutoDeleteWatchedEpisodesKey), normalized.AutoDeleteWatchedEpisodes);
+        store.Set(Key(HomeHeroEnabledKey), normalized.HomeHeroEnabled);
     }
 
     private string Key(string key) => profile.PrefixKey(key);
