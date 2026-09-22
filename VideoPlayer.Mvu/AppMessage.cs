@@ -313,3 +313,49 @@ public sealed record FavoriteToggleCompletedMessage(
     bool? IsFavorite,
     string MediaType,
     long MediaId) : AppMessage;
+
+/// <summary>
+/// Die Favoriten-Seite wurde geöffnet bzw. soll (erneut) laden — online
+/// wird zuerst die lokale Kopie vom Serverstand erneuert (führendes
+/// System), offline wird der Cache-Stand angezeigt.
+/// </summary>
+public sealed record FavoritesPageOpenedMessage : AppMessage;
+
+/// <summary>Die Favoritenliste wurde geladen (<paramref name="Error"/> bei Fehlschlag).</summary>
+/// <param name="Items">Die geladenen Favoriten-Einträge.</param>
+/// <param name="Error">Fehlertext bei Fehlschlag; <c>null</c> bei Erfolg.</param>
+/// <returns>Nachricht mit dem Ladeergebnis der Favoritenliste.</returns>
+public sealed record FavoritesPageLoadedMessage(
+    IReadOnlyList<FavoriteListItem> Items,
+    string? Error) : AppMessage;
+
+/// <summary>Ein Favorit soll direkt aus der Liste entfernt werden (nur online wirksam).</summary>
+/// <param name="Item">Der zu entfernende Favoriten-Eintrag.</param>
+/// <returns>Nachricht für die Entfernen-Anforderung.</returns>
+public sealed record FavoriteRemoveRequestedMessage(FavoriteListItem Item) : AppMessage;
+
+/// <summary>
+/// Ergebnis des Entfernens eines Favoriten: bei Erfolg wurde die lokale
+/// Kopie <c>cached_favorites</c> bereits vom Serverstand erneuert; bei
+/// Fehlschlag bleibt der Eintrag in der Liste.
+/// </summary>
+/// <param name="FavoriteId">Id des Favoriteneintrags, der entfernt werden sollte.</param>
+/// <param name="Success"><c>true</c>, wenn der Eintrag auf dem Server entfernt wurde.</param>
+/// <returns>Nachricht mit dem Ergebnis des Entfernens.</returns>
+public sealed record FavoriteRemoveCompletedMessage(long FavoriteId, bool Success) : AppMessage;
+
+/// <summary>Die Profil-Seite wurde geöffnet — die Profilinformationen werden (erneut) ermittelt.</summary>
+public sealed record ProfilePageOpenedMessage : AppMessage;
+
+/// <summary>Die Profilinformationen wurden ermittelt.</summary>
+/// <param name="Info">Die ermittelten Profilinformationen.</param>
+/// <returns>Nachricht mit den Profilinformationen.</returns>
+public sealed record ProfileInfoLoadedMessage(ProfileInfo Info) : AppMessage;
+
+/// <summary>
+/// Der Anwender fordert die Abmeldung an — die Sitzung endet lokal
+/// (Token/Zugangsdaten werden verworfen, die Ereignisverbindung getrennt)
+/// und die App wechselt in den Anmelde-Workflow. Die API besitzt keinen
+/// Logout-Endpunkt (zustandslose JWT).
+/// </summary>
+public sealed record LogoutRequestedMessage : AppMessage;

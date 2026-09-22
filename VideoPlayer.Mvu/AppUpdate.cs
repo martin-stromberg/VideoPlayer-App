@@ -91,6 +91,13 @@ public static class AppUpdate
             SeasonSelectedMessage selected => UpdateSeasonSelected(model, selected),
             FavoriteToggleRequestedMessage => UpdateFavoriteToggleRequested(model),
             FavoriteToggleCompletedMessage completed => UpdateFavoriteToggleCompleted(model, completed),
+            FavoritesPageOpenedMessage => UpdateFavoritesPageOpened(model),
+            FavoritesPageLoadedMessage loaded => UpdateFavoritesPageLoaded(model, loaded),
+            FavoriteRemoveRequestedMessage requested => UpdateFavoriteRemoveRequested(model, requested),
+            FavoriteRemoveCompletedMessage completed => UpdateFavoriteRemoveCompleted(model, completed),
+            ProfilePageOpenedMessage => UpdateProfilePageOpened(model),
+            ProfileInfoLoadedMessage loaded => UpdateProfileInfoLoaded(model, loaded),
+            LogoutRequestedMessage => UpdateLogoutRequested(model),
             _ => AppTransition.Unchanged(model)
         };
     }
@@ -956,6 +963,194 @@ public static class AppUpdate
                 }
             },
             []);
+    }
+
+    private static AppTransition UpdateFavoritesPageOpened(AppModel model)
+    {
+        var state = model.FavoritesPage;
+        if (state.IsLoading)
+        {
+            return AppTransition.Unchanged(model);
+        }
+
+        // Die Seite lädt nur in den Zuständen mit anzeigbarer
+        // Favoriten-Kopie: online erneuert der Effekt-Handler zuerst den
+        // Cache vom Serverstand (führendes System), offline wird der
+        // bisherige Cache-Stand gezeigt — beides landet in derselben
+        // Liste; der Offline-Hinweis bindet an IsOffline.
+        if (model.ConnectionState is not (ConnectionState.Connected or ConnectionState.Offline))
+        {
+            return AppTransition.Unchanged(model);
+        }
+
+        return new AppTransition(
+            model with
+            {
+                FavoritesPage = state with
+                {
+                    IsLoading = true,
+                    Attempted = true,
+                    Error = null
+                }
+            },
+            [new LoadFavoritesPageEffect(model.ConnectionState == ConnectionState.Connected)]);
+    }
+
+    private static AppTransition UpdateFavoritesPageLoaded(AppModel model, FavoritesPageLoadedMessage message)
+    {
+        return new AppTransition(
+            model with
+            {
+                FavoritesPage = new FavoritesPageState
+                {
+                    Attempted = true,
+                    Items = message.Items,
+                    Error = message.Error
+                }
+            },
+            []);
+    }
+
+    private static AppTransition UpdateFavoriteRemoveRequested(AppModel model, FavoriteRemoveRequestedMessage message)
+    {
+        var state = model.FavoritesPage;
+        var favoriteId = message.Item.FavoriteId;
+        // Entfernen ist nur online möglich (der Server ist führend) und
+        // nur für einen Eintrag der geladenen Liste — ohne gültige
+        // Favoriten-Id oder bei laufendem Lauf kein zweiter Aufruf.
+        if (model.ConnectionState != ConnectionState.Connected
+            || favoriteId <= 0
+            || state.Items.All(i => i.FavoriteId != favoriteId)
+            || state.Items.Any(i => i.FavoriteId == favoriteId && i.IsRemoving))
+        {
+            return AppTransition.Unchanged(model);
+        }
+
+        var items = state.Items
+            .Select(i => i.FavoriteId == favoriteId ? i with { IsRemoving = true } : i)
+            .ToList();
+        return new AppTransition(
+            model with { FavoritesPage = state with { Items = items, Error = null } },
+            [new RemoveFavoriteEffect(favoriteId)]);
+    }
+
+    private static AppTransition UpdateFavoriteRemoveCompleted(AppModel model, FavoriteRemoveCompletedMessage message)
+    {
+        var state = model.FavoritesPage;
+        if (message.Success)
+        {
+            // Der Server hat den Eintrag entfernt und die lokale Kopie
+            // wurde bereits erneuert — der Eintrag verschwindet aus der
+            // Liste; die Startseiten-Favoriten folgen über die vom
+            // Effekt-Handler gemeldete CachedListsChangedMessage.
+            return new AppTransition(
+                model with
+                {
+                    FavoritesPage = state with
+                    {
+                        Items = state.Items
+                            .Where(i => i.FavoriteId != message.FavoriteId)
+                            .ToList(),
+                        Error = null
+                    }
+                },
+                []);
+        }
+
+        // Fehlschlag: der Eintrag bleibt in der Liste, der Laufzustand
+        // wird zurückgesetzt und der Fehler angezeigt.
+        var restored = state.Items
+            .Select(i => i.FavoriteId == message.FavoriteId ? i with { IsRemoving = false } : i)
+            .ToList();
+        return new AppTransition(
+            model with
+            {
+                FavoritesPage = state with
+                {
+                    Items = restored,
+                    Error = "Der Favorit konnte nicht entfernt werden."
+                }
+            },
+            []);
+    }
+
+    private static AppTransition UpdateProfilePageOpened(AppModel model)
+    {
+        if (model.Profile.IsLoading)
+        {
+            return AppTransition.Unchanged(model);
+        }
+
+        return new AppTransition(
+            model with { Profile = model.Profile with { IsLoading = true } },
+            [new LoadProfileInfoEffect()]);
+    }
+
+    private static AppTransition UpdateProfileInfoLoaded(AppModel model, ProfileInfoLoadedMessage message)
+    {
+        return new AppTransition(
+            model with
+            {
+                Profile = new ProfilePageState
+                {
+                    Attempted = true,
+                    Username = message.Info.Username,
+                    Email = message.Info.Email,
+                    ProfileName = message.Info.ProfileName
+                }
+            },
+            []);
+    }
+
+    private static AppTransition UpdateLogoutRequested(AppModel model)
+    {
+        // Die Abmeldung ist nur aus einem angemeldeten Zustand wirksam —
+        // ohne Sitzung (Anmeldung/Einrichtung ausstehend) gibt es nichts
+        // zu beenden.
+        if (model.ConnectionState is not (ConnectionState.Connected or ConnectionState.Offline))
+        {
+            return AppTransition.Unchanged(model);
+        }
+
+        // Die Sitzung endet lokal (die API besitzt keinen Logout-
+        // Endpunkt — JWT ist zustandslos): Ereignisverbindung trennen,
+        // Client und gespeicherte Geheimnisse verwerfen und den
+        // sitzungsbezogenen Anzeigezustand zurücksetzen — ein anderer
+        // Benutzer darf keine Daten der beendeten Sitzung sehen.
+        // Gerätebezogene Daten (Einstellungen, bekannte Server, aktive
+        // Adresse, Offline-Daten-Bestand) bleiben erhalten; die lokalen
+        // Caches werden beim nächsten Sync autoritativ ersetzt.
+        var updated = model with
+        {
+            ConnectionState = ConnectionState.NeedsLogin,
+            CurrentPage = AppPage.Login,
+            IsStartupRunning = false,
+            IsServerCheckRunning = false,
+            IsLoginRunning = false,
+            IsSyncRunning = false,
+            LoginError = null,
+            LoginUsername = null,
+            ContinueWatching = [],
+            Favorites = [],
+            RecentEntries = [],
+            SourcesOverview = SourcesOverviewState.Initial,
+            SourceBrowser = SourceBrowserState.Empty,
+            MediaDetails = MediaDetailsState.Empty,
+            FavoritesPage = FavoritesPageState.Initial,
+            Profile = ProfilePageState.Initial
+        };
+
+        var effects = new List<AppEffect>
+        {
+            new DisconnectServerEventsEffect(),
+            new LogoutEffect()
+        };
+        if (model.CurrentPage != AppPage.Login)
+        {
+            effects.Add(new NavigateToPageEffect(AppPage.Login));
+        }
+
+        return new AppTransition(updated, effects);
     }
 
     private static string? LoginErrorFor(AuthAttemptStatus status)

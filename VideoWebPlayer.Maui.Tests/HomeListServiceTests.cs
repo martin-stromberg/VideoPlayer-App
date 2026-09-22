@@ -147,6 +147,69 @@ public class HomeListServiceTests : IDisposable
         Assert.False(movie.ShowProgress);
     }
 
+    /// <summary>Prüft LoadFavoriteItems: bildet Favoriten mit Eintrags-Id und Serienkontext ab (Schritt 9).</summary>
+    [Fact]
+    public async Task LoadFavoriteItems_MapsFavoriteIdAndMediaHints()
+    {
+        await WriteFavoriteAsync(
+            new FavoriteEntry { Id = 1, Entry = new TvShow { Id = 11, Name = "Serie" } },
+            "tvshow");
+        await WriteFavoriteAsync(
+            new FavoriteEntry
+            {
+                Id = 2,
+                Entry = new TvShowEpisode
+                {
+                    Id = 30,
+                    Name = "Folge",
+                    Season = new TvShowSeason { Id = 20, Show = new TvShow { Id = 11 } }
+                }
+            },
+            "tvshowepisode");
+        await WriteFavoriteAsync(
+            new FavoriteEntry { Id = 3, Entry = new Movie { Id = 12, Name = "Film", PosterPictureId = 9 } },
+            "movie");
+
+        var items = await service.LoadFavoriteItemsAsync();
+
+        Assert.Equal(3, items.Count);
+        var episode = Assert.Single(items, i => i.Id == 30);
+        // Die Eintrags-Id ist Grundlage der Entfernen-Aktion; der
+        // Serienkontext steuert die Detail-Navigation.
+        Assert.Equal(2, episode.FavoriteId);
+        Assert.Equal("tvshowepisode", episode.MediaType);
+        Assert.Equal(11, episode.ShowId);
+        Assert.Equal(20, episode.SeasonId);
+        Assert.Equal(30, episode.EpisodeId);
+        Assert.Equal("Episode", episode.MediaTypeText);
+
+        var movie = Assert.Single(items, i => i.FavoriteId == 3);
+        Assert.Equal(9, movie.PosterPictureId);
+        Assert.True(movie.HasPoster);
+        Assert.True(movie.CanRemove);
+        Assert.Equal("Film", movie.MediaTypeText);
+
+        var homeItem = movie.ToMediaItem();
+        Assert.Equal(12, homeItem.Id);
+        Assert.Equal("movie", homeItem.MediaType);
+        Assert.Equal("Film", homeItem.Title);
+    }
+
+    /// <summary>Prüft LoadFavoriteItems: bei leerem Cache oder ohne Medium → leere bzw. übersprungene Einträge.</summary>
+    [Fact]
+    public async Task LoadFavoriteItems_EmptyAndWithoutMedia_ReturnsOnlyIdentifiable()
+    {
+        Assert.Empty(await service.LoadFavoriteItemsAsync());
+
+        await WriteFavoriteAsync(new FavoriteEntry { Id = 4 }, "movie"); // Entry null
+        await WriteFavoriteAsync(
+            new FavoriteEntry { Id = 5, Entry = new Movie { Id = 13, Name = "Film" } },
+            "movie");
+
+        var item = Assert.Single(await service.LoadFavoriteItemsAsync());
+        Assert.Equal(5, item.FavoriteId);
+    }
+
     /// <summary>Prüft LoadHomeLists: bildet die Recent-Liste ab.</summary>
     [Fact]
     public async Task LoadHomeLists_MapsRecent()

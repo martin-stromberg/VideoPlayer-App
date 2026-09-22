@@ -137,7 +137,7 @@ Beteiligte Klassen/Komponenten: `ProfilePage`, `AppUpdate`,
 | `ProfileInfo` | Record (`VideoPlayer.Mvu`) | Ergebnis der Profil-Ermittlung: `Username`, `Email`, `ProfileName` |
 | `ProfileInfoService` | Klasse (`VideoPlayer.Mvu`) | Liest gespeicherten Benutzernamen + Token (`AppSecretsService`), dekodiert JWT-Claims, ergänzt `AppProfile.Name` |
 | `FavoritesPageOpenedMessage`, `FavoritesPageLoadedMessage`, `FavoriteRemoveRequestedMessage`, `FavoriteRemoveCompletedMessage`, `ProfilePageOpenedMessage`, `ProfileInfoLoadedMessage`, `LogoutRequestedMessage` | Records (`VideoPlayer.Mvu`, `AppMessage.cs`) | MVU-Nachrichten der beiden Seiten |
-| `LoadFavoritesPageEffect`, `RemoveFavoriteEffect`, `LoadProfileInfoEffect`, `LogoutEffect` | Records (`VideoPlayer.Mvu`, `AppEffect.cs`) | MVU-Effekte |
+| `LoadFavoritesPageEffect` (`RefreshFromServer`), `RemoveFavoriteEffect`, `LoadProfileInfoEffect`, `LogoutEffect` | Records (`VideoPlayer.Mvu`, `AppEffect.cs`) | MVU-Effekte; `RefreshFromServer` trägt die Entscheidung „Sync vor Cache-Lesen" aus dem Zustand, damit der Handler offline keinen vergeblichen Server-Aufruf macht |
 
 ## Änderungen an bestehenden Klassen
 

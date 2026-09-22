@@ -124,6 +124,56 @@ public class FavoritesServiceTests : IDisposable
         Assert.Empty(handler.Requests);
     }
 
+    /// <summary>Prüft RemoveFavorite: bei <c>SendsRemove_AndRefreshesCache</c> → sendet den Entfernen-Request und erneuert die lokale Kopie.</summary>
+    [Fact]
+    public async Task RemoveFavorite_SendsRemove_AndRefreshesCache()
+    {
+        await LoginAsync();
+        // Ausgangsbestand in der lokalen Kopie (wie nach einem Sync).
+        handler.EnqueueJson(HttpStatusCode.OK, new[]
+        {
+            new FavoriteEntry { Id = 5, Entry = new Movie { Id = 50, Name = "Film A" } },
+            new FavoriteEntry { Id = 6, Entry = new Movie { Id = 60, Name = "Film B" } }
+        });
+        await syncService.SyncFavoritesAsync();
+        handler.Requests.Clear();
+
+        // 1. Entfernen-Request → 200; 2. Erneuerung der Kopie vom
+        //    Serverstand (Eintrag 5 fehlt nun).
+        handler.Enqueue(HttpStatusCode.OK);
+        handler.EnqueueJson(HttpStatusCode.OK, new[]
+        {
+            new FavoriteEntry { Id = 6, Entry = new Movie { Id = 60, Name = "Film B" } }
+        });
+
+        var result = await CreateService().RemoveFavoriteAsync(5);
+
+        Assert.True(result);
+        var requests = handler.Requests;
+        Assert.Equal(2, requests.Count);
+        Assert.Equal(HttpMethod.Post, requests[0].Method);
+        Assert.EndsWith("/api/favorites/remove", requests[0].PathAndQuery);
+        // Der Request trägt die Favoriten-Eintrags-Id (Vertrag wie die
+        // Webanwendung: { id, userId }).
+        using var body = JsonDocument.Parse(requests[0].Body!);
+        Assert.Equal(5, body.RootElement.GetProperty("Id").GetInt64());
+        Assert.EndsWith("/api/favorites", requests[1].PathAndQuery);
+
+        var cached = await cache.Connection.Table<CachedFavoritesEntry>().ToListAsync();
+        var entry = Assert.Single(cached);
+        Assert.Equal("movie:60", entry.Key);
+    }
+
+    /// <summary>Prüft RemoveFavorite: ohne Client → gibt false zurück und fordert nichts an.</summary>
+    [Fact]
+    public async Task RemoveFavorite_WithoutClient_ReturnsFalse_NoRequests()
+    {
+        var result = await CreateService().RemoveFavoriteAsync(5);
+
+        Assert.False(result);
+        Assert.Empty(handler.Requests);
+    }
+
     /// <summary>Prüft CreateEntry: bildet auf den korrekten Eintragstyp ab.</summary>
     /// <param name="mediaType">Der Medientyp.</param>
     /// <param name="expected">Der erwartete Wert.</param>

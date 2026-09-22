@@ -110,6 +110,31 @@ public sealed class AuthSessionService
         return await LoginCoreAsync(serverAddress, username.Trim(), password, cancellationToken);
     }
 
+    /// <summary>
+    /// Beendet die Sitzung lokal („Abmelden"): der gehaltene API-Client
+    /// wird freigegeben und die gespeicherten Zugangsdaten samt Token
+    /// entfernt — danach ist keine automatische Anmeldung mehr möglich.
+    /// Die API besitzt keinen Logout-Endpunkt (zustandslose JWT); die
+    /// Sitzung endet durch Verwerfen der lokalen Geheimnisse.
+    /// </summary>
+    /// <returns>Eine abgeschlossene Aufgabe nach dem Räumen der Sitzung.</returns>
+    public async Task LogoutAsync()
+    {
+        Client = null;
+        ClientBaseAddress = null;
+        try
+        {
+            await secrets.ClearCredentialsAsync();
+        }
+        catch (Exception ex)
+        {
+            // Ein Fehler der sicheren Ablage verhindert die Abmeldung
+            // nicht — der Client ist bereits freigegeben; Reste werden
+            // bei der nächsten Anmeldung überschrieben.
+            System.Diagnostics.Debug.WriteLine($"[AuthSessionService] Zugangsdaten entfernen fehlgeschlagen: {ex.Message}");
+        }
+    }
+
     private async Task<AuthAttempt> LoginCoreAsync(
         Uri serverAddress,
         string username,

@@ -54,6 +54,35 @@ public sealed class FavoritesService
     }
 
     /// <summary>
+    /// Entfernt einen Favoriten-Eintrag über <c>api/favorites/remove</c>
+    /// auf dem Server (führendes System — dieselbe Aktion wie die
+    /// Entfernen-Kontextaktion der Favoriten-Liste der Webanwendung) und
+    /// erneuert danach die lokale Kopie <c>cached_favorites</c> über
+    /// <see cref="ServerSyncService.SyncFavoritesAsync"/>.
+    /// </summary>
+    /// <param name="favoriteId">Id des zu entfernenden Favoriteneintrags.</param>
+    /// <param name="cancellationToken">Bricht den Aufruf ab.</param>
+    /// <returns>
+    /// <c>true</c>, wenn der Eintrag entfernt wurde; <c>false</c>, wenn
+    /// kein angemeldeter Client vorhanden ist (offline).
+    /// </returns>
+    public async Task<bool> RemoveFavoriteAsync(long favoriteId, CancellationToken cancellationToken = default)
+    {
+        var client = authSession.Client;
+        if (client is null)
+        {
+            return false;
+        }
+
+        await client.RemoveFavoriteAsync(favoriteId, cancellationToken);
+
+        // Lokale Kopie autoritativ vom Serverstand erneuern — damit sind
+        // Favoriten-Seite und Startseiten-Liste nach Neustart konsistent.
+        await syncService.SyncFavoritesAsync(cancellationToken);
+        return true;
+    }
+
+    /// <summary>
     /// Erzeugt den typkorrekten <see cref="MediaEntry"/> für den
     /// Toggle-Request (polymorphes <c>$type</c>); unbekannte Typen fallen
     /// auf die Basisklasse zurück.

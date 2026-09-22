@@ -136,6 +136,18 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
             case ToggleFavoriteEffect toggle:
                 await ToggleFavoriteAsync(toggle, cancellationToken);
                 break;
+            case LoadFavoritesPageEffect loadFavorites:
+                await LoadFavoritesPageAsync(loadFavorites.RefreshFromServer, cancellationToken);
+                break;
+            case RemoveFavoriteEffect remove:
+                await RemoveFavoriteAsync(remove.FavoriteId, cancellationToken);
+                break;
+            case LoadProfileInfoEffect:
+                await LoadProfileInfoAsync(cancellationToken);
+                break;
+            case LogoutEffect:
+                await LogoutAsync();
+                break;
         }
     }
 
@@ -385,6 +397,90 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
             // Startseiten-Liste lädt den neuen Stand ohne manuelle
             // Aktualisierung nach.
             await DispatchMessageAsync(new CachedListsChangedMessage());
+        }
+    }
+
+    private async Task LoadFavoritesPageAsync(bool refreshFromServer, CancellationToken cancellationToken)
+    {
+        IReadOnlyList<FavoriteListItem> items = [];
+        string? error = null;
+        try
+        {
+            // Online ist der Server führend: erst die lokale Kopie vom
+            // Serverstand erneuern, dann den Cache lesen. Schlägt der
+            // Sync fehl, bleibt der bisherige Cache-Stand anzeigbar.
+            // Offline wird direkt der Cache-Stand geliefert — ohne
+            // vergeblichen Server-Aufruf.
+            if (refreshFromServer && authSession.Client is not null)
+            {
+                await services.GetRequiredService<ServerSyncService>()
+                    .SyncFavoritesAsync(cancellationToken);
+            }
+
+            items = await services.GetRequiredService<HomeListService>()
+                .LoadFavoriteItemsAsync(cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[ShellAppEffectHandler] Favoriten laden fehlgeschlagen: {ex.Message}");
+            error = "Die Favoriten konnten nicht geladen werden.";
+        }
+
+        await DispatchMessageAsync(new FavoritesPageLoadedMessage(items, error));
+    }
+
+    private async Task RemoveFavoriteAsync(long favoriteId, CancellationToken cancellationToken)
+    {
+        var success = false;
+        try
+        {
+            success = await services.GetRequiredService<FavoritesService>()
+                .RemoveFavoriteAsync(favoriteId, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[ShellAppEffectHandler] Favorit entfernen fehlgeschlagen: {ex.Message}");
+        }
+
+        await DispatchMessageAsync(new FavoriteRemoveCompletedMessage(favoriteId, success));
+
+        if (success)
+        {
+            // Die lokale Favoriten-Kopie wurde aktualisiert — die
+            // Startseiten-Favoritenliste lädt den neuen Stand ohne
+            // manuelle Aktualisierung nach.
+            await DispatchMessageAsync(new CachedListsChangedMessage());
+        }
+    }
+
+    private async Task LoadProfileInfoAsync(CancellationToken cancellationToken)
+    {
+        ProfileInfo info;
+        try
+        {
+            info = await services.GetRequiredService<ProfileInfoService>()
+                .LoadAsync(cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            // Ohne lesbare Ablage bleibt die Seite mit Platzhaltern
+            // anzeigbar (Benutzername/E-Mail „—").
+            System.Diagnostics.Debug.WriteLine($"[ShellAppEffectHandler] Profilinformationen laden fehlgeschlagen: {ex.Message}");
+            info = new ProfileInfo(null, null, null);
+        }
+
+        await DispatchMessageAsync(new ProfileInfoLoadedMessage(info));
+    }
+
+    private async Task LogoutAsync()
+    {
+        try
+        {
+            await authSession.LogoutAsync();
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[ShellAppEffectHandler] Abmeldung fehlgeschlagen: {ex.Message}");
         }
     }
 

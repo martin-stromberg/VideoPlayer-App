@@ -51,6 +51,34 @@ public sealed class HomeListService
         };
     }
 
+    /// <summary>
+    /// Liest die Favoriten-Kopie <c>cached_favorites</c> und mappt sie auf
+    /// anzeigefertige <see cref="FavoriteListItem"/>s der Favoriten-Seite —
+    /// derselbe Lesepfad wie die Startseiten-Favoriten, jedoch mit der
+    /// Favoriten-Eintrags-Id (Grundlage der Entfernen-Aktion über
+    /// <c>api/favorites/remove</c>) und dem Serienkontext der
+    /// Detail-Navigation.
+    /// </summary>
+    /// <param name="cancellationToken">Bricht das Lesen ab.</param>
+    /// <returns>Die Favoriten-Einträge aus der lokalen Kopie.</returns>
+    public async Task<IReadOnlyList<FavoriteListItem>> LoadFavoriteItemsAsync(CancellationToken cancellationToken = default)
+    {
+        var favorites = await ReadFavoritesAsync();
+        var items = new List<FavoriteListItem>(favorites.Count);
+        foreach (var favorite in favorites)
+        {
+            // Einträge ohne identifizierbares Medium werden übersprungen —
+            // die Auswahl muss das Medium eindeutig bestimmen können.
+            var item = MapFavorite(favorite);
+            if (item is not null)
+            {
+                items.Add(item);
+            }
+        }
+
+        return items;
+    }
+
     private async Task<IReadOnlyList<T>> ReadListAsync<T>(string key)
     {
         try
@@ -167,15 +195,36 @@ public sealed class HomeListService
         };
     }
 
+    private static FavoriteListItem? MapFavorite(FavoriteEntry favorite)
+    {
+        var media = favorite.Entry;
+        if (media is null || media.Id <= 0)
+        {
+            return null;
+        }
+
+        var (showId, seasonId, episodeId) = MediaHints(media);
+        return new FavoriteListItem
+        {
+            FavoriteId = favorite.Id,
+            Id = media.Id,
+            MediaType = MediaTypeOf(null, media),
+            Title = media.Name,
+            PosterPictureId = media.PosterPictureId,
+            ShowId = showId,
+            SeasonId = seasonId,
+            EpisodeId = episodeId
+        };
+    }
+
     /// <summary>
     /// Serienkontext-Hints aus dem eingebetteten Objektgraph — Grundlage
     /// der Detail-Navigation (Episoden/Staffeln öffnen die Serienansicht
     /// mit Vorwahl, wie im Altbestand).
     /// </summary>
     /// <param name="media">Das Medium, aus dem der Serienkontext gelesen wird.</param>
-    /// <param name="ShowId">Tupel-Element des Ergebnisses: Id der Serie, falls auflösbar.</param>
-    /// <param name="SeasonId">Tupel-Element des Ergebnisses: Id der Staffel, falls auflösbar.</param>
-    private static (long? ShowId, long? SeasonId, long? EpisodeId) MediaHints(MediaEntry media)
+    /// <returns>Tupel aus Serien-, Staffel- und Episoden-Id (in dieser Reihenfolge); Elemente <c>null</c>, wenn nicht auflösbar.</returns>
+    private static (long?, long?, long?) MediaHints(MediaEntry media)
     {
         return media switch
         {
