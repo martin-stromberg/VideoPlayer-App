@@ -6,6 +6,15 @@
 
     <VerticalStackLayout Padding="20" Spacing="10">
         <Label Text="Startseite" FontSize="24" FontAttributes="Bold" />
+        <Border x:Name="OfflineBanner"
+                AutomationId="OfflineBanner"
+                IsVisible="False"
+                BackgroundColor="#FFF3CD"
+                StrokeShape="RoundRectangle 6"
+                Padding="10">
+            <Label Text="Offline-Modus: Der Server ist nicht erreichbar. Es werden lokal gespeicherte Daten angezeigt. Über „Einstellungen → Serververwaltung“ kann ein anderer Server gewählt werden."
+                   TextColor="#664D03" />
+        </Border>
         <Label Text="Diese Seite wird in einem späteren Entwicklungsschritt gefüllt." />
         <Label x:Name="ServerStatusLabel"
                AutomationId="ServerStatusLabel"

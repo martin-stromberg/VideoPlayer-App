@@ -15,6 +15,11 @@ namespace VideoPlayer.Maui
             // auf den Navigationsstack geschobene Route („Server wechseln").
             Routing.RegisterRoute("serversetup", typeof(Pages.ServerSetupPage));
 
+            // Anmeldemaske: ebenfalls ohne Menüeintrag — wird bei
+            // Sitzungsablauf über die Shell-Route erreicht (beim Start als
+            // Window-Root statt der Shell).
+            Routing.RegisterRoute("login", typeof(Pages.LoginPage));
+
             Navigated += OnShellNavigated;
         }
 

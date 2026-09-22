@@ -121,6 +121,48 @@ public class LocalDatabaseTests : IDisposable
     }
 
     [Fact]
+    public async Task CacheDatabase_HasOfflineData_FalseWhenEmpty()
+    {
+        var db = new CacheDatabase(CreateLayout());
+        await db.InitializeAsync();
+
+        Assert.False(await db.HasOfflineDataAsync());
+    }
+
+    [Fact]
+    public async Task CacheDatabase_HasOfflineData_TrueWithCachedList()
+    {
+        var db = new CacheDatabase(CreateLayout());
+        await db.InitializeAsync();
+        await db.Connection.InsertAsync(new CachedListEntry
+        {
+            Key = "home:recentlyAdded",
+            Json = "[]",
+            UpdatedAtUtc = DateTime.UtcNow
+        });
+
+        Assert.True(await db.HasOfflineDataAsync());
+    }
+
+    [Fact]
+    public async Task CacheDatabase_HasOfflineData_TrueWithDownloadManifest()
+    {
+        var db = new CacheDatabase(CreateLayout());
+        await db.InitializeAsync();
+        await db.Connection.InsertAsync(new DownloadManifestEntry
+        {
+            VideoId = 42,
+            VideoType = "episode",
+            FilePath = "videos/42.mp4",
+            SizeBytes = 1024,
+            State = "Completed",
+            UpdatedAtUtc = DateTime.UtcNow
+        });
+
+        Assert.True(await db.HasOfflineDataAsync());
+    }
+
+    [Fact]
     public async Task Databases_LandInClassifiedDirectories()
     {
         var layout = CreateLayout();

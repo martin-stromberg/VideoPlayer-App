@@ -8,9 +8,9 @@ Dieses Repository enthält die ausgelagerte .NET-MAUI-App und ihre Tests.
 - `VideoWebPlayer.Maui.Tests/` - tests ohne Rückreferenz auf das Webprojekt.
 - `VideoWebPlayer.Client/` - kopierte Übergabeschnittstelle aus dem Web-Repository (Altbestand, wird im Rahmen der Neugestaltung entfernt).
 - `VideoPlayer.ApiClient/` - neu implementierter, plattformneutraler Zugriff auf die öffentliche Server-API sowie Netzwerk-Erkennung von Servern (mDNS/UDP, Namespace `Discovery`; Dokumentation: `docs/help/api-client/`).
-- `VideoPlayer.Mvu/` - plattformneutrale MVU-Schicht der neuen App (Modell, Messages, Update, Effekte; eigener schlanker MVU-Kreislauf ohne externes Framework).
-- `VideoPlayer.Storage/` - plattformneutrale lokale Datenhaltung der neuen App (Einstellungsmodell und -dienst, Geheimnis-Ablage, Profil-Isolation, Backup-/NoBackup-Ablageorte, SQLite-Datenbanken, Serververwaltung `KnownServersService`).
-- `VideoPlayer.Maui/` - neue MAUI-App auf MVU-Basis (Seitenmenü-Navigation, ausgebaute Einstellungsseite, Serververwaltung mit Erststart-Einrichtung, Erreichbarkeitsprüfung; Dokumentation: `docs/help/app-grundgeruest.md`, `docs/help/einstellungen-datenhaltung.md`, `docs/help/serververwaltung-erststart.md`).
+- `VideoPlayer.Mvu/` - plattformneutrale MVU-Schicht der neuen App (Modell, Messages, Update, Effekte; eigener schlanker MVU-Kreislauf ohne externes Framework) inklusive `AuthSessionService` (Anmeldung, stille Token-Erneuerung, Verbindungszustände).
+- `VideoPlayer.Storage/` - plattformneutrale lokale Datenhaltung der neuen App (Einstellungsmodell und -dienst, Geheimnis-Ablage, Profil-Isolation, Backup-/NoBackup-Ablageorte, SQLite-Datenbanken, Serververwaltung `KnownServersService`, Offline-Daten-Prüfung).
+- `VideoPlayer.Maui/` - neue MAUI-App auf MVU-Basis (Seitenmenü-Navigation, ausgebaute Einstellungsseite, Serververwaltung mit Erststart-Einrichtung, Verbindungs-Workflow mit Anmeldemaske und Offline-Modus; Dokumentation: `docs/help/app-grundgeruest.md`, `docs/help/einstellungen-datenhaltung.md`, `docs/help/serververwaltung-erststart.md`, `docs/help/verbindung-anmeldung.md`).
 - `VideoPlayer.App.sln` - eigene Solution dieses Repositorys.
 - `LICENSE` - PolyForm Noncommercial License 1.0.0.
 

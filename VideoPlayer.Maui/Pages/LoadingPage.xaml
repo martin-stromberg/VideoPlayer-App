@@ -7,7 +7,7 @@
     <VerticalStackLayout Padding="20" Spacing="12" HorizontalOptions="Center" VerticalOptions="Center">
         <ActivityIndicator IsRunning="True" WidthRequest="48" HeightRequest="48" />
         <Label Text="VideoPlayer wird geladen" FontAttributes="Bold" HorizontalTextAlignment="Center" />
-        <Label Text="{Binding Model.ServerHealthText}" HorizontalTextAlignment="Center" />
+        <Label Text="{Binding Model.StartupStatusText}" HorizontalTextAlignment="Center" />
     </VerticalStackLayout>
 
 </ContentPage>

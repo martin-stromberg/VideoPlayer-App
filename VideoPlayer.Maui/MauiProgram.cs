@@ -16,6 +16,7 @@ namespace VideoPlayer.Maui
             // führt Navigation und Server-Erreichbarkeitsprüfung am App-Rand aus.
             builder.Services.AddSingleton<IServerAddressProvider, ServerAddressProvider>();
             builder.Services.AddSingleton<IServerHealthProbe, ServerHealthProbe>();
+            builder.Services.AddSingleton<AuthSessionService>();
             builder.Services.AddSingleton<IAppEffectHandler, ShellAppEffectHandler>();
             builder.Services.AddSingleton<MvuHost>();
 
@@ -45,6 +46,7 @@ namespace VideoPlayer.Maui
             builder.Services.AddTransient<Pages.ProfilePage>();
             builder.Services.AddTransient<Pages.SettingsPage>();
             builder.Services.AddTransient<Pages.ServerSetupPage>();
+            builder.Services.AddTransient<Pages.LoginPage>();
 
             builder.ConfigureFonts(fonts =>
             {

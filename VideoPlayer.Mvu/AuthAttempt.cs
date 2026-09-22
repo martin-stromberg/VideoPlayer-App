@@ -1,0 +1,31 @@
+namespace VideoPlayer.Mvu;
+
+/// <summary>Ergebnis einer Anmeldung am VideoPlayer-Server.</summary>
+public enum AuthAttemptStatus
+{
+    /// <summary>Anmeldung erfolgreich; Token und Zugangsdaten sind gespeichert.</summary>
+    Succeeded,
+
+    /// <summary>Keine gespeicherten Zugangsdaten vorhanden (nur automatische Anmeldung).</summary>
+    MissingCredentials,
+
+    /// <summary>Der Server lehnt die Zugangsdaten ab (401/403).</summary>
+    InvalidCredentials,
+
+    /// <summary>Der Server ist nicht erreichbar (Transportfehler/Zeitüberschreitung nach der Wiederholungsstrategie).</summary>
+    ServerUnreachable,
+
+    /// <summary>Sonstiger Fehler der Anmeldung.</summary>
+    Failed
+}
+
+/// <summary>
+/// Ergebnistransport eines Anmeldeversuchs. <see cref="Username"/> trägt den
+/// (nicht geheimen) gespeicherten bzw. eingegebenen Benutzernamen zur
+/// Vorbefüllung der Anmeldemaske.
+/// </summary>
+public sealed record AuthAttempt(AuthAttemptStatus Status, string? Username = null)
+{
+    /// <summary>Die Anmeldung war erfolgreich.</summary>
+    public bool Succeeded => Status == AuthAttemptStatus.Succeeded;
+}

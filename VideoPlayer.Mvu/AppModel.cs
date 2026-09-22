@@ -19,6 +19,31 @@ public sealed record AppModel
     public ServerHealthStatus ServerHealth { get; init; } = ServerHealthStatus.Unknown;
 
     /// <summary>
+    /// Verbindungszustand der App (verbunden, Anmeldung erforderlich,
+    /// Servereinrichtung erforderlich, offline). Steuert die Navigation;
+    /// Startwert <see cref="Mvu.ConnectionState.Connecting"/> (Ladeanzeige).
+    /// </summary>
+    public ConnectionState ConnectionState { get; init; } = ConnectionState.Connecting;
+
+    /// <summary>Anmeldeversuch (manuell oder automatisch) läuft.</summary>
+    public bool IsLoginRunning { get; init; }
+
+    /// <summary>Inline-Fehlertext der Anmeldemaske; <c>null</c> = kein Fehler.</summary>
+    public string? LoginError { get; init; }
+
+    /// <summary>
+    /// Bekannter Benutzername zur Vorbefüllung der Anmeldemaske (nicht geheim,
+    /// liegt in der normalen Ablage und übersteht eine Backup-Wiederherstellung).
+    /// </summary>
+    public string? LoginUsername { get; init; }
+
+    /// <summary>Ergebnis der Prüfung, ob lokale Offline-Daten vorhanden sind.</summary>
+    public bool HasOfflineData { get; init; }
+
+    /// <summary>Die App befindet sich im Offline-Zustand.</summary>
+    public bool IsOffline => ConnectionState == ConnectionState.Offline;
+
+    /// <summary>
     /// Geladene App-Einstellungen (beim Start über <see cref="LoadSettingsEffect"/>
     /// befüllt; bis dahin Defaults).
     /// </summary>
@@ -59,4 +84,14 @@ public sealed record AppModel
         ServerHealthStatus.Unreachable => "Server: nicht erreichbar",
         _ => "Server: unbekannt"
     };
+
+    /// <summary>
+    /// Anzeigetext der Start-Ladeanzeige: während der automatischen Anmeldung
+    /// (Server erreichbar, Start läuft noch) „Anmeldung …", sonst der
+    /// Serverstatus.
+    /// </summary>
+    public string StartupStatusText =>
+        IsStartupRunning && ServerHealth == ServerHealthStatus.Reachable
+            ? "Anmeldung beim Server läuft …"
+            : ServerHealthText;
 }
