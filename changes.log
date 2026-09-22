@@ -1,5 +1,11 @@
 # Änderungsprotokoll
 
+## 2026-09-22 — Design-Angleichung an die Webanwendung, Schritt 4: Wiederholte Wiedergabe ohne Absturz
+
+- Die Wiedergabeseite (`PlayerPage`) stürzte beim zweiten Abspielen mit unbehandelter `COMException 0x8001010E` (`RPC_E_WRONG_THREAD`) ab: `SeekTo` auf die Fortsetzungsposition lief aus dem `MediaOpened`-Ereignis, das das `CommunityToolkit.Maui.MediaElement` unter Windows auf einem Threadpool-Thread auslösen kann — `MediaManager.PlatformSeek` greift dann thread-fremd auf `MediaPlayerElement.MediaPlayer` zu.
+- Zwei Ursachen behoben: (1) Alle Zugriffe auf das native Element aus Toolkit-Ereignissen (`SeekTo`, Positions-/Zustandsabfrage in `ReportPosition`) laufen jetzt gemarshalt über `MainThread.BeginInvokeOnMainThread` auf dem UI-Thread. (2) Die transiente Seite (pro Wiedergabe neu erzeugt) abonniert `MvuHost.ModelChanged` nur noch sichtbar — Abo in `OnAppearing`, Abmeldung in `OnDisappearing` (Muster `SettingsPage`) — und ein `volatile subscribed`-Guard sperrt Modell-Updates und Wiedergabe-Messages verwaister Seiten, die sonst auf ihr losgelöstes `MediaElement` zugegriffen bzw. die neue Wiedergabe fälschlich als „angesehen" gemeldet hätten.
+- Fortschrittsmeldung (`ReportPlaybackProgressEffect` → `ProgressReportService`) und „angesehen"-Schwelle unverändert. Drei neue Contract-Tests (`PlayerContractTests`) pinnen Abmeldung, UI-Thread-Marshal und Reaktions-Sperre; Negativprobe auf dem Ausgangsstand fehlgeschlagen wie erwartet.
+
 ## 2026-09-22 — Design-Angleichung an die Webanwendung, Schritt 3: Player-Steuerung in der Vollansicht
 
 - Die nativen Transportsteuerungen der Wiedergabeseite (`PlayerPage`, `MediaElement` mit `ShouldShowPlaybackControls`) sind in der Vollansicht wieder unmittelbar bedienbar: Das Kopf-Overlay `OverlayChrome` füllte als `VerticalStackLayout` ohne `VerticalOptions` (Default `Fill`) das gesamte Wiedergabe-Grid und fing alle Eingaben ab, obwohl nur das obere Kopfband sichtbaren Inhalt zeigte.
