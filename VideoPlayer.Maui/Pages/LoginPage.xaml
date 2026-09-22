@@ -16,10 +16,10 @@
                    TextColor="Gray"
                    IsVisible="false" />
 
-            <Label Text="Benutzername" FontAttributes="Bold" />
+            <Label Text="E-Mail" FontAttributes="Bold" />
             <Entry x:Name="UsernameEntry"
                    AutomationId="LoginUsernameEntry"
-                   Placeholder="Benutzername"
+                   Placeholder="E-Mail-Adresse"
                    Keyboard="Email" />
             <Label Text="Passwort" FontAttributes="Bold" />
             <Entry x:Name="PasswordEntry"

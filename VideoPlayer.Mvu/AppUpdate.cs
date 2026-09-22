@@ -15,10 +15,10 @@ public static class AppUpdate
     public const string UnreachableServerError = "Der Server ist nicht erreichbar. Bitte die Adresse prüfen.";
 
     /// <summary>Fehlertext der Anmeldemaske bei leeren Eingabefeldern.</summary>
-    public const string CredentialsRequiredError = "Bitte Benutzername und Passwort eingeben.";
+    public const string CredentialsRequiredError = "Bitte E-Mail-Adresse und Passwort eingeben.";
 
     /// <summary>Fehlertext der Anmeldemaske bei vom Server abgelehnten Zugangsdaten.</summary>
-    public const string InvalidCredentialsError = "Anmeldung fehlgeschlagen. Bitte Benutzername und Passwort prüfen.";
+    public const string InvalidCredentialsError = "Anmeldung fehlgeschlagen. Bitte E-Mail-Adresse und Passwort prüfen.";
 
     /// <summary>Fehlertext der Anmeldemaske bei nicht erreichbarem Server.</summary>
     public const string LoginUnreachableError = "Der Server ist nicht erreichbar. Bitte später erneut versuchen.";
