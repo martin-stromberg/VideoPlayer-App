@@ -1,3 +1,4 @@
+using System.Xml.Linq;
 using VideoWebPlayer.Maui.Tests.Stubs;
 
 namespace VideoWebPlayer.Maui.Tests;
@@ -84,6 +85,40 @@ public class PlayerContractTests
         // Lokale Dateien über die Quellenabstraktion.
         Assert.Contains("PlaybackSourceKind.LocalFile", code, StringComparison.Ordinal);
         Assert.Contains("MediaSource.FromFile", code, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// Prüft PlayerPage: das Kopf-Overlay „OverlayChrome" blockiert nicht die
+    /// Videofläche — es füllt nicht das gesamte Grid (kein Default `Fill`)
+    /// und ist außerhalb seines Mini-Player-Schalters eingabedurchlässig.
+    /// Pinnt die Korrektur des Hit-Test-Blockers, der die nativen
+    /// Transportsteuerungen in der Vollansicht unbedienbar machte.
+    /// </summary>
+    [Fact]
+    public void PlayerPage_OverlayChromeDoesNotCoverPlaybackSurface()
+    {
+        var document = XDocument.Parse(Read("VideoPlayer.Maui", "Pages", "PlayerPage.xaml"));
+        var mauiNs = XNamespace.Get("http://schemas.microsoft.com/dotnet/2021/maui");
+        var xNs = XNamespace.Get("http://schemas.microsoft.com/winfx/2009/xaml");
+
+        var overlay = document.Descendants(mauiNs + "VerticalStackLayout")
+            .SingleOrDefault(e => (string?)e.Attribute(xNs + "Name") == "OverlayChrome");
+        Assert.NotNull(overlay);
+
+        // Ohne VerticalOptions gilt der LayoutOptions-Default Fill:
+        // das Layout belegt das gesamte Grid über dem MediaElement.
+        Assert.Equal("Start", (string?)overlay.Attribute("VerticalOptions"));
+
+        // Das sichtbare Kopfband bleibt für Eingaben durchlässig;
+        // nur der Mini-Player-Schalter ist davon ausgenommen.
+        var band = overlay.Element(mauiNs + "Border");
+        Assert.NotNull(band);
+        Assert.Equal("True", (string?)band.Attribute("InputTransparent"));
+
+        var pipButton = band.Descendants(mauiNs + "Button")
+            .Single(e => (string?)e.Attribute(xNs + "Name") == "PipButton");
+        Assert.Equal("False", (string?)pipButton.Attribute("InputTransparent"));
+        Assert.Equal("OnPipClicked", (string?)pipButton.Attribute("Clicked"));
     }
 
     /// <summary>Prüft PictureInPictureService: Windows-CompactOverlay (Mini-Player).</summary>

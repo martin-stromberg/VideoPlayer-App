@@ -27,10 +27,16 @@
                            HeightRequest="48"
                            WidthRequest="48" />
 
-        <!-- Kopf-Overlay: Titel, „angesehen"-Hinweis, Mini-Player-Schalter -->
+        <!-- Kopf-Overlay: Titel, „angesehen"-Hinweis, Mini-Player-Schalter.
+             VerticalOptions="Start" ist Pflicht: Ohne Angabe füllt das Layout
+             (Default Fill) das gesamte Grid und fängt als Hit-Test-Blocker
+             alle Eingaben auf dem MediaElement ab. Das Kopfband selbst ist
+             eingabedurchlässig — nur der Mini-Player-Schalter nimmt Klicks an. -->
         <VerticalStackLayout x:Name="OverlayChrome"
+                             VerticalOptions="Start"
                              Spacing="0">
             <Border Padding="12"
+                    InputTransparent="True"
                     BackgroundColor="{StaticResource VpOverlay}">
                 <Grid ColumnDefinitions="*,Auto,Auto"
                       ColumnSpacing="8">
@@ -54,6 +60,7 @@
                             FontSize="12"
                             HeightRequest="36"
                             IsVisible="False"
+                            InputTransparent="False"
                             Clicked="OnPipClicked" />
                 </Grid>
             </Border>
