@@ -52,6 +52,12 @@ namespace VideoPlayer.Maui
             builder.Services.AddSingleton<HomeListService>();
             builder.Services.AddSingleton<PosterImageService>();
 
+            // Quellen-Browsing, Medien-Details und Favoriten-Umschaltung
+            // (plattformneutrale Dienste auf dem angemeldeten API-Client).
+            builder.Services.AddSingleton<SourceBrowserService>();
+            builder.Services.AddSingleton<MediaDetailsService>();
+            builder.Services.AddSingleton<FavoritesService>();
+
             builder.Services.AddSingleton<AppShell>();
             builder.Services.AddTransient<Pages.LoadingPage>();
             builder.Services.AddTransient<Pages.HomePage>();
@@ -62,8 +68,10 @@ namespace VideoPlayer.Maui
             builder.Services.AddTransient<Pages.SettingsPage>();
             builder.Services.AddTransient<Pages.ServerSetupPage>();
             builder.Services.AddTransient<Pages.LoginPage>();
-            // Platzhalter-Detailseite (Shell-Route „mediadetails").
+            // Detailseite (Shell-Route „mediadetails") und
+            // Quellen-Browsing-Seite (Shell-Route „sourceoverview").
             builder.Services.AddTransient<Pages.MediaDetailsPage>();
+            builder.Services.AddTransient<Pages.SourceOverviewPage>();
 
             builder.ConfigureFonts(fonts =>
             {

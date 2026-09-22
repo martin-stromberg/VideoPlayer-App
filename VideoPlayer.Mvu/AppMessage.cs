@@ -128,3 +128,98 @@ public sealed record CachedListsChangedMessage : AppMessage;
 /// navigiert zur Detailseite des Mediums.
 /// </summary>
 public sealed record MediaItemSelectedMessage(HomeMediaItem Item) : AppMessage;
+
+/// <summary>
+/// Die Quellen-Seite wurde geöffnet bzw. soll (erneut) laden —
+/// im verbundenen Zustand werden die Quellen vom Server geholt.
+/// </summary>
+public sealed record SourcesPageOpenedMessage : AppMessage;
+
+/// <summary>Die Quellenliste wurde geladen (<paramref name="Error"/> bei Fehlschlag).</summary>
+public sealed record SourcesLoadedMessage(
+    IReadOnlyList<SourceItem> Sources,
+    string? Error) : AppMessage;
+
+/// <summary>Eine Quelle wurde in der Übersicht ausgewählt — Browser initialisieren und öffnen.</summary>
+public sealed record SourceSelectedMessage(SourceItem Source) : AppMessage;
+
+/// <summary>
+/// Die Quellen-Browsing-Seite ist erschienen und meldet ihre Identität —
+/// bei abweichendem Browser-Zustand wird dieser (neu) initialisiert,
+/// ohne erneut zu navigieren.
+/// </summary>
+public sealed record SourceBrowserOpenedMessage(long SourceId, string SourceName) : AppMessage;
+
+/// <summary>Die Genres der geöffneten Quelle wurden geladen (inkl. „Alle"-Eintrag).</summary>
+public sealed record SourceGenresLoadedMessage(
+    long SourceId,
+    IReadOnlyList<SourceGenreItem> Genres) : AppMessage;
+
+/// <summary>
+/// Eine Eintragsseite der Quelle wurde geladen (<paramref name="Append"/> =
+/// Folgeseite anhängen, sonst Liste ersetzen; <paramref name="Error"/> bei
+/// Fehlschlag).
+/// </summary>
+public sealed record SourceItemsLoadedMessage(
+    long SourceId,
+    int Page,
+    IReadOnlyList<SourceMediaItem> Items,
+    bool HasMore,
+    bool Append,
+    string? Error) : AppMessage;
+
+/// <summary>Ein Genre-Filter wurde gewählt (<paramref name="GenreId"/> 0 = „Alle").</summary>
+public sealed record SourceGenreSelectedMessage(long GenreId) : AppMessage;
+
+/// <summary>Ein Suchtext wurde abgeschickt (leer = Suche zurücksetzen).</summary>
+public sealed record SourceSearchSubmittedMessage(string SearchText) : AppMessage;
+
+/// <summary>Die nächste Eintragsseite soll nachgeladen werden (Listenende erreicht).</summary>
+public sealed record SourceItemsNextPageRequestedMessage : AppMessage;
+
+/// <summary>Der letzte Eintrags-Lauf soll wiederholt werden (Fehlerzustand).</summary>
+public sealed record SourceItemsRetryRequestedMessage : AppMessage;
+
+/// <summary>Ein Medium des Quellen-Rasters wurde ausgewählt — Detailseite öffnen.</summary>
+public sealed record SourceMediaItemSelectedMessage(SourceMediaItem Item) : AppMessage;
+
+/// <summary>
+/// Die Detailseite eines Mediums ist erschienen und meldet ihre Identität —
+/// die Detaildaten werden vom Server geladen. Die Hints
+/// <paramref name="ShowId"/>/<paramref name="SeasonId"/>/
+/// <paramref name="EpisodeId"/> lösen Episoden/Staffeln zum Serienkontext
+/// auf (kein Staffel-Endpunkt vorhanden).
+/// </summary>
+public sealed record MediaDetailsRequestedMessage(
+    string MediaType,
+    long MediaId,
+    string? Title,
+    long? ShowId = null,
+    long? SeasonId = null,
+    long? EpisodeId = null) : AppMessage;
+
+/// <summary>
+/// Die Detaildaten der angefragten Identität wurden geladen
+/// (<paramref name="Error"/> bei Fehlschlag).
+/// </summary>
+public sealed record MediaDetailsLoadedMessage(
+    string MediaType,
+    long MediaId,
+    MediaDetailsView? Details,
+    string? Error) : AppMessage;
+
+/// <summary>Eine andere Staffel wurde im Serienkontext gewählt.</summary>
+public sealed record SeasonSelectedMessage(long SeasonId) : AppMessage;
+
+/// <summary>Die Favoriten-Markierung des angezeigten Mediums umschalten.</summary>
+public sealed record FavoriteToggleRequestedMessage : AppMessage;
+
+/// <summary>
+/// Ergebnis der Favoriten-Umschaltung: <paramref name="IsFavorite"/> ist der
+/// neue Server-Zustand; <c>null</c> = fehlgeschlagen/kein Server (Stern
+/// bleibt unverändert, Fehlerhinweis wird gesetzt).
+/// </summary>
+public sealed record FavoriteToggleCompletedMessage(
+    bool? IsFavorite,
+    string MediaType,
+    long MediaId) : AppMessage;

@@ -1,12 +1,82 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:controls="clr-namespace:VideoPlayer.Maui.Controls"
+             xmlns:mvu="clr-namespace:VideoPlayer.Mvu;assembly=VideoPlayer.Mvu"
              x:Class="VideoPlayer.Maui.Pages.SourcesPage"
-             Title="Quellen">
+             Title="Quellen"
+             x:DataType="mvu:MvuHost">
 
-    <VerticalStackLayout Padding="20" Spacing="10">
-        <Label Text="Quellen" FontSize="24" FontAttributes="Bold" />
-        <Label Text="Diese Seite wird in einem späteren Entwicklungsschritt gefüllt." />
-    </VerticalStackLayout>
+    <Grid Padding="20"
+          RowDefinitions="Auto,Auto,Auto,*"
+          RowSpacing="12">
+
+        <!-- Offline-Hinweis: im Offlinebetrieb gibt es keine Quellenliste —
+             statt leerer oder veralteter Daten ein klarer Hinweis. -->
+        <Border x:Name="OfflineBanner"
+                Grid.Row="0"
+                Padding="12,8"
+                StrokeShape="RoundRectangle 8"
+                BackgroundColor="#D9A029"
+                IsVisible="False">
+            <Label Text="Offline – die Quellenliste steht ohne Verbindung zum Server nicht zur Verfügung."
+                   TextColor="Black"
+                   FontAttributes="Bold" />
+        </Border>
+
+        <ActivityIndicator x:Name="LoadingIndicator"
+                           Grid.Row="1"
+                           IsRunning="{Binding Model.SourcesOverview.IsLoading}"
+                           IsVisible="{Binding Model.SourcesOverview.IsLoading}"
+                           Color="#FFB84D" />
+
+        <VerticalStackLayout x:Name="ErrorPanel"
+                             Grid.Row="1"
+                             Spacing="8"
+                             IsVisible="False">
+            <Label x:Name="ErrorLabel" TextColor="Red" />
+            <Button x:Name="RetryButton"
+                    Text="Erneut laden"
+                    Clicked="OnRetryClicked"
+                    HorizontalOptions="Start" />
+        </VerticalStackLayout>
+
+        <Label x:Name="EmptyLabel"
+               Grid.Row="1"
+               Text="Keine Quellen freigegeben."
+               IsVisible="False" />
+
+        <!-- Liste der serverseitig freigegebenen Quellen -->
+        <CollectionView x:Name="SourcesCollection"
+                        Grid.Row="3"
+                        ItemsSource="{Binding Model.SourcesOverview.Sources}"
+                        SelectionMode="Single"
+                        SelectionChanged="OnSourceSelected">
+            <CollectionView.ItemTemplate>
+                <DataTemplate x:DataType="mvu:SourceItem">
+                    <Border Padding="12"
+                            Margin="0,0,0,10"
+                            StrokeShape="RoundRectangle 8"
+                            BackgroundColor="#23232a">
+                        <Border.Shadow>
+                            <Shadow Brush="Black" Offset="0,2" Radius="4" Opacity="0.3" />
+                        </Border.Shadow>
+                        <HorizontalStackLayout Spacing="14">
+                            <controls:CachedSourceIconImage PictureId="{Binding IconPictureId}"
+                                                            HeightRequest="48"
+                                                            WidthRequest="48"
+                                                            Aspect="AspectFit"
+                                                            VerticalOptions="Center" />
+                            <Label Text="{Binding Name}"
+                                   FontSize="17"
+                                   FontAttributes="Bold"
+                                   TextColor="#FFDDAA"
+                                   VerticalOptions="Center" />
+                        </HorizontalStackLayout>
+                    </Border>
+                </DataTemplate>
+            </CollectionView.ItemTemplate>
+        </CollectionView>
+    </Grid>
 
 </ContentPage>

@@ -99,9 +99,62 @@ public sealed record LoadHomeListsEffect : AppEffect;
 
 /// <summary>
 /// Zur Detailseite eines Mediums navigieren (Shell-Route
-/// <c>mediadetails</c>, geschoben auf den Navigationsstack).
+/// <c>mediadetails</c>, geschoben auf den Navigationsstack). Die
+/// optionalen Hints lösen Episoden/Staffeln zum Serienkontext auf.
 /// </summary>
 public sealed record NavigateToMediaDetailsEffect(
+    string MediaType,
+    long MediaId,
+    string Title,
+    long? ShowId = null,
+    long? SeasonId = null,
+    long? EpisodeId = null) : AppEffect;
+
+/// <summary>Quellenliste vom Server laden (Ergebnis: <c>SourcesLoadedMessage</c>).</summary>
+public sealed record LoadSourcesEffect : AppEffect;
+
+/// <summary>
+/// Zur Quellen-Browsing-Seite navigieren (Shell-Route
+/// <c>sourceoverview?id=…&amp;name=…</c>, geschoben auf den Stack).
+/// </summary>
+public sealed record NavigateToSourceOverviewEffect(
+    long SourceId,
+    string SourceName) : AppEffect;
+
+/// <summary>Genres einer Quelle laden (Ergebnis: <c>SourceGenresLoadedMessage</c>).</summary>
+public sealed record LoadSourceGenresEffect(long SourceId) : AppEffect;
+
+/// <summary>
+/// Eine Eintragsseite einer Quelle laden — <c>api/items</c> mit
+/// Paging/Suche/Genre-Filter (Ergebnis: <c>SourceItemsLoadedMessage</c>).
+/// </summary>
+public sealed record LoadSourceItemsEffect(
+    long SourceId,
+    int Page,
+    string? SearchText,
+    long? GenreId,
+    bool Append) : AppEffect;
+
+/// <summary>
+/// Detaildaten eines Mediums laden — je Medientyp der passende
+/// <c>api/items/{typ}/{id}</c>-Endpunkt (Ergebnis:
+/// <c>MediaDetailsLoadedMessage</c>). Hints wie bei
+/// <see cref="MediaDetailsRequestedMessage"/>.
+/// </summary>
+public sealed record LoadMediaDetailsEffect(
+    string MediaType,
+    long MediaId,
+    string? Title,
+    long? ShowId = null,
+    long? SeasonId = null,
+    long? EpisodeId = null) : AppEffect;
+
+/// <summary>
+/// Favoriten-Markierung eines Mediums zum Server umschalten und die
+/// lokale Kopie <c>cached_favorites</c> erneuern (Ergebnis:
+/// <c>FavoriteToggleCompletedMessage</c> + <c>CachedListsChangedMessage</c>).
+/// </summary>
+public sealed record ToggleFavoriteEffect(
     string MediaType,
     long MediaId,
     string Title) : AppEffect;
