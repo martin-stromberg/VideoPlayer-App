@@ -48,14 +48,14 @@ public sealed record FavoriteListItem
     /// <summary>Übersetzte Medientyp-Bezeichnung (Anzeige unter dem Titel).</summary>
     public string MediaTypeText =>
         MediaTypeNames.Normalize(MediaType) switch
-    {
-        "movie" => "Film",
-        "moviecollection" => "Filmkollektion",
-        "tvshow" => "Serie",
-        "tvshowseason" => "Staffel",
-        "tvshowepisode" => "Episode",
-        _ => "Medium"
-    };
+        {
+            "movie" => "Film",
+            "moviecollection" => "Filmkollektion",
+            "tvshow" => "Serie",
+            "tvshowseason" => "Staffel",
+            "tvshowepisode" => "Episode",
+            _ => "Medium"
+        };
 
     /// <summary>
     /// Bildet den Eintrag auf das gemeinsame <see cref="HomeMediaItem"/>

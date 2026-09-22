@@ -10,6 +10,13 @@ public interface INetworkStatusMonitor
     /// <summary>Letzter bekannter Netzwerkstatus (<c>true</c> = online).</summary>
     bool IsOnline { get; }
 
+    /// <summary>
+    /// Die aktuelle Verbindung läuft über ein ungedrosseltes
+    /// Festnetz-Profil (WLAN oder Ethernet) — Grundlage der
+    /// Einstellung „Downloads nur im WLAN".
+    /// </summary>
+    bool IsWifi { get; }
+
     /// <summary>Wird bei jedem erkannten Wechsel des Netzwerkstatus ausgelöst.</summary>
     event EventHandler<bool>? AvailabilityChanged;
 

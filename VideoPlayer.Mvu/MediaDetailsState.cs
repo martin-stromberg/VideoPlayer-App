@@ -33,6 +33,15 @@ public sealed record MediaDetailsState
     /// <summary>Fehlertext der letzten Favoriten-Umschaltung; <c>null</c> = kein Fehler.</summary>
     public string? FavoriteError { get; init; }
 
+    /// <summary>
+    /// Hinweistext der letzten Download-Anforderung dieses Mediums
+    /// (eingeplant/bereits vorhanden/Fehler); <c>null</c> = kein Hinweis.
+    /// </summary>
+    public string? DownloadNotice { get; init; }
+
+    /// <summary><c>true</c>, wenn <see cref="DownloadNotice"/> einen Fehler/eine Ablehnung beschreibt.</summary>
+    public bool DownloadNoticeIsError { get; init; }
+
     /// <summary>Geladenes Anzeigemodell; <c>null</c> während des Ladens oder bei Fehler.</summary>
     public MediaDetailsView? Details { get; init; }
 

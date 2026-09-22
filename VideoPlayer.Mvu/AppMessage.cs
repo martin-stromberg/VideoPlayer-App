@@ -433,3 +433,91 @@ public sealed record PictureInPictureChangedMessage(bool IsActive) : AppMessage;
 /// und den Player-Zustand zurücksetzen.
 /// </summary>
 public sealed record PlayerClosedMessage : AppMessage;
+
+/// <summary>
+/// Die Downloads-Seite wurde geöffnet — das Download-Manifest wird
+/// (erneut) gelesen. Die Seite arbeitet ohne Serververbindung, die
+/// Daten liegen lokal vor.
+/// </summary>
+public sealed record DownloadsPageOpenedMessage : AppMessage;
+
+/// <summary>
+/// Die Download-Liste wurde aus dem Manifest geladen
+/// (<paramref name="Error"/> bei Fehlschlag).
+/// </summary>
+/// <param name="Items">Die Download-Einträge in Auftragsreihenfolge.</param>
+/// <param name="UsedBytes">Durch Download-Dateien belegter Speicher.</param>
+/// <param name="QuotaGb">Konfiguriertes Speicherplatzkontingent in Gigabyte.</param>
+/// <param name="Error">Fehlertext bei Fehlschlag; <c>null</c> bei Erfolg.</param>
+/// <returns>Nachricht mit dem Ladeergebnis der Download-Liste.</returns>
+public sealed record DownloadsLoadedMessage(
+    IReadOnlyList<DownloadListItem> Items,
+    long UsedBytes,
+    int QuotaGb,
+    string? Error) : AppMessage;
+
+/// <summary>
+/// Der Anwender fordert den Download eines Mediums an („Herunterladen"
+/// auf der Detailseite bzw. je Episoden-Eintrag). Nur abspielbare Typen
+/// (<c>movie</c>/<c>tvshowepisode</c>) werden angenommen.
+/// </summary>
+/// <param name="MediaType">Medientyp (wird normalisiert).</param>
+/// <param name="MediaId">Id des Mediums.</param>
+/// <param name="Title">Anzeigetitel des Downloads; <c>null</c> = Fallback.</param>
+/// <returns>Nachricht für die Download-Anforderung.</returns>
+public sealed record DownloadRequestedMessage(
+    string MediaType,
+    long MediaId,
+    string? Title) : AppMessage;
+
+/// <summary>
+/// Ergebnis einer Download-Einreihe-Anforderung: <paramref name="Item"/>
+/// trägt den Snapshot des Manifest-Eintrags (bei ungültiger Anforderung
+/// <c>null</c>), <paramref name="Notice"/> den Hinweistext für die
+/// Detailseite.
+/// </summary>
+/// <param name="Item">Der Manifest-Eintrag als Anzeige-Snapshot; <c>null</c> bei ungültiger Anforderung.</param>
+/// <param name="Notice">Hinweistext (eingeplant/bereits vorhanden/Fehler); <c>null</c> = kein Hinweis.</param>
+/// <param name="IsError"><c>true</c>, wenn der Hinweis eine Ablehnung/einen Fehler beschreibt.</param>
+/// <param name="MediaType">Medientyp der Anforderung (normalisiert).</param>
+/// <param name="MediaId">Medien-Id der Anforderung.</param>
+/// <returns>Nachricht mit dem Einreihe-Ergebnis.</returns>
+public sealed record DownloadEnqueueCompletedMessage(
+    DownloadListItem? Item,
+    string? Notice,
+    bool IsError,
+    string MediaType,
+    long MediaId) : AppMessage;
+
+/// <summary>
+/// Ein Download-Eintrag hat sich geändert (Zustand oder Fortschritt) —
+/// vom <see cref="DownloadService"/> gemeldet und vom Effekt-Handler in
+/// den MVU-Zyklus eingespeist.
+/// </summary>
+/// <param name="Item">Der geänderte Eintrag (Snapshot).</param>
+/// <returns>Nachricht mit dem geänderten Eintrag.</returns>
+public sealed record DownloadItemChangedMessage(DownloadListItem Item) : AppMessage;
+
+/// <summary>
+/// Ein Download-Eintrag wurde aus dem Manifest entfernt (Löschen durch
+/// den Anwender oder automatisches Entfernen gesehener Episoden).
+/// </summary>
+/// <param name="MediaType">Medientyp des entfernten Downloads (normalisiert).</param>
+/// <param name="MediaId">Id des Mediums.</param>
+/// <returns>Nachricht über das Entfernen.</returns>
+public sealed record DownloadDeletedMessage(string MediaType, long MediaId) : AppMessage;
+
+/// <summary>Einen wartenden/laufenden Download abbrechen.</summary>
+/// <param name="Item">Der abzubrechende Download-Eintrag.</param>
+/// <returns>Nachricht für die Abbruch-Anforderung.</returns>
+public sealed record DownloadCancelRequestedMessage(DownloadListItem Item) : AppMessage;
+
+/// <summary>Einen fehlgeschlagenen/abgebrochenen Download erneut einreihen.</summary>
+/// <param name="Item">Der zu wiederholende Download-Eintrag.</param>
+/// <returns>Nachricht für die Wiederholen-Anforderung.</returns>
+public sealed record DownloadRetryRequestedMessage(DownloadListItem Item) : AppMessage;
+
+/// <summary>Einen Download vollständig entfernen (Datei + Manifest-Eintrag).</summary>
+/// <param name="Item">Der zu löschende Download-Eintrag.</param>
+/// <returns>Nachricht für die Lösch-Anforderung.</returns>
+public sealed record DownloadDeleteRequestedMessage(DownloadListItem Item) : AppMessage;

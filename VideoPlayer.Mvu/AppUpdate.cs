@@ -70,12 +70,8 @@ public static class AppUpdate
             NetworkAvailabilityChangedMessage network => UpdateNetworkAvailabilityChanged(model, network),
             ServerEventReceivedMessage received => UpdateServerEventReceived(model, received),
             ServerEventsConnectionClosedMessage => UpdateServerEventsConnectionClosed(model),
-            SynchronizationCompletedMessage => new AppTransition(
-                model with { IsSyncRunning = false },
-                // Nach dem Voll-Sync die Startseiten-Listen aus dem
-                // aktualisierten Cache neu laden.
-                [new LoadHomeListsEffect()]),
-            CachedListsChangedMessage => new AppTransition(model, [new LoadHomeListsEffect()]),
+            SynchronizationCompletedMessage => UpdateSynchronizationCompleted(model),
+            CachedListsChangedMessage => UpdateCachedListsChanged(model),
             HomeListsLoadedMessage loaded => UpdateHomeListsLoaded(model, loaded),
             MediaItemSelectedMessage selected => UpdateMediaItemSelected(model, selected),
             SourcesPageOpenedMessage => UpdateSourcesPageOpened(model),
@@ -109,6 +105,15 @@ public static class AppUpdate
             PictureInPictureRequestedMessage => UpdatePictureInPictureRequested(model),
             PictureInPictureChangedMessage changed => UpdatePictureInPictureChanged(model, changed),
             PlayerClosedMessage => UpdatePlayerClosed(model),
+            DownloadsPageOpenedMessage => UpdateDownloadsPageOpened(model),
+            DownloadsLoadedMessage loaded => UpdateDownloadsLoaded(model, loaded),
+            DownloadRequestedMessage requested => UpdateDownloadRequested(model, requested),
+            DownloadEnqueueCompletedMessage completed => UpdateDownloadEnqueueCompleted(model, completed),
+            DownloadItemChangedMessage changed => UpdateDownloadItemChanged(model, changed),
+            DownloadDeletedMessage deleted => UpdateDownloadDeleted(model, deleted),
+            DownloadCancelRequestedMessage requested => UpdateDownloadCancelRequested(model, requested),
+            DownloadRetryRequestedMessage requested => UpdateDownloadRetryRequested(model, requested),
+            DownloadDeleteRequestedMessage requested => UpdateDownloadDeleteRequested(model, requested),
             LogoutRequestedMessage => UpdateLogoutRequested(model),
             _ => AppTransition.Unchanged(model)
         };
@@ -149,9 +154,17 @@ public static class AppUpdate
     private static AppTransition UpdateSaveSettingsRequested(AppModel model, SaveSettingsRequestedMessage message)
     {
         var normalized = message.Settings.Normalize();
-        return new AppTransition(
-            model with { Settings = normalized },
-            [new PersistSettingsEffect(normalized)]);
+        var effects = new List<AppEffect> { new PersistSettingsEffect(normalized) };
+        // Beim Einschalten der automatischen Downloads läuft der Vorlauf
+        // sofort an (Throttle umgangen) — nur bei bestehender Verbindung.
+        if (normalized.AutoDownloadEnabled
+            && !model.Settings.AutoDownloadEnabled
+            && model.ConnectionState == ConnectionState.Connected)
+        {
+            effects.Add(new RunAutoDownloadsEffect(normalized, Force: true));
+        }
+
+        return new AppTransition(model with { Settings = normalized }, effects);
     }
 
     private static AppTransition UpdateServersLoaded(AppModel model, ServersLoadedMessage message)
@@ -430,6 +443,11 @@ public static class AppUpdate
 
         effects.Add(new RunFullSyncEffect());
 
+        // Unterbrochene Downloads (App-Neustart, Netzwerkverlust) werden
+        // mit der Verbindung wieder aufgenommen — der Auftragsbestand
+        // liegt persistent im Manifest.
+        effects.Add(new ResumeDownloadsEffect(model.Settings));
+
         if (IsWorkflowPage(model.CurrentPage))
         {
             updated = updated with { CurrentPage = AppPage.Home };
@@ -478,7 +496,41 @@ public static class AppUpdate
                 [new CheckServerHealthEffect()]);
         }
 
-        return new AppTransition(model with { IsOnline = true }, []);
+        // Bereits verbunden: die Online-Meldung kann auch ein Profil-
+        // wechsel (Mobilfunk → WLAN) sein — wartende Downloads werden
+        // bei erfüllter WLAN-Bedingung fortgesetzt.
+        return model.ConnectionState == ConnectionState.Connected
+            ? new AppTransition(
+                model with { IsOnline = true },
+                [new ResumeDownloadsEffect(model.Settings)])
+            : new AppTransition(model with { IsOnline = true }, []);
+    }
+
+    private static AppTransition UpdateSynchronizationCompleted(AppModel model)
+    {
+        // Nach dem Voll-Sync die Startseiten-Listen aus dem aktualisierten
+        // Cache neu laden; bei aktivierten automatischen Downloads läuft
+        // der Vorlauf auf dem frischen Weiterschauen-Stand.
+        var effects = new List<AppEffect> { new LoadHomeListsEffect() };
+        if (model.ConnectionState == ConnectionState.Connected && model.Settings.AutoDownloadEnabled)
+        {
+            effects.Add(new RunAutoDownloadsEffect(model.Settings, Force: false));
+        }
+
+        return new AppTransition(model with { IsSyncRunning = false }, effects);
+    }
+
+    private static AppTransition UpdateCachedListsChanged(AppModel model)
+    {
+        // Teil-Synchronisationen (Server-Ereignisse) ändern die
+        // Weiterschauen-Liste — der Vorlauf folgt dem neuen Stand.
+        var effects = new List<AppEffect> { new LoadHomeListsEffect() };
+        if (model.ConnectionState == ConnectionState.Connected && model.Settings.AutoDownloadEnabled)
+        {
+            effects.Add(new RunAutoDownloadsEffect(model.Settings, Force: false));
+        }
+
+        return new AppTransition(model, effects);
     }
 
     private static AppTransition UpdateServerEventReceived(AppModel model, ServerEventReceivedMessage message)
@@ -1388,6 +1440,12 @@ public static class AppUpdate
                 && remaining <= TimeSpan.FromSeconds(model.Settings.WatchedEndWindowSeconds))
             {
                 updated = updated with { IsWatched = true };
+                // Optionales Aufräumen: einen abgeschlossenen Download
+                // der gesehenen Episode entfernen.
+                if (model.Settings.AutoDeleteWatchedEpisodes && updated.MediaType == "tvshowepisode")
+                {
+                    effects.Add(new DeleteWatchedDownloadEffect(updated.MediaType, updated.MediaId));
+                }
             }
 
             // Auto-Fortsetzung: Restlaufzeit unterschreitet das Fenster
@@ -1434,6 +1492,14 @@ public static class AppUpdate
             new ReportPlaybackProgressEffect(
                 updated.MediaType!, updated.MediaId, finalPosition, updated.Duration)
         };
+
+        // Optionales Aufräumen: einen abgeschlossenen Download der
+        // gesehenen Episode entfernen (idempotent — wirkt auch, wenn die
+        // Schwelle bereits im Takt erreicht wurde).
+        if (model.Settings.AutoDeleteWatchedEpisodes && updated.MediaType == "tvshowepisode")
+        {
+            effects.Add(new DeleteWatchedDownloadEffect(updated.MediaType, updated.MediaId));
+        }
 
         // Am Ende liegt die Restlaufzeit bei 0 — die Auto-Fortsetzung
         // greift damit wie im Takt (Fenster ist stets > 0).
@@ -1498,6 +1564,176 @@ public static class AppUpdate
         }
 
         return new AppTransition(model with { Player = PlayerState.Empty }, effects);
+    }
+
+    // --- Downloads (Schritt 11) -------------------------------------------
+
+    private static AppTransition UpdateDownloadsPageOpened(AppModel model)
+    {
+        var state = model.Downloads;
+        if (state.IsLoading)
+        {
+            return AppTransition.Unchanged(model);
+        }
+
+        // Die Liste liegt lokal vor (Manifest) — das Laden ist in jedem
+        // Verbindungszustand möglich; laufende Transfers melden ihren
+        // Fortschritt über DownloadItemChangedMessage nach.
+        return new AppTransition(
+            model with
+            {
+                Downloads = state with { IsLoading = true, Attempted = true, Error = null }
+            },
+            [new LoadDownloadsEffect(model.Settings)]);
+    }
+
+    private static AppTransition UpdateDownloadsLoaded(AppModel model, DownloadsLoadedMessage message)
+    {
+        return new AppTransition(
+            model with
+            {
+                Downloads = new DownloadsPageState
+                {
+                    Attempted = true,
+                    Items = message.Items,
+                    UsedBytes = message.UsedBytes,
+                    QuotaGb = message.QuotaGb,
+                    Error = message.Error
+                }
+            },
+            []);
+    }
+
+    private static AppTransition UpdateDownloadRequested(AppModel model, DownloadRequestedMessage message)
+    {
+        var mediaType = MediaTypeNames.Normalize(message.MediaType);
+        if (message.MediaId <= 0 || mediaType is not ("movie" or "tvshowepisode"))
+        {
+            return AppTransition.Unchanged(model);
+        }
+
+        if (model.ConnectionState != ConnectionState.Connected)
+        {
+            // Ohne Serververbindung kann kein Download beginnen — der
+            // Hinweis erscheint auf der Detailseite.
+            return new AppTransition(
+                model with
+                {
+                    MediaDetails = model.MediaDetails with
+                    {
+                        DownloadNotice = "Keine Serververbindung — der Download ist derzeit nicht möglich.",
+                        DownloadNoticeIsError = true
+                    }
+                },
+                []);
+        }
+
+        return new AppTransition(
+            model,
+            [new EnqueueDownloadEffect(mediaType, message.MediaId, message.Title, model.Settings)]);
+    }
+
+    private static AppTransition UpdateDownloadEnqueueCompleted(AppModel model, DownloadEnqueueCompletedMessage message)
+    {
+        var downloads = message.Item is { } item
+            ? model.Downloads with { Items = UpsertItem(model.Downloads.Items, item) }
+            : model.Downloads;
+
+        var details = model.MediaDetails;
+        if (message.Notice is not null
+            && details.MediaType == MediaTypeNames.Normalize(message.MediaType)
+            && details.MediaId == message.MediaId)
+        {
+            // Rückmeldung der angezeigten Detailseite — Hinweis einblenden.
+            details = details with
+            {
+                DownloadNotice = message.Notice,
+                DownloadNoticeIsError = message.IsError
+            };
+        }
+
+        return new AppTransition(
+            model with { Downloads = downloads, MediaDetails = details },
+            []);
+    }
+
+    private static AppTransition UpdateDownloadItemChanged(AppModel model, DownloadItemChangedMessage message)
+    {
+        return new AppTransition(
+            model with
+            {
+                Downloads = model.Downloads with
+                {
+                    Items = UpsertItem(model.Downloads.Items, message.Item)
+                }
+            },
+            []);
+    }
+
+    private static AppTransition UpdateDownloadDeleted(AppModel model, DownloadDeletedMessage message)
+    {
+        var type = MediaTypeNames.Normalize(message.MediaType);
+        return new AppTransition(
+            model with
+            {
+                Downloads = model.Downloads with
+                {
+                    Items = model.Downloads.Items
+                        .Where(i => !(i.MediaId == message.MediaId && i.MediaType == type))
+                        .ToList()
+                }
+            },
+            []);
+    }
+
+    private static AppTransition UpdateDownloadCancelRequested(AppModel model, DownloadCancelRequestedMessage message)
+    {
+        return message.Item.CanCancel
+            ? new AppTransition(model, [new CancelDownloadEffect(message.Item.MediaType, message.Item.MediaId)])
+            : AppTransition.Unchanged(model);
+    }
+
+    private static AppTransition UpdateDownloadRetryRequested(AppModel model, DownloadRetryRequestedMessage message)
+    {
+        return message.Item.CanRetry
+            ? new AppTransition(
+                model,
+                [new EnqueueDownloadEffect(message.Item.MediaType, message.Item.MediaId, message.Item.Title, model.Settings)])
+            : AppTransition.Unchanged(model);
+    }
+
+    private static AppTransition UpdateDownloadDeleteRequested(AppModel model, DownloadDeleteRequestedMessage message)
+    {
+        return message.Item.CanDelete
+            ? new AppTransition(model, [new DeleteDownloadEffect(message.Item.MediaType, message.Item.MediaId)])
+            : AppTransition.Unchanged(model);
+    }
+
+    /// <summary>
+    /// Fügt einen geänderten Download-Eintrag in die Liste ein bzw.
+    /// ersetzt ihn (Identität = Medientyp + Medien-Id, Sortierung nach
+    /// Manifest-Id bleibt erhalten).
+    /// </summary>
+    /// <param name="items">Die bisherigen Einträge.</param>
+    /// <param name="item">Der geänderte Eintrag.</param>
+    /// <returns>Die aktualisierte Liste.</returns>
+    private static IReadOnlyList<DownloadListItem> UpsertItem(
+        IReadOnlyList<DownloadListItem> items,
+        DownloadListItem item)
+    {
+        var list = items.ToList();
+        var index = list.FindIndex(i => i.EntryId == item.EntryId
+            || (i.MediaId == item.MediaId && i.MediaType == item.MediaType));
+        if (index >= 0)
+        {
+            list[index] = item;
+        }
+        else
+        {
+            list.Add(item);
+        }
+
+        return list;
     }
 
     private static AppTransition UpdateNavigateTo(AppModel model, NavigateToMessage message)
