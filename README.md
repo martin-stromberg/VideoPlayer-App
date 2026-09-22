@@ -6,7 +6,8 @@ Dieses Repository enthält die ausgelagerte .NET-MAUI-App und ihre Tests.
 
 - `VideoWebPlayer.Maui/` - mobile App.
 - `VideoWebPlayer.Maui.Tests/` - tests ohne Rückreferenz auf das Webprojekt.
-- `VideoWebPlayer.Client/` - kopierte Übergabeschnittstelle aus dem Web-Repository.
+- `VideoWebPlayer.Client/` - kopierte Übergabeschnittstelle aus dem Web-Repository (Altbestand, wird im Rahmen der Neugestaltung entfernt).
+- `VideoPlayer.ApiClient/` - neu implementierter, plattformneutraler Zugriff auf die öffentliche Server-API (Dokumentation: `docs/help/api-client/`).
 - `VideoPlayer.App.sln` - eigene Solution dieses Repositorys.
 - `LICENSE` - PolyForm Noncommercial License 1.0.0.
 
@@ -59,6 +60,8 @@ Produktive Werte werden zentral über `VideoWebPlayer.Maui/Services/MauiClientCo
 
 - MSBuild: `dotnet build VideoWebPlayer.Maui/VideoWebPlayer.Maui.csproj -p:MauiClientApiToken="<MAUI_CLIENT_API_TOKEN>"`
 - Runtime-Umgebung: `VIDEOWEBPLAYER_MAUI_API_TOKEN`
+
+Der neue `VideoPlayer.ApiClient` löst den Schlüssel plattformneutral über `ClientGate.Resolve()` auf: Umgebungsvariable `VIDEOWEBPLAYER_MAUI_API_TOKEN`, dann die MSBuild-Eigenschaft `VideoPlayerApiToken` (Assembly-Metadata `VideoPlayer.ApiClient.ApiToken`), sonst der Platzhalter — oder explizit über `VideoPlayerApiClientOptions.ApiKey`.
 
 Der Wert muss backendseitig zu `Jwt:ApiToken:Maui` passen. Echte JWT-Schlüssel, Benutzerpasswörter und produktive API-Tokens gehören nicht in dieses Repository. Benutzerpasswörter werden im Client über `SecureStorage` abgelegt; `Preferences` enthält nur nicht geheime App-Einstellungen wie Serveradresse und Benutzername.
 
