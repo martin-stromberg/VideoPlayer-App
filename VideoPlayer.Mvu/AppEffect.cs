@@ -201,6 +201,26 @@ public sealed record LoadMediaDetailsEffect(
     long? EpisodeId = null) : AppEffect;
 
 /// <summary>
+/// Kopfbereichs-Bild der geladenen Detailseite über den angemeldeten
+/// API-Client laden: Episoden-Still über <c>api/episodes/{id}/
+/// background-image</c> (<paramref name="HeaderEpisodeId"/>), sonst die
+/// aufgelöste Bildquelle über <c>api/pictures/{id}</c>
+/// (<paramref name="HeaderPictureId"/>; Ergebnis:
+/// <c>MediaDetailsHeaderImageLoadedMessage</c>). Fehlschlag ist kein
+/// Fehlerzustand — der Kopfbereich zeigt dann nur Gradienten und Texte.
+/// </summary>
+/// <param name="MediaType">Medientyp der Detailseite (CLR-Konvention).</param>
+/// <param name="MediaId">Medien-Id der Detailseite.</param>
+/// <param name="HeaderPictureId">Bild-Id für <c>api/pictures</c>; <c>null</c>, wenn ein Episoden-Still gilt.</param>
+/// <param name="HeaderEpisodeId">Episoden-Id des Stills; <c>null</c>, wenn <paramref name="HeaderPictureId"/> gilt.</param>
+/// <returns>Effekt-Datensatz für das Laden des Kopfbereichs-Bilds.</returns>
+public sealed record LoadMediaDetailsHeaderEffect(
+    string MediaType,
+    long MediaId,
+    long? HeaderPictureId,
+    long? HeaderEpisodeId) : AppEffect;
+
+/// <summary>
 /// Favoriten-Markierung eines Mediums zum Server umschalten und die
 /// lokale Kopie <c>cached_favorites</c> erneuern (Ergebnis:
 /// <c>FavoriteToggleCompletedMessage</c> + <c>CachedListsChangedMessage</c>).

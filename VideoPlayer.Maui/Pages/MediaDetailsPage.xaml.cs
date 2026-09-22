@@ -26,6 +26,7 @@ public partial class MediaDetailsPage : ContentPage
     private long? episodeId;
     private bool requested;
     private bool updatingSeasonPicker;
+    private byte[]? appliedHeaderBytes;
 
     /// <summary>Initialisiert eine neue Instanz der <see cref="MediaDetailsPage"/>-Klasse.</summary>
     /// <param name="mvuHost">MVU-Host; liefert den Detail-Zustand und nimmt die Benutzer-Nachrichten entgegen.</param>
@@ -35,6 +36,7 @@ public partial class MediaDetailsPage : ContentPage
         this.mvuHost = mvuHost;
         BindingContext = mvuHost;
         mvuHost.ModelChanged += OnModelChanged;
+        SizeChanged += OnSizeChanged;
         UpdateUi(mvuHost.Model);
     }
 
@@ -116,13 +118,15 @@ public partial class MediaDetailsPage : ContentPage
             return;
         }
 
-        TitleLabel.Text = details.Title;
-        PlotLabel.Text = details.Plot ?? string.Empty;
-        PlotLabel.IsVisible = !string.IsNullOrWhiteSpace(details.Plot);
-        MetaLabel.Text = details.MediaTypeText + (details.ReleaseYear is > 0 ? $" · {details.ReleaseYear}" : string.Empty);
-        GenreLabel.Text = details.GenreNames ?? string.Empty;
-        GenreLabel.IsVisible = !string.IsNullOrWhiteSpace(details.GenreNames);
-        HeaderImage.PictureId = details.PosterPictureId ?? details.BannerPictureId;
+        // Kopfbereich (Web-Vorbild .tvshow-header): Titel, Metazeile und
+        // Handlung folgen dem MVU-View — bei ausgewählter Episode deren
+        // Angaben, sonst die des Mediums.
+        TitleLabel.Text = details.HeaderTitle;
+        MetaLabel.Text = details.HeaderMeta ?? string.Empty;
+        MetaLabel.IsVisible = !string.IsNullOrWhiteSpace(details.HeaderMeta);
+        PlotLabel.Text = details.HeaderPlot ?? string.Empty;
+        PlotLabel.IsVisible = !string.IsNullOrWhiteSpace(details.HeaderPlot);
+        UpdateHeaderImage(state);
 
         FavoriteButton.Text = details.FavoriteStarText;
         // Die Favoriten-Umschaltung braucht den Server — im Offline-
@@ -149,6 +153,37 @@ public partial class MediaDetailsPage : ContentPage
 
         UpdateSeasonSection(details);
         UpdateCollectionSection(details);
+    }
+
+    /// <summary>
+    /// Übernimmt die Kopfbereichs-Bilddaten des Models in die Bildebene.
+    /// Die Umwandlung in eine <see cref="ImageSource"/> erfolgt nur bei
+    /// tatsächlich neuen Bytes (Referenzvergleich, Muster des
+    /// Startseiten-Hero); ohne Bild bleibt die Ebene leer — die
+    /// Gradienten und Texte tragen den Kopfbereich.
+    /// </summary>
+    /// <param name="state">Zustand der Detailseite.</param>
+    private void UpdateHeaderImage(MediaDetailsState state)
+    {
+        if (ReferenceEquals(appliedHeaderBytes, state.HeaderImageBytes))
+        {
+            return;
+        }
+
+        appliedHeaderBytes = state.HeaderImageBytes;
+        HeaderImage.Source = appliedHeaderBytes is { Length: > 0 } bytes
+            ? ImageSource.FromStream(() => new MemoryStream(bytes))
+            : null;
+    }
+
+    private void OnSizeChanged(object? sender, EventArgs e)
+    {
+        // Responsive Höhe — App-Gegenstück zum Web-CSS
+        // clamp(360px, 52vw, 620px) des Detail-Headers.
+        if (Width > 0)
+        {
+            HeaderSection.HeightRequest = Math.Clamp(Width * 0.52, 360, 620);
+        }
     }
 
     private void UpdateSeasonSection(MediaDetailsView details)

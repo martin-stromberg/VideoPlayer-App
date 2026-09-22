@@ -313,6 +313,27 @@ public sealed record MediaDetailsLoadedMessage(
     MediaDetailsView? Details,
     string? Error) : AppMessage;
 
+/// <summary>
+/// Ergebnis des Kopfbereichs-Bildlaufs der Detailseite. Die Identität
+/// (<paramref name="MediaType"/>, <paramref name="MediaId"/> und die
+/// angefragte Bildquelle <paramref name="HeaderPictureId"/> bzw.
+/// <paramref name="HeaderEpisodeId"/>) wird beim Anwenden gegen den
+/// aktuellen Zustand geprüft — verspätete Antworten abgelöster
+/// Seiten-/Bildstände werden verworfen.
+/// </summary>
+/// <param name="MediaType">Medientyp der Detailseite (CLR-Konvention).</param>
+/// <param name="MediaId">Medien-Id der Detailseite.</param>
+/// <param name="HeaderPictureId">Angefragte Bild-Id; <c>null</c>, wenn ein Episoden-Still angefragt war.</param>
+/// <param name="HeaderEpisodeId">Angefragte Episoden-Id des Stills; <c>null</c>, wenn eine Bild-Id angefragt war.</param>
+/// <param name="ImageBytes">Bilddaten; <c>null</c> bei Fehlschlag oder fehlendem Bild.</param>
+/// <returns>Nachricht mit dem Ladeergebnis des Kopfbereichs-Bilds.</returns>
+public sealed record MediaDetailsHeaderImageLoadedMessage(
+    string MediaType,
+    long MediaId,
+    long? HeaderPictureId,
+    long? HeaderEpisodeId,
+    byte[]? ImageBytes) : AppMessage;
+
 /// <summary>Eine andere Staffel wurde im Serienkontext gewählt.</summary>
 /// <param name="SeasonId">Id der gewählten Staffel.</param>
 /// <returns>Nachricht für die Staffelauswahl.</returns>

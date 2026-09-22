@@ -150,6 +150,9 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
             case LoadMediaDetailsEffect loadDetails:
                 await LoadMediaDetailsAsync(loadDetails, cancellationToken);
                 break;
+            case LoadMediaDetailsHeaderEffect header:
+                await LoadMediaDetailsHeaderAsync(header, cancellationToken);
+                break;
             case ToggleFavoriteEffect toggle:
                 await ToggleFavoriteAsync(toggle, cancellationToken);
                 break;
@@ -580,6 +583,41 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
 
         await DispatchMessageAsync(new MediaDetailsLoadedMessage(
             loadDetails.MediaType, loadDetails.MediaId, details, error));
+    }
+
+    private async Task LoadMediaDetailsHeaderAsync(LoadMediaDetailsHeaderEffect header, CancellationToken cancellationToken)
+    {
+        byte[]? imageBytes = null;
+        try
+        {
+            // Episoden-Still-Endpunkt bzw. aufgelöste Bildquelle des
+            // Web-Layouts (Bearer + stille Token-Erneuerung in der
+            // Sende-Pipeline). Ohne Sitzung bzw. bei Fehlschlag bleibt
+            // das Bild aus — der Kopfbereich zeigt dann nur Gradienten
+            // und Texte.
+            var client = authSession.Client;
+            if (client is not null)
+            {
+                var bytes = header.HeaderEpisodeId is > 0
+                    ? await client.GetEpisodeBackgroundImageAsync(header.HeaderEpisodeId.Value, cancellationToken)
+                    : header.HeaderPictureId is > 0
+                        ? await client.GetPictureAsync(header.HeaderPictureId.Value, cancellationToken)
+                        : [];
+                imageBytes = bytes.Length > 0 ? bytes : null;
+            }
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[ShellAppEffectHandler] Detail-Kopfbild laden fehlgeschlagen: {ex.Message}");
+        }
+
+        await DispatchMessageAsync(new MediaDetailsHeaderImageLoadedMessage(
+            header.MediaType, header.MediaId,
+            header.HeaderPictureId, header.HeaderEpisodeId, imageBytes));
     }
 
     private async Task ToggleFavoriteAsync(ToggleFavoriteEffect toggle, CancellationToken cancellationToken)

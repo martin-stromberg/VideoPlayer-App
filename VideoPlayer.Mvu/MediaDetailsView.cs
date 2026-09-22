@@ -14,6 +14,15 @@ public sealed record SeasonItem
     /// <summary>Anzeigename — bei leerem Servernamen „Staffel {Number}".</summary>
     public required string Name { get; init; }
 
+    /// <summary>
+    /// Aufgelöste Banner-Bild-Id der Staffel für <c>api/pictures/{id}</c>
+    /// (Banner → Fanart → Poster); <c>null</c> = kein eigenes Bild.
+    /// </summary>
+    public long? BannerPictureId { get; init; }
+
+    /// <summary>Premieren-/Erscheinungsjahr der Staffel; <c>null</c> = unbekannt.</summary>
+    public int? Year { get; init; }
+
     /// <summary>Episoden der Staffel (in der Serienantwort eingebettet).</summary>
     public IReadOnlyList<EpisodeItem> Episodes { get; init; } = [];
 }
@@ -34,6 +43,9 @@ public sealed record EpisodeItem
 
     /// <summary>Handlungstext der Episode.</summary>
     public string? Plot { get; init; }
+
+    /// <summary>Erscheinungsjahr der Episode (aus <c>ReleaseDate</c>).</summary>
+    public int? ReleaseYear { get; init; }
 
     /// <summary>
     /// Bild-Id für <c>api/pictures/{id}</c> (generiertes Hintergrundbild
@@ -167,6 +179,15 @@ public sealed record MediaDetailsView
     /// <summary>Titel der navigierten Episode (Untertitel-Zeile).</summary>
     public string? HighlightedEpisodeTitle { get; init; }
 
+    /// <summary>
+    /// Im Kopfbereich ausgewählte Episode: initial die navigierte Episode
+    /// (<c>tvshowepisode</c>), nach einem Staffelwechsel die erste Episode
+    /// der gewählten Staffel (Web-Parität zu <c>SelectSeason</c>);
+    /// <c>null</c> = der Kopfbereich zeigt die Serien-/Staffel-
+    /// Informationen statt eines Episoden-Stills.
+    /// </summary>
+    public long? SelectedEpisodeId { get; init; }
+
     /// <summary>Filme einer Kollektion (leer = keine Kollektion).</summary>
     public IReadOnlyList<CollectionMovieItem> Movies { get; init; } = [];
 
@@ -205,6 +226,101 @@ public sealed record MediaDetailsView
 
     /// <summary>Episoden der gewählten Staffel.</summary>
     public IReadOnlyList<EpisodeItem> SelectedSeasonEpisodes => SelectedSeason?.Episodes ?? [];
+
+    /// <summary>Ausgewählte Kopfbereichs-Episode (Auflösung von <see cref="SelectedEpisodeId"/> in <see cref="Seasons"/>).</summary>
+    public EpisodeItem? SelectedEpisode =>
+        SelectedEpisodeId is > 0
+            ? Seasons.SelectMany(s => s.Episodes).FirstOrDefault(e => e.Id == SelectedEpisodeId)
+            : null;
+
+    /// <summary>
+    /// Episoden-Id des Kopfbereichs-Stills (<c>api/episodes/{id}/
+    /// background-image</c>); <c>null</c> = der Kopfbereich nutzt die
+    /// Bildquelle <see cref="HeaderPictureId"/>.
+    /// </summary>
+    public long? HeaderEpisodeId => SelectedEpisodeId is > 0 ? SelectedEpisodeId : null;
+
+    /// <summary>
+    /// Bildquelle des Kopfbereichs für <c>api/pictures/{id}</c>, wenn kein
+    /// Episoden-Still gilt: bei Staffel-Kontext das aufgelöste
+    /// Staffel-Banner (Fallback: Serien-Banner), sonst der Banner des
+    /// Mediums; <c>null</c> = nur Gradienten.
+    /// </summary>
+    public long? HeaderPictureId =>
+        HeaderEpisodeId is > 0
+            ? null
+            : MediaType == "tvshowseason"
+                ? SelectedSeason?.BannerPictureId ?? BannerPictureId
+                : BannerPictureId;
+
+    /// <summary>
+    /// Titelzeile des Kopfbereichs: bei ausgewählter Episode der
+    /// Episodentitel, bei Staffel-Kontext ohne Episode
+    /// „{Serie} - {Staffel}", sonst der Medientitel.
+    /// </summary>
+    public string HeaderTitle =>
+        HeaderEpisodeId is > 0
+            ? SelectedEpisode?.Title ?? HighlightedEpisodeTitle ?? Title
+            : MediaType == "tvshowseason" && SelectedSeason is { } season
+                ? $"{Title} - {season.Name}"
+                : Title;
+
+    /// <summary>
+    /// Metazeile des Kopfbereichs (nur vorhandene Teile): Episode →
+    /// „{Jahr} · Episode {Nr.}"; Staffel → „{Jahr} · {N} Episoden";
+    /// sonst „{Medientyp} · {Jahr} · {Genres}".
+    /// </summary>
+    public string? HeaderMeta
+    {
+        get
+        {
+            var parts = new List<string>(3);
+            if (SelectedEpisode is { } episode)
+            {
+                if (episode.ReleaseYear is > 0)
+                {
+                    parts.Add(episode.ReleaseYear.Value.ToString());
+                }
+                if (episode.Number > 0)
+                {
+                    parts.Add($"Episode {episode.Number}");
+                }
+            }
+            else if (MediaType == "tvshowseason" && HeaderEpisodeId is not > 0 && SelectedSeason is { } season)
+            {
+                if (season.Year is > 0)
+                {
+                    parts.Add(season.Year.Value.ToString());
+                }
+                if (season.Episodes.Count > 0)
+                {
+                    parts.Add(season.Episodes.Count == 1 ? "1 Episode" : $"{season.Episodes.Count} Episoden");
+                }
+            }
+            else
+            {
+                parts.Add(MediaTypeText);
+                if (ReleaseYear is > 0)
+                {
+                    parts.Add(ReleaseYear.Value.ToString());
+                }
+                if (!string.IsNullOrWhiteSpace(GenreNames))
+                {
+                    parts.Add(GenreNames);
+                }
+            }
+            return parts.Count > 0 ? string.Join(" · ", parts) : null;
+        }
+    }
+
+    /// <summary>
+    /// Handlungstext des Kopfbereichs: bei ausgewählter Episode deren
+    /// Plot, bei Staffel-Kontext ohne Episode keiner (Web-Verhalten),
+    /// sonst der Plot des Mediums.
+    /// </summary>
+    public string? HeaderPlot =>
+        SelectedEpisode?.Plot
+        ?? (MediaType == "tvshowseason" && HeaderEpisodeId is not > 0 ? null : Plot);
 
     /// <summary>Anzeigezeile „Jahr | Genres | Episodentitel" (nur vorhandene Teile).</summary>
     public string? YearGenreLine

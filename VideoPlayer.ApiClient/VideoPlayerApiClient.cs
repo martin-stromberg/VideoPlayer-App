@@ -434,6 +434,26 @@ public class VideoPlayerApiClient
         return await response.Content.ReadAsByteArrayAsync(cancellationToken);
     }
 
+    /// <summary>
+    /// Lädt das Hintergrundbild einer Episode (<c>GET
+    /// api/episodes/{id}/background-image</c>). Der Server liefert das
+    /// generierte Episoden-Standbild, fällt auf Banner/Fanart zurück
+    /// oder sendet einen Platzhalter.
+    /// </summary>
+    /// <param name="episodeId">ID der Episode.</param>
+    /// <param name="cancellationToken">Abbruchtoken.</param>
+    /// <returns>Die Bilddaten als Byte-Array.</returns>
+    public async Task<byte[]> GetEpisodeBackgroundImageAsync(long episodeId, CancellationToken cancellationToken = default)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(episodeId);
+        using var response = await SendWithPolicyAsync(
+            $"api/episodes/{episodeId}/background-image",
+            () => new HttpRequestMessage(HttpMethod.Get, $"api/episodes/{episodeId}/background-image"),
+            allowReauth: true,
+            cancellationToken);
+        return await response.Content.ReadAsByteArrayAsync(cancellationToken);
+    }
+
     #endregion
 
     #region Send pipeline

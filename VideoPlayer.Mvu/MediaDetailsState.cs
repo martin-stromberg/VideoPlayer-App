@@ -45,6 +45,19 @@ public sealed record MediaDetailsState
     /// <summary>Geladenes Anzeigemodell; <c>null</c> während des Ladens oder bei Fehler.</summary>
     public MediaDetailsView? Details { get; init; }
 
+    /// <summary>
+    /// Bilddaten des Kopfbereichs (flüchtig, kein Dateicache);
+    /// <c>null</c> = noch nicht geladen/fehlgeschlagen — der Kopfbereich
+    /// zeigt dann nur Gradienten und Texte.
+    /// </summary>
+    public byte[]? HeaderImageBytes { get; init; }
+
+    /// <summary>Das Kopfbereichs-Bild wird gerade geladen.</summary>
+    public bool IsHeaderImageLoading { get; init; }
+
+    /// <summary>Ein Kopfbereichs-Bild liegt vor.</summary>
+    public bool HasHeaderImage => HeaderImageBytes is { Length: > 0 };
+
     /// <summary>Detaildaten liegen vor.</summary>
     public bool HasDetails => Details is not null;
 

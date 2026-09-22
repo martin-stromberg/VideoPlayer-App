@@ -52,6 +52,8 @@ public class VideoPlayerApiClientTests_Endpoints
             c => c.GetGenreOptionsAsync());
         yield return Case("Picture", HttpMethod.Get, "/api/pictures/7", null,
             c => c.GetPictureAsync(7));
+        yield return Case("EpisodeBackgroundImage", HttpMethod.Get, "/api/episodes/9/background-image", null,
+            c => c.GetEpisodeBackgroundImageAsync(9));
         yield return Case("SourceIcon", HttpMethod.Get, "/api/sourceicons/8", null,
             c => c.GetSourceIconAsync(8));
 
@@ -269,5 +271,42 @@ public class VideoPlayerApiClientTests_Endpoints
         await client.GetHeroBackgroundAsync();
 
         Assert.Equal("Bearer jwt-hero", handler.Requests[1].Authorization);
+    }
+
+    /// <summary>Prüft GetEpisodeBackgroundImageAsync: ruft den Episoden-Still-Endpunkt auf und gibt die Bilddaten zurück.</summary>
+    [Fact]
+    public async Task GetEpisodeBackgroundImageAsync_RequestsStillEndpoint_AndReturnsBytes()
+    {
+        var handler = new StubHttpMessageHandler();
+        handler.Enqueue(_ => new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new ByteArrayContent([4, 5, 6])
+        });
+        var client = ApiClientTestFactory.CreateClient(handler);
+
+        var bytes = await client.GetEpisodeBackgroundImageAsync(9);
+
+        Assert.Equal([4, 5, 6], bytes);
+        var request = Assert.Single(handler.Requests);
+        Assert.Equal(HttpMethod.Get, request.Method);
+        Assert.Equal("/api/episodes/9/background-image", request.PathAndQuery);
+    }
+
+    /// <summary>Prüft GetEpisodeBackgroundImageAsync: sendet den Bearer-Token der angemeldeten Sitzung.</summary>
+    [Fact]
+    public async Task GetEpisodeBackgroundImageAsync_SendsBearerToken()
+    {
+        var handler = new StubHttpMessageHandler();
+        handler.EnqueueJson(HttpStatusCode.OK, new { token = "jwt-still", expires = "2030-01-01T00:00:00Z" });
+        handler.Enqueue(_ => new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new ByteArrayContent([6])
+        });
+        var client = ApiClientTestFactory.CreateClient(handler);
+
+        await client.LoginAsync("user@example.com", "secret");
+        await client.GetEpisodeBackgroundImageAsync(9);
+
+        Assert.Equal("Bearer jwt-still", handler.Requests[1].Authorization);
     }
 }
