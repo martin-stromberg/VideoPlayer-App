@@ -24,6 +24,7 @@
                                     Padding="0"
                                     Margin="0"
                                     StrokeThickness="0"
+                                    Opacity="{Binding CardOpacity}"
                                     BackgroundColor="#23232a">
                                 <Border.StrokeShape>
                                     <RoundRectangle CornerRadius="8" />
@@ -54,6 +55,22 @@
                                                  BackgroundColor="#40404a"
                                                  HeightRequest="4"
                                                  VerticalOptions="End" />
+                                    <!-- Platzhalter-Markierung fehlender
+                                         Offline-Episoden (nicht abspielbar). -->
+                                    <Border x:Name="PlaceholderBadge"
+                                            IsVisible="{Binding IsPlaceholder}"
+                                            BackgroundColor="#AA000000"
+                                            Padding="8,4"
+                                            HorizontalOptions="Center"
+                                            VerticalOptions="End"
+                                            Margin="0,0,0,10">
+                                        <Border.StrokeShape>
+                                            <RoundRectangle CornerRadius="4" />
+                                        </Border.StrokeShape>
+                                        <Label Text="Nicht heruntergeladen"
+                                               TextColor="White"
+                                               FontSize="10" />
+                                    </Border>
                                 </Grid>
                             </Border>
                             <Label Text="{Binding Title}"

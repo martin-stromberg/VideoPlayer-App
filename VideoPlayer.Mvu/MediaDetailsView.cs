@@ -47,6 +47,21 @@ public sealed record EpisodeItem
     /// </summary>
     public bool IsHighlighted { get; init; }
 
+    /// <summary>
+    /// Eine lokale Datei des Downloads liegt vor (nur im Offline-Snapshot
+    /// gesetzt, <see cref="MediaDetailsView.IsOfflineSnapshot"/>).
+    /// </summary>
+    public bool HasLocalFile { get; init; }
+
+    /// <summary>
+    /// Platzhalter-Eintrag: die Episode ist im Offline-Snapshot nicht
+    /// heruntergeladen und damit nicht abspielbar.
+    /// </summary>
+    public bool IsPlaceholder { get; init; }
+
+    /// <summary>Hinweiszeile „Nicht heruntergeladen" wird angezeigt.</summary>
+    public bool ShowUnavailable => IsPlaceholder;
+
     /// <summary>Anzeigezeile „{Number}. {Title}" bzw. nur Titel.</summary>
     public string DisplayTitle => Number > 0 ? $"{Number}. {Title}" : Title;
 
@@ -122,6 +137,20 @@ public sealed record MediaDetailsView
 
     /// <summary>Das navigierte Medium ist als Favorit markiert.</summary>
     public bool IsFavorite { get; init; }
+
+    /// <summary>
+    /// Eine lokale Download-Datei des navigierten Mediums liegt vor
+    /// (nur im Offline-Snapshot gesetzt) — Grundlage des Abspielen-Schalters
+    /// ohne Serververbindung.
+    /// </summary>
+    public bool HasLocalFile { get; init; }
+
+    /// <summary>
+    /// Der Snapshot wurde ohne Serververbindung aus lokalen Daten gebaut —
+    /// servergebundene Aktionen (Download, Favoriten-Umschaltung) werden
+    /// auf der Detailseite ausgeblendet/deaktiviert.
+    /// </summary>
+    public bool IsOfflineSnapshot { get; init; }
 
     /// <summary>Id der angezeigten Serie (Episoden-/Staffel-Kontext); <c>null</c> ohne Serie.</summary>
     public long? ShowId { get; init; }

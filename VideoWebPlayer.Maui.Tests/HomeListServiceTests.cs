@@ -277,6 +277,66 @@ public class HomeListServiceTests : IDisposable
         Assert.Empty(lists.Recent);
     }
 
+    /// <summary>Prüft LoadHomeLists: ein beschädigter <c>cached_lists</c>-Eintrag wird verworfen und gemeldet.</summary>
+    [Fact]
+    public async Task LoadHomeLists_CorruptListEntry_IsDiscardedAndReported()
+    {
+        await cache.Connection.InsertAsync(new CachedListEntry
+        {
+            Key = ServerSyncService.ContinueWatchingCacheKey,
+            Json = "{ defekt",
+            UpdatedAtUtc = DateTime.UtcNow
+        });
+
+        var lists = await service.LoadHomeListsAsync();
+
+        Assert.Empty(lists.ContinueWatching);
+        Assert.Contains(ServerSyncService.ContinueWatchingCacheKey, lists.DiscardedCaches);
+        // Der beschädigte Eintrag wurde aus der Ablage entfernt — die
+        // nächste Synchronisation schreibt ihn frisch.
+        Assert.Null(await cache.Connection.Table<CachedListEntry>()
+            .Where(e => e.Key == ServerSyncService.ContinueWatchingCacheKey)
+            .FirstOrDefaultAsync());
+    }
+
+    /// <summary>Prüft LoadHomeLists: eine beschädigte Favoriten-Zeile wird verworfen, intakte bleiben.</summary>
+    [Fact]
+    public async Task LoadHomeLists_CorruptFavoriteRow_IsDiscardedAndReported()
+    {
+        await WriteFavoriteAsync(
+            new FavoriteEntry { Id = 1, Entry = new Movie { Id = 12, Name = "Film" } },
+            "movie");
+        await cache.Connection.InsertAsync(new CachedFavoritesEntry
+        {
+            Key = "movie:99",
+            VideoId = 99,
+            VideoType = "movie",
+            Json = "{ kaputt",
+            UpdatedAtUtc = DateTime.UtcNow.AddMinutes(-1)
+        });
+
+        var lists = await service.LoadHomeListsAsync();
+
+        var item = Assert.Single(lists.Favorites);
+        Assert.Equal(12, item.Id);
+        Assert.Contains(HomeListService.FavoritesCacheName, lists.DiscardedCaches);
+        Assert.Null(await cache.Connection.FindAsync<CachedFavoritesEntry>("movie:99"));
+    }
+
+    /// <summary>Prüft LoadHomeLists: intakter Cache → keine verworfenen Bereiche.</summary>
+    [Fact]
+    public async Task LoadHomeLists_IntactCache_ReportsNoDiscards()
+    {
+        await WriteCachedListAsync(ServerSyncService.RecentCacheKey, new[]
+        {
+            new RecentEntry { Id = 1, Entry = new Movie { Id = 30, Name = "Film" } }
+        });
+
+        var lists = await service.LoadHomeListsAsync();
+
+        Assert.Empty(lists.DiscardedCaches);
+    }
+
     /// <summary>Prüft LoadHomeLists: die Persistenz übersteht mehrere Lesevorgänge.</summary>
     [Fact]
     public async Task LoadHomeLists_PersistsAcrossReads()

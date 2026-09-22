@@ -58,7 +58,7 @@ public class AutoDownloadServiceTests : IDisposable
             () => new HttpClient(handler, disposeHandler: false) { Timeout = Timeout.InfiniteTimeSpan },
             File.Exists, null);
         var lists = new HomeListService(cache);
-        service = new AutoDownloadService(authSession, lists, downloadService, networkMonitor);
+        service = new AutoDownloadService(authSession, lists, downloadService, networkMonitor, cache);
     }
 
     /// <inheritdoc/>
@@ -201,6 +201,38 @@ public class AutoDownloadServiceTests : IDisposable
         Assert.All(entries, e => Assert.StartsWith("Probe ", e.Title));
         // Serien-Detail-Request plus die gestarteten Stream-Requests.
         Assert.Contains(handler.Requests, r => r.PathAndQuery.Contains("api/items/tvshow/11"));
+    }
+
+    /// <summary>Prüft Auto-Downloads: nach der letzten Episode einer Staffel geht es staffelübergreifend weiter.</summary>
+    [Fact]
+    public async Task Run_EpisodeCandidate_CrossesIntoNextSeason()
+    {
+        await LoginAsync();
+        await CacheContinueWatchingAsync(
+            new ContinueWatchingEntry
+            {
+                MediaType = "episode",
+                PositionSeconds = 60,
+                Entry = new TvShowEpisode
+                {
+                    Id = 36, // Staffel 1, letzte Episode
+                    Name = "Finale",
+                    Season = new TvShowSeason { Id = 21, Number = 1, Show = new TvShow { Id = 11 } }
+                }
+            });
+        handler.EnqueueJson(HttpStatusCode.OK,
+            ShowWithEpisodes(11, "Probe", (1, 5, 35, "S1E5"), (1, 6, 36, "S1E6"), (2, 1, 37, "S2E1"), (2, 2, 38, "S2E2")));
+
+        var oneEpisode = settings with { PreloadEpisodeCount = 1 };
+        await service.RunAsync(oneEpisode);
+
+        // Kein Kandidat mehr in Staffel 1 → der flache Nachfolger S2E1.
+        var entry = Assert.Single(await EntriesAsync());
+        Assert.Equal(37, entry.VideoId);
+        Assert.Equal(11, entry.ShowId);
+        Assert.Equal("Probe", entry.ShowTitle);
+        Assert.Equal(2, entry.SeasonNumber);
+        Assert.Equal(1, entry.EpisodeNumber);
     }
 
     /// <summary>Prüft Auto-Downloads: deaktiviert → kein Auftrag, kein Request.</summary>

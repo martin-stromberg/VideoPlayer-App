@@ -14,10 +14,23 @@
                                IsVisible="{Binding Model.Profile.IsLoading}"
                                Color="#FFB84D" />
 
+            <!-- Offline-Hinweis: ohne Serververbindung stehen die
+                 Profilinformationen nicht zur Verfügung. -->
+            <Border x:Name="ProfileOfflineBanner"
+                    Padding="12,8"
+                    StrokeShape="RoundRectangle 8"
+                    BackgroundColor="#D9A029"
+                    IsVisible="False">
+                <Label Text="Offline-Modus – Profilinformationen stehen ohne Serververbindung nicht zur Verfügung."
+                       TextColor="Black"
+                       FontAttributes="Bold" />
+            </Border>
+
             <!-- Angemeldeter Server-Benutzer: Benutzername und E-Mail aus
                  den Claims des Anmelde-Tokens bzw. der gespeicherten
                  Anmelde-Kennung (kein Benutzerinfo-Endpunkt vorhanden). -->
-            <Border Padding="16"
+            <Border x:Name="UserInfoBorder"
+                    Padding="16"
                     StrokeShape="RoundRectangle 8"
                     BackgroundColor="#23232a">
                 <Border.Shadow>

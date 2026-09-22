@@ -68,11 +68,18 @@ public sealed class PlaybackSourceService
     /// <param name="mediaType">Medientyp (wird normalisiert).</param>
     /// <param name="mediaId">Id des Mediums.</param>
     /// <param name="cancellationToken">Bricht die Auflösung ab.</param>
+    /// <param name="allowServerStream">
+    /// <c>false</c> = Offline-Modus: nur lokale Dateien werden aufgelöst —
+    /// ohne lokale Datei wird <c>null</c> geliefert statt eine
+    /// unerreichbare Stream-URL zu erzeugen; die Fortsetzungsposition
+    /// kommt direkt aus der Cache-Kopie.
+    /// </param>
     /// <returns>Die aufgelöste Quelle; <c>null</c>, wenn keine Quelle verfügbar ist.</returns>
     public async Task<PlaybackSource?> ResolveAsync(
         string mediaType,
         long mediaId,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        bool allowServerStream = true)
     {
         var type = MediaTypeNames.Normalize(mediaType);
         if (mediaId <= 0 || type is not ("movie" or "tvshowepisode"))
@@ -80,7 +87,9 @@ public sealed class PlaybackSourceService
             return null;
         }
 
-        var resumePosition = await ResolveResumePositionAsync(type, mediaId, cancellationToken);
+        var resumePosition = allowServerStream
+            ? await ResolveResumePositionAsync(type, mediaId, cancellationToken)
+            : await ReadCachedResumePositionAsync(type, mediaId);
 
         var localFile = await ResolveLocalFileAsync(type, mediaId);
         if (localFile is not null)
@@ -91,6 +100,12 @@ public sealed class PlaybackSourceService
                 Location = localFile,
                 ResumePosition = resumePosition
             };
+        }
+
+        if (!allowServerStream)
+        {
+            // Offline: keine Stream-URL für einen unerreichbaren Server.
+            return null;
         }
 
         var baseAddress = authSession.ClientBaseAddress?.TrimEnd('/');

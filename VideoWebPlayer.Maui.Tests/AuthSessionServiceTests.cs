@@ -90,6 +90,87 @@ public class AuthSessionServiceTests
         Assert.Equal("jwt-stored", await secrets.GetAuthTokenAsync());
     }
 
+    /// <summary>Prüft TryStoredLogin: ein gültiges gespeichertes Token wird direkt wiederverwendet (kein Login-Request).</summary>
+    [Fact]
+    public async Task TryStoredLogin_ValidStoredToken_ReusesTokenWithoutLogin()
+    {
+        var handler = new StubHttpMessageHandler();
+        var service = CreateService(handler, out var secrets);
+        await secrets.SetCredentialsAsync("martin", "pw");
+        await secrets.SetAuthTokenAsync("jwt-vorhanden");
+        handler.EnqueueJson(HttpStatusCode.OK, Array.Empty<object>()); // api/favorites
+
+        var attempt = await service.TryStoredLoginAsync(Server);
+
+        Assert.Equal(AuthAttemptStatus.Succeeded, attempt.Status);
+        Assert.Equal("martin", attempt.Username);
+        Assert.NotNull(service.Client);
+        // Genau eine Anfrage: die Token-Validierung — kein Login-Request.
+        var request = Assert.Single(handler.Requests);
+        Assert.EndsWith("/api/favorites", request.PathAndQuery);
+        Assert.Equal("Bearer jwt-vorhanden", request.Authorization);
+    }
+
+    /// <summary>Prüft TryStoredLogin: ein abgelehntes Token fällt über die stille Neuanmeldung auf die Zugangsdaten zurück.</summary>
+    [Fact]
+    public async Task TryStoredLogin_RejectedStoredToken_FallsBackToCredentials()
+    {
+        var handler = new StubHttpMessageHandler();
+        var service = CreateService(handler, out var secrets);
+        await secrets.SetCredentialsAsync("martin", "pw");
+        await secrets.SetAuthTokenAsync("jwt-abgelaufen");
+        handler.Enqueue(HttpStatusCode.Unauthorized);          // api/favorites mit altem Token
+        EnqueueLoginOk(handler, "jwt-neu");                    // stille Neuanmeldung
+        handler.EnqueueJson(HttpStatusCode.OK, Array.Empty<object>()); // Wiederholung api/favorites
+
+        var attempt = await service.TryStoredLoginAsync(Server);
+
+        Assert.Equal(AuthAttemptStatus.Succeeded, attempt.Status);
+        Assert.NotNull(service.Client);
+        Assert.Equal(3, handler.Requests.Count);
+        Assert.EndsWith("/api/favorites", handler.Requests[0].PathAndQuery);
+        Assert.Equal("Bearer jwt-abgelaufen", handler.Requests[0].Authorization);
+        Assert.EndsWith("/api/auth/login", handler.Requests[1].PathAndQuery);
+        Assert.Equal("Bearer jwt-neu", handler.Requests[2].Authorization);
+        Assert.Equal("jwt-neu", await secrets.GetAuthTokenAsync());
+    }
+
+    /// <summary>Prüft TryStoredLogin: Token vorhanden, aber keine Zugangsdaten (Backup-Wiederherstellung) → MissingCredentials.</summary>
+    [Fact]
+    public async Task TryStoredLogin_TokenWithoutCredentials_ReturnsMissingCredentials()
+    {
+        var handler = new StubHttpMessageHandler();
+        var service = CreateService(handler, out var secrets);
+        await secrets.SetAuthTokenAsync("jwt-waise");
+        handler.Enqueue(HttpStatusCode.Unauthorized); // api/favorites lehnt ab
+
+        var attempt = await service.TryStoredLoginAsync(Server);
+
+        Assert.Equal(AuthAttemptStatus.MissingCredentials, attempt.Status);
+        Assert.Null(service.Client);
+        Assert.Null(await secrets.GetAuthTokenAsync());
+        Assert.Single(handler.Requests);
+    }
+
+    /// <summary>Prüft TryStoredLogin: gespeicherter Token, Server nicht erreichbar → ServerUnreachable (Offline-Fallback).</summary>
+    [Fact]
+    public async Task TryStoredLogin_TokenValidationUnreachable_ReturnsServerUnreachable()
+    {
+        var handler = new StubHttpMessageHandler();
+        var service = CreateService(handler, out var secrets);
+        await secrets.SetAuthTokenAsync("jwt-vorhanden");
+        // Retry-Politik des API-Clients: 3 Wiederholungen nach dem Erstversuch.
+        for (var i = 0; i < 4; i++)
+        {
+            handler.EnqueueException(new HttpRequestException("Verbindung fehlgeschlagen"));
+        }
+
+        var attempt = await service.TryStoredLoginAsync(Server);
+
+        Assert.Equal(AuthAttemptStatus.ServerUnreachable, attempt.Status);
+        Assert.Null(service.Client);
+    }
+
     /// <summary>Prüft TryStoredLogin: bei ungültigen Zugangsdaten → gibt InvalidCredentials zurück.</summary>
     [Fact]
     public async Task TryStoredLogin_InvalidCredentials_ReturnsInvalidCredentials()

@@ -151,4 +151,11 @@ public sealed record AppModel
         IsStartupRunning && ServerHealth == ServerHealthStatus.Reachable
             ? "Anmeldung beim Server läuft …"
             : ServerHealthText;
+
+    /// <summary>
+    /// Hinweis der Ablage-Wiederherstellung (beschädigte lokale Datenbank
+    /// wurde neu initialisiert); <c>null</c> = kein Hinweis. Wird auf der
+    /// Startseite als Banner angezeigt.
+    /// </summary>
+    public string? StorageNotice { get; init; }
 }

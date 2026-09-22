@@ -310,7 +310,20 @@ public sealed record EnqueueDownloadEffect(
     string MediaType,
     long MediaId,
     string? Title,
-    AppSettings Settings) : AppEffect;
+    AppSettings Settings) : AppEffect
+{
+    /// <summary>Id der zugehörigen Serie (Episoden-Downloads); <c>null</c> = unbekannt/kein Episoden-Download.</summary>
+    public long? ShowId { get; init; }
+
+    /// <summary>Anzeigetitel der Serie (Episoden-Downloads); <c>null</c> = unbekannt.</summary>
+    public string? ShowTitle { get; init; }
+
+    /// <summary>Staffelnummer der Episode (Episoden-Downloads); <c>null</c> = unbekannt.</summary>
+    public int? SeasonNumber { get; init; }
+
+    /// <summary>Episodennummer innerhalb der Staffel (Episoden-Downloads); <c>null</c> = unbekannt.</summary>
+    public int? EpisodeNumber { get; init; }
+}
 
 /// <summary>
 /// Einen wartenden/laufenden Download abbrechen (Zustand →

@@ -94,11 +94,13 @@ public class AppUpdateTests_Connection
         Assert.Equal(AppPage.Home, navigate.Page);
     }
 
-    /// <summary>Prüft AutoLoginCompleted: bei fehlenden Zugangsdaten → navigiert ohne Fehler zur Login-Seite.</summary>
+    /// <summary>Prüft AutoLoginCompleted: bei fehlenden Zugangsdaten → navigiert mit Re-Anmelde-Hinweis zur Login-Seite.</summary>
     [Fact]
-    public void AutoLoginCompleted_MissingCredentials_NavigatesToLoginWithoutError()
+    public void AutoLoginCompleted_MissingCredentials_NavigatesToLoginWithReloginNotice()
     {
         // Z. B. nach Backup-Wiederherstellung: Server bekannt, Geheimnisse fehlen.
+        // Der Nutzer erhält eine verständliche Begründung statt einer
+        // stillen Login-Seite.
         var transition = AppUpdate.Update(
             StartupModel(),
             new AutoLoginCompletedMessage(AuthAttemptStatus.MissingCredentials, "martin"));
@@ -106,7 +108,7 @@ public class AppUpdateTests_Connection
         Assert.False(transition.Model.IsStartupRunning);
         Assert.Equal(ConnectionState.NeedsLogin, transition.Model.ConnectionState);
         Assert.Equal("martin", transition.Model.LoginUsername);
-        Assert.Null(transition.Model.LoginError);
+        Assert.Equal(AppUpdate.ReloginRequiredNotice, transition.Model.LoginError);
         Assert.Equal(AppPage.Login, transition.Model.CurrentPage);
         var navigate = Assert.IsType<NavigateToPageEffect>(Assert.Single(transition.Effects));
         Assert.Equal(AppPage.Login, navigate.Page);

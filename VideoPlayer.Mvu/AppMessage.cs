@@ -163,6 +163,16 @@ public sealed record SynchronizationCompletedMessage(SyncResult Result) : AppMes
 public sealed record HomeListsLoadedMessage(HomeLists Lists) : AppMessage;
 
 /// <summary>
+/// Eine lokale Datenbank war beschädigt und wurde neu initialisiert —
+/// die alte Datei wurde beiseitegelegt (<c>*.corrupt-*</c>). Der Nutzer
+/// wird über <paramref name="Notice"/> informiert; verworfene Caches
+/// werden bei bestehender Verbindung neu synchronisiert.
+/// </summary>
+/// <param name="Notice">Der anzuzeigende Hinweistext.</param>
+/// <returns>Nachricht mit dem Wiederherstellungs-Hinweis.</returns>
+public sealed record StorageRecoveredMessage(string Notice) : AppMessage;
+
+/// <summary>
 /// Die gecachten Listen wurden geändert (z. B. durch eine
 /// Teil-Synchronisation nach einem Server-Ereignis) — die
 /// Startseiten-Listen sind aus dem Cache neu zu laden.
@@ -468,7 +478,20 @@ public sealed record DownloadsLoadedMessage(
 public sealed record DownloadRequestedMessage(
     string MediaType,
     long MediaId,
-    string? Title) : AppMessage;
+    string? Title) : AppMessage
+{
+    /// <summary>Id der zugehörigen Serie (Episoden-Downloads); <c>null</c> = unbekannt/kein Episoden-Download.</summary>
+    public long? ShowId { get; init; }
+
+    /// <summary>Anzeigetitel der Serie (Episoden-Downloads); <c>null</c> = unbekannt.</summary>
+    public string? ShowTitle { get; init; }
+
+    /// <summary>Staffelnummer der Episode (Episoden-Downloads); <c>null</c> = unbekannt.</summary>
+    public int? SeasonNumber { get; init; }
+
+    /// <summary>Episodennummer innerhalb der Staffel (Episoden-Downloads); <c>null</c> = unbekannt.</summary>
+    public int? EpisodeNumber { get; init; }
+}
 
 /// <summary>
 /// Ergebnis einer Download-Einreihe-Anforderung: <paramref name="Item"/>

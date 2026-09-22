@@ -16,8 +16,22 @@
                     StrokeShape="RoundRectangle 8"
                     BackgroundColor="#D9A029"
                     IsVisible="False">
-                <Label Text="Offline-Modus – zwischengespeicherte Inhalte werden angezeigt."
+                <Label Text="Offline-Modus – zwischengespeicherte Inhalte werden angezeigt. Neue Inhalte, Quellen und Profildaten sind nicht verfügbar."
                        TextColor="Black"
+                       FontAttributes="Bold" />
+            </Border>
+
+            <!-- Hinweis der Ablage-Wiederherstellung: beschädigte lokale
+                 Daten wurden neu initialisiert. -->
+            <Border x:Name="StorageNoticeBanner"
+                    Margin="20,0"
+                    Padding="12,8"
+                    StrokeShape="RoundRectangle 8"
+                    BackgroundColor="#B06020"
+                    IsVisible="False">
+                <Label x:Name="StorageNoticeLabel"
+                       Text="{Binding Model.StorageNotice}"
+                       TextColor="White"
                        FontAttributes="Bold" />
             </Border>
 
