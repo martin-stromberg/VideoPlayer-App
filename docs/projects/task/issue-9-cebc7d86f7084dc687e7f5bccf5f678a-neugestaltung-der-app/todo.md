@@ -13,5 +13,5 @@ Eingabe: `docs/features/task/issue-9-customer-feedback.md` (Rückmeldung des Kun
 - [x] Offene Punkte klären (ggf. Nutzer fragen) und Plan aktualisieren
 - [x] Projektplan prüfen lassen (`project-plan-check.md`) – Unteragent
 - [x] Planungscommit, `steps.md` und `status.html` anlegen
-- [ ] Entwicklungsschleife: je Schritt lifecycle-Delegation, Abnahmeprüfung, Merge (2/7)
+- [ ] Entwicklungsschleife: je Schritt lifecycle-Delegation, Abnahmeprüfung, Merge (3/7)
 - [ ] Abschluss: Projektverzeichnis aufräumen und Abschlusscommit
