@@ -4,10 +4,12 @@ Dieses Repository enthält die ausgelagerte .NET-MAUI-App und ihre Tests.
 
 ## Inhalt
 
-- `VideoWebPlayer.Maui/` - mobile App.
+- `VideoWebPlayer.Maui/` - bisherige mobile App (Altbestand, wird schrittweise durch `VideoPlayer.Maui` abgelöst).
 - `VideoWebPlayer.Maui.Tests/` - tests ohne Rückreferenz auf das Webprojekt.
 - `VideoWebPlayer.Client/` - kopierte Übergabeschnittstelle aus dem Web-Repository (Altbestand, wird im Rahmen der Neugestaltung entfernt).
 - `VideoPlayer.ApiClient/` - neu implementierter, plattformneutraler Zugriff auf die öffentliche Server-API (Dokumentation: `docs/help/api-client/`).
+- `VideoPlayer.Mvu/` - plattformneutrale MVU-Schicht der neuen App (Modell, Messages, Update, Effekte; eigener schlanker MVU-Kreislauf ohne externes Framework).
+- `VideoPlayer.Maui/` - neue MAUI-App auf MVU-Basis (Seitenmenü-Navigation, Platzhalterseiten, Erreichbarkeitsprüfung; Dokumentation: `docs/help/app-grundgeruest.md`).
 - `VideoPlayer.App.sln` - eigene Solution dieses Repositorys.
 - `LICENSE` - PolyForm Noncommercial License 1.0.0.
 
@@ -40,12 +42,14 @@ Windows:
 
 ```powershell
 dotnet build .\VideoWebPlayer.Maui\VideoWebPlayer.Maui.csproj -f net10.0-windows10.0.19041.0
+dotnet build .\VideoPlayer.Maui\VideoPlayer.Maui.csproj -f net10.0-windows10.0.19041.0
 ```
 
 Android:
 
 ```bash
 dotnet build VideoWebPlayer.Maui/VideoWebPlayer.Maui.csproj -f net10.0-android
+dotnet build VideoPlayer.Maui/VideoPlayer.Maui.csproj -f net10.0-android
 ```
 
 ## Web-API-Vertrag

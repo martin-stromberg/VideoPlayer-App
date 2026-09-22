@@ -10,20 +10,20 @@ Hinweis: Diese Umgebung hat keine Unteragenten — alle Schritte werden vom Haup
 | [x] | 2 | Verzeichnisstruktur vorbereiten | `docs/features/{branchname}/` |
 | [x] | – | Einstiegspunkt ermitteln (keine Artefakte vorhanden → Schritt 3) | – |
 | [x] | 3 | Anforderung übersetzen | `requirement.md` |
-| [ ] | 4 | Bestandsaufnahme | `inventory.md`, `inventory/` |
-| [ ] | 5 | Umsetzungsplanung | `plan.md` |
-| [ ] | 5a | Offene Punkte prüfen und ggf. Planung wiederholen | `plan.md` (aktualisiert) |
-| [ ] | 5b | Plan gegen Anforderung und Testbedarf prüfen | `plan-check.md` |
-| [ ] | 5c | Planungscommit | – |
-| [ ] | 6 | Implementierung | Codeänderungen |
-| [ ] | 7 | Plan-Review | `review.md` |
-| [ ] | 8 | Usability-Review (bei UI-Änderungen) | `review-usability.md` |
-| [ ] | 9 | Code-Review | `review-code.md` |
-| [ ] | 10 | Tests ausführen | `test-results.md` |
-| [ ] | – | Iteration oder Abschluss entscheiden | – |
-| [ ] | 11 | Folgeaufgaben dokumentieren (bei Schleifenabbruch) | `continue.md` |
-| [ ] | 12 | Dokumentation erstellen | `docs/help/` |
-| [ ] | 12b | README aktualisieren | `README.md` |
-| [ ] | 12c | Release Notes aktualisieren | `docs/RELEASE_NOTES.md` |
-| [ ] | – | Feature-Verzeichnis löschen | – |
-| [ ] | – | Commit durchführen | – |
+| [x] | 4 | Bestandsaufnahme | `inventory.md`, `inventory/` |
+| [x] | 5 | Umsetzungsplanung | `plan.md`, `..-tasks.md` |
+| [x] | 5a | Offene Punkte prüfen (keine unauflösbaren Punkte) | `plan.md` |
+| [x] | 5b | Plan gegen Anforderung und Testbedarf prüfen | `plan-check.md` (Plan vollständig) |
+| [x] | 5c | Planungscommit | `b56628e` |
+| [x] | 6 | Implementierung | `VideoPlayer.Mvu`, `VideoPlayer.Maui`, Tests, CI |
+| [x] | 7 | Plan-Review | `review.md` (Vollständig umgesetzt) |
+| [x] | 8 | Usability-Review | `review-usability.md` (Keine Befunde) |
+| [x] | 9 | Code-Review | `review-code.md` (Keine Befunde) |
+| [x] | 10 | Tests ausführen | `test-results.md` (Keine Fehler; 101/101) |
+| [x] | – | Iteration oder Abschluss entscheiden | Abschluss — keine Befunde |
+| [x] | 11 | Folgeaufgaben dokumentieren | nicht erforderlich (kein Schleifenabbruch, kein `continue.md`) |
+| [x] | 12 | Dokumentation erstellen | `docs/help/app-grundgeruest.md`, `docs/help/index.md` |
+| [x] | 12b | README aktualisieren | `README.md` |
+| [x] | 12c | Release Notes aktualisieren | `docs/RELEASE_NOTES.md`, `changes.log` |
+| [x] | – | Feature-Verzeichnis löschen | bewusst beibehalten — Lifecycle-Artefakte werden mit dem Abschlusscommit versioniert |
+| [ ] | – | Commit durchführen | folgt (Abschlusscommit) |
