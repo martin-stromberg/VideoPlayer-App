@@ -1,0 +1,156 @@
+#pragma warning disable xUnit1051 // Kurzlebige Unit-Tests: TestContext-CancellationToken nicht erforderlich
+using System.Net;
+using System.Text.Json;
+using VideoPlayer.Mvu;
+using VideoPlayer.Storage;
+using VideoWebPlayer.Maui.Tests.Stubs;
+
+namespace VideoWebPlayer.Maui.Tests;
+
+/// <summary>
+/// Fortschrittsmeldungen (Schritt 6): Online direkt an den Server; offline
+/// oder bei überholbarem Sendefehler in die persistente Warteschlange;
+/// permanente Clientfehler werden verworfen.
+/// </summary>
+[Collection("SqliteDatabase")]
+public class ProgressReportServiceTests : IDisposable
+{
+    private static readonly Uri Server = new("http://testserver/videoplayer/");
+
+    private readonly string root;
+    private readonly PendingProgressSyncService queue;
+    private readonly FakeNetworkMonitor monitor = new();
+    private readonly StubHttpMessageHandler handler = new();
+    private readonly AuthSessionService authSession;
+
+    public ProgressReportServiceTests()
+    {
+        root = Path.Combine(Path.GetTempPath(), "videoplayer-report-tests", Guid.NewGuid().ToString("N"));
+        var layout = new AppStorageLayout(
+            backupRoot: Path.Combine(root, "backup"),
+            noBackupRoot: Path.Combine(root, "nobackup"),
+            cacheRoot: Path.Combine(root, "cache"),
+            profile: AppProfile.Create(null));
+        layout.EnsureDirectoriesExist();
+        var database = new BackupDatabase(layout);
+        database.InitializeAsync().Wait();
+        queue = new PendingProgressSyncService(database);
+
+        var secrets = new AppSecretsService(
+            new InMemorySettingsStore(), new InMemorySecretStore(), AppProfile.Create(null));
+        authSession = new AuthSessionService(
+            secrets,
+            uri => new HttpClient(handler, disposeHandler: false) { BaseAddress = uri },
+            new RecordingDelays().Delay);
+    }
+
+    public void Dispose()
+    {
+        SQLite.SQLiteAsyncConnection.ResetPool();
+        if (Directory.Exists(root))
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    private async Task LoginAsync()
+    {
+        handler.EnqueueJson(HttpStatusCode.OK, new { token = "jwt", expires = "2030-01-01T00:00:00Z" });
+        await authSession.LoginAsync(Server, "martin", "pw");
+    }
+
+    private ProgressReportService CreateService() => new(authSession, queue, monitor);
+
+    [Fact]
+    public async Task ReportProgress_Online_SendsDirectlyWithoutQueueing()
+    {
+        await LoginAsync();
+        handler.Enqueue(HttpStatusCode.OK);
+        var service = CreateService();
+
+        await service.ReportProgressAsync("movie", 42, TimeSpan.FromMinutes(12), TimeSpan.FromMinutes(90));
+
+        var request = Assert.Single(handler.Requests, r =>
+            r.PathAndQuery.EndsWith("/api/continue-watching/progress"));
+        Assert.Equal(HttpMethod.Post, request.Method);
+        Assert.Equal("Bearer jwt", request.Authorization);
+
+        using var body = JsonDocument.Parse(request.Body!);
+        Assert.Equal("movie", body.RootElement.GetProperty("MediaType").GetString());
+        Assert.Equal(42, body.RootElement.GetProperty("MediaId").GetInt64());
+        Assert.Equal(720, body.RootElement.GetProperty("PositionSeconds").GetInt64());
+        Assert.Equal(5400, body.RootElement.GetProperty("DurationSeconds").GetInt64());
+        Assert.Equal(0, await queue.CountAsync());
+    }
+
+    [Fact]
+    public async Task ReportProgress_Offline_EnqueuesWithoutRequest()
+    {
+        await LoginAsync();
+        monitor.IsOnline = false;
+        var service = CreateService();
+
+        await service.ReportProgressAsync("episode", 7, TimeSpan.FromMinutes(3), TimeSpan.FromMinutes(45));
+
+        var entry = Assert.Single(await queue.GetPendingAsync());
+        Assert.Equal("episode", entry.VideoType);
+        Assert.Equal(7, entry.VideoId);
+        Assert.Equal(TimeSpan.FromMinutes(3).Ticks, entry.PositionTicks);
+        Assert.Equal(TimeSpan.FromMinutes(45).Ticks, entry.DurationTicks);
+        Assert.DoesNotContain(handler.Requests, r =>
+            r.PathAndQuery.EndsWith("/api/continue-watching/progress"));
+    }
+
+    [Fact]
+    public async Task ReportProgress_WithoutClient_Enqueues()
+    {
+        // Nicht angemeldet (kein Client) — Meldung geht nicht verloren.
+        var service = CreateService();
+
+        await service.ReportProgressAsync("movie", 5, TimeSpan.FromMinutes(1), TimeSpan.FromMinutes(90));
+
+        Assert.Equal(1, await queue.CountAsync());
+    }
+
+    [Fact]
+    public async Task ReportProgress_TransportError_Enqueues()
+    {
+        await LoginAsync();
+        // Wiederholungsstrategie: Erstversuch + 3 Wiederholungen.
+        for (var i = 0; i < 4; i++)
+        {
+            handler.EnqueueException(new HttpRequestException("Netzwerk weg"));
+        }
+        var service = CreateService();
+
+        await service.ReportProgressAsync("movie", 42, TimeSpan.FromMinutes(12), TimeSpan.FromMinutes(90));
+
+        Assert.Equal(1, await queue.CountAsync());
+    }
+
+    [Fact]
+    public async Task ReportProgress_PermanentClientError_Discards()
+    {
+        await LoginAsync();
+        // 404 ist nicht wiederholbar und wird bei jedem Versuch erneut
+        // scheitern — die Meldung wird verworfen statt eingereiht.
+        handler.Enqueue(HttpStatusCode.NotFound);
+        var service = CreateService();
+
+        await service.ReportProgressAsync("movie", 42, TimeSpan.FromMinutes(12), TimeSpan.FromMinutes(90));
+
+        Assert.Equal(0, await queue.CountAsync());
+    }
+
+    private sealed class FakeNetworkMonitor : INetworkStatusMonitor
+    {
+        public bool IsOnline { get; set; } = true;
+        public event EventHandler<bool>? AvailabilityChanged;
+        public void Start() { }
+        public void SetOnline(bool online)
+        {
+            IsOnline = online;
+            AvailabilityChanged?.Invoke(this, online);
+        }
+    }
+}

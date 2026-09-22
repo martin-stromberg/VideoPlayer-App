@@ -44,6 +44,16 @@ public sealed record AppModel
     public bool IsOffline => ConnectionState == ConnectionState.Offline;
 
     /// <summary>
+    /// Letzter bekannter Netzwerkstatus (<c>true</c> = online). Wird beim
+    /// Start des Monitorings mit dem Ist-Wert befüllt und danach über
+    /// <see cref="NetworkAvailabilityChangedMessage"/> aktualisiert.
+    /// </summary>
+    public bool IsOnline { get; init; } = true;
+
+    /// <summary>Eine vollständige Synchronisation läuft (nach (Wieder-)Verbindung).</summary>
+    public bool IsSyncRunning { get; init; }
+
+    /// <summary>
     /// Geladene App-Einstellungen (beim Start über <see cref="LoadSettingsEffect"/>
     /// befüllt; bis dahin Defaults).
     /// </summary>

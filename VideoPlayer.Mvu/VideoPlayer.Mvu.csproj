@@ -12,6 +12,7 @@
     <ProjectReference Include="..\VideoPlayer.Storage\VideoPlayer.Storage.csproj" />
   </ItemGroup>
   <ItemGroup>
+    <InternalsVisibleTo Include="VideoWebPlayer.Maui.Tests" />
     <None Include="../LICENSE" Pack="true" PackagePath="\" />
   </ItemGroup>
 </Project>

@@ -56,6 +56,10 @@ public static class AppUpdate
             LoginCompletedMessage completed => UpdateLoginCompleted(model, completed),
             OfflineDataCheckCompletedMessage check => UpdateOfflineDataCheckCompleted(model, check),
             SessionExpiredMessage => UpdateSessionExpired(model),
+            NetworkAvailabilityChangedMessage network => UpdateNetworkAvailabilityChanged(model, network),
+            ServerEventReceivedMessage received => UpdateServerEventReceived(model, received),
+            ServerEventsConnectionClosedMessage => UpdateServerEventsConnectionClosed(model),
+            SynchronizationCompletedMessage => new AppTransition(model with { IsSyncRunning = false }, []),
             _ => AppTransition.Unchanged(model)
         };
     }
@@ -69,6 +73,8 @@ public static class AppUpdate
 
         // Der Health-Check folgt erst nach dem Laden der Serververwaltung —
         // ohne hinterlegten Server verzweigt der Start in die Einrichtung.
+        // Der Netzwerkmonitor läuft ab Start mit, damit Online↔Offline-
+        // Wechsel zur Laufzeit erkannt werden.
         return new AppTransition(
             model with
             {
@@ -76,7 +82,7 @@ public static class AppUpdate
                 ServerHealth = ServerHealthStatus.Checking,
                 ConnectionState = ConnectionState.Connecting
             },
-            [new InitializeStorageEffect(), new LoadSettingsEffect(), new LoadServersEffect()]);
+            [new InitializeStorageEffect(), new LoadSettingsEffect(), new LoadServersEffect(), new StartNetworkMonitoringEffect()]);
     }
 
     private static AppTransition UpdateSettingsLoaded(AppModel model, SettingsLoadedMessage message)
@@ -251,20 +257,23 @@ public static class AppUpdate
     {
         if (message.HasOfflineData)
         {
-            return new AppTransition(
-                model with
-                {
-                    IsStartupRunning = false,
-                    HasOfflineData = true,
-                    ConnectionState = ConnectionState.Offline,
-                    CurrentPage = AppPage.Home
-                },
-                [new NavigateToPageEffect(AppPage.Home)]);
+            // Offline-Betrieb: auf Workflow-Seiten (Start-Ladeanzeige) wird
+            // zur Startseite navigiert; auf einer Menüseite bleibt der
+            // Anwender bei einer Wiederverbindungs-Prüfung stehen.
+            var withOfflineData = model with
+            {
+                IsStartupRunning = false,
+                HasOfflineData = true,
+                ConnectionState = ConnectionState.Offline
+            };
+            return IsWorkflowPage(model.CurrentPage)
+                ? new AppTransition(withOfflineData with { CurrentPage = AppPage.Home }, [new NavigateToPageEffect(AppPage.Home)])
+                : new AppTransition(withOfflineData, []);
         }
 
         // Keine Offline-Daten → Serverauswahl (bekannte Server, Erkennung,
         // manuelle Eingabe auf der Einrichtungsseite).
-        var updated = model with
+        var withSetup = model with
         {
             IsStartupRunning = false,
             HasOfflineData = false,
@@ -272,26 +281,15 @@ public static class AppUpdate
             CurrentPage = AppPage.ServerSetup
         };
         return model.CurrentPage == AppPage.ServerSetup
-            ? new AppTransition(updated, [])
-            : new AppTransition(updated, [new NavigateToPageEffect(AppPage.ServerSetup)]);
+            ? new AppTransition(withSetup, [])
+            : new AppTransition(withSetup, [new NavigateToPageEffect(AppPage.ServerSetup)]);
     }
 
     private static AppTransition UpdateAutoLoginCompleted(AppModel model, AutoLoginCompletedMessage message)
     {
         if (message.Status == AuthAttemptStatus.Succeeded)
         {
-            return new AppTransition(
-                model with
-                {
-                    IsStartupRunning = false,
-                    IsServerCheckRunning = false,
-                    IsLoginRunning = false,
-                    LoginError = null,
-                    LoginUsername = message.Username ?? model.LoginUsername,
-                    ConnectionState = ConnectionState.Connected,
-                    CurrentPage = AppPage.Home
-                },
-                [new NavigateToPageEffect(AppPage.Home)]);
+            return EnterConnected(model with { LoginUsername = message.Username ?? model.LoginUsername });
         }
 
         // Fehlende oder fehlgeschlagene Zugangsdaten → Anmeldemaske.
@@ -334,16 +332,7 @@ public static class AppUpdate
     {
         if (message.Status == AuthAttemptStatus.Succeeded)
         {
-            return new AppTransition(
-                model with
-                {
-                    IsStartupRunning = false,
-                    IsLoginRunning = false,
-                    LoginError = null,
-                    ConnectionState = ConnectionState.Connected,
-                    CurrentPage = AppPage.Home
-                },
-                [new NavigateToPageEffect(AppPage.Home)]);
+            return EnterConnected(model);
         }
 
         return new AppTransition(
@@ -354,6 +343,114 @@ public static class AppUpdate
                 ConnectionState = ConnectionState.NeedsLogin
             },
             []);
+    }
+
+    /// <summary>
+    /// Übergang in den verbundenen Zustand: baut die Ereignisverbindung auf
+    /// und startet die vollständige Synchronisation. Die Startseite wird
+    /// nur von Workflow-Seiten aus angesteuert — bei einer Wiederverbindung
+    /// zur Laufzeit bleibt der Anwender auf der aktuellen Menüseite.
+    /// </summary>
+    private static AppTransition EnterConnected(AppModel model)
+    {
+        var updated = model with
+        {
+            IsStartupRunning = false,
+            IsServerCheckRunning = false,
+            IsLoginRunning = false,
+            LoginError = null,
+            ConnectionState = ConnectionState.Connected,
+            // Eine erfolgreiche Anmeldung beweist Konnektivität — der
+            // Netzwerk-Ist-Wert wird damit konsistent zum Zustand.
+            IsOnline = true,
+            IsSyncRunning = true
+        };
+
+        var effects = new List<AppEffect>();
+        if (model.ActiveServerAddress is not null)
+        {
+            effects.Add(new ConnectServerEventsEffect(model.ActiveServerAddress));
+        }
+
+        effects.Add(new RunFullSyncEffect());
+
+        if (IsWorkflowPage(model.CurrentPage))
+        {
+            updated = updated with { CurrentPage = AppPage.Home };
+            effects.Add(new NavigateToPageEffect(AppPage.Home));
+        }
+
+        return new AppTransition(updated, effects);
+    }
+
+    /// <summary>Seiten ohne Menüeintrag (Start-Ladeanzeige, Anmeldung, Servereinrichtung).</summary>
+    private static bool IsWorkflowPage(AppPage page)
+    {
+        return page is AppPage.Loading or AppPage.Login or AppPage.ServerSetup;
+    }
+
+    private static AppTransition UpdateNetworkAvailabilityChanged(AppModel model, NetworkAvailabilityChangedMessage message)
+    {
+        if (!message.IsOnline)
+        {
+            // Netzwerkverlust: der Offline-Übergang greift nur aus dem
+            // verbundenen Zustand — in den Workflow-Zuständen (Anmeldung,
+            // Servereinrichtung, laufender Start) entscheiden die
+            // ohnehin laufenden Prüfungen über den Ausgang.
+            var updated = model with { IsOnline = false };
+            return model.ConnectionState == ConnectionState.Connected
+                ? new AppTransition(
+                    updated with { ConnectionState = ConnectionState.Offline },
+                    [new DisconnectServerEventsEffect()])
+                : new AppTransition(updated, []);
+        }
+
+        // Online-Rückkehr: aus dem Offline-Zustand läuft die normale
+        // Wiederverbindungs-Kette (Erreichbarkeitsprüfung → automatische
+        // Anmeldung → Ereignisverbindung + Synchronisation).
+        if (model.ConnectionState == ConnectionState.Offline && model.ActiveServerAddress is not null)
+        {
+            return new AppTransition(
+                model with
+                {
+                    IsOnline = true,
+                    ConnectionState = ConnectionState.Connecting,
+                    ServerHealth = ServerHealthStatus.Checking
+                },
+                [new CheckServerHealthEffect()]);
+        }
+
+        return new AppTransition(model with { IsOnline = true }, []);
+    }
+
+    private static AppTransition UpdateServerEventReceived(AppModel model, ServerEventReceivedMessage message)
+    {
+        if (model.ConnectionState != ConnectionState.Connected)
+        {
+            return AppTransition.Unchanged(model);
+        }
+
+        // Eingehende Server-Ereignisse lösen die gezielte Aktualisierung der
+        // betroffenen Caches aus — die Anzeigen werden darüber ohne
+        // manuelle Aktualisierung frisch.
+        return message.Kind switch
+        {
+            ServerEventKind.ContinueWatchingUpdated => new AppTransition(model, [new SyncContinueWatchingEffect()]),
+            ServerEventKind.FavoritesChanged => new AppTransition(model, [new SyncFavoritesEffect()]),
+            ServerEventKind.NewVideosScanned => new AppTransition(model, [new SyncMetadataEffect()]),
+            _ => AppTransition.Unchanged(model)
+        };
+    }
+
+    private static AppTransition UpdateServerEventsConnectionClosed(AppModel model)
+    {
+        // Endgültig getrennt: im verbundenen Online-Zustand die
+        // Ereignisverbindung erneut aufbauen (idempotent).
+        return model.ConnectionState == ConnectionState.Connected
+            && model.IsOnline
+            && model.ActiveServerAddress is not null
+                ? new AppTransition(model, [new ConnectServerEventsEffect(model.ActiveServerAddress)])
+                : AppTransition.Unchanged(model);
     }
 
     private static AppTransition UpdateSessionExpired(AppModel model)
@@ -369,9 +466,15 @@ public static class AppUpdate
             LoginError = SessionExpiredError,
             CurrentPage = AppPage.Login
         };
-        return model.CurrentPage == AppPage.Login
-            ? new AppTransition(updated, [])
-            : new AppTransition(updated, [new NavigateToPageEffect(AppPage.Login)]);
+        // Zur Anmeldemaske — die Ereignisverbindung wird getrennt (das
+        // abgelaufene Token kann ohnehin nicht mehr autorisiert werden).
+        var effects = new List<AppEffect> { new DisconnectServerEventsEffect() };
+        if (model.CurrentPage != AppPage.Login)
+        {
+            effects.Add(new NavigateToPageEffect(AppPage.Login));
+        }
+
+        return new AppTransition(updated, effects);
     }
 
     private static AppTransition GoToServerSetup(AppModel model, ServerHealthStatus health)

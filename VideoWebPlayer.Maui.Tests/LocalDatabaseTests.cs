@@ -163,6 +163,37 @@ public class LocalDatabaseTests : IDisposable
     }
 
     [Fact]
+    public async Task BackupDatabase_MigratesDurationTicksOntoExistingTable()
+    {
+        // Bestehende Installation (Schritt-6-Migration): Tabelle im alten
+        // Schema ohne DurationTicks anlegen und eine Zeile befüllen.
+        var layout = CreateLayout();
+        SqliteBootstrap.EnsureInitialized();
+        var legacy = new SQLite.SQLiteAsyncConnection(layout.DataDatabasePath);
+        await legacy.ExecuteAsync(
+            "CREATE TABLE pending_progress (" +
+            "Id integer primary key autoincrement, " +
+            "VideoId integer not null, " +
+            "VideoType varchar not null, " +
+            "PositionTicks bigint not null, " +
+            "UpdatedAtUtc datetime not null)");
+        await legacy.ExecuteAsync(
+            "INSERT INTO pending_progress (VideoId, VideoType, PositionTicks, UpdatedAtUtc) " +
+            "VALUES (42, 'episode', 123, '2026-01-01 00:00:00')");
+        SQLite.SQLiteAsyncConnection.ResetPool();
+
+        var db = new BackupDatabase(layout);
+        await db.InitializeAsync();
+
+        var entry = Assert.Single(await db.Connection.Table<PendingProgressSyncEntry>().ToListAsync());
+        Assert.Equal(42, entry.VideoId);
+        Assert.Equal(0, entry.DurationTicks); // Spalte per Migration, Default 0
+
+        // Idempotent: ein zweites Initialize läuft fehlerfrei.
+        await db.InitializeAsync();
+    }
+
+    [Fact]
     public async Task Databases_LandInClassifiedDirectories()
     {
         var layout = CreateLayout();
