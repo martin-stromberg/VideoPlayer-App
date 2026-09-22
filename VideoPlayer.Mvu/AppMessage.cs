@@ -1,3 +1,4 @@
+using VideoPlayer.ApiClient.Discovery;
 using VideoPlayer.Storage;
 
 namespace VideoPlayer.Mvu;
@@ -25,3 +26,36 @@ public sealed record SettingsLoadedMessage(AppSettings Settings) : AppMessage;
 
 /// <summary>Geänderte Einstellungen übernehmen und persistent speichern.</summary>
 public sealed record SaveSettingsRequestedMessage(AppSettings Settings) : AppMessage;
+
+/// <summary>Serververwaltung (erneut) laden anfordern (Liste + aktive Adresse).</summary>
+public sealed record LoadServersRequestedMessage : AppMessage;
+
+/// <summary>
+/// Serververwaltung wurde geladen: bekannte Server und die aktive Adresse
+/// (<c>null</c> = kein Server hinterlegt → Erststart-Einrichtung).
+/// </summary>
+public sealed record ServersLoadedMessage(
+    IReadOnlyList<KnownServer> Servers,
+    string? ActiveAddress) : AppMessage;
+
+/// <summary>Automatische Netzwerk-Erkennung (mDNS + UDP) starten.</summary>
+public sealed record ServerDiscoveryRequestedMessage : AppMessage;
+
+/// <summary>Netzwerk-Erkennung abgeschlossen; gefundene Kandidaten übernehmen.</summary>
+public sealed record ServerDiscoveryCompletedMessage(
+    IReadOnlyList<DiscoveredServer> Servers) : AppMessage;
+
+/// <summary>Manuell eingegebene Serveradresse prüfen und übernehmen.</summary>
+public sealed record ServerAddressSubmittedMessage(string Text) : AppMessage;
+
+/// <summary>Einen per Erkennung gefundenen Server aus der Auswahl übernehmen.</summary>
+public sealed record DiscoveredServerSelectedMessage(string Address, string? DisplayName) : AppMessage;
+
+/// <summary>Auf einen bekannten Server wechseln („Server wechseln").</summary>
+public sealed record ServerSwitchRequestedMessage(string Address, string? DisplayName) : AppMessage;
+
+/// <summary>Ergebnis der Verbindungsprüfung eines Server-Kandidaten.</summary>
+public sealed record ServerCheckCompletedMessage(
+    string Address,
+    string? DisplayName,
+    bool Success) : AppMessage;

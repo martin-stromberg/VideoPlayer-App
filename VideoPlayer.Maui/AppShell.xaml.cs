@@ -10,6 +10,11 @@ namespace VideoPlayer.Maui
         {
             InitializeComponent();
             this.mvuHost = mvuHost;
+
+            // Server-Einrichtung/-verwaltung: kein FlyoutItem, sondern eine
+            // auf den Navigationsstack geschobene Route („Server wechseln").
+            Routing.RegisterRoute("serversetup", typeof(Pages.ServerSetupPage));
+
             Navigated += OnShellNavigated;
         }
 

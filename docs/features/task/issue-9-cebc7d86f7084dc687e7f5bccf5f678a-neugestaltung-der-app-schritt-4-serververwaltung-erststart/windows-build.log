@@ -1,0 +1,13 @@
+  Wiederherzustellende Projekte werden ermittelt...
+  Alle Projekte sind für die Wiederherstellung auf dem neuesten Stand.
+  VideoPlayer.Storage -> D:\Repositories\softwareschmiede\cebc7d86-f708-4dc6-87e7-f5bccf5f678a\VideoPlayer.Storage\bin\Release\net10.0\VideoPlayer.Storage.dll
+  VideoPlayer.ApiClient -> D:\Repositories\softwareschmiede\cebc7d86-f708-4dc6-87e7-f5bccf5f678a\VideoPlayer.ApiClient\bin\Release\net10.0\VideoPlayer.ApiClient.dll
+  VideoPlayer.Mvu -> D:\Repositories\softwareschmiede\cebc7d86-f708-4dc6-87e7-f5bccf5f678a\VideoPlayer.Mvu\bin\Release\net10.0\VideoPlayer.Mvu.dll
+  XAML source generation is enabled (MauiXamlInflator=SourceGen). This generates C# code from XAML at compile time for better performance. To disable, remove the MauiXamlInflator line from your .csproj file (reverts to configuration-based defaults: Runtime in Debug, XamlC in Release).
+  VideoPlayer.Maui -> D:\Repositories\softwareschmiede\cebc7d86-f708-4dc6-87e7-f5bccf5f678a\VideoPlayer.Maui\bin\Release\net10.0-windows10.0.19041.0\win-x64\VideoPlayer.Maui.dll
+
+Der Buildvorgang wurde erfolgreich ausgeführt.
+    0 Warnung(en)
+    0 Fehler
+
+Verstrichene Zeit 00:00:01.91

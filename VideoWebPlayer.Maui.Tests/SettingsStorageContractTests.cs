@@ -93,12 +93,15 @@ public class SettingsStorageContractTests
     }
 
     [Fact]
-    public void ServerAddressProvider_UsesSettingsStore()
+    public void ServerAddressProvider_UsesKnownServersService()
     {
+        // Schritt 4: Die Serveradresse kommt aus der backup-pflichtigen
+        // Serververwaltung (zuletzt verbundener Server); der Legacy-
+        // Ablageschlüssel wird über KnownServersService migriert.
         var provider = ReadMaui("Services", "ServerAddressProvider.cs");
 
-        Assert.Contains("ISettingsStore", provider, StringComparison.Ordinal);
-        Assert.Contains("PrefixKey", provider, StringComparison.Ordinal);
+        Assert.Contains("KnownServersService", provider, StringComparison.Ordinal);
+        Assert.Contains("GetLastConnectedAddressAsync", provider, StringComparison.Ordinal);
         Assert.DoesNotContain("Preferences.Default", provider, StringComparison.Ordinal);
     }
 

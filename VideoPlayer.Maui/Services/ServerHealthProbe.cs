@@ -4,7 +4,8 @@ namespace VideoPlayer.Maui.Services;
 
 /// <summary>
 /// Führt die Erreichbarkeitsprüfung über den plattformneutralen
-/// <see cref="VideoPlayerApiClient"/> aus (<c>GET api/health</c>).
+/// <see cref="VideoPlayerApiClient"/> aus (<c>GET api/health</c>) — für die
+/// aufgelöste Serveradresse oder eine konkrete Kandidatenadresse.
 /// </summary>
 public sealed class ServerHealthProbe : IServerHealthProbe
 {
@@ -19,11 +20,19 @@ public sealed class ServerHealthProbe : IServerHealthProbe
 
     public async Task<bool> CheckAsync(CancellationToken cancellationToken = default)
     {
+        return await CheckAsync(
+            await addressProvider.GetServerAddressAsync(cancellationToken),
+            cancellationToken);
+    }
+
+    public async Task<bool> CheckAsync(Uri baseAddress, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(baseAddress);
         try
         {
             using var httpClient = new HttpClient
             {
-                BaseAddress = addressProvider.GetServerAddress(),
+                BaseAddress = baseAddress,
                 Timeout = RequestTimeout
             };
             var client = new VideoPlayerApiClient(httpClient);

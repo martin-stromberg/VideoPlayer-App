@@ -123,6 +123,12 @@ public partial class SettingsPage : ContentPage
         SaveNumeric(WatchedEndWindowEntry, v => s => s with { WatchedEndWindowSeconds = v });
     }
 
+    /// <summary>„Server wechseln": Serververwaltung als geschobene Route öffnen.</summary>
+    private void OnServerSwitchClicked(object? sender, EventArgs e)
+    {
+        _ = mvuHost.DispatchAsync(new NavigateToMessage(AppPage.ServerSetup));
+    }
+
     /// <summary>
     /// Liest einen Zahlenwert aus einem Eingabefeld und speichert ihn.
     /// Ungültige Eingaben werden nicht übernommen; ein Inline-Hinweis wird
