@@ -86,6 +86,27 @@ der Fehlerhinweis stehen und die Seite lässt sich normal verlassen.
   dafür nötige Hintergrund-Audio-Modus ist in der `Info.plist`
   deklariert — kein eigener Schalter nötig.
 
+## Stabilität bei wiederholter Wiedergabe
+
+Die Wiedergabeseite lässt sich beliebig oft hintereinander öffnen und
+schließen, ohne dass die Anwendung abbricht. Fachlich heißt das: Nach
+zurückgelegter Wiedergabe startet das nächste Medium sofort wieder —
+Fortsetzungsposition, Fortschrittsmeldung und „angesehen"-Markierung
+verhalten sich dabei wie bei der ersten Wiedergabe.
+
+Technischer Hintergrund (für Betreuer): Die `PlayerPage` ist transient —
+jede Wiedergabe erzeugt eine neue Instanz. Die Seite abonniert
+`MvuHost.ModelChanged` nur, solange sie sichtbar ist (Abo in
+`OnAppearing`, Abmeldung in `OnDisappearing`), damit verwaiste Seiten
+nicht mehr auf ihr losgelöstes `MediaElement` zugreifen. Alle Zugriffe
+auf das native Player-Element aus den Toolkit-Ereignissen
+(`MediaOpened`, `StateChanged` u. a.) werden zusätzlich auf den
+UI-Thread gemarshalt — das `MediaElement` des CommunityToolkit kann
+diese Ereignisse unter Windows auf Threadpool-Threads auslösen; ein
+thread-fremder Zugriff (z. B. `SeekTo` → `MediaManager.PlatformSeek` →
+`MediaPlayerElement.get_MediaPlayer`) führte dort zur unbehandelten
+`COMException 0x8001010E` (`RPC_E_WRONG_THREAD`).
+
 ## MVU-Anbindung
 
 Der Wiedergabe-Zustand liegt in `AppModel.Player` (`PlayerState`):

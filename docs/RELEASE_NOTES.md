@@ -6,6 +6,7 @@
 
 ## What's New
 
+- Repeated playback without crash (`VideoPlayer.Maui`): starting another video after a finished or closed playback no longer crashes the app with an unhandled COM exception — the playback page now releases its model subscription when closed and all native player access runs on the UI thread; progress reporting and the "watched" marking work unchanged.
 - Player controls usable in full view (`VideoPlayer.Maui`): on the playback page the native transport controls (play/pause, seek, etc.) were unreachable because the app's header overlay invisibly covered the whole video area; the overlay now only occupies its visible top band and the title area passes input through, while the "Mini player" button stays usable.
 - Web-style dark design (`VideoPlayer.Maui`): the new app now uses the web application's documented design tokens — deep black backgrounds, graded dark surfaces, the red primary color with hover state, pill-shaped chips/badges/round icon buttons and 4px button corners. All colors come from central `Vp*` style resources; behavior is unchanged.
 - New platform-neutral server API client (`VideoPlayer.ApiClient`): login, health check, sources, recently added items, continue watching (progress/hide/skip), favorites, media lookup and picture retrieval.
@@ -32,6 +33,7 @@
 
 ## Neuerungen
 
+- Wiederholte Wiedergabe ohne Absturz (`VideoPlayer.Maui`): Der Start eines weiteren Videos nach beendeter oder geschlossener Wiedergabe führt nicht mehr zum Abbruch der App mit einer unbehandelten COM-Ausnahme — die Wiedergabeseite meldet ihr Modell-Abo beim Schließen ab und alle Zugriffe auf das native Player-Element laufen auf dem UI-Thread; Fortschrittsmeldung und „Angesehen"-Markierung funktionieren unverändert.
 - Player-Steuerung in der Vollansicht bedienbar (`VideoPlayer.Maui`): Auf der Wiedergabeseite waren die nativen Transportsteuerungen (Play/Pause, Seek u. a.) nicht erreichbar, weil die Kopf-Überlagerung der App unsichtbar die gesamte Videofläche abdeckte; die Überlagerung belegt jetzt nur noch ihr sichtbares Kopfband und die Titelfläche lässt Eingaben durch, während der „Mini-Player"-Schalter nutzbar bleibt.
 - Dunkles Web-Design (`VideoPlayer.Maui`): Die neue App nutzt die dokumentierten Design-Tokens der Webanwendung — tiefschwarze Hintergründe, abgestufte dunkle Flächen, rote Primärfarbe mit Hover-Zustand, pill-förmige Chips/Badges/runde Symbol-Schaltflächen und 4px-Button-Ecken. Alle Farben kommen aus zentralen `Vp*`-Stilressourcen; die Bedienung ist unverändert.
 - Neuer plattformneutraler Server-API-Client (`VideoPlayer.ApiClient`): Anmeldung, Erreichbarkeitsprüfung, Quellen, „Neu im Programm", Weiterschauen (Fortschritt/Ausblenden/Überspringen), Favoriten, Mediennachschlagen und Bildabrufe.
