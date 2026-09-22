@@ -14,5 +14,5 @@ Branch: `task/issue-9-cebc7d86f7084dc687e7f5bccf5f678a-neugestaltung-der-app`
 | 8 | Quellen-Browsing und Medien-Detailseiten | 5 | `task/issue-9-cebc7d86f7084dc687e7f5bccf5f678a-neugestaltung-der-app-schritt-8-quellen-details` | Fertig |
 | 9 | Favoriten- und Profil-Seite | 5 | `task/issue-9-cebc7d86f7084dc687e7f5bccf5f678a-neugestaltung-der-app-schritt-9-favoriten-profil` | Fertig |
 | 10 | Videowiedergabe mit Picture-in-Picture und Fortschrittsverfolgung | 6, 7, 8 | `task/issue-9-cebc7d86f7084dc687e7f5bccf5f678a-neugestaltung-der-app-schritt-10-wiedergabe-pip` | Fertig |
-| 11 | Download-Verwaltung und automatische Downloads | 6, 10 | `task/issue-9-cebc7d86f7084dc687e7f5bccf5f678a-neugestaltung-der-app-schritt-11-downloads` | In Arbeit |
+| 11 | Download-Verwaltung und automatische Downloads | 6, 10 | `task/issue-9-cebc7d86f7084dc687e7f5bccf5f678a-neugestaltung-der-app-schritt-11-downloads` | Fertig |
 | 12 | Offlinebetrieb und Wiederherstellung | 7, 9, 11 | `task/issue-9-cebc7d86f7084dc687e7f5bccf5f678a-neugestaltung-der-app-schritt-12-offline-wiederherstellung` | Offen |
