@@ -1,3 +1,4 @@
+using System.Collections.ObjectModel;
 using VideoPlayer.Mvu;
 
 namespace VideoPlayer.Maui.Pages;
@@ -15,6 +16,11 @@ public partial class DownloadsPage : ContentPage
 {
     private readonly MvuHost mvuHost;
 
+    // Stabile ItemsSource: Fortschritts-Ticks aktualisieren die Einträge
+    // in-place (PropertyChanged am Eintrag), statt den CollectionView
+    // pro Tick über eine neue Listeninstanz zurückzusetzen (Flackern).
+    private readonly ObservableCollection<DownloadItemViewModel> downloadItems = [];
+
     /// <summary>Initialisiert eine neue Instanz der <see cref="DownloadsPage"/>-Klasse.</summary>
     /// <param name="mvuHost">MVU-Host; dient als <see cref="BindableObject.BindingContext"/> und Dispatch-Ziel der Download-Nachrichten.</param>
     public DownloadsPage(MvuHost mvuHost)
@@ -22,6 +28,7 @@ public partial class DownloadsPage : ContentPage
         InitializeComponent();
         this.mvuHost = mvuHost;
         BindingContext = mvuHost;
+        DownloadsCollection.ItemsSource = downloadItems;
         mvuHost.ModelChanged += OnModelChanged;
         UpdateUi(mvuHost.Model);
     }
@@ -43,6 +50,10 @@ public partial class DownloadsPage : ContentPage
 
     private void UpdateUi(AppModel model)
     {
+        // Granularer Abgleich: nur neue/entfallene Einträge lösen
+        // CollectionChanged aus; Fortschritte laufen über das
+        // Eintrags-ViewModel (kein Neuaufbau der Liste).
+        DownloadListSync.Sync(downloadItems, model.Downloads.Items);
         OfflineBanner.IsVisible = model.IsOffline;
         QuotaLabel.Text = model.Downloads.QuotaText;
         ErrorPanel.IsVisible = model.Downloads.HasError && !model.Downloads.IsLoading;
@@ -52,25 +63,25 @@ public partial class DownloadsPage : ContentPage
 
     private void OnCancelClicked(object? sender, EventArgs e)
     {
-        if ((sender as Element)?.BindingContext is DownloadListItem item)
+        if ((sender as Element)?.BindingContext is DownloadItemViewModel viewItem)
         {
-            _ = mvuHost.DispatchAsync(new DownloadCancelRequestedMessage(item));
+            _ = mvuHost.DispatchAsync(new DownloadCancelRequestedMessage(viewItem.Item));
         }
     }
 
     private void OnRetryDownloadClicked(object? sender, EventArgs e)
     {
-        if ((sender as Element)?.BindingContext is DownloadListItem item)
+        if ((sender as Element)?.BindingContext is DownloadItemViewModel viewItem)
         {
-            _ = mvuHost.DispatchAsync(new DownloadRetryRequestedMessage(item));
+            _ = mvuHost.DispatchAsync(new DownloadRetryRequestedMessage(viewItem.Item));
         }
     }
 
     private void OnDeleteClicked(object? sender, EventArgs e)
     {
-        if ((sender as Element)?.BindingContext is DownloadListItem item)
+        if ((sender as Element)?.BindingContext is DownloadItemViewModel viewItem)
         {
-            _ = mvuHost.DispatchAsync(new DownloadDeleteRequestedMessage(item));
+            _ = mvuHost.DispatchAsync(new DownloadDeleteRequestedMessage(viewItem.Item));
         }
     }
 

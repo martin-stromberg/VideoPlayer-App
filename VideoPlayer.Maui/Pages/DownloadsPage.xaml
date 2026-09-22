@@ -54,12 +54,15 @@
                IsVisible="False" />
 
         <!-- Download-Liste: Titel, Zustand, Fortschritt und die Aktionen
-             Abbrechen/Erneut versuchen/Löschen je Eintrag. -->
+             Abbrechen/Erneut versuchen/Löschen je Eintrag. Die
+             ItemsSource wird einmalig im Code-Behind auf eine stabile
+             ObservableCollection gesetzt — Fortschritts-Ticks
+             aktualisieren nur den betroffenen Eintrag in-place, ohne
+             dass die Liste neu aufgebaut wird (Flackern). -->
         <CollectionView x:Name="DownloadsCollection"
-                        Grid.Row="3"
-                        ItemsSource="{Binding Model.Downloads.Items}">
+                        Grid.Row="3">
             <CollectionView.ItemTemplate>
-                <DataTemplate x:DataType="mvu:DownloadListItem">
+                <DataTemplate x:DataType="mvu:DownloadItemViewModel">
                     <Border Padding="12"
                             Margin="0,0,0,10"
                             StrokeShape="RoundRectangle 8"
