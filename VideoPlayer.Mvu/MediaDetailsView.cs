@@ -60,6 +60,13 @@ public sealed record EpisodeItem
     public bool IsHighlighted { get; init; }
 
     /// <summary>
+    /// Gesehen-Zeitpunkt der Episode, wie ihn der Server mitliefert
+    /// (<c>MediaEntry.WatchedAt</c>) bzw. der lokale Player gesetzt hat;
+    /// <c>null</c> = ungesehen.
+    /// </summary>
+    public DateTime? WatchedAt { get; init; }
+
+    /// <summary>
     /// Eine lokale Datei des Downloads liegt vor (nur im Offline-Snapshot
     /// gesetzt, <see cref="MediaDetailsView.IsOfflineSnapshot"/>).
     /// </summary>
@@ -73,6 +80,9 @@ public sealed record EpisodeItem
 
     /// <summary>Hinweiszeile „Nicht heruntergeladen" wird angezeigt.</summary>
     public bool ShowUnavailable => IsPlaceholder;
+
+    /// <summary>Die Episode wurde als gesehen markiert (Angesehen-Badge).</summary>
+    public bool IsWatched => WatchedAt.HasValue;
 
     /// <summary>Anzeigezeile „{Number}. {Title}" bzw. nur Titel.</summary>
     public string DisplayTitle => Number > 0 ? $"{Number}. {Title}" : Title;

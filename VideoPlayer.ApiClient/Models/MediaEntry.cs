@@ -56,6 +56,12 @@ public class MediaEntry
 
     /// <summary>Ob die Metadaten des Eintrags manuell bearbeitet wurden.</summary>
     public bool IsManuallyEdited { get; set; }
+
+    /// <summary>
+    /// Zeitpunkt, zu dem der Eintrag zuletzt vollständig angesehen wurde
+    /// (serverseitig je Benutzer gepflegt); <c>null</c> = ungesehen.
+    /// </summary>
+    public DateTime? WatchedAt { get; set; }
 }
 
 /// <summary>

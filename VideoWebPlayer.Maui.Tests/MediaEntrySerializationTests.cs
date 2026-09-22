@@ -38,4 +38,27 @@ public class MediaEntrySerializationTests
 
         Assert.Contains("\"$type\":\"movie\"", json);
     }
+
+    /// <summary>Prüft MediaEntry: übernimmt den serverseitigen Gesehen-Zeitpunkt (camelCase-JSON).</summary>
+    [Fact]
+    public void MediaEntry_DeserializesWatchedAt()
+    {
+        var json = "{\"$type\":\"episode\",\"Id\":31,\"Name\":\"Pilot\",\"watchedAt\":\"2026-09-20T21:30:00Z\"}";
+
+        var entry = JsonSerializer.Deserialize<MediaEntry>(json, JsonOptions);
+
+        var episode = Assert.IsType<TvShowEpisode>(entry);
+        Assert.Equal(new DateTime(2026, 9, 20, 21, 30, 0, DateTimeKind.Utc), episode.WatchedAt);
+    }
+
+    /// <summary>Prüft MediaEntry: ohne Gesehen-Feld bleibt der Zeitpunkt leer (ungesehen).</summary>
+    [Fact]
+    public void MediaEntry_WithoutWatchedAt_StaysNull()
+    {
+        var json = "{\"$type\":\"episode\",\"Id\":31,\"Name\":\"Pilot\"}";
+
+        var entry = JsonSerializer.Deserialize<MediaEntry>(json, JsonOptions);
+
+        Assert.Null(Assert.IsType<TvShowEpisode>(entry).WatchedAt);
+    }
 }

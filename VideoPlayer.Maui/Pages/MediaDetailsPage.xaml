@@ -173,11 +173,59 @@
                                         </Border.Triggers>
                                         <Grid ColumnDefinitions="110,*,Auto,Auto"
                                               ColumnSpacing="10">
-                                            <controls:CachedPosterImage PictureId="{Binding PosterPictureId}"
-                                                                        Grid.Column="0"
-                                                                        HeightRequest="62"
-                                                                        WidthRequest="110"
-                                                                        Aspect="AspectFill" />
+                                            <Grid Grid.Column="0">
+                                                <controls:CachedPosterImage PictureId="{Binding PosterPictureId}"
+                                                                            HeightRequest="62"
+                                                                            WidthRequest="110"
+                                                                            Aspect="AspectFill" />
+                                                <!-- Angesehen-Badge (Web:
+                                                     WatchedIndicator mit
+                                                     watched-indicator-episode
+                                                     und -image-left) —
+                                                     rundes dunkles Badge mit
+                                                     Auge in Primärfarbe, oben
+                                                     links über dem Poster,
+                                                     nur bei gesetztem
+                                                     Gesehen-Zeitpunkt. -->
+                                                <Border AutomationId="WatchedIndicator"
+                                                        IsVisible="{Binding IsWatched}"
+                                                        WidthRequest="26"
+                                                        HeightRequest="26"
+                                                        Margin="6,6,0,0"
+                                                        HorizontalOptions="Start"
+                                                        VerticalOptions="Start"
+                                                        InputTransparent="True"
+                                                        ToolTipProperties.Text="Gesehen"
+                                                        Stroke="{StaticResource VpBadgeBorder}"
+                                                        StrokeThickness="1"
+                                                        BackgroundColor="{StaticResource VpBadgeBg}"
+                                                        Padding="4">
+                                                    <Border.StrokeShape>
+                                                        <RoundRectangle CornerRadius="999" />
+                                                    </Border.StrokeShape>
+                                                    <!-- Auge des Web-SVG
+                                                         (viewBox 24×24):
+                                                         Kontur-Pfad, Pupille
+                                                         und Glanzpunkt. -->
+                                                    <Grid WidthRequest="18"
+                                                          HeightRequest="18">
+                                                        <Path Data="M2 12C4 7 8 4 12 4C16 4 20 7 22 12C20 17 16 20 12 20C8 20 4 17 2 12Z"
+                                                              Stroke="{StaticResource VpPrimarySoft}"
+                                                              StrokeThickness="1.6"
+                                                              Fill="Transparent"
+                                                              Aspect="Uniform" />
+                                                        <Ellipse WidthRequest="5"
+                                                                 HeightRequest="5"
+                                                                 Fill="{StaticResource VpPrimarySoft}" />
+                                                        <Ellipse WidthRequest="1.5"
+                                                                 HeightRequest="1.5"
+                                                                 Fill="{StaticResource VpText}"
+                                                                 Opacity="0.9"
+                                                                 TranslationX="1"
+                                                                 TranslationY="-0.8" />
+                                                    </Grid>
+                                                </Border>
+                                            </Grid>
                                             <VerticalStackLayout Grid.Column="1" Spacing="2">
                                                 <Label Text="{Binding DisplayTitle}"
                                                        FontSize="14"

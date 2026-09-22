@@ -18,6 +18,13 @@ public sealed record CachedShowEpisode
 
     /// <summary>Anzeigetitel der Episode.</summary>
     public required string Title { get; init; }
+
+    /// <summary>
+    /// Gesehen-Zeitpunkt der Episode beim Schreiben des Cache-Eintrags;
+    /// <c>null</c> = ungesehen bzw. aus einem älteren Cache-Stand nicht
+    /// bekannt (abwärtskompatibel).
+    /// </summary>
+    public DateTime? WatchedAt { get; init; }
 }
 
 /// <summary>
@@ -117,7 +124,8 @@ public static class ShowDetailsCache
                         {
                             Id = e.Id,
                             Number = e.Number,
-                            Title = e.Name ?? string.Empty
+                            Title = e.Name ?? string.Empty,
+                            WatchedAt = e.WatchedAt
                         })
                         .ToList()
                 })

@@ -222,6 +222,63 @@ public class MediaDetailsServiceTests : IDisposable
         Assert.Equal(55, details.HeaderPictureId);
     }
 
+    /// <summary>Prüft Load: bei <c>TvShow</c> → übernimmt den Gesehen-Zeitpunkt der Episoden.</summary>
+    [Fact]
+    public async Task Load_TvShow_MapsEpisodeWatchedAt()
+    {
+        await LoginAsync();
+        var show = Show();
+        var watchedAt = new DateTime(2026, 9, 20, 21, 30, 0, DateTimeKind.Utc);
+        show.Seasons[0].Episodes[0].WatchedAt = watchedAt;
+        handler.EnqueueJson(HttpStatusCode.OK, show);
+
+        var details = await CreateService().LoadAsync("tvshow", 11, null, null, null, null);
+
+        var watched = details.Seasons[0].Episodes[0];
+        Assert.Equal(watchedAt, watched.WatchedAt);
+        Assert.True(watched.IsWatched);
+        var unseen = details.Seasons[0].Episodes[1];
+        Assert.Null(unseen.WatchedAt);
+        Assert.False(unseen.IsWatched);
+        Assert.All(details.Seasons[1].Episodes, e => Assert.Null(e.WatchedAt));
+    }
+
+    /// <summary>Prüft Load: ohne Client bei einer Serie → übernimmt den gecachten Gesehen-Stand.</summary>
+    [Fact]
+    public async Task Load_WithoutClient_ShowSnapshot_MapsEpisodeWatchedAt()
+    {
+        var show = Show();
+        var watchedAt = new DateTime(2026, 9, 20, 21, 30, 0, DateTimeKind.Utc);
+        show.Seasons[0].Episodes[1].WatchedAt = watchedAt;
+        await ShowDetailsCache.WriteAsync(cache, show);
+
+        var details = await CreateService().LoadAsync("tvshow", 11, null, null, null, null);
+
+        Assert.True(details.IsOfflineSnapshot);
+        var episode = details.Seasons[0].Episodes[1];
+        Assert.Equal(watchedAt, episode.WatchedAt);
+        Assert.True(episode.IsWatched);
+        Assert.Null(details.Seasons[0].Episodes[0].WatchedAt);
+    }
+
+    /// <summary>Prüft Load: Alt-Cache ohne Gesehen-Feld → Episoden gelten als ungesehen.</summary>
+    [Fact]
+    public async Task Load_WithoutClient_LegacyCache_TreatsEpisodesAsUnwatched()
+    {
+        await cache.Connection.InsertAsync(new VideoPlayer.Storage.Entities.CachedListEntry
+        {
+            Key = ShowDetailsCache.KeyFor(11),
+            Json = "{\"ShowId\":11,\"Title\":\"Testserie\",\"Seasons\":[{\"Id\":21,\"Number\":1,\"Episodes\":[{\"Id\":31,\"Number\":1,\"Title\":\"Pilot\"}]}]}",
+            UpdatedAtUtc = DateTime.UtcNow
+        });
+
+        var details = await CreateService().LoadAsync("tvshow", 11, null, null, null, null);
+
+        var episode = Assert.Single(details.Seasons).Episodes.Single();
+        Assert.Null(episode.WatchedAt);
+        Assert.False(episode.IsWatched);
+    }
+
     /// <summary>Prüft Load: bei Episode im Serienkontext → führt die navigierte Episode den Kopfbereich.</summary>
     [Fact]
     public async Task Load_Episode_WithShowHint_SelectsEpisodeForHeader()

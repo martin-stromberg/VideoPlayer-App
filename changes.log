@@ -1,5 +1,12 @@
 # Änderungsprotokoll
 
+## 2026-09-23 — Design-Angleichung an die Webanwendung, Schritt 7: Angesehen-Symbol in den Episodenlisten
+
+- Die Episodenliste der Serien-/Staffelansicht (`MediaDetailsPage`) markiert gesehene Episoden jetzt mit einem runden Angesehen-Badge nach Web-Vorbild (`WatchedIndicator` / `.watched-indicator-episode -image-left`): dunkler transluzenter Kreis (`rgba(0,0,0,.68)` ≙ `VpBadgeBg`), feiner heller Rand (`rgba(255,255,255,.28)` ≙ `VpBadgeBorder`) und ein Augen-Symbol in der weichen Primärfarbe (`VpPrimarySoft`), oben links über dem Episoden-Still. Ungesehene Episoden zeigen kein Symbol.
+- Grundlage ist der vom Server bereits gelieferte Gesehen-Zeitpunkt `WatchedAt`, der jetzt durchgängig abgebildet wird: `MediaEntry.WatchedAt` (API-Client) → `EpisodeItem.WatchedAt`/`IsWatched` (MVU-View-Modell) → `CachedShowEpisode.WatchedAt` (Offline-Serienkontext, abwärtskompatibel — Alt-Einträge ohne das Feld gelten als ungesehen).
+- Markiert der Player eine Episode der geöffneten Serie als gesehen (Ende der Wiedergabe bzw. Watched-Endfenster), überträgt `MarkEpisodeWatchedInDetails` den Stand ohne Seitenreload in die geladene Detailansicht — auch während der Auto-Fortsetzung auf die Folge-Episode. Die bestehende Gesehen-Logik (Fortschrittsmeldung, Schwellenwert, automatisches Löschen gesehener Downloads) ist unverändert; der Server benötigt keine Änderung.
+- Abgesichert durch 15 neue Tests: `WatchedAt`-Deserialisierung, Online-/Offline-Mapping samt Legacy-Cache-Kompatibilität, Markierung bei `PlaybackEnded`/Watched-Fenster mit Randfällen (Auto-Fortsetzung, Server-Zeitpunkt bleibt erhalten, Film-Wiedergabe, unbekannte Episode) sowie Quell-Vertragstests für Badge-Markup und die neuen Farb-Tokens. Volle Testsuite 743/743 grün, Build Debug und Release fehlerfrei.
+
 ## 2026-10-04 — Design-Angleichung an die Webanwendung, Schritt 6: Vollbreiter Detail-Kopfbereich mit Hintergrundgrafik
 
 - Alle Medien-Detailseiten (`MediaDetailsPage` — Film, Kollektion, Serie, Staffel, Episode) zeigen jetzt einen vollbreiten Kopfbereich nach Web-Vorbild (`tvshow-header`): das Hintergrundbild liegt bildschirmbreit in Cover-Darstellung (`AspectFill`) unter geschichteten Dunkelgradienten (seitlicher Verlauf, weicher Übergang zum Seitenhintergrund, `VpBorder`-Trennlinie). Die Höhe folgt der Fensterbreite (`Math.Clamp(Breite × 0,52, 360, 620)`). Der bisherige zweispaltige Poster-Kopf entfällt.
