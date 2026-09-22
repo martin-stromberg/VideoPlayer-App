@@ -7,7 +7,7 @@ Branch: `task/issue-9-cebc7d86f7084dc687e7f5bccf5f678a-neugestaltung-der-app`
 | 1 | Clientseitiger Zugriff auf die Server-API (Neuimplementierung) | Keine | `task/issue-9-cebc7d86f7084dc687e7f5bccf5f678a-neugestaltung-der-app-schritt-1-api-client` | Fertig |
 | 2 | App-Grundgerüst mit MVU-Struktur und Navigation | 1 | `task/issue-9-cebc7d86f7084dc687e7f5bccf5f678a-neugestaltung-der-app-schritt-2-mvu-grundgeruest` | Fertig |
 | 3 | Einstellungsverwaltung und lokale Datenhaltung mit Backup-Trennung | 2 | `task/issue-9-cebc7d86f7084dc687e7f5bccf5f678a-neugestaltung-der-app-schritt-3-einstellungen-datenhaltung` | Fertig |
-| 4 | Serververwaltung und Erststart-Einrichtung | 2, 3 | `task/issue-9-cebc7d86f7084dc687e7f5bccf5f678a-neugestaltung-der-app-schritt-4-serververwaltung-erststart` | Offen |
+| 4 | Serververwaltung und Erststart-Einrichtung | 2, 3 | `task/issue-9-cebc7d86f7084dc687e7f5bccf5f678a-neugestaltung-der-app-schritt-4-serververwaltung-erststart` | In Arbeit |
 | 5 | Verbindungs-Workflow und Anmeldung | 4 | `task/issue-9-cebc7d86f7084dc687e7f5bccf5f678a-neugestaltung-der-app-schritt-5-verbindung-anmeldung` | Offen |
 | 6 | Netzwerkstatus-Erkennung und Synchronisation | 5 | `task/issue-9-cebc7d86f7084dc687e7f5bccf5f678a-neugestaltung-der-app-schritt-6-netzwerk-sync` | Offen |
 | 7 | Startseite mit gecachten Medienlisten | 6 | `task/issue-9-cebc7d86f7084dc687e7f5bccf5f678a-neugestaltung-der-app-schritt-7-startseite` | Offen |
