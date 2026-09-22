@@ -9,7 +9,8 @@ Dieses Repository enthält die ausgelagerte .NET-MAUI-App und ihre Tests.
 - `VideoWebPlayer.Client/` - kopierte Übergabeschnittstelle aus dem Web-Repository (Altbestand, wird im Rahmen der Neugestaltung entfernt).
 - `VideoPlayer.ApiClient/` - neu implementierter, plattformneutraler Zugriff auf die öffentliche Server-API (Dokumentation: `docs/help/api-client/`).
 - `VideoPlayer.Mvu/` - plattformneutrale MVU-Schicht der neuen App (Modell, Messages, Update, Effekte; eigener schlanker MVU-Kreislauf ohne externes Framework).
-- `VideoPlayer.Maui/` - neue MAUI-App auf MVU-Basis (Seitenmenü-Navigation, Platzhalterseiten, Erreichbarkeitsprüfung; Dokumentation: `docs/help/app-grundgeruest.md`).
+- `VideoPlayer.Storage/` - plattformneutrale lokale Datenhaltung der neuen App (Einstellungsmodell und -dienst, Geheimnis-Ablage, Profil-Isolation, Backup-/NoBackup-Ablageorte, SQLite-Datenbanken).
+- `VideoPlayer.Maui/` - neue MAUI-App auf MVU-Basis (Seitenmenü-Navigation, ausgebaute Einstellungsseite, Erreichbarkeitsprüfung; Dokumentation: `docs/help/app-grundgeruest.md`, `docs/help/einstellungen-datenhaltung.md`).
 - `VideoPlayer.App.sln` - eigene Solution dieses Repositorys.
 - `LICENSE` - PolyForm Noncommercial License 1.0.0.
 

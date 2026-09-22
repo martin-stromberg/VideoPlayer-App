@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Logging;
 using VideoPlayer.Maui.Services;
 using VideoPlayer.Mvu;
+using VideoPlayer.Storage;
 
 namespace VideoPlayer.Maui
 {
@@ -17,6 +18,18 @@ namespace VideoPlayer.Maui
             builder.Services.AddSingleton<IServerHealthProbe, ServerHealthProbe>();
             builder.Services.AddSingleton<IAppEffectHandler, ShellAppEffectHandler>();
             builder.Services.AddSingleton<MvuHost>();
+
+            // Lokale Datenhaltung: Profil-Isolation, normale und sichere Ablage,
+            // Einstellungs-/Geheimnisdienste und getrennte Datenbanken.
+            builder.Services.AddSingleton(_ => AppProfile.FromEnvironment());
+            builder.Services.AddSingleton<ISettingsStore>(_ => new PreferencesSettingsStore(Preferences.Default));
+            builder.Services.AddSingleton<ISecretStore>(_ => new SecureStorageSecretStore(SecureStorage.Default));
+            builder.Services.AddSingleton<AppSettingsService>();
+            builder.Services.AddSingleton<AppSecretsService>();
+            builder.Services.AddSingleton(sp =>
+                AppStorageLayoutProvider.CreateLayout(sp.GetRequiredService<AppProfile>()));
+            builder.Services.AddSingleton<BackupDatabase>();
+            builder.Services.AddSingleton<CacheDatabase>();
 
             builder.Services.AddSingleton<AppShell>();
             builder.Services.AddTransient<Pages.LoadingPage>();

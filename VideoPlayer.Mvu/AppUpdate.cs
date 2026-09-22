@@ -17,6 +17,9 @@ public static class AppUpdate
             ServerHealthCheckCompletedMessage completed => UpdateHealthCheckCompleted(model, completed),
             NavigateToMessage navigate => UpdateNavigateTo(model, navigate),
             NavigatedMessage navigated => UpdateNavigated(model, navigated),
+            LoadSettingsRequestedMessage => new AppTransition(model, [new LoadSettingsEffect()]),
+            SettingsLoadedMessage loaded => UpdateSettingsLoaded(model, loaded),
+            SaveSettingsRequestedMessage save => UpdateSaveSettingsRequested(model, save),
             _ => AppTransition.Unchanged(model)
         };
     }
@@ -30,7 +33,22 @@ public static class AppUpdate
 
         return new AppTransition(
             model with { IsStartupRunning = true, ServerHealth = ServerHealthStatus.Checking },
-            [new CheckServerHealthEffect()]);
+            [new InitializeStorageEffect(), new LoadSettingsEffect(), new CheckServerHealthEffect()]);
+    }
+
+    private static AppTransition UpdateSettingsLoaded(AppModel model, SettingsLoadedMessage message)
+    {
+        return new AppTransition(
+            model with { Settings = message.Settings.Normalize() },
+            []);
+    }
+
+    private static AppTransition UpdateSaveSettingsRequested(AppModel model, SaveSettingsRequestedMessage message)
+    {
+        var normalized = message.Settings.Normalize();
+        return new AppTransition(
+            model with { Settings = normalized },
+            [new PersistSettingsEffect(normalized)]);
     }
 
     private static AppTransition UpdateHealthCheckCompleted(AppModel model, ServerHealthCheckCompletedMessage message)

@@ -1,5 +1,15 @@
 # Änderungsprotokoll
 
+## 2026-09-22 — Einstellungsverwaltung und lokale Datenhaltung mit Backup-Trennung (Neugestaltung, Schritt 3)
+
+- Neues plattformneutrales Projekt `VideoPlayer.Storage`: Einstellungsmodell `AppSettings` mit acht Einstellungen (automatische Downloads, vorzuladende Episoden, WLAN-only-Downloads, Speicherplatzkontingent in GB mit Standard 5, automatisches Löschen gesehener Episoden, Auto-Fortsetzung mit Zeitfenster, „Als angesehen"-Zeitfenster), `AppSettingsService`/`AppSecretsService`, Profil-Isolation über `VIDEOPLAYER_PROFILE` und getrenntes Ablageort-Layout.
+- Strukturierte lokale Datenhaltung mit Backup-Trennung: backup-pflichtige Datenbank `videoplayer.db3` (Serverliste, zuletzt verbundener Server, Profildaten ohne Geheimnisse, unsynchronisierte Fortschritte) getrennt von der nicht backup-pflichtigen `videoplayer-cache.db3` (Favoriten-Kopie, Listen-Caches, Download-Manifest) sowie Dateiablagen `videos/`/`previews/` und Temp-Cache.
+- Plattform-Backup-Strategie: iOS/MacCatalyst schließt die NoBackup-Ablage per `NSFileManager.SetSkipBackupAttribute` aus; Android nutzt `NoBackupFilesDir`; Windows legt backup-pflichtige Daten im Roaming-Profilverzeichnis `%APPDATA%\VideoPlayer` ab.
+- Geheimnisse (Passwort, Anmelde-Token) werden ausschließlich über `SecureStorage` abgelegt — weder in der normalen Einstellungsablage noch im Cloud-Backup; Legacy-Werte werden migriert.
+- `SettingsPage` der neuen App ausgebaut: alle acht Einstellungen mit deutschen Beschriftungen, numerische Eingaben mit Bereichsprüfung und Inline-Fehlerhinweis; Änderungen laufen über die MVU-Strecke `SaveSettingsRequestedMessage` → `PersistSettingsEffect`.
+- `ServerAddressProvider` auf die profil-isolierte Ablage-Abstraktion umgestellt (kein direkter `Preferences`-Zugriff mehr in der neuen App).
+- 59 neue xUnit-Tests für Einstellungen, Ablage-Isolation, Datenbanken, MVU-Erweiterung und Architekturverträge (insgesamt 160 Tests).
+
 ## 2026-09-22 — App-Grundgerüst mit MVU-Struktur und Navigation (Neugestaltung, Schritt 2)
 
 - Neues Projekt `VideoPlayer.Mvu`: plattformneutrale MVU-Schicht mit eigenem schlanken Kreislauf (Modell, Messages, Update-Funktion, Effekte, `MvuHost`) — ohne externes MVU-Framework.

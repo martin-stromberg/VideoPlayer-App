@@ -28,9 +28,11 @@ public class MvuHostTests
         Assert.Equal(AppPage.Home, host.Model.CurrentPage);
         Assert.Equal(ServerHealthStatus.Reachable, host.Model.ServerHealth);
         Assert.False(host.Model.IsStartupRunning);
-        Assert.Equal(2, handler.Effects.Count);
-        Assert.IsType<CheckServerHealthEffect>(handler.Effects[0]);
-        Assert.IsType<NavigateToPageEffect>(handler.Effects[1]);
+        Assert.Equal(4, handler.Effects.Count);
+        Assert.IsType<InitializeStorageEffect>(handler.Effects[0]);
+        Assert.IsType<LoadSettingsEffect>(handler.Effects[1]);
+        Assert.IsType<CheckServerHealthEffect>(handler.Effects[2]);
+        Assert.IsType<NavigateToPageEffect>(handler.Effects[3]);
     }
 
     [Fact]

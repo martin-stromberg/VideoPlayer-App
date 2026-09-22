@@ -26,6 +26,7 @@
   <ItemGroup>
     <ProjectReference Include="..\VideoPlayer.ApiClient\VideoPlayer.ApiClient.csproj" />
     <ProjectReference Include="..\VideoPlayer.Mvu\VideoPlayer.Mvu.csproj" />
+    <ProjectReference Include="..\VideoPlayer.Storage\VideoPlayer.Storage.csproj" />
     <ProjectReference Include="..\VideoWebPlayer.Client\VideoWebPlayer.Client.csproj" />
   </ItemGroup>
   <ItemGroup>

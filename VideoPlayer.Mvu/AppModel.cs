@@ -1,3 +1,5 @@
+using VideoPlayer.Storage;
+
 namespace VideoPlayer.Mvu;
 
 /// <summary>
@@ -14,6 +16,12 @@ public sealed record AppModel
 
     /// <summary>Ergebnis der Server-Erreichbarkeitsprüfung.</summary>
     public ServerHealthStatus ServerHealth { get; init; } = ServerHealthStatus.Unknown;
+
+    /// <summary>
+    /// Geladene App-Einstellungen (beim Start über <see cref="LoadSettingsEffect"/>
+    /// befüllt; bis dahin Defaults).
+    /// </summary>
+    public AppSettings Settings { get; init; } = new();
 
     /// <summary>Dem Anwender anzeigbarer Text zum Serverstatus.</summary>
     public string ServerHealthText => ServerHealth switch
