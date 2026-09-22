@@ -25,12 +25,12 @@
                                     Margin="0"
                                     StrokeThickness="0"
                                     Opacity="{Binding CardOpacity}"
-                                    BackgroundColor="#23232a">
+                                    BackgroundColor="{StaticResource VpSurface}">
                                 <Border.StrokeShape>
                                     <RoundRectangle CornerRadius="8" />
                                 </Border.StrokeShape>
                                 <Border.Shadow>
-                                    <Shadow Brush="Black" Offset="0,2" Radius="4" Opacity="0.3" />
+                                    <Shadow Brush="{StaticResource VpShadowBrush}" Offset="0,2" Radius="4" Opacity="0.3" />
                                 </Border.Shadow>
                                 <Border.GestureRecognizers>
                                     <TapGestureRecognizer Tapped="OnItemTapped" />
@@ -39,7 +39,7 @@
                                     <!-- Titel-Fallback: liegt unter dem Bild und bleibt sichtbar,
                                          solange kein Poster geladen ist. -->
                                     <Label Text="{Binding Title}"
-                                           TextColor="White"
+                                           TextColor="{StaticResource VpText}"
                                            FontSize="13"
                                            Padding="8"
                                            HorizontalTextAlignment="Center"
@@ -51,24 +51,24 @@
                                                                 IsVisible="{Binding HasPoster}" />
                                     <ProgressBar Progress="{Binding Progress}"
                                                  IsVisible="{Binding ShowProgress}"
-                                                 ProgressColor="#FFB84D"
-                                                 BackgroundColor="#40404a"
+                                                 ProgressColor="{StaticResource VpPrimary}"
+                                                 BackgroundColor="{StaticResource VpSurfaceBright}"
                                                  HeightRequest="4"
                                                  VerticalOptions="End" />
                                     <!-- Platzhalter-Markierung fehlender
                                          Offline-Episoden (nicht abspielbar). -->
                                     <Border x:Name="PlaceholderBadge"
                                             IsVisible="{Binding IsPlaceholder}"
-                                            BackgroundColor="#AA000000"
+                                            BackgroundColor="{StaticResource VpOverlay}"
                                             Padding="8,4"
                                             HorizontalOptions="Center"
                                             VerticalOptions="End"
                                             Margin="0,0,0,10">
                                         <Border.StrokeShape>
-                                            <RoundRectangle CornerRadius="4" />
+                                            <RoundRectangle CornerRadius="999" />
                                         </Border.StrokeShape>
                                         <Label Text="Nicht heruntergeladen"
-                                               TextColor="White"
+                                               TextColor="{StaticResource VpText}"
                                                FontSize="10" />
                                     </Border>
                                 </Grid>

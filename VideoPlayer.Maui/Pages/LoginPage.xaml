@@ -13,7 +13,7 @@
             <Label x:Name="ServerLabel"
                    AutomationId="LoginServerLabel"
                    FontSize="12"
-                   TextColor="Gray"
+                   TextColor="{StaticResource VpTextMuted}"
                    IsVisible="false" />
 
             <Label Text="E-Mail" FontAttributes="Bold" />
@@ -34,7 +34,7 @@
             <ActivityIndicator x:Name="LoginIndicator" IsRunning="false" IsVisible="false" />
             <Label x:Name="ErrorLabel"
                    AutomationId="LoginErrorLabel"
-                   TextColor="Red"
+                   TextColor="{StaticResource VpDanger}"
                    IsVisible="false" />
 
             <Button x:Name="ServerSetupButton"

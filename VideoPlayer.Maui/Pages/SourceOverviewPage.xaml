@@ -29,23 +29,23 @@
             <CollectionView.ItemTemplate>
                 <DataTemplate x:DataType="mvu:SourceGenreItem">
                     <Border Padding="12,6"
-                            StrokeShape="RoundRectangle 14"
-                            BackgroundColor="#23232a">
+                            StrokeShape="RoundRectangle 999"
+                            BackgroundColor="{StaticResource VpSurface}">
                         <Label Text="{Binding Name}"
                                FontSize="13"
-                               TextColor="#FFDDAA" />
+                               TextColor="{StaticResource VpPrimarySoft}" />
                         <Border.Triggers>
                             <DataTrigger TargetType="Border"
                                          Binding="{Binding IsSelected}"
                                          Value="True">
-                                <Setter Property="BackgroundColor" Value="#FFB84D" />
+                                <Setter Property="BackgroundColor" Value="{StaticResource VpPrimary}" />
                             </DataTrigger>
                         </Border.Triggers>
                         <Label.Triggers>
                             <DataTrigger TargetType="Label"
                                          Binding="{Binding IsSelected}"
                                          Value="True">
-                                <Setter Property="TextColor" Value="Black" />
+                                <Setter Property="TextColor" Value="{StaticResource VpText}" />
                                 <Setter Property="FontAttributes" Value="Bold" />
                             </DataTrigger>
                         </Label.Triggers>
@@ -58,14 +58,14 @@
                            Grid.Row="2"
                            IsRunning="{Binding Model.SourceBrowser.IsLoading}"
                            IsVisible="{Binding Model.SourceBrowser.IsLoading}"
-                           Color="#FFB84D" />
+                           Color="{StaticResource VpPrimary}" />
 
         <!-- Fehler beim Erstladen: Meldung + erneut versuchen -->
         <VerticalStackLayout x:Name="ErrorPanel"
                              Grid.Row="2"
                              Spacing="8"
                              IsVisible="False">
-            <Label x:Name="ErrorLabel" TextColor="Red" />
+            <Label x:Name="ErrorLabel" TextColor="{StaticResource VpDanger}" />
             <Button Text="Erneut versuchen"
                     Clicked="OnRetryClicked"
                     HorizontalOptions="Start" />
@@ -95,7 +95,7 @@
                                                     HeightRequest="150" />
                         <Label Text="{Binding Title}"
                                FontSize="12"
-                               TextColor="#FFDDAA"
+                               TextColor="{StaticResource VpPrimarySoft}"
                                LineBreakMode="TailTruncation"
                                MaxLines="2" />
                     </VerticalStackLayout>
@@ -108,7 +108,7 @@
                                            Spacing="8"
                                            IsVisible="False">
                         <Label Text="Fehler beim Laden weiterer Einträge"
-                               TextColor="Red"
+                               TextColor="{StaticResource VpDanger}"
                                VerticalOptions="Center" />
                         <Button Text="Erneut versuchen"
                                 FontSize="12"
@@ -117,7 +117,7 @@
                     <ActivityIndicator x:Name="FooterLoadingIndicator"
                                        IsRunning="{Binding Model.SourceBrowser.IsLoadingMore}"
                                        IsVisible="{Binding Model.SourceBrowser.IsLoadingMore}"
-                                       Color="#FFB84D" />
+                                       Color="{StaticResource VpPrimary}" />
                 </Grid>
             </CollectionView.Footer>
         </CollectionView>

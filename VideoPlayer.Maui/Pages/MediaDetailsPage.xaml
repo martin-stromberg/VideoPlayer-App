@@ -15,13 +15,13 @@
                            Grid.Row="0"
                            IsRunning="{Binding Model.MediaDetails.IsLoading}"
                            IsVisible="{Binding Model.MediaDetails.IsLoading}"
-                           Color="#FFB84D" />
+                           Color="{StaticResource VpPrimary}" />
 
         <VerticalStackLayout x:Name="ErrorPanel"
                              Grid.Row="1"
                              Spacing="8"
                              IsVisible="False">
-            <Label x:Name="ErrorLabel" TextColor="Red" />
+            <Label x:Name="ErrorLabel" TextColor="{StaticResource VpDanger}" />
         </VerticalStackLayout>
 
         <!-- Detail-Ansicht (Layout je nach Medientyp über IsVisible) -->
@@ -43,7 +43,7 @@
                             <Label x:Name="TitleLabel"
                                    FontSize="22"
                                    FontAttributes="Bold"
-                                   TextColor="#FFDDAA"
+                                   TextColor="{StaticResource VpPrimarySoft}"
                                    VerticalOptions="Center" />
                             <Button x:Name="PlayButton"
                                     Text="Abspielen"
@@ -53,6 +53,7 @@
                                     Clicked="OnPlayClicked" />
                             <Button x:Name="DownloadButton"
                                     Text="⤓"
+                                    Style="{StaticResource IconButton}"
                                     FontSize="16"
                                     WidthRequest="44"
                                     HeightRequest="40"
@@ -60,6 +61,7 @@
                                     Clicked="OnDownloadClicked" />
                             <Button x:Name="FavoriteButton"
                                     Text="☆"
+                                    Style="{StaticResource IconButton}"
                                     FontSize="20"
                                     WidthRequest="44"
                                     HeightRequest="44"
@@ -67,10 +69,10 @@
                         </HorizontalStackLayout>
                         <Label x:Name="MetaLabel"
                                FontSize="12"
-                               TextColor="#BBBBBB" />
+                               TextColor="{StaticResource VpTextMuted}" />
                         <Label x:Name="GenreLabel"
                                FontSize="12"
-                               TextColor="#BBBBBB" />
+                               TextColor="{StaticResource VpTextMuted}" />
                         <!-- Hinweis der letzten Download-Anforderung
                              (eingeplant/bereits vorhanden/Fehler). -->
                         <Label x:Name="DownloadNoticeLabel"
@@ -100,7 +102,7 @@
                                 <Border Padding="10"
                                         Margin="0,0,0,8"
                                         StrokeShape="RoundRectangle 8"
-                                        BackgroundColor="#23232a">
+                                        BackgroundColor="{StaticResource VpSurface}">
                                     <Border.Triggers>
                                         <!-- Platzhalter fehlender Offline-Episoden:
                                              abgedunkelt, ohne Aktions-Schalter. -->
@@ -121,7 +123,7 @@
                                             <Label Text="{Binding DisplayTitle}"
                                                    FontSize="14"
                                                    FontAttributes="Bold"
-                                                   TextColor="#FFDDAA" />
+                                                   TextColor="{StaticResource VpPrimarySoft}" />
                                             <Label Text="{Binding Plot}"
                                                    FontSize="12"
                                                    MaxLines="3"
@@ -130,11 +132,12 @@
                                                  Offline-Snapshot sichtbar). -->
                                             <Label Text="Nicht heruntergeladen"
                                                    FontSize="11"
-                                                   TextColor="#BBBBBB"
+                                                   TextColor="{StaticResource VpTextMuted}"
                                                    IsVisible="{Binding ShowUnavailable}" />
                                         </VerticalStackLayout>
                                         <Button Grid.Column="2"
                                                 Text="⤓"
+                                                Style="{StaticResource IconButton}"
                                                 FontSize="16"
                                                 WidthRequest="44"
                                                 HeightRequest="44"
@@ -150,6 +153,7 @@
                                         </Button>
                                         <Button Grid.Column="3"
                                                 Text="▶"
+                                                Style="{StaticResource IconButton}"
                                                 FontSize="16"
                                                 WidthRequest="44"
                                                 HeightRequest="44"
@@ -177,7 +181,7 @@
                     <Label Text="Enthaltene Filme"
                            FontSize="16"
                            FontAttributes="Bold"
-                           TextColor="#FFDDAA" />
+                           TextColor="{StaticResource VpPrimarySoft}" />
                     <CollectionView x:Name="CollectionCollection"
                                     SelectionMode="Single"
                                     SelectionChanged="OnCollectionMovieSelected">
@@ -192,7 +196,7 @@
                                                                 HeightRequest="150" />
                                     <Label Text="{Binding Title}"
                                            FontSize="12"
-                                           TextColor="#FFDDAA"
+                                           TextColor="{StaticResource VpPrimarySoft}"
                                            LineBreakMode="TailTruncation"
                                            MaxLines="2" />
                                 </VerticalStackLayout>

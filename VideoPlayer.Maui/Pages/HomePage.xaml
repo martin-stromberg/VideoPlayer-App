@@ -14,10 +14,11 @@
                     Margin="20,0"
                     Padding="12,8"
                     StrokeShape="RoundRectangle 8"
-                    BackgroundColor="#D9A029"
+                    Stroke="{StaticResource VpBorderStrong}"
+                    BackgroundColor="{StaticResource VpSurfaceHigh}"
                     IsVisible="False">
                 <Label Text="Offline-Modus – zwischengespeicherte Inhalte werden angezeigt. Neue Inhalte, Quellen und Profildaten sind nicht verfügbar."
-                       TextColor="Black"
+                       TextColor="{StaticResource VpText}"
                        FontAttributes="Bold" />
             </Border>
 
@@ -27,11 +28,12 @@
                     Margin="20,0"
                     Padding="12,8"
                     StrokeShape="RoundRectangle 8"
-                    BackgroundColor="#B06020"
+                    Stroke="{StaticResource VpBorderStrong}"
+                    BackgroundColor="{StaticResource VpSurfaceHigh}"
                     IsVisible="False">
                 <Label x:Name="StorageNoticeLabel"
                        Text="{Binding Model.StorageNotice}"
-                       TextColor="White"
+                       TextColor="{StaticResource VpText}"
                        FontAttributes="Bold" />
             </Border>
 

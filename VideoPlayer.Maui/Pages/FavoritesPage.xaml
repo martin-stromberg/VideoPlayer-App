@@ -18,10 +18,11 @@
                 Grid.Row="0"
                 Padding="12,8"
                 StrokeShape="RoundRectangle 8"
-                BackgroundColor="#D9A029"
+                Stroke="{StaticResource VpBorderStrong}"
+                BackgroundColor="{StaticResource VpSurfaceHigh}"
                 IsVisible="False">
             <Label Text="Offline – es wird die gespeicherte Favoritenliste angezeigt; Entfernen ist ohne Serververbindung nicht möglich."
-                   TextColor="Black"
+                   TextColor="{StaticResource VpText}"
                    FontAttributes="Bold" />
         </Border>
 
@@ -29,13 +30,13 @@
                            Grid.Row="1"
                            IsRunning="{Binding Model.FavoritesPage.IsLoading}"
                            IsVisible="{Binding Model.FavoritesPage.IsLoading}"
-                           Color="#FFB84D" />
+                           Color="{StaticResource VpPrimary}" />
 
         <VerticalStackLayout x:Name="ErrorPanel"
                              Grid.Row="1"
                              Spacing="8"
                              IsVisible="False">
-            <Label x:Name="ErrorLabel" TextColor="Red" />
+            <Label x:Name="ErrorLabel" TextColor="{StaticResource VpDanger}" />
             <Button x:Name="RetryButton"
                     Text="Erneut laden"
                     Clicked="OnRetryClicked"
@@ -60,9 +61,9 @@
                     <Border Padding="10"
                             Margin="0,0,0,10"
                             StrokeShape="RoundRectangle 8"
-                            BackgroundColor="#23232a">
+                            BackgroundColor="{StaticResource VpSurface}">
                         <Border.Shadow>
-                            <Shadow Brush="Black" Offset="0,2" Radius="4" Opacity="0.3" />
+                            <Shadow Brush="{StaticResource VpShadowBrush}" Offset="0,2" Radius="4" Opacity="0.3" />
                         </Border.Shadow>
                         <Grid ColumnDefinitions="72,*,Auto"
                               ColumnSpacing="14">
@@ -71,13 +72,13 @@
                                     HeightRequest="108"
                                     Padding="0"
                                     StrokeThickness="0"
-                                    BackgroundColor="#17171c"
-                                    StrokeShape="RoundRectangle 6">
+                                    BackgroundColor="{StaticResource VpSurfaceLow}"
+                                    StrokeShape="RoundRectangle 8">
                                 <Grid>
                                     <!-- Titel-Fallback: liegt unter dem Bild und bleibt sichtbar,
                                          solange kein Poster geladen ist. -->
                                     <Label Text="{Binding Title}"
-                                           TextColor="White"
+                                           TextColor="{StaticResource VpText}"
                                            FontSize="11"
                                            Padding="4"
                                            HorizontalTextAlignment="Center"
@@ -95,7 +96,7 @@
                                 <Label Text="{Binding Title}"
                                        FontSize="17"
                                        FontAttributes="Bold"
-                                       TextColor="#FFDDAA"
+                                       TextColor="{StaticResource VpPrimarySoft}"
                                        MaxLines="2"
                                        LineBreakMode="TailTruncation" />
                                 <Label Text="{Binding MediaTypeText}"

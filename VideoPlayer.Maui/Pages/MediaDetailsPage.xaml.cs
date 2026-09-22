@@ -140,7 +140,12 @@ public partial class MediaDetailsPage : ContentPage
         // Hinweis der letzten Download-Anforderung dieser Identität.
         DownloadNoticeLabel.IsVisible = isRequested && state.DownloadNotice is not null;
         DownloadNoticeLabel.Text = state.DownloadNotice;
-        DownloadNoticeLabel.TextColor = state.DownloadNoticeIsError ? Colors.Red : Color.FromArgb("#7BD88F");
+        // Farben kommen aus den zentralen Design-Tokens (Vp*), nicht aus
+        // hartcodierten Werten — die Schlüssel sind per Contract-Test gepinnt.
+        var resources = Application.Current!.Resources;
+        DownloadNoticeLabel.TextColor = state.DownloadNoticeIsError
+            ? (Color)resources["VpDanger"]
+            : (Color)resources["VpSecondary"];
 
         UpdateSeasonSection(details);
         UpdateCollectionSection(details);
