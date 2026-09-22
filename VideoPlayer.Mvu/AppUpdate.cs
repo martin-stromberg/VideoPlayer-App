@@ -78,8 +78,8 @@ public static class AppUpdate
             HomeListsLoadedMessage loaded => UpdateHomeListsLoaded(model, loaded),
             StorageRecoveredMessage recovered => UpdateStorageRecovered(model, recovered),
             MediaItemSelectedMessage selected => UpdateMediaItemSelected(model, selected),
-            SourcesPageOpenedMessage => UpdateSourcesPageOpened(model),
             SourcesLoadedMessage loaded => UpdateSourcesLoaded(model, loaded),
+            SourcesReloadRequestedMessage => UpdateSourcesReloadRequested(model),
             SourceSelectedMessage selected => UpdateSourceSelected(model, selected),
             SourceBrowserOpenedMessage opened => UpdateSourceBrowserOpened(model, opened),
             SourceGenresLoadedMessage loaded => UpdateSourceGenresLoaded(model, loaded),
@@ -287,7 +287,9 @@ public static class AppUpdate
         // Der Server wird übernommen; die (automatische) Anmeldung am neuen
         // Server entscheidet über das Navigationsziel — „Home" wird nur aus
         // Connected/Offline erreicht. IsServerCheckRunning bleibt bis zum
-        // Login-Abschluss gesetzt (Anzeige läuft weiter).
+        // Login-Abschluss gesetzt (Anzeige läuft weiter). Quellen- und
+        // Browsing-Zustand des bisherigen Servers verlieren ihre Gültigkeit —
+        // EnterConnected lädt den neuen Stand.
         return new AppTransition(
             model with
             {
@@ -296,7 +298,9 @@ public static class AppUpdate
                 ActiveServerAddress = normalized,
                 KnownServers = known,
                 ServerHealth = ServerHealthStatus.Reachable,
-                ConnectionState = ConnectionState.Connecting
+                ConnectionState = ConnectionState.Connecting,
+                SourcesOverview = SourcesOverviewState.Initial,
+                SourceBrowser = SourceBrowserState.Empty
             },
             [new PersistActiveServerEffect(normalized, message.DisplayName), new AttemptAutoLoginEffect(normalized)]);
     }
@@ -420,10 +424,11 @@ public static class AppUpdate
     }
 
     /// <summary>
-    /// Übergang in den verbundenen Zustand: baut die Ereignisverbindung auf
-    /// und startet die vollständige Synchronisation. Die Startseite wird
-    /// nur von Workflow-Seiten aus angesteuert — bei einer Wiederverbindung
-    /// zur Laufzeit bleibt der Anwender auf der aktuellen Menüseite.
+    /// Übergang in den verbundenen Zustand: lädt die Quellen des
+    /// Navigationsmenüs, baut die Ereignisverbindung auf und startet die
+    /// vollständige Synchronisation. Die Startseite wird nur von
+    /// Workflow-Seiten aus angesteuert — bei einer Wiederverbindung zur
+    /// Laufzeit bleibt der Anwender auf der aktuellen Menüseite.
     /// </summary>
     /// <param name="model">Aktuelles App-Model.</param>
     /// <returns>Übergang in den verbundenen Zustand samt Effekten.</returns>
@@ -439,10 +444,14 @@ public static class AppUpdate
             // Eine erfolgreiche Anmeldung beweist Konnektivität — der
             // Netzwerk-Ist-Wert wird damit konsistent zum Zustand.
             IsOnline = true,
-            IsSyncRunning = true
+            IsSyncRunning = true,
+            // Die Quellen des Navigationsmenüs werden direkt mit dem
+            // Verbindungsaufbau geladen — die bisherigen Einträge
+            // bleiben während des Ladens sichtbar (kein Menü-Flackern).
+            SourcesOverview = model.SourcesOverview with { IsLoading = true, Error = null }
         };
 
-        var effects = new List<AppEffect>();
+        var effects = new List<AppEffect> { new LoadSourcesEffect() };
         if (model.ActiveServerAddress is not null)
         {
             effects.Add(new ConnectServerEventsEffect(model.ActiveServerAddress));
@@ -481,9 +490,16 @@ public static class AppUpdate
             // Servereinrichtung, laufender Start) entscheiden die
             // ohnehin laufenden Prüfungen über den Ausgang.
             var updated = model with { IsOnline = false };
+            // Offline steht keine Quellenliste zur Verfügung — die
+            // Menü-Einträge werden mit dem Übergang zurückgesetzt,
+            // damit kein veralteter Stand als aktuell erscheint.
             return model.ConnectionState == ConnectionState.Connected
                 ? new AppTransition(
-                    updated with { ConnectionState = ConnectionState.Offline },
+                    updated with
+                    {
+                        ConnectionState = ConnectionState.Offline,
+                        SourcesOverview = SourcesOverviewState.Initial
+                    },
                     [new DisconnectServerEventsEffect()])
                 : new AppTransition(updated, []);
         }
@@ -517,27 +533,62 @@ public static class AppUpdate
     {
         // Nach dem Voll-Sync die Startseiten-Listen aus dem aktualisierten
         // Cache neu laden; bei aktivierten automatischen Downloads läuft
-        // der Vorlauf auf dem frischen Weiterschauen-Stand.
+        // der Vorlauf auf dem frischen Weiterschauen-Stand. Der Sync kann
+        // Freigaben/Entzüge geändert haben — die Quellen des
+        // Navigationsmenüs werden ebenfalls neu geladen (die
+        // IsLoading-Sperre verhindert überlagerte Läufe).
+        var updated = model with { IsSyncRunning = false };
         var effects = new List<AppEffect> { new LoadHomeListsEffect() };
+        updated = WithSourcesReload(updated, effects);
+
         if (model.ConnectionState == ConnectionState.Connected && model.Settings.AutoDownloadEnabled)
         {
             effects.Add(new RunAutoDownloadsEffect(model.Settings, Force: false));
         }
 
-        return new AppTransition(model with { IsSyncRunning = false }, effects);
+        return new AppTransition(updated, effects);
     }
 
     private static AppTransition UpdateCachedListsChanged(AppModel model)
     {
         // Teil-Synchronisationen (Server-Ereignisse) ändern die
         // Weiterschauen-Liste — der Vorlauf folgt dem neuen Stand.
+        // Aktualisierte Quellen-Freigaben werden fürs Navigationsmenü
+        // nachgeladen (die IsLoading-Sperre verhindert überlagerte Läufe).
         var effects = new List<AppEffect> { new LoadHomeListsEffect() };
+        var updated = WithSourcesReload(model, effects);
+
         if (model.ConnectionState == ConnectionState.Connected && model.Settings.AutoDownloadEnabled)
         {
             effects.Add(new RunAutoDownloadsEffect(model.Settings, Force: false));
         }
 
-        return new AppTransition(model, effects);
+        return new AppTransition(updated, effects);
+    }
+
+    /// <summary>
+    /// Reiht das (Neu-)Laden der Menü-Quellen ein, wenn die App verbunden
+    /// ist und kein Ladevorgang läuft: <see cref="SourcesOverviewState"/>
+    /// erhält <c>IsLoading = true</c> (ein gesetzter Fehler wird
+    /// zurückgesetzt, der Neuversuch soll nicht als Fehlerstand
+    /// erscheinen) und ein <see cref="LoadSourcesEffect"/> wird an
+    /// <paramref name="effects"/> angehängt.
+    /// </summary>
+    /// <param name="model">Aktuelles App-Model.</param>
+    /// <param name="effects">Effektliste des Übergangs, an die der Ladeeffekt angehängt wird.</param>
+    /// <returns>Das ggf. aktualisierte Model; unverändert, wenn kein Ladevorgang angestoßen wird.</returns>
+    private static AppModel WithSourcesReload(AppModel model, List<AppEffect> effects)
+    {
+        if (model.ConnectionState != ConnectionState.Connected || model.SourcesOverview.IsLoading)
+        {
+            return model;
+        }
+
+        effects.Add(new LoadSourcesEffect());
+        return model with
+        {
+            SourcesOverview = model.SourcesOverview with { IsLoading = true, Error = null }
+        };
     }
 
     private static AppTransition UpdateServerEventReceived(AppModel model, ServerEventReceivedMessage message)
@@ -581,7 +632,12 @@ public static class AppUpdate
         {
             ConnectionState = ConnectionState.NeedsLogin,
             LoginError = SessionExpiredError,
-            CurrentPage = AppPage.Login
+            CurrentPage = AppPage.Login,
+            // Quellen und Browsing-Zustand gehören zur abgelaufenen
+            // Sitzung — sie dürfen für den nächsten Benutzer nicht
+            // sichtbar bleiben.
+            SourcesOverview = SourcesOverviewState.Initial,
+            SourceBrowser = SourceBrowserState.Empty
         };
         // Zur Anmeldemaske — die Ereignisverbindung wird getrennt (das
         // abgelaufene Token kann ohnehin nicht mehr autorisiert werden).
@@ -649,30 +705,17 @@ public static class AppUpdate
                 item.ShowId, item.SeasonId, item.EpisodeId)]);
     }
 
-    private static AppTransition UpdateSourcesPageOpened(AppModel model)
+    private static AppTransition UpdateSourcesLoaded(AppModel model, SourcesLoadedMessage message)
     {
-        if (model.IsOffline)
-        {
-            // Offline gibt es keine Quellenliste — der Hinweis wird über
-            // IsOffline gebunden; ein zuvor geladener Stand wird
-            // zurückgesetzt, damit nichts Veraltetes als aktuell erscheint.
-            return model.SourcesOverview == SourcesOverviewState.Initial
-                ? AppTransition.Unchanged(model)
-                : new AppTransition(model with { SourcesOverview = SourcesOverviewState.Initial }, []);
-        }
-
-        if (model.ConnectionState != ConnectionState.Connected || model.SourcesOverview.IsLoading)
+        // Verspätete Antworten eines abgelösten Ladevorgangs (Offline-
+        // Übergang, Abmeldung, Serverwechsel) dürfen die Quellenliste
+        // nicht wieder befüllen — das Menü spiegelt nur den verbundenen
+        // Zustand.
+        if (model.ConnectionState != ConnectionState.Connected)
         {
             return AppTransition.Unchanged(model);
         }
 
-        return new AppTransition(
-            model with { SourcesOverview = SourcesOverviewState.Initial with { IsLoading = true } },
-            [new LoadSourcesEffect()]);
-    }
-
-    private static AppTransition UpdateSourcesLoaded(AppModel model, SourcesLoadedMessage message)
-    {
         return new AppTransition(
             model with
             {
@@ -684,6 +727,18 @@ public static class AppUpdate
                 }
             },
             []);
+    }
+
+    private static AppTransition UpdateSourcesReloadRequested(AppModel model)
+    {
+        // Manueller Neuversuch aus dem Navigationsmenü (Fehler-Eintrag):
+        // außerhalb des verbundenen Zustands oder bei laufendem
+        // Ladevorgang bleibt die Anforderung wirkungslos.
+        var effects = new List<AppEffect>();
+        var updated = WithSourcesReload(model, effects);
+        return ReferenceEquals(updated, model)
+            ? AppTransition.Unchanged(model)
+            : new AppTransition(updated, effects);
     }
 
     private static SourceBrowserState NewBrowser(long sourceId, string sourceName) => new()

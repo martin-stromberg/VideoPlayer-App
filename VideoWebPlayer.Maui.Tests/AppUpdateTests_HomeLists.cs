@@ -74,14 +74,24 @@ public class AppUpdateTests_HomeLists
     {
         // Der Effekt-Handler meldet nach jeder Teil-Synchronisation
         // (Server-Ereignis) diese Nachricht — die Anzeige lädt den
-        // aktualisierten Cache-Stand.
-        var model = ConnectedModel();
+        // aktualisierten Cache-Stand; die Quellen des Navigationsmenüs
+        // werden gleichermaßen aktualisiert.
+        var model = ConnectedModel() with
+        {
+            SourcesOverview = new SourcesOverviewState
+            {
+                Attempted = true,
+                Sources = [new SourceItem { Id = 7, Name = "Filme" }]
+            }
+        };
         var transition = AppUpdate.Update(model, new CachedListsChangedMessage());
 
-        var effect = Assert.Single(transition.Effects);
-        Assert.IsType<LoadHomeListsEffect>(effect);
-        // Das Model bleibt unverändert — nur ein Neu-Laden wird ausgelöst.
-        Assert.Same(model, transition.Model);
+        Assert.Contains(transition.Effects, e => e is LoadHomeListsEffect);
+        Assert.Contains(transition.Effects, e => e is LoadSourcesEffect);
+        // Der Quellen-Lauf läuft an, die bisherigen Einträge bleiben
+        // während des Ladens erhalten.
+        Assert.True(transition.Model.SourcesOverview.IsLoading);
+        Assert.Single(transition.Model.SourcesOverview.Sources);
     }
 
     /// <summary>Prüft ServerEventReceived: bei vollständiger Sequenz → aktualisiert die Listen.</summary>
@@ -101,8 +111,8 @@ public class AppUpdateTests_HomeLists
             syncTransition.Model,
             new CachedListsChangedMessage());
 
-        var effect = Assert.Single(reloadTransition.Effects);
-        Assert.IsType<LoadHomeListsEffect>(effect);
+        Assert.Contains(reloadTransition.Effects, e => e is LoadHomeListsEffect);
+        Assert.Contains(reloadTransition.Effects, e => e is LoadSourcesEffect);
     }
 
     /// <summary>Prüft ServerEventReceived: bildet die Ereignisart auf den passenden Sync-Effekt ab.</summary>

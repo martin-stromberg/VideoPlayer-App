@@ -5,12 +5,14 @@ namespace VideoWebPlayer.Maui.Tests;
 /// <summary>Tests für <c>AppRoutes</c>.</summary>
 public class AppRoutesTests
 {
-    /// <summary>Prüft MenuPages: enthält alle sechs Menüeinträge in definierter Reihenfolge.</summary>
+    /// <summary>Prüft MenuPages: enthält alle fünf Menüeinträge in definierter Reihenfolge.</summary>
     [Fact]
-    public void MenuPages_ContainsAllSixMenuEntriesInOrder()
+    public void MenuPages_ContainsAllFiveMenuEntriesInOrder()
     {
+        // Die Quellen sind dynamische Menüeinträge (je freigegebener
+        // Quelle) und keine eigene Menüseite mehr.
         Assert.Equal(
-            [AppPage.Home, AppPage.Sources, AppPage.Favorites, AppPage.Downloads, AppPage.Profile, AppPage.Settings],
+            [AppPage.Home, AppPage.Favorites, AppPage.Downloads, AppPage.Profile, AppPage.Settings],
             AppRoutes.MenuPages);
     }
 
@@ -39,7 +41,6 @@ public class AppRoutesTests
     /// <param name="expected">Der erwartete Wert.</param>
     [Theory]
     [InlineData("//home", AppPage.Home)]
-    [InlineData("//sources/SourcesPage", AppPage.Sources)]
     [InlineData("//settings?x=1", AppPage.Settings)]
     public void TryGetPage_ResolvesShellLocations(string location, AppPage expected)
     {
@@ -53,6 +54,9 @@ public class AppRoutesTests
     [InlineData(null)]
     [InlineData("")]
     [InlineData("//unknown")]
+    // Die ehemalige Menü-Route „sources" existiert nicht mehr — die
+    // Quellen sind dynamische Menüeinträge ohne eigene Seite.
+    [InlineData("//sources/SourcesPage")]
     public void TryGetPage_UnknownLocation_ReturnsFalse(string? location)
     {
         Assert.False(AppRoutes.TryGetPage(location, out _));

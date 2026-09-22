@@ -40,9 +40,10 @@ public class MvuHostTests
         Assert.False(host.Model.IsStartupRunning);
         // Start (Ablage, Einstellungen, Serverliste, Netzwerk-Monitoring,
         // gecachte Startseiten-Listen), Health-Check, automatische
-        // Anmeldung, dann Ereignisverbindung + Synchronisation +
-        // Download-Wiederaufnahme + Navigation zur Startseite.
-        Assert.Equal(11, handler.Effects.Count);
+        // Anmeldung, dann Quellen-Laden fürs Menü + Ereignisverbindung +
+        // Synchronisation + Download-Wiederaufnahme + Navigation zur
+        // Startseite.
+        Assert.Equal(12, handler.Effects.Count);
         Assert.IsType<InitializeStorageEffect>(handler.Effects[0]);
         Assert.IsType<LoadSettingsEffect>(handler.Effects[1]);
         Assert.IsType<LoadServersEffect>(handler.Effects[2]);
@@ -50,10 +51,11 @@ public class MvuHostTests
         Assert.IsType<LoadHomeListsEffect>(handler.Effects[4]);
         Assert.IsType<CheckServerHealthEffect>(handler.Effects[5]);
         Assert.IsType<AttemptAutoLoginEffect>(handler.Effects[6]);
-        Assert.IsType<ConnectServerEventsEffect>(handler.Effects[7]);
-        Assert.IsType<RunFullSyncEffect>(handler.Effects[8]);
-        Assert.IsType<ResumeDownloadsEffect>(handler.Effects[9]);
-        Assert.IsType<NavigateToPageEffect>(handler.Effects[10]);
+        Assert.IsType<LoadSourcesEffect>(handler.Effects[7]);
+        Assert.IsType<ConnectServerEventsEffect>(handler.Effects[8]);
+        Assert.IsType<RunFullSyncEffect>(handler.Effects[9]);
+        Assert.IsType<ResumeDownloadsEffect>(handler.Effects[10]);
+        Assert.IsType<NavigateToPageEffect>(handler.Effects[11]);
     }
 
     /// <summary>Prüft DispatchAsync: löst die ModelChanged- und PropertyChanged-Ereignisse aus.</summary>

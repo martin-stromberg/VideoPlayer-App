@@ -1,10 +1,11 @@
 namespace VideoPlayer.Mvu;
 
 /// <summary>
-/// Zustand der Quellen-Übersicht (Menüseite „Quellen"): die vom Server
-/// freigegebenen Medienbereiche samt Lade-/Fehlerzustand. Im
-/// Offline-Zustand wird kein Ladevorgang angestoßen — die Seite zeigt
-/// einen Hinweis statt einer leeren Liste.
+/// Zustand der Quellenliste des Navigationsmenüs: die vom Server
+/// freigegebenen Medienbereiche samt Lade-/Fehlerzustand. Geladen wird
+/// zustandsgesteuert beim Verbindungsaufbau sowie nach
+/// (Teil-)Synchronisationen; im Offline-Zustand wird der Stand
+/// zurückgesetzt — das Menü zeigt dann keine Quelleneinträge.
 /// </summary>
 public sealed record SourcesOverviewState
 {

@@ -187,12 +187,6 @@ public sealed record CachedListsChangedMessage : AppMessage;
 /// <returns>Nachricht für die Auswahl.</returns>
 public sealed record MediaItemSelectedMessage(HomeMediaItem Item) : AppMessage;
 
-/// <summary>
-/// Die Quellen-Seite wurde geöffnet bzw. soll (erneut) laden —
-/// im verbundenen Zustand werden die Quellen vom Server geholt.
-/// </summary>
-public sealed record SourcesPageOpenedMessage : AppMessage;
-
 /// <summary>Die Quellenliste wurde geladen (<paramref name="Error"/> bei Fehlschlag).</summary>
 /// <param name="Sources">Die geladenen Quellen.</param>
 /// <param name="Error">Fehlertext bei Fehlschlag; <c>null</c> bei Erfolg.</param>
@@ -200,6 +194,12 @@ public sealed record SourcesPageOpenedMessage : AppMessage;
 public sealed record SourcesLoadedMessage(
     IReadOnlyList<SourceItem> Sources,
     string? Error) : AppMessage;
+
+/// <summary>
+/// Erneutes Laden der Quellenliste angefordert — Auslöser ist der
+/// Fehler-Eintrag im Navigationsmenü nach einem Ladefehlschlag.
+/// </summary>
+public sealed record SourcesReloadRequestedMessage : AppMessage;
 
 /// <summary>Eine Quelle wurde in der Übersicht ausgewählt — Browser initialisieren und öffnen.</summary>
 /// <param name="Source">Die ausgewählte Quelle.</param>

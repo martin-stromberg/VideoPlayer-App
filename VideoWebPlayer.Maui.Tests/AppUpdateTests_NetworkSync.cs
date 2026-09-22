@@ -123,6 +123,9 @@ public class AppUpdateTests_NetworkSync
         Assert.Contains(transition.Effects, e =>
             e is ConnectServerEventsEffect c && c.ServerAddress == Server);
         Assert.Contains(transition.Effects, e => e is RunFullSyncEffect);
+        // Die Quellen des Navigationsmenüs werden mit dem
+        // Verbindungsaufbau geladen.
+        Assert.Contains(transition.Effects, e => e is LoadSourcesEffect);
         Assert.DoesNotContain(transition.Effects, e => e is NavigateToPageEffect);
     }
 
@@ -148,6 +151,7 @@ public class AppUpdateTests_NetworkSync
         Assert.Contains(transition.Effects, e =>
             e is ConnectServerEventsEffect c && c.ServerAddress == Server);
         Assert.Contains(transition.Effects, e => e is RunFullSyncEffect);
+        Assert.Contains(transition.Effects, e => e is LoadSourcesEffect);
         Assert.Contains(transition.Effects, e =>
             e is NavigateToPageEffect n && n.Page == AppPage.Home);
     }
@@ -241,9 +245,10 @@ public class AppUpdateTests_NetworkSync
 
         Assert.False(transition.Model.IsSyncRunning);
         // Nach dem Voll-Sync werden die Startseiten-Listen aus dem
-        // aktualisierten Cache neu geladen.
-        var effect = Assert.Single(transition.Effects);
-        Assert.IsType<LoadHomeListsEffect>(effect);
+        // aktualisierten Cache und die Quellen des Navigationsmenüs
+        // neu geladen.
+        Assert.Contains(transition.Effects, e => e is LoadHomeListsEffect);
+        Assert.Contains(transition.Effects, e => e is LoadSourcesEffect);
     }
 
     /// <summary>Prüft SessionExpired: trennt Events.</summary>

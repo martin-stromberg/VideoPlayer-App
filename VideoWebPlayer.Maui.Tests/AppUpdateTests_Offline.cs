@@ -59,15 +59,27 @@ public class AppUpdateTests_Offline
         Assert.Equal(11, navigation.ShowId);
     }
 
-    /// <summary>Prüft SourcesPageOpened: offline wird keine Quellenliste geladen.</summary>
+    /// <summary>Prüft NetworkLost: aus <c>Connected</c> → setzt den Quellenstand des Menüs zurück.</summary>
     [Fact]
-    public void SourcesPageOpened_Offline_NoLoadEffect()
+    public void NetworkLost_FromConnected_ResetsSourcesOverview()
     {
-        var transition = AppUpdate.Update(
-            OfflineModel() with { CurrentPage = AppPage.Sources },
-            new SourcesPageOpenedMessage());
+        // Offline steht keine Quellenliste zur Verfügung — die Menü-
+        // Einträge werden mit dem Übergang entfernt (kein veralteter
+        // Stand als aktuell).
+        var model = ConnectedModel() with
+        {
+            SourcesOverview = new SourcesOverviewState
+            {
+                Attempted = true,
+                Sources = [new SourceItem { Id = 7, Name = "Filme" }]
+            }
+        };
 
-        Assert.DoesNotContain(transition.Effects, e => e is LoadSourcesEffect);
+        var transition = AppUpdate.Update(model, new NetworkAvailabilityChangedMessage(false));
+
+        Assert.Equal(ConnectionState.Offline, transition.Model.ConnectionState);
+        Assert.Same(SourcesOverviewState.Initial, transition.Model.SourcesOverview);
+        Assert.Contains(transition.Effects, e => e is DisconnectServerEventsEffect);
     }
 
     /// <summary>Prüft ProfilePageOpened: offline wird kein Profilabruf ausgelöst.</summary>

@@ -94,7 +94,6 @@ namespace VideoPlayer.Maui
             builder.Services.AddSingleton<AppShell>();
             builder.Services.AddTransient<Pages.LoadingPage>();
             builder.Services.AddTransient<Pages.HomePage>();
-            builder.Services.AddTransient<Pages.SourcesPage>();
             builder.Services.AddTransient<Pages.FavoritesPage>();
             builder.Services.AddTransient<Pages.DownloadsPage>();
             builder.Services.AddTransient<Pages.ProfilePage>();

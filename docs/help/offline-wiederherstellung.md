@@ -38,8 +38,9 @@ Wiederanmelde-/Offline-Zustand.
   fehlende erscheinen abgedunkelt mit „Nicht heruntergeladen" und
   ohne Abspiel-/Download-Schalter.
 - Serverseitige Aktionen (Favorit umschalten, Download starten) sind
-  im Offline-Snapshot ausgeblendet; die Quellen-Seite lädt offline
-  nichts.
+  im Offline-Snapshot ausgeblendet; die Quellen-Einträge des Menüs
+  werden offline entfernt — ohne Verbindung steht keine Quellenliste
+  zur Verfügung.
 
 ## Profilseite offline
 

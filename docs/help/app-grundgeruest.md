@@ -16,17 +16,19 @@ Entwicklungsschritten.
 
 ## Hauptnavigation
 
-Die Hauptnavigation ist ein Seitenmenü (Hamburger-Menü) mit sechs Einträgen:
+Die Hauptnavigation ist ein Seitenmenü (Hamburger-Menü) mit fünf festen
+Einträgen:
 
 - **Startseite** — Einstieg und Serverstatus.
-- **Quellen** — Übersicht der Videoquellen (Platzhalter).
 - **Favoriten** — gemerkte Inhalte (Platzhalter).
 - **Downloads** — lokal gespeicherte Inhalte (Platzhalter).
 - **Profil** — Benutzerprofil (Platzhalter).
 - **Einstellungen** — App-Einstellungen (Platzhalter).
 
 Jeder Eintrag öffnet eine eigene Seite. Die Seiten enthalten in diesem Schritt
-nur ihren Titel und einen kurzen Hinweis auf den späteren Zweck.
+nur ihren Titel und einen kurzen Hinweis auf den späteren Zweck. Die freigegebenen
+Quellen des Servers erscheinen als dynamische Menüeinträge hinter der
+Startseite (siehe `quellen-browsing-details.md`).
 
 ## Serveradresse
 

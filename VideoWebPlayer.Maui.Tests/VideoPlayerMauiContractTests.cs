@@ -14,10 +14,12 @@ public class VideoPlayerMauiContractTests
     private static readonly string Root = RepositoryRoot.Find();
     private static readonly XNamespace MauiNs = "http://schemas.microsoft.com/dotnet/2021/maui";
 
+    // Die Quellen stehen als dynamische Einträge je freigegebener Quelle
+    // im Menü (aufgebaut in AppShell.xaml.cs) — die statischen
+    // FlyoutItem-Einträge sind nur die fünf Menüseiten.
     private static readonly (string Title, AppPage Page)[] ExpectedMenuEntries =
     [
         ("Startseite", AppPage.Home),
-        ("Quellen", AppPage.Sources),
         ("Favoriten", AppPage.Favorites),
         ("Downloads", AppPage.Downloads),
         ("Profil", AppPage.Profile),

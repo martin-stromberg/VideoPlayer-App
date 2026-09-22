@@ -112,7 +112,12 @@ public sealed record AppModel
     /// <summary>Mindestens eine Startseiten-Liste enthält Einträge.</summary>
     public bool HasHomeContent => HasContinueWatching || HasFavorites || HasRecentEntries;
 
-    /// <summary>Zustand der Quellen-Übersicht (Menüseite „Quellen").</summary>
+    /// <summary>
+    /// Freigegebene Quellen des angemeldeten Benutzers — Träger der
+    /// dynamischen Quellen-Einträge im Navigationsmenü. Die Befüllung ist
+    /// zustandsgesteuert (Verbindungsaufbau, Synchronisation) und erfolgt
+    /// nicht über eine eigene Seite.
+    /// </summary>
     public SourcesOverviewState SourcesOverview { get; init; } = SourcesOverviewState.Initial;
 
     /// <summary>Zustand der Quellen-Browsing-Seite (geöffnete Quelle, Filter, Paging).</summary>

@@ -11,7 +11,6 @@ public static class AppRoutes
         new Dictionary<AppPage, string>
         {
             [AppPage.Home] = "home",
-            [AppPage.Sources] = "sources",
             [AppPage.Favorites] = "favorites",
             [AppPage.Downloads] = "downloads",
             [AppPage.Profile] = "profile",
@@ -22,7 +21,6 @@ public static class AppRoutes
     public static IReadOnlyList<AppPage> MenuPages { get; } =
     [
         AppPage.Home,
-        AppPage.Sources,
         AppPage.Favorites,
         AppPage.Downloads,
         AppPage.Profile,
@@ -44,7 +42,7 @@ public static class AppRoutes
     }
 
     /// <summary>
-    /// Ermittelt zu einem Shell-Navigationsziel (z. B. <c>//sources/SourcesPage</c>)
+    /// Ermittelt zu einem Shell-Navigationsziel (z. B. <c>//favorites/FavoritesPage</c>)
     /// die zugehörige Menüseite.
     /// </summary>
     /// <param name="location">Das Shell-Navigationsziel (Pfad mit optionalen Query-Parametern).</param>

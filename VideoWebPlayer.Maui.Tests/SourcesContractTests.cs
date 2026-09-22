@@ -17,30 +17,120 @@ public class SourcesContractTests
     private static string Read(params string[] parts) =>
         File.ReadAllText(Path.Combine(new[] { Root }.Concat(parts).ToArray()));
 
-    /// <summary>Prüft SourcesPage: zeigt Quellen mit Icons und Offline-Hinweis.</summary>
+    /// <summary>Prüft AppShell: baut die Quellen-Menüeinträge dynamisch aus dem Model auf.</summary>
     [Fact]
-    public void SourcesPage_ShowsSources_WithIcons_AndOfflineHint()
+    public void AppShell_BuildsSourceMenuItems_FromModel()
     {
-        var xaml = Read("VideoPlayer.Maui", "Pages", "SourcesPage.xaml");
+        var code = Read("VideoPlayer.Maui", "AppShell.xaml.cs");
 
-        // Quellenliste mit Icon + Name, Offline-Banner und Fehler-Retry.
-        Assert.Contains("{Binding Model.SourcesOverview.Sources}", xaml, StringComparison.Ordinal);
-        Assert.Contains("CachedSourceIconImage", xaml, StringComparison.Ordinal);
-        Assert.Contains("{Binding IconPictureId}", xaml, StringComparison.Ordinal);
-        Assert.Contains("OfflineBanner", xaml, StringComparison.Ordinal);
-        Assert.Contains("Offline", xaml, StringComparison.Ordinal);
-        Assert.Contains("RetryButton", xaml, StringComparison.Ordinal);
+        // ModelChanged-Abonnement, Quellenstand aus dem Model, Einträge
+        // als MenuItem mit eigenem Sektions-Template für die Überschrift
+        // „Quellen", positionsabhängiges Einfügen/Entfernen, Dispatch der
+        // Auswahl-Message und Icon-Auflösung über den PosterImageService.
+        Assert.Contains("ModelChanged", code, StringComparison.Ordinal);
+        Assert.Contains("SourcesOverview", code, StringComparison.Ordinal);
+        Assert.Contains("MenuItem", code, StringComparison.Ordinal);
+        Assert.Contains("SetMenuItemTemplate", code, StringComparison.Ordinal);
+        Assert.Contains("Items.Insert", code, StringComparison.Ordinal);
+        Assert.Contains("Items.Remove", code, StringComparison.Ordinal);
+        Assert.Contains("SourceSelectedMessage", code, StringComparison.Ordinal);
+        Assert.Contains("GetSourceIconSourceAsync", code, StringComparison.Ordinal);
     }
 
-    /// <summary>Prüft SourcesPage: dispatcht die Öffnen- und Auswahl-Nachrichten.</summary>
+    /// <summary>Prüft AppShell: der gerenderte Stand wird erst nach erfolgreichem Aufbau markiert und der UI-Callback ist abgesichert.</summary>
     [Fact]
-    public void SourcesPage_DispatchesOpenAndSelection()
+    public void AppShell_MarksRenderedStateOnlyAfterSuccessfulBuild()
     {
-        var code = Read("VideoPlayer.Maui", "Pages", "SourcesPage.xaml.cs");
+        var code = Read("VideoPlayer.Maui", "AppShell.xaml.cs");
 
-        Assert.Contains("SourcesPageOpenedMessage", code, StringComparison.Ordinal);
-        Assert.Contains("SourceSelectedMessage", code, StringComparison.Ordinal);
-        Assert.Contains("DispatchAsync", code, StringComparison.Ordinal);
+        // Der Main-Thread-Callback liest das Model zum Ausführungszeitpunkt
+        // (kein Snapshot-Capture im Event-Handler) und fängt Ausnahmen —
+        // renderedSources darf erst nach InsertSourceMenuItems gesetzt
+        // werden, sonst pinnt ein halb aufgebautes Menü.
+        Assert.Contains("BeginInvokeOnMainThread(UpdateSourceMenuItemsSafe)", code, StringComparison.Ordinal);
+        Assert.Contains("UpdateSourceMenuItems(mvuHost.Model)", code, StringComparison.Ordinal);
+        var update = code[(code.IndexOf("private void UpdateSourceMenuItems(AppModel model)", StringComparison.Ordinal))..];
+        var insert = update.IndexOf("InsertSourceMenuItems(overview", StringComparison.Ordinal);
+        var mark = update.IndexOf("renderedSources = overview.Sources", StringComparison.Ordinal);
+        Assert.True(insert > 0 && mark > insert);
+    }
+
+    /// <summary>Prüft AppShell: die Quellenauswahl schließt das Flyout — MenuItem-Aktivierungen tun das nicht selbst.</summary>
+    [Fact]
+    public void AppShell_ClosesFlyout_OnSourceSelection()
+    {
+        var code = Read("VideoPlayer.Maui", "AppShell.xaml.cs");
+
+        // Shell.OnFlyoutItemSelectedAsync returnt für MenuShellItem vor
+        // dem FlyoutIsPresented=false — ohne explizites Schließen bliebe
+        // das Menü über der geschobenen Übersichtsseite geöffnet. Der
+        // Retry-Eintrag schließt bewusst nicht: ohne Seitenwechsel ist
+        // die Zeilenaktualisierung die Bestätigung — daher genau ein
+        // Vorkommen (Quellen-Eintrag).
+        Assert.Contains("FlyoutIsPresented = false", code, StringComparison.Ordinal);
+        Assert.Equal(1, code.Split("FlyoutIsPresented").Length - 1);
+    }
+
+    /// <summary>Prüft AppShell: Lade- und Leerstand bekommen eine nicht-klickbare Statuszeile.</summary>
+    [Fact]
+    public void AppShell_ShowsStatusRows_ForLoadingAndEmpty()
+    {
+        var code = Read("VideoPlayer.Maui", "AppShell.xaml.cs");
+
+        Assert.Contains("Quellen werden geladen", code, StringComparison.Ordinal);
+        Assert.Contains("Keine Quellen freigegeben", code, StringComparison.Ordinal);
+        Assert.Contains("overview.IsLoading", code, StringComparison.Ordinal);
+        Assert.Contains("overview.ShowEmpty", code, StringComparison.Ordinal);
+        Assert.Contains("sourceInfoTemplate", code, StringComparison.Ordinal);
+    }
+
+    /// <summary>Prüft AppShell: bei Ladefehlschlag steht ein klickbarer Neuversuch-Eintrag im Menü.</summary>
+    [Fact]
+    public void AppShell_ShowsRetryEntry_OnSourcesError()
+    {
+        var code = Read("VideoPlayer.Maui", "AppShell.xaml.cs");
+
+        Assert.Contains("overview.HasError", code, StringComparison.Ordinal);
+        Assert.Contains("erneut versuchen", code, StringComparison.Ordinal);
+        Assert.Contains("SourcesReloadRequestedMessage", code, StringComparison.Ordinal);
+    }
+
+    /// <summary>Prüft AppShell: Sektions-, Fehler- und Status-Templates für die Quellengruppe sind definiert.</summary>
+    [Fact]
+    public void AppShell_DefinesSourceSectionAndErrorTemplates()
+    {
+        var xaml = Read("VideoPlayer.Maui", "AppShell.xaml");
+
+        Assert.Contains("x:Key=\"SourceSectionTemplate\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("x:Key=\"SourceErrorTemplate\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("x:Key=\"SourceInfoTemplate\"", xaml, StringComparison.Ordinal);
+    }
+
+    /// <summary>Prüft AppShell: enthält keinen statischen Quellen-Eintrag mehr — nur fünf FlyoutItems.</summary>
+    [Fact]
+    public void AppShell_HasNoStaticSourcesFlyoutItem()
+    {
+        var xaml = Read("VideoPlayer.Maui", "AppShell.xaml");
+
+        Assert.DoesNotContain("Route=\"sources\"", xaml, StringComparison.Ordinal);
+        Assert.DoesNotContain("Title=\"Quellen\"", xaml, StringComparison.Ordinal);
+
+        var document = System.Xml.Linq.XDocument.Parse(xaml);
+        var ns = System.Xml.Linq.XNamespace.Get("http://schemas.microsoft.com/dotnet/2021/maui");
+        Assert.Equal(5, document.Root!.Elements(ns + "FlyoutItem").Count());
+    }
+
+    /// <summary>Prüft MauiProgram/Shell: der PosterImageService ist für die Icon-Auflösung des Menüs verdrahtet.</summary>
+    [Fact]
+    public void MauiProgram_RegistersPosterImageServiceForShell()
+    {
+        var program = Read("VideoPlayer.Maui", "MauiProgram.cs");
+        var shell = Read("VideoPlayer.Maui", "AppShell.xaml.cs");
+
+        Assert.Contains("AddSingleton<PosterImageService>", program, StringComparison.Ordinal);
+        Assert.Contains("AddSingleton<AppShell>", program, StringComparison.Ordinal);
+        Assert.DoesNotContain("SourcesPage", program, StringComparison.Ordinal);
+        Assert.Contains("PosterImageService", shell, StringComparison.Ordinal);
     }
 
     /// <summary>Prüft SourceOverviewPage: hat Genre-Bar, Suche und ein inkrementelles Raster.</summary>

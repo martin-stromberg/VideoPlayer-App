@@ -1,26 +1,38 @@
 # Quellen-Browsing und Medien-Detailseiten (Entwicklungsschritt 8)
 
-Die Menüseite **„Quellen"** der neuen VideoPlayer-App zeigt die vom
-Server freigegebenen Medienbereiche und führt in die Detailseiten für
-Filme, Filmkollektionen, Serien, Staffeln und Episoden — im Muster der
-alten App, vollständig über den MVU-Kreislauf gesteuert.
+Die vom Server freigegebenen Medienbereiche erscheinen als eigene
+Einträge **direkt im Navigationsmenü** der neuen VideoPlayer-App und
+führen in die Detailseiten für Filme, Filmkollektionen, Serien,
+Staffeln und Episoden — im Muster der alten App, vollständig über den
+MVU-Kreislauf gesteuert.
 
-## Quellen-Übersicht
+## Quellen im Menü
 
-- Beim Öffnen wird die Liste **live vom Server** geladen
-  (`api/Sources`); jede Quelle erscheint als Karte mit Icon
-  (`api/sourceicons/{id}`) und Name.
-- **Offline** steht keine Quellenliste zur Verfügung: statt einer
-  leeren oder veralteten Liste zeigt die Seite das bekannte gelbe
-  Banner mit einem klaren Hinweis.
-- Ladefehler zeigen eine Meldung mit Schaltfläche **„Erneut laden"**;
-  eine erfolgreiche, aber leere Antwort zeigt „Keine Quellen
-  freigegeben.".
+- Hinter dem Eintrag **„Startseite"** steht im Seitenmenü die
+  Sektionsüberschrift **„Quellen"** (als Abschnittstitel formatiert);
+  darunter erhält jede freigegebene Quelle einen eigenen Menüeintrag
+  mit Name und — sofern vorhanden — Icon (`api/sourceicons/{id}`).
+- Die Quellenliste wird **live vom Server** geladen (`api/Sources`):
+  beim Verbindungsaufbau sowie nach (Teil-)Synchronisationen, sodass
+  Freigaben und Entzüge ohne App-Neustart sichtbar werden.
+- Während des (Erst-)Ladens zeigt die Sektion die Statuszeile
+  **„Quellen werden geladen …"**; bei einem Nachladevorgang bleiben
+  bereits vorhandene Einträge stattdessen sichtbar.
+- **Offline** steht keine Quellenliste zur Verfügung: beim Übergang in
+  den Offline-Zustand werden die Quelleneinträge aus dem Menü entfernt.
+- Sind keine Quellen freigegeben, steht unter der Überschrift die
+  Statuszeile **„Keine Quellen freigegeben"**.
+- Schlägt das Laden fehl, erscheint unter der Überschrift der
+  klickbare Eintrag **„Quellen konnten nicht geladen werden — erneut
+  versuchen"** (rot hervorgehoben), der den Ladevorgang erneut
+  anstößt — das Seitenmenü bleibt dabei geöffnet und der Rest des
+  Menüs funktionsfähig.
 
 ## Browsing einer Quelle
 
-Die Auswahl einer Quelle öffnet die Übersichtsseite (Shell-Route
-`sourceoverview`, auf den Navigationsstack geschoben):
+Die Auswahl einer Quelle schließt das Seitenmenü und öffnet die
+Übersichtsseite (Shell-Route `sourceoverview`, auf den
+Navigationsstack geschoben):
 
 - **Genre-Leiste:** horizontal, mit vorangestelltem Eintrag **„Alle"**
   (kein Filter); das gewählte Genre ist hervorgehoben. Ein Wechsel
@@ -70,12 +82,14 @@ Startseiten-Listen).
 ## Architektur-Einordnung
 
 - Zustand liegt in drei unveränderlichen Records im `AppModel`:
-  `SourcesOverview` (Quellenliste), `SourceBrowser` (geöffnete Quelle
-  mit Filter/Suche/Paging) und `MediaDetails` (Detailansicht inkl.
-  Favoriten-Umschaltung).
+  `SourcesOverview` (Quellen des Navigationsmenüs), `SourceBrowser`
+  (geöffnete Quelle mit Filter/Suche/Paging) und `MediaDetails`
+  (Detailansicht inkl. Favoriten-Umschaltung). Die `AppShell` abonniert
+  `MvuHost.ModelChanged` und baut die Menüeinträge bei geändertem
+  Quellenstand neu auf.
 - Plattformneutrale Dienste in `VideoPlayer.Mvu`:
   `SourceBrowserService` (Quellen/Genres/Einträge), `MediaDetailsService`
   (Detail-Mapping je Typ), `FavoritesService` (Toggle + Cache-Sync).
 - Quellen-Icons und Poster nutzen die lokale Vorschaubild-Ablage
-  (`previews/`, nicht backup-pflichtig) über `PosterImageService` und
-  die Controls `CachedSourceIconImage`/`CachedPosterImage`.
+  (`previews/`, nicht backup-pflichtig) über `PosterImageService`
+  (Menüeinträge) bzw. das Control `CachedPosterImage`.

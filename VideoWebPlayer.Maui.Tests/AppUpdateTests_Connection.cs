@@ -83,14 +83,17 @@ public class AppUpdateTests_Connection
         Assert.Equal("martin", transition.Model.LoginUsername);
         Assert.Null(transition.Model.LoginError);
         Assert.Equal(AppPage.Home, transition.Model.CurrentPage);
-        // Verbundener Zustand: Ereignisverbindung + Voll-Sync +
-        // Download-Wiederaufnahme + Navigation.
+        // Verbundener Zustand: Quellen-Laden fürs Menü +
+        // Ereignisverbindung + Voll-Sync + Download-Wiederaufnahme +
+        // Navigation.
         Assert.True(transition.Model.IsSyncRunning);
-        Assert.Equal(4, transition.Effects.Count);
-        Assert.IsType<ConnectServerEventsEffect>(transition.Effects[0]);
-        Assert.IsType<RunFullSyncEffect>(transition.Effects[1]);
-        Assert.IsType<ResumeDownloadsEffect>(transition.Effects[2]);
-        var navigate = Assert.IsType<NavigateToPageEffect>(transition.Effects[3]);
+        Assert.True(transition.Model.SourcesOverview.IsLoading);
+        Assert.Equal(5, transition.Effects.Count);
+        Assert.IsType<LoadSourcesEffect>(transition.Effects[0]);
+        Assert.IsType<ConnectServerEventsEffect>(transition.Effects[1]);
+        Assert.IsType<RunFullSyncEffect>(transition.Effects[2]);
+        Assert.IsType<ResumeDownloadsEffect>(transition.Effects[3]);
+        var navigate = Assert.IsType<NavigateToPageEffect>(transition.Effects[4]);
         Assert.Equal(AppPage.Home, navigate.Page);
     }
 
@@ -228,11 +231,12 @@ public class AppUpdateTests_Connection
         Assert.Equal(ConnectionState.Connected, transition.Model.ConnectionState);
         Assert.Equal(AppPage.Home, transition.Model.CurrentPage);
         Assert.True(transition.Model.IsSyncRunning);
-        Assert.Equal(4, transition.Effects.Count);
-        Assert.IsType<ConnectServerEventsEffect>(transition.Effects[0]);
-        Assert.IsType<RunFullSyncEffect>(transition.Effects[1]);
-        Assert.IsType<ResumeDownloadsEffect>(transition.Effects[2]);
-        var navigate = Assert.IsType<NavigateToPageEffect>(transition.Effects[3]);
+        Assert.Equal(5, transition.Effects.Count);
+        Assert.IsType<LoadSourcesEffect>(transition.Effects[0]);
+        Assert.IsType<ConnectServerEventsEffect>(transition.Effects[1]);
+        Assert.IsType<RunFullSyncEffect>(transition.Effects[2]);
+        Assert.IsType<ResumeDownloadsEffect>(transition.Effects[3]);
+        var navigate = Assert.IsType<NavigateToPageEffect>(transition.Effects[4]);
         Assert.Equal(AppPage.Home, navigate.Page);
     }
 
@@ -284,6 +288,31 @@ public class AppUpdateTests_Connection
         Assert.IsType<DisconnectServerEventsEffect>(transition.Effects[0]);
         var navigate = Assert.IsType<NavigateToPageEffect>(transition.Effects[1]);
         Assert.Equal(AppPage.Login, navigate.Page);
+    }
+
+    /// <summary>Prüft SessionExpired: setzt Quellen- und Browser-Zustand der abgelaufenen Sitzung zurück.</summary>
+    [Fact]
+    public void SessionExpired_ResetsSourcesOverviewAndBrowser()
+    {
+        var model = new AppModel
+        {
+            CurrentPage = AppPage.Home,
+            ConnectionState = ConnectionState.Connected,
+            ActiveServerAddress = Server,
+            SourcesOverview = new SourcesOverviewState
+            {
+                Attempted = true,
+                Sources = [new SourceItem { Id = 7, Name = "Filme" }]
+            },
+            SourceBrowser = new SourceBrowserState { SourceId = 7, SourceName = "Filme" }
+        };
+
+        var transition = AppUpdate.Update(model, new SessionExpiredMessage());
+
+        // Die Quellen der abgelaufenen Sitzung dürfen für den nächsten
+        // Benutzer nicht sichtbar bleiben.
+        Assert.Same(SourcesOverviewState.Initial, transition.Model.SourcesOverview);
+        Assert.Same(SourceBrowserState.Empty, transition.Model.SourceBrowser);
     }
 
     /// <summary>Prüft SessionExpired: bei <c>WhenAlreadyNeedsLogin</c> → keine Effekte.</summary>
@@ -360,7 +389,7 @@ public class AppUpdateTests_Connection
             ActiveServerAddress = Server
         };
 
-        var transition = AppUpdate.Update(model, new NavigatedMessage(AppPage.Sources));
+        var transition = AppUpdate.Update(model, new NavigatedMessage(AppPage.Favorites));
 
         Assert.Equal(expectedTarget, transition.Model.CurrentPage);
         var navigate = Assert.IsType<NavigateToPageEffect>(Assert.Single(transition.Effects));
@@ -409,5 +438,31 @@ public class AppUpdateTests_Connection
         Assert.IsType<PersistActiveServerEffect>(transition.Effects[0]);
         var autoLogin = Assert.IsType<AttemptAutoLoginEffect>(transition.Effects[1]);
         Assert.Equal("http://neu/videoplayer/", autoLogin.ServerAddress);
+    }
+
+    /// <summary>Prüft ServerCheckCompleted: im Erfolgspfad → setzt Quellen- und Browser-Zustand zurück.</summary>
+    [Fact]
+    public void ServerCheckCompleted_Success_ResetsSourcesOverviewAndBrowser()
+    {
+        // Serverwechsel: die Quellen des bisherigen Servers verlieren
+        // ihre Gültigkeit, bis EnterConnected den neuen Stand lädt.
+        var model = new AppModel
+        {
+            CurrentPage = AppPage.ServerSetup,
+            IsServerCheckRunning = true,
+            SourcesOverview = new SourcesOverviewState
+            {
+                Attempted = true,
+                Sources = [new SourceItem { Id = 7, Name = "Filme" }]
+            },
+            SourceBrowser = new SourceBrowserState { SourceId = 7, SourceName = "Filme" }
+        };
+
+        var transition = AppUpdate.Update(
+            model,
+            new ServerCheckCompletedMessage("http://neu/videoplayer/", "Neuer Server", true));
+
+        Assert.Same(SourcesOverviewState.Initial, transition.Model.SourcesOverview);
+        Assert.Same(SourceBrowserState.Empty, transition.Model.SourceBrowser);
     }
 }

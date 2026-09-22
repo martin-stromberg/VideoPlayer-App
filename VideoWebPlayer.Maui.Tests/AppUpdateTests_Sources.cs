@@ -21,65 +21,121 @@ public class AppUpdateTests_Sources
     private static SourceMediaItem Item(long id) =>
         new() { Id = id, Title = $"Eintrag {id}", MediaType = "moviecollection" };
 
-    // --- Quellenliste ---
+    // --- Quellenliste (Navigationsmenü) ---
 
-    /// <summary>Prüft SourcesPageOpened: bei <c>Connected</c> → startet das Laden.</summary>
+    /// <summary>Prüft EnterConnected: startet das Quellen-Laden fürs Menü und behält bisherige Einträge.</summary>
     [Fact]
-    public void SourcesPageOpened_Connected_StartsLoading()
+    public void EnterConnected_StartsSourcesLoad()
     {
-        var transition = AppUpdate.Update(Connected(), new SourcesPageOpenedMessage());
-
-        Assert.True(transition.Model.SourcesOverview.IsLoading);
-        var effect = Assert.Single(transition.Effects);
-        Assert.IsType<LoadSourcesEffect>(effect);
-    }
-
-    /// <summary>Prüft SourcesPageOpened: bei Offline → kein Request und der Zustand wird zurückgesetzt.</summary>
-    [Fact]
-    public void SourcesPageOpened_Offline_NoRequestAndStateReset()
-    {
-        // Offline steht keine Quellenliste zur Verfügung — kein Request,
-        // ein alter Stand wird zurückgesetzt (kein veralteter Erfolgszustand).
         var model = new AppModel
         {
-            ConnectionState = ConnectionState.Offline,
+            ConnectionState = ConnectionState.Connecting,
+            ActiveServerAddress = "http://nas/videoplayer/",
+            CurrentPage = AppPage.Loading,
             SourcesOverview = new SourcesOverviewState
             {
                 Attempted = true,
-                Sources = [Source()]
+                Sources = [Source(3, "Archiv")]
             }
         };
 
-        var transition = AppUpdate.Update(model, new SourcesPageOpenedMessage());
+        var transition = AppUpdate.Update(
+            model,
+            new AutoLoginCompletedMessage(AuthAttemptStatus.Succeeded, "martin"));
 
-        Assert.Empty(transition.Effects);
-        Assert.False(transition.Model.SourcesOverview.Attempted);
-        Assert.Empty(transition.Model.SourcesOverview.Sources);
+        Assert.True(transition.Model.SourcesOverview.IsLoading);
+        Assert.Null(transition.Model.SourcesOverview.Error);
+        // Die bisherigen Einträge bleiben während des Ladens sichtbar.
+        var retained = Assert.Single(transition.Model.SourcesOverview.Sources);
+        Assert.Equal(3, retained.Id);
+        Assert.Contains(transition.Effects, e => e is LoadSourcesEffect);
     }
 
-    /// <summary>Prüft SourcesPageOpened: bei <c>NotConnected</c> → kein Request.</summary>
+    /// <summary>Prüft SynchronizationCompleted: bei <c>Connected</c> → lädt die Menü-Quellen neu.</summary>
     [Fact]
-    public void SourcesPageOpened_NotConnected_NoRequest()
+    public void SynchronizationCompleted_WhenConnected_ReloadsSources()
     {
-        var model = new AppModel { ConnectionState = ConnectionState.Connecting };
+        var transition = AppUpdate.Update(
+            Connected(),
+            new SynchronizationCompletedMessage(new SyncResult(0, 0, true, true, true)));
 
-        var transition = AppUpdate.Update(model, new SourcesPageOpenedMessage());
-
-        Assert.Same(model, transition.Model);
-        Assert.Empty(transition.Effects);
+        Assert.True(transition.Model.SourcesOverview.IsLoading);
+        Assert.Contains(transition.Effects, e => e is LoadSourcesEffect);
+        Assert.Contains(transition.Effects, e => e is LoadHomeListsEffect);
     }
 
-    /// <summary>Prüft SourcesPageOpened: bei <c>AlreadyLoading</c> → kein zweiter Ladevorgang.</summary>
+    /// <summary>Prüft SynchronizationCompleted: bei laufendem Quellen-Lauf → kein zweiter Ladevorgang.</summary>
     [Fact]
-    public void SourcesPageOpened_AlreadyLoading_NoSecondRun()
+    public void SynchronizationCompleted_WhileSourcesLoading_NoDuplicate()
     {
         var model = Connected() with
         {
             SourcesOverview = SourcesOverviewState.Initial with { IsLoading = true }
         };
 
-        var transition = AppUpdate.Update(model, new SourcesPageOpenedMessage());
+        var transition = AppUpdate.Update(
+            model,
+            new SynchronizationCompletedMessage(new SyncResult(0, 0, true, true, true)));
 
+        Assert.DoesNotContain(transition.Effects, e => e is LoadSourcesEffect);
+    }
+
+    /// <summary>Prüft CachedListsChanged: bei <c>Connected</c> → lädt die Menü-Quellen neu.</summary>
+    [Fact]
+    public void CachedListsChanged_WhenConnected_ReloadsSources()
+    {
+        var transition = AppUpdate.Update(Connected(), new CachedListsChangedMessage());
+
+        Assert.True(transition.Model.SourcesOverview.IsLoading);
+        Assert.Contains(transition.Effects, e => e is LoadSourcesEffect);
+        Assert.Contains(transition.Effects, e => e is LoadHomeListsEffect);
+    }
+
+    /// <summary>Prüft CachedListsChanged: bei laufendem Quellen-Lauf → kein zweiter Ladevorgang.</summary>
+    [Fact]
+    public void CachedListsChanged_WhileSourcesLoading_NoDuplicate()
+    {
+        var model = Connected() with
+        {
+            SourcesOverview = SourcesOverviewState.Initial with { IsLoading = true }
+        };
+
+        var transition = AppUpdate.Update(model, new CachedListsChangedMessage());
+
+        Assert.DoesNotContain(transition.Effects, e => e is LoadSourcesEffect);
+    }
+
+    /// <summary>Prüft CachedListsChanged: bei <c>NotConnected</c> → kein Quellen-Ladevorgang.</summary>
+    [Fact]
+    public void CachedListsChanged_WhenNotConnected_NoSourcesLoad()
+    {
+        var model = Connected() with
+        {
+            ConnectionState = ConnectionState.Offline,
+            IsOnline = false
+        };
+
+        var transition = AppUpdate.Update(model, new CachedListsChangedMessage());
+
+        Assert.DoesNotContain(transition.Effects, e => e is LoadSourcesEffect);
+    }
+
+    /// <summary>Prüft SourcesLoaded: außerhalb von <c>Connected</c> → wird verworfen.</summary>
+    /// <param name="state">Der Verbindungszustand.</param>
+    [Theory]
+    [InlineData(ConnectionState.Offline)]
+    [InlineData(ConnectionState.NeedsLogin)]
+    public void SourcesLoaded_WhenNotConnected_IsIgnored(ConnectionState state)
+    {
+        // Verspätete Antwort eines abgelösten Ladevorgangs — das
+        // Offline-/Abmelde-Menü darf nicht wieder befüllt werden.
+        var model = Connected() with { ConnectionState = state };
+
+        var transition = AppUpdate.Update(
+            model,
+            new SourcesLoadedMessage([Source(1, "Filme")], null));
+
+        Assert.Same(model, transition.Model);
         Assert.Empty(transition.Effects);
     }
 
@@ -111,6 +167,68 @@ public class AppUpdateTests_Sources
 
         Assert.True(transition.Model.SourcesOverview.HasError);
         Assert.False(transition.Model.SourcesOverview.ShowEmpty);
+    }
+
+    // --- Manueller Neuversuch aus dem Menü (Fehler-Eintrag) ---
+
+    /// <summary>Prüft SourcesReloadRequested: bei <c>Connected</c> → startet den Ladevorgang erneut und löscht den Fehler.</summary>
+    [Fact]
+    public void SourcesReloadRequested_WhenConnected_ReloadsAndClearsError()
+    {
+        var model = Connected() with
+        {
+            SourcesOverview = new SourcesOverviewState
+            {
+                Attempted = true,
+                Error = "Die Quellen konnten nicht geladen werden."
+            }
+        };
+
+        var transition = AppUpdate.Update(model, new SourcesReloadRequestedMessage());
+
+        Assert.True(transition.Model.SourcesOverview.IsLoading);
+        Assert.Null(transition.Model.SourcesOverview.Error);
+        Assert.IsType<LoadSourcesEffect>(Assert.Single(transition.Effects));
+    }
+
+    /// <summary>Prüft SourcesReloadRequested: außerhalb von <c>Connected</c> → wird ignoriert.</summary>
+    /// <param name="state">Der Verbindungszustand.</param>
+    [Theory]
+    [InlineData(ConnectionState.Offline)]
+    [InlineData(ConnectionState.NeedsLogin)]
+    public void SourcesReloadRequested_WhenNotConnected_IsIgnored(ConnectionState state)
+    {
+        // Der Neuversuch-Eintrag existiert nur im verbundenen Menü —
+        // verspätete Dispatches dürfen offline keinen Lauf auslösen.
+        var model = Connected() with
+        {
+            ConnectionState = state,
+            SourcesOverview = new SourcesOverviewState
+            {
+                Attempted = true,
+                Error = "Fehler"
+            }
+        };
+
+        var transition = AppUpdate.Update(model, new SourcesReloadRequestedMessage());
+
+        Assert.Same(model, transition.Model);
+        Assert.Empty(transition.Effects);
+    }
+
+    /// <summary>Prüft SourcesReloadRequested: bei laufendem Ladevorgang → kein zweiter Lauf.</summary>
+    [Fact]
+    public void SourcesReloadRequested_WhileLoading_NoDuplicate()
+    {
+        var model = Connected() with
+        {
+            SourcesOverview = SourcesOverviewState.Initial with { IsLoading = true }
+        };
+
+        var transition = AppUpdate.Update(model, new SourcesReloadRequestedMessage());
+
+        Assert.Same(model, transition.Model);
+        Assert.Empty(transition.Effects);
     }
 
     // --- Quellenwahl / Browser ---
