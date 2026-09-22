@@ -13,8 +13,8 @@ Issue: #9
 | [x] | 5 | Grobe Projektplanung (Unteragent) | `project-plan.md` |
 | [x] | 5a | Offene Punkte prüfen und ggf. Planung wiederholen | `project-plan.md` (aktualisiert, alle 15 Punkte durch Nutzer geklärt) |
 | [x] | 5b | Projektplan gegen Anforderung prüfen (Unteragent) | `project-plan-check.md` → Projektplan vollständig |
-| [ ] | 5c | Planungscommit | – |
-| [ ] | 6 | Entwicklungsschritte-Tracking anlegen | `steps.md` |
+| [x] | 5c | Planungscommit | `429be2b` |
+| [x] | 6 | Entwicklungsschritte-Tracking anlegen | `steps.md`, `status.html` |
 | [ ] | 7 | Entwicklungsschritte abarbeiten (Schleife über lifecycle-Skill) | Codeänderungen je Schritt |
 | [ ] | – | Projekt-Verzeichnis aufräumen | – |
 | [ ] | 8 | Abschlusscommit | – |
