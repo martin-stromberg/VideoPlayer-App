@@ -59,7 +59,14 @@ public static class AppUpdate
             NetworkAvailabilityChangedMessage network => UpdateNetworkAvailabilityChanged(model, network),
             ServerEventReceivedMessage received => UpdateServerEventReceived(model, received),
             ServerEventsConnectionClosedMessage => UpdateServerEventsConnectionClosed(model),
-            SynchronizationCompletedMessage => new AppTransition(model with { IsSyncRunning = false }, []),
+            SynchronizationCompletedMessage => new AppTransition(
+                model with { IsSyncRunning = false },
+                // Nach dem Voll-Sync die Startseiten-Listen aus dem
+                // aktualisierten Cache neu laden.
+                [new LoadHomeListsEffect()]),
+            CachedListsChangedMessage => new AppTransition(model, [new LoadHomeListsEffect()]),
+            HomeListsLoadedMessage loaded => UpdateHomeListsLoaded(model, loaded),
+            MediaItemSelectedMessage selected => UpdateMediaItemSelected(model, selected),
             _ => AppTransition.Unchanged(model)
         };
     }
@@ -82,7 +89,11 @@ public static class AppUpdate
                 ServerHealth = ServerHealthStatus.Checking,
                 ConnectionState = ConnectionState.Connecting
             },
-            [new InitializeStorageEffect(), new LoadSettingsEffect(), new LoadServersEffect(), new StartNetworkMonitoringEffect()]);
+            // Die gecachten Startseiten-Listen werden direkt nach der
+            // Ablage-Initialisierung gelesen (Effekte laufen sequenziell) —
+            // Cache-First: die Startseite zeigt beim Öffnen sofort den
+            // letzten Stand, auch ohne Serverantwort.
+            [new InitializeStorageEffect(), new LoadSettingsEffect(), new LoadServersEffect(), new StartNetworkMonitoringEffect(), new LoadHomeListsEffect()]);
     }
 
     private static AppTransition UpdateSettingsLoaded(AppModel model, SettingsLoadedMessage message)
@@ -489,6 +500,32 @@ public static class AppUpdate
         return model.CurrentPage == AppPage.ServerSetup
             ? new AppTransition(updated, [])
             : new AppTransition(updated, [new NavigateToPageEffect(AppPage.ServerSetup)]);
+    }
+
+    private static AppTransition UpdateHomeListsLoaded(AppModel model, HomeListsLoadedMessage message)
+    {
+        return new AppTransition(
+            model with
+            {
+                ContinueWatching = message.Lists.ContinueWatching,
+                Favorites = message.Lists.Favorites,
+                RecentEntries = message.Lists.Recent
+            },
+            []);
+    }
+
+    private static AppTransition UpdateMediaItemSelected(AppModel model, MediaItemSelectedMessage message)
+    {
+        var item = message.Item;
+        if (item.Id <= 0 || string.IsNullOrWhiteSpace(item.MediaType))
+        {
+            // Ohne identifizierbares Medium keine Navigation.
+            return AppTransition.Unchanged(model);
+        }
+
+        return new AppTransition(
+            model,
+            [new NavigateToMediaDetailsEffect(item.MediaType, item.Id, item.Title)]);
     }
 
     private static string? LoginErrorFor(AuthAttemptStatus status)

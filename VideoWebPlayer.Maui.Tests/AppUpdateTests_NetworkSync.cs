@@ -225,7 +225,10 @@ public class AppUpdateTests_NetworkSync
             new SynchronizationCompletedMessage(new SyncResult(2, 0, true, true, true)));
 
         Assert.False(transition.Model.IsSyncRunning);
-        Assert.Empty(transition.Effects);
+        // Nach dem Voll-Sync werden die Startseiten-Listen aus dem
+        // aktualisierten Cache neu geladen.
+        var effect = Assert.Single(transition.Effects);
+        Assert.IsType<LoadHomeListsEffect>(effect);
     }
 
     [Fact]

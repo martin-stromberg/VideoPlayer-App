@@ -46,6 +46,12 @@ namespace VideoPlayer.Maui
             builder.Services.AddSingleton<ProgressReportService>();
             builder.Services.AddSingleton<ServerSyncService>();
 
+            // Startseiten-Listen aus der Cache-Ablage (Cache-First) und
+            // Vorschaubilder (api/pictures/{id}) mit lokaler Ablage im
+            // nicht backup-pflichtigen Previews-Verzeichnis.
+            builder.Services.AddSingleton<HomeListService>();
+            builder.Services.AddSingleton<PosterImageService>();
+
             builder.Services.AddSingleton<AppShell>();
             builder.Services.AddTransient<Pages.LoadingPage>();
             builder.Services.AddTransient<Pages.HomePage>();
@@ -56,6 +62,8 @@ namespace VideoPlayer.Maui
             builder.Services.AddTransient<Pages.SettingsPage>();
             builder.Services.AddTransient<Pages.ServerSetupPage>();
             builder.Services.AddTransient<Pages.LoginPage>();
+            // Platzhalter-Detailseite (Shell-Route „mediadetails").
+            builder.Services.AddTransient<Pages.MediaDetailsPage>();
 
             builder.ConfigureFonts(fonts =>
             {

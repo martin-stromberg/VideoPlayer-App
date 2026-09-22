@@ -20,6 +20,10 @@ namespace VideoPlayer.Maui
             // Window-Root statt der Shell).
             Routing.RegisterRoute("login", typeof(Pages.LoginPage));
 
+            // Detailseite eines Mediums (Platzhalter bis Entwicklungsschritt 8):
+            // „mediadetails?mediaType=…&id=…&title=…", geschoben auf den Stack.
+            Routing.RegisterRoute("mediadetails", typeof(Pages.MediaDetailsPage));
+
             Navigated += OnShellNavigated;
         }
 

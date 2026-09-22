@@ -3,8 +3,11 @@ using VideoPlayer.Mvu;
 namespace VideoPlayer.Maui.Pages;
 
 /// <summary>
-/// Startseite (Grundgerüst). Zeigt den Serverstatus aus dem MVU-Model sowie
-/// im Offline-Zustand einen Hinweis auf den eingeschränkten Betrieb.
+/// Startseite der App: horizontale Medienlisten „Weiterschauen",
+/// „Favoriten" und „Neu im Programm" aus der lokalen Cache-Ablage
+/// (Cache-First, Aktualisierung über MVU-Modell nach Synchronisation und
+/// Server-Ereignissen). Die Auswahl eines Eintrags navigiert über den MVU-
+/// Kreislauf zur Detailseite des Mediums.
 /// </summary>
 public partial class HomePage : ContentPage
 {
@@ -15,29 +18,27 @@ public partial class HomePage : ContentPage
         InitializeComponent();
         this.mvuHost = mvuHost;
         BindingContext = mvuHost;
-        UpdateUi(mvuHost.Model);
-    }
-
-    protected override void OnAppearing()
-    {
-        base.OnAppearing();
-        mvuHost.ModelChanged -= OnModelChanged;
         mvuHost.ModelChanged += OnModelChanged;
-    }
-
-    protected override void OnDisappearing()
-    {
-        base.OnDisappearing();
-        mvuHost.ModelChanged -= OnModelChanged;
+        UpdateOfflineBanner(mvuHost.Model);
     }
 
     private void OnModelChanged(object? sender, EventArgs e)
     {
-        MainThread.BeginInvokeOnMainThread(() => UpdateUi(mvuHost.Model));
+        // UI-Anpassungen auf dem Hauptthread; die Listen binden über
+        // BindingContext an das MVU-Modell.
+        var model = mvuHost.Model;
+        MainThread.BeginInvokeOnMainThread(() => UpdateOfflineBanner(model));
     }
 
-    private void UpdateUi(AppModel model)
+    private void UpdateOfflineBanner(AppModel model)
     {
         OfflineBanner.IsVisible = model.IsOffline;
+    }
+
+    private void OnMediaItemTapped(object? sender, HomeMediaItem item)
+    {
+        // Die Auswahl läuft über den MVU-Kreislauf — Update entscheidet
+        // über die Detail-Navigation.
+        _ = mvuHost.DispatchAsync(new MediaItemSelectedMessage(item));
     }
 }

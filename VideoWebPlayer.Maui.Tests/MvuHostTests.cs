@@ -36,19 +36,21 @@ public class MvuHostTests
         Assert.Equal(ConnectionState.Connected, host.Model.ConnectionState);
         Assert.Equal(ServerHealthStatus.Reachable, host.Model.ServerHealth);
         Assert.False(host.Model.IsStartupRunning);
-        // Start (Ablage, Einstellungen, Serverliste, Netzwerk-Monitoring),
-        // Health-Check, automatische Anmeldung, dann Ereignisverbindung +
-        // Synchronisation + Navigation zur Startseite.
-        Assert.Equal(9, handler.Effects.Count);
+        // Start (Ablage, Einstellungen, Serverliste, Netzwerk-Monitoring,
+        // gecachte Startseiten-Listen), Health-Check, automatische
+        // Anmeldung, dann Ereignisverbindung + Synchronisation + Navigation
+        // zur Startseite.
+        Assert.Equal(10, handler.Effects.Count);
         Assert.IsType<InitializeStorageEffect>(handler.Effects[0]);
         Assert.IsType<LoadSettingsEffect>(handler.Effects[1]);
         Assert.IsType<LoadServersEffect>(handler.Effects[2]);
         Assert.IsType<StartNetworkMonitoringEffect>(handler.Effects[3]);
-        Assert.IsType<CheckServerHealthEffect>(handler.Effects[4]);
-        Assert.IsType<AttemptAutoLoginEffect>(handler.Effects[5]);
-        Assert.IsType<ConnectServerEventsEffect>(handler.Effects[6]);
-        Assert.IsType<RunFullSyncEffect>(handler.Effects[7]);
-        Assert.IsType<NavigateToPageEffect>(handler.Effects[8]);
+        Assert.IsType<LoadHomeListsEffect>(handler.Effects[4]);
+        Assert.IsType<CheckServerHealthEffect>(handler.Effects[5]);
+        Assert.IsType<AttemptAutoLoginEffect>(handler.Effects[6]);
+        Assert.IsType<ConnectServerEventsEffect>(handler.Effects[7]);
+        Assert.IsType<RunFullSyncEffect>(handler.Effects[8]);
+        Assert.IsType<NavigateToPageEffect>(handler.Effects[9]);
     }
 
     [Fact]

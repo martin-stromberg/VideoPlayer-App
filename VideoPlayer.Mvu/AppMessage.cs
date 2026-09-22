@@ -109,3 +109,22 @@ public sealed record ServerEventsConnectionClosedMessage : AppMessage;
 
 /// <summary>Die vollständige Synchronisation wurde abgeschlossen.</summary>
 public sealed record SynchronizationCompletedMessage(SyncResult Result) : AppMessage;
+
+/// <summary>
+/// Die gecachten Startseiten-Listen wurden aus der lokalen Ablage gelesen
+/// und ins Model übernommen (Antwort auf <c>LoadHomeListsEffect</c>).
+/// </summary>
+public sealed record HomeListsLoadedMessage(HomeLists Lists) : AppMessage;
+
+/// <summary>
+/// Die gecachten Listen wurden geändert (z. B. durch eine
+/// Teil-Synchronisation nach einem Server-Ereignis) — die
+/// Startseiten-Listen sind aus dem Cache neu zu laden.
+/// </summary>
+public sealed record CachedListsChangedMessage : AppMessage;
+
+/// <summary>
+/// Ein Eintrag einer Startseiten-Liste wurde ausgewählt — die App
+/// navigiert zur Detailseite des Mediums.
+/// </summary>
+public sealed record MediaItemSelectedMessage(HomeMediaItem Item) : AppMessage;
