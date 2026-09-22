@@ -23,20 +23,26 @@ public class MvuHostTests
         var cancellationToken = TestContext.Current.CancellationToken;
 
         await host.DispatchAsync(new StartupRequestedMessage(), cancellationToken);
-        // Hinterlegter Server → Health-Check → Abschluss navigiert zur Startseite.
+        // Hinterlegter Server → Health-Check → automatische Anmeldung → Startseite.
         await host.DispatchAsync(
             new ServersLoadedMessage([], "http://nas/videoplayer/"), cancellationToken);
         await host.DispatchAsync(new ServerHealthCheckCompletedMessage(IsReachable: true), cancellationToken);
+        Assert.Equal(AppPage.Loading, host.Model.CurrentPage);
+        Assert.True(host.Model.IsStartupRunning);
+        await host.DispatchAsync(
+            new AutoLoginCompletedMessage(AuthAttemptStatus.Succeeded, "martin"), cancellationToken);
 
         Assert.Equal(AppPage.Home, host.Model.CurrentPage);
+        Assert.Equal(ConnectionState.Connected, host.Model.ConnectionState);
         Assert.Equal(ServerHealthStatus.Reachable, host.Model.ServerHealth);
         Assert.False(host.Model.IsStartupRunning);
-        Assert.Equal(5, handler.Effects.Count);
+        Assert.Equal(6, handler.Effects.Count);
         Assert.IsType<InitializeStorageEffect>(handler.Effects[0]);
         Assert.IsType<LoadSettingsEffect>(handler.Effects[1]);
         Assert.IsType<LoadServersEffect>(handler.Effects[2]);
         Assert.IsType<CheckServerHealthEffect>(handler.Effects[3]);
-        Assert.IsType<NavigateToPageEffect>(handler.Effects[4]);
+        Assert.IsType<AttemptAutoLoginEffect>(handler.Effects[4]);
+        Assert.IsType<NavigateToPageEffect>(handler.Effects[5]);
     }
 
     [Fact]

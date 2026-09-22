@@ -37,3 +37,24 @@ public sealed record CheckCandidateServerEffect(string Address, string? DisplayN
 
 /// <summary>Erfolgreich geprüften Server als bekannten/aktiven Server speichern.</summary>
 public sealed record PersistActiveServerEffect(string Address, string? DisplayName) : AppEffect;
+
+/// <summary>
+/// Automatische Anmeldung mit den gespeicherten Zugangsdaten ausführen
+/// (Ergebnis: <c>AutoLoginCompletedMessage</c>).
+/// </summary>
+public sealed record AttemptAutoLoginEffect(string ServerAddress) : AppEffect;
+
+/// <summary>
+/// Manuelle Anmeldung mit eingegebenen Zugangsdaten ausführen
+/// (Ergebnis: <c>LoginCompletedMessage</c>).
+/// </summary>
+public sealed record AttemptLoginEffect(
+    string ServerAddress,
+    string Username,
+    string Password) : AppEffect;
+
+/// <summary>
+/// Prüfen, ob lokale Offline-Daten vorhanden sind
+/// (Ergebnis: <c>OfflineDataCheckCompletedMessage</c>).
+/// </summary>
+public sealed record CheckOfflineDataEffect : AppEffect;

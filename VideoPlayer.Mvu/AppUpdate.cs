@@ -14,6 +14,21 @@ public static class AppUpdate
     /// <summary>Fehlertext bei fehlgeschlagener Verbindungsprüfung.</summary>
     public const string UnreachableServerError = "Der Server ist nicht erreichbar. Bitte die Adresse prüfen.";
 
+    /// <summary>Fehlertext der Anmeldemaske bei leeren Eingabefeldern.</summary>
+    public const string CredentialsRequiredError = "Bitte Benutzername und Passwort eingeben.";
+
+    /// <summary>Fehlertext der Anmeldemaske bei vom Server abgelehnten Zugangsdaten.</summary>
+    public const string InvalidCredentialsError = "Anmeldung fehlgeschlagen. Bitte Benutzername und Passwort prüfen.";
+
+    /// <summary>Fehlertext der Anmeldemaske bei nicht erreichbarem Server.</summary>
+    public const string LoginUnreachableError = "Der Server ist nicht erreichbar. Bitte später erneut versuchen.";
+
+    /// <summary>Fehlertext der Anmeldemaske bei sonstigen Anmeldefehlern.</summary>
+    public const string LoginFailedError = "Anmeldung fehlgeschlagen. Bitte erneut versuchen.";
+
+    /// <summary>Hinweistext der Anmeldemaske nach abgelaufener Sitzung.</summary>
+    public const string SessionExpiredError = "Die Anmeldung ist abgelaufen. Bitte erneut anmelden.";
+
     public static AppTransition Update(AppModel model, AppMessage message)
     {
         ArgumentNullException.ThrowIfNull(model);
@@ -36,6 +51,11 @@ public static class AppUpdate
             DiscoveredServerSelectedMessage selected => UpdateServerCandidateSelected(model, selected.Address, selected.DisplayName),
             ServerSwitchRequestedMessage switchTo => UpdateServerCandidateSelected(model, switchTo.Address, switchTo.DisplayName),
             ServerCheckCompletedMessage check => UpdateServerCheckCompleted(model, check),
+            AutoLoginCompletedMessage autoLogin => UpdateAutoLoginCompleted(model, autoLogin),
+            LoginSubmittedMessage submitted => UpdateLoginSubmitted(model, submitted),
+            LoginCompletedMessage completed => UpdateLoginCompleted(model, completed),
+            OfflineDataCheckCompletedMessage check => UpdateOfflineDataCheckCompleted(model, check),
+            SessionExpiredMessage => UpdateSessionExpired(model),
             _ => AppTransition.Unchanged(model)
         };
     }
@@ -50,7 +70,12 @@ public static class AppUpdate
         // Der Health-Check folgt erst nach dem Laden der Serververwaltung —
         // ohne hinterlegten Server verzweigt der Start in die Einrichtung.
         return new AppTransition(
-            model with { IsStartupRunning = true, ServerHealth = ServerHealthStatus.Checking },
+            model with
+            {
+                IsStartupRunning = true,
+                ServerHealth = ServerHealthStatus.Checking,
+                ConnectionState = ConnectionState.Connecting
+            },
             [new InitializeStorageEffect(), new LoadSettingsEffect(), new LoadServersEffect()]);
     }
 
@@ -92,6 +117,7 @@ public static class AppUpdate
         {
             IsStartupRunning = false,
             ServerHealth = ServerHealthStatus.Unknown,
+            ConnectionState = ConnectionState.NeedsServerSetup,
             CurrentPage = AppPage.ServerSetup
         };
 
@@ -181,35 +207,211 @@ public static class AppUpdate
             .ToList();
         known.Insert(0, server);
 
+        // Der Server wird übernommen; die (automatische) Anmeldung am neuen
+        // Server entscheidet über das Navigationsziel — „Home" wird nur aus
+        // Connected/Offline erreicht. IsServerCheckRunning bleibt bis zum
+        // Login-Abschluss gesetzt (Anzeige läuft weiter).
         return new AppTransition(
             model with
             {
-                IsServerCheckRunning = false,
+                IsServerCheckRunning = true,
                 ServerSetupError = null,
                 ActiveServerAddress = normalized,
                 KnownServers = known,
                 ServerHealth = ServerHealthStatus.Reachable,
-                IsStartupRunning = false,
-                CurrentPage = AppPage.Home
+                ConnectionState = ConnectionState.Connecting
             },
-            [new PersistActiveServerEffect(normalized, message.DisplayName), new NavigateToPageEffect(AppPage.Home)]);
+            [new PersistActiveServerEffect(normalized, message.DisplayName), new AttemptAutoLoginEffect(normalized)]);
     }
 
     private static AppTransition UpdateHealthCheckCompleted(AppModel model, ServerHealthCheckCompletedMessage message)
     {
+        if (message.IsReachable)
+        {
+            if (model.ActiveServerAddress is null)
+            {
+                // Defensiv: Health-Check ohne aktiven Server → Einrichtung.
+                return GoToServerSetup(model, ServerHealthStatus.Unknown);
+            }
+
+            // Erreichbar → automatische Anmeldung mit gespeicherten Zugangsdaten.
+            return new AppTransition(
+                model with { ServerHealth = ServerHealthStatus.Reachable },
+                [new AttemptAutoLoginEffect(model.ActiveServerAddress)]);
+        }
+
+        // Nicht erreichbar → Offline-Daten-Bestand entscheidet zwischen
+        // Offline-Zustand und Serverauswahl.
+        return new AppTransition(
+            model with { ServerHealth = ServerHealthStatus.Unreachable },
+            [new CheckOfflineDataEffect()]);
+    }
+
+    private static AppTransition UpdateOfflineDataCheckCompleted(AppModel model, OfflineDataCheckCompletedMessage message)
+    {
+        if (message.HasOfflineData)
+        {
+            return new AppTransition(
+                model with
+                {
+                    IsStartupRunning = false,
+                    HasOfflineData = true,
+                    ConnectionState = ConnectionState.Offline,
+                    CurrentPage = AppPage.Home
+                },
+                [new NavigateToPageEffect(AppPage.Home)]);
+        }
+
+        // Keine Offline-Daten → Serverauswahl (bekannte Server, Erkennung,
+        // manuelle Eingabe auf der Einrichtungsseite).
+        var updated = model with
+        {
+            IsStartupRunning = false,
+            HasOfflineData = false,
+            ConnectionState = ConnectionState.NeedsServerSetup,
+            CurrentPage = AppPage.ServerSetup
+        };
+        return model.CurrentPage == AppPage.ServerSetup
+            ? new AppTransition(updated, [])
+            : new AppTransition(updated, [new NavigateToPageEffect(AppPage.ServerSetup)]);
+    }
+
+    private static AppTransition UpdateAutoLoginCompleted(AppModel model, AutoLoginCompletedMessage message)
+    {
+        if (message.Status == AuthAttemptStatus.Succeeded)
+        {
+            return new AppTransition(
+                model with
+                {
+                    IsStartupRunning = false,
+                    IsServerCheckRunning = false,
+                    IsLoginRunning = false,
+                    LoginError = null,
+                    LoginUsername = message.Username ?? model.LoginUsername,
+                    ConnectionState = ConnectionState.Connected,
+                    CurrentPage = AppPage.Home
+                },
+                [new NavigateToPageEffect(AppPage.Home)]);
+        }
+
+        // Fehlende oder fehlgeschlagene Zugangsdaten → Anmeldemaske.
+        var updated = model with
+        {
+            IsStartupRunning = false,
+            IsServerCheckRunning = false,
+            IsLoginRunning = false,
+            LoginUsername = message.Username ?? model.LoginUsername,
+            LoginError = LoginErrorFor(message.Status),
+            ConnectionState = ConnectionState.NeedsLogin,
+            CurrentPage = AppPage.Login
+        };
+        return model.CurrentPage == AppPage.Login
+            ? new AppTransition(updated, [])
+            : new AppTransition(updated, [new NavigateToPageEffect(AppPage.Login)]);
+    }
+
+    private static AppTransition UpdateLoginSubmitted(AppModel model, LoginSubmittedMessage message)
+    {
+        if (string.IsNullOrWhiteSpace(message.Username) || string.IsNullOrWhiteSpace(message.Password))
+        {
+            return new AppTransition(
+                model with { LoginError = CredentialsRequiredError },
+                []);
+        }
+
+        if (model.ActiveServerAddress is null)
+        {
+            // Defensiv: Anmeldung ohne aktiven Server → Einrichtung.
+            return GoToServerSetup(model, model.ServerHealth);
+        }
+
+        return new AppTransition(
+            model with { IsLoginRunning = true, LoginError = null },
+            [new AttemptLoginEffect(model.ActiveServerAddress, message.Username.Trim(), message.Password)]);
+    }
+
+    private static AppTransition UpdateLoginCompleted(AppModel model, LoginCompletedMessage message)
+    {
+        if (message.Status == AuthAttemptStatus.Succeeded)
+        {
+            return new AppTransition(
+                model with
+                {
+                    IsStartupRunning = false,
+                    IsLoginRunning = false,
+                    LoginError = null,
+                    ConnectionState = ConnectionState.Connected,
+                    CurrentPage = AppPage.Home
+                },
+                [new NavigateToPageEffect(AppPage.Home)]);
+        }
+
         return new AppTransition(
             model with
             {
-                IsStartupRunning = false,
-                ServerHealth = message.IsReachable ? ServerHealthStatus.Reachable : ServerHealthStatus.Unreachable,
-                CurrentPage = AppPage.Home
+                IsLoginRunning = false,
+                LoginError = LoginErrorFor(message.Status) ?? LoginFailedError,
+                ConnectionState = ConnectionState.NeedsLogin
             },
-            [new NavigateToPageEffect(AppPage.Home)]);
+            []);
+    }
+
+    private static AppTransition UpdateSessionExpired(AppModel model)
+    {
+        if (model.ConnectionState == ConnectionState.NeedsLogin)
+        {
+            return AppTransition.Unchanged(model);
+        }
+
+        var updated = model with
+        {
+            ConnectionState = ConnectionState.NeedsLogin,
+            LoginError = SessionExpiredError,
+            CurrentPage = AppPage.Login
+        };
+        return model.CurrentPage == AppPage.Login
+            ? new AppTransition(updated, [])
+            : new AppTransition(updated, [new NavigateToPageEffect(AppPage.Login)]);
+    }
+
+    private static AppTransition GoToServerSetup(AppModel model, ServerHealthStatus health)
+    {
+        var updated = model with
+        {
+            IsStartupRunning = false,
+            ServerHealth = health,
+            ConnectionState = ConnectionState.NeedsServerSetup,
+            CurrentPage = AppPage.ServerSetup
+        };
+        return model.CurrentPage == AppPage.ServerSetup
+            ? new AppTransition(updated, [])
+            : new AppTransition(updated, [new NavigateToPageEffect(AppPage.ServerSetup)]);
+    }
+
+    private static string? LoginErrorFor(AuthAttemptStatus status)
+    {
+        return status switch
+        {
+            AuthAttemptStatus.InvalidCredentials => InvalidCredentialsError,
+            AuthAttemptStatus.ServerUnreachable => LoginUnreachableError,
+            AuthAttemptStatus.Failed => LoginFailedError,
+            _ => null
+        };
     }
 
     private static AppTransition UpdateNavigateTo(AppModel model, NavigateToMessage message)
     {
         if (message.Page == AppPage.Loading || message.Page == model.CurrentPage)
+        {
+            return AppTransition.Unchanged(model);
+        }
+
+        // Zustandsgesteuerte Navigation: Solange die Anmeldung bzw. die
+        // Servereinrichtung aussteht, sind Menüseiten nicht erreichbar —
+        // erlaubt bleibt nur der Wechsel zwischen den Workflow-Seiten
+        // (z. B. „Anderen Server einrichten" von der Anmeldemaske).
+        if (model.ConnectionState is ConnectionState.NeedsLogin or ConnectionState.NeedsServerSetup
+            && AppRoutes.MenuPages.Contains(message.Page))
         {
             return AppTransition.Unchanged(model);
         }
@@ -224,6 +426,18 @@ public static class AppUpdate
         if (message.Page == AppPage.Loading || message.Page == model.CurrentPage)
         {
             return AppTransition.Unchanged(model);
+        }
+
+        // Flyout-Navigation läuft nativ über die Shell: Bei ausstehender
+        // Anmeldung/Servereinrichtung wird auf die Workflow-Seite
+        // zurücknavigiert statt den Modelzustand zu übernehmen.
+        if (model.ConnectionState is ConnectionState.NeedsLogin or ConnectionState.NeedsServerSetup
+            && AppRoutes.MenuPages.Contains(message.Page))
+        {
+            var target = model.ConnectionState == ConnectionState.NeedsLogin
+                ? AppPage.Login
+                : AppPage.ServerSetup;
+            return new AppTransition(model, [new NavigateToPageEffect(target)]);
         }
 
         return new AppTransition(model with { CurrentPage = message.Page }, []);

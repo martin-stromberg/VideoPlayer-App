@@ -33,4 +33,27 @@ public sealed class CacheDatabase
         await Connection.CreateTableAsync<CachedFavoritesEntry>();
         await Connection.CreateTableAsync<DownloadManifestEntry>();
     }
+
+    /// <summary>
+    /// Prüft, ob lokale Offline-Daten vorliegen (gecachte Listen/Favoriten
+    /// oder Download-Manifesteinträge) — Grundlage für den Offline-Zustand
+    /// des Verbindungs-Workflows.
+    /// </summary>
+    public async Task<bool> HasOfflineDataAsync()
+    {
+        var cachedLists = await Connection.Table<CachedListEntry>().CountAsync();
+        if (cachedLists > 0)
+        {
+            return true;
+        }
+
+        var favorites = await Connection.Table<CachedFavoritesEntry>().CountAsync();
+        if (favorites > 0)
+        {
+            return true;
+        }
+
+        var downloads = await Connection.Table<DownloadManifestEntry>().CountAsync();
+        return downloads > 0;
+    }
 }

@@ -59,3 +59,29 @@ public sealed record ServerCheckCompletedMessage(
     string Address,
     string? DisplayName,
     bool Success) : AppMessage;
+
+/// <summary>
+/// Ergebnis der automatischen Anmeldung mit gespeicherten Zugangsdaten.
+/// <paramref name="Username"/> trägt den bekannten Benutzernamen zur
+/// Vorbefüllung der Anmeldemaske.
+/// </summary>
+public sealed record AutoLoginCompletedMessage(
+    AuthAttemptStatus Status,
+    string? Username) : AppMessage;
+
+/// <summary>Manuelle Anmeldung auf der Anmeldemaske angefordert.</summary>
+public sealed record LoginSubmittedMessage(
+    string Username,
+    string Password) : AppMessage;
+
+/// <summary>Ergebnis der manuellen Anmeldung.</summary>
+public sealed record LoginCompletedMessage(AuthAttemptStatus Status) : AppMessage;
+
+/// <summary>Ergebnis der Prüfung, ob lokale Offline-Daten vorhanden sind.</summary>
+public sealed record OfflineDataCheckCompletedMessage(bool HasOfflineData) : AppMessage;
+
+/// <summary>
+/// Die stille Token-Neuanmeldung wurde endgültig abgelehnt bzw. es fehlen
+/// Zugangsdaten — die App wechselt in den Zustand <c>NeedsLogin</c>.
+/// </summary>
+public sealed record SessionExpiredMessage : AppMessage;

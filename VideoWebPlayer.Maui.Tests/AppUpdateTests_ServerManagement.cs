@@ -132,8 +132,11 @@ public class AppUpdateTests_ServerManagement
     }
 
     [Fact]
-    public void Update_ServerCheckCompleted_Success_PersistsAndNavigatesHome()
+    public void Update_ServerCheckCompleted_Success_PersistsAndStartsAutoLogin()
     {
+        // Der erfolgreich geprüfte Server wird übernommen; die Navigation
+        // entscheidet erst die automatische Anmeldung am neuen Server
+        // (Verbindungs-Workflow, Schritt 5) — die Ladeanzeige läuft weiter.
         var settings = new AppSettings { DownloadQuotaGb = 9 };
         var model = new AppModel
         {
@@ -146,11 +149,12 @@ public class AppUpdateTests_ServerManagement
             model,
             new ServerCheckCompletedMessage("http://nas:8080/", "NAS", true));
 
-        Assert.False(transition.Model.IsServerCheckRunning);
+        Assert.True(transition.Model.IsServerCheckRunning);
         Assert.Null(transition.Model.ServerSetupError);
         Assert.Equal("http://nas:8080/", transition.Model.ActiveServerAddress);
         Assert.Equal(ServerHealthStatus.Reachable, transition.Model.ServerHealth);
-        Assert.Equal(AppPage.Home, transition.Model.CurrentPage);
+        Assert.Equal(ConnectionState.Connecting, transition.Model.ConnectionState);
+        Assert.Equal(AppPage.ServerSetup, transition.Model.CurrentPage);
 
         var server = Assert.Single(transition.Model.KnownServers);
         Assert.Equal("http://nas:8080/", server.Address);
@@ -163,8 +167,8 @@ public class AppUpdateTests_ServerManagement
         var persist = Assert.IsType<PersistActiveServerEffect>(transition.Effects[0]);
         Assert.Equal("http://nas:8080/", persist.Address);
         Assert.Equal("NAS", persist.DisplayName);
-        var navigate = Assert.IsType<NavigateToPageEffect>(transition.Effects[1]);
-        Assert.Equal(AppPage.Home, navigate.Page);
+        var autoLogin = Assert.IsType<AttemptAutoLoginEffect>(transition.Effects[1]);
+        Assert.Equal("http://nas:8080/", autoLogin.ServerAddress);
     }
 
     [Fact]

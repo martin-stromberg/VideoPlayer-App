@@ -7,18 +7,28 @@ namespace VideoPlayer.Maui.Services;
 /// <summary>
 /// Führt MVU-Effekte aus: Navigation über die Shell, Server-Erreichbarkeits-
 /// prüfung über <see cref="IServerHealthProbe"/>, Ablage-Initialisierung und
-/// Einstellungs-Persistenz über <see cref="VideoPlayer.Storage"/> sowie die
-/// Serververwaltung (Laden, Discovery, Kandidaten-Prüfung, Speichern).
+/// Einstellungs-Persistenz über <see cref="VideoPlayer.Storage"/>, die
+/// Serververwaltung (Laden, Discovery, Kandidaten-Prüfung, Speichern) sowie
+/// den Anmelde-Workflow über <see cref="AuthSessionService"/>.
 /// </summary>
 public sealed class ShellAppEffectHandler : IAppEffectHandler
 {
     private readonly IServiceProvider services;
     private readonly IServerHealthProbe healthProbe;
+    private readonly AuthSessionService authSession;
 
-    public ShellAppEffectHandler(IServiceProvider services, IServerHealthProbe healthProbe)
+    public ShellAppEffectHandler(
+        IServiceProvider services,
+        IServerHealthProbe healthProbe,
+        AuthSessionService authSession)
     {
         this.services = services;
         this.healthProbe = healthProbe;
+        this.authSession = authSession;
+
+        // Endgültig abgelehnte stille Neuanmeldung (401 ohne gültige
+        // Zugangsdaten) → die App wechselt in den Anmeldezustand.
+        this.authSession.SessionExpired += OnSessionExpired;
     }
 
     public async Task HandleAsync(AppEffect effect, CancellationToken cancellationToken = default)
@@ -52,6 +62,91 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
             case PersistActiveServerEffect persist:
                 await PersistActiveServerAsync(persist.Address, persist.DisplayName);
                 break;
+            case AttemptAutoLoginEffect autoLogin:
+                await AttemptAutoLoginAsync(autoLogin.ServerAddress, cancellationToken);
+                break;
+            case AttemptLoginEffect login:
+                await AttemptLoginAsync(login.ServerAddress, login.Username, login.Password, cancellationToken);
+                break;
+            case CheckOfflineDataEffect:
+                await CheckOfflineDataAsync();
+                break;
+        }
+    }
+
+    private async Task AttemptAutoLoginAsync(string serverAddress, CancellationToken cancellationToken)
+    {
+        AuthAttempt attempt;
+        try
+        {
+            attempt = await authSession.TryStoredLoginAsync(new Uri(serverAddress), cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[ShellAppEffectHandler] Automatische Anmeldung fehlgeschlagen: {ex.Message}");
+            attempt = new AuthAttempt(AuthAttemptStatus.Failed);
+        }
+
+        var host = services.GetRequiredService<MvuHost>();
+        await MainThread.InvokeOnMainThreadAsync(
+            () => host.DispatchAsync(new AutoLoginCompletedMessage(attempt.Status, attempt.Username)));
+    }
+
+    private async Task AttemptLoginAsync(string serverAddress, string username, string password, CancellationToken cancellationToken)
+    {
+        AuthAttempt attempt;
+        try
+        {
+            attempt = await authSession.LoginAsync(new Uri(serverAddress), username, password, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[ShellAppEffectHandler] Anmeldung fehlgeschlagen: {ex.Message}");
+            attempt = new AuthAttempt(AuthAttemptStatus.Failed);
+        }
+
+        var host = services.GetRequiredService<MvuHost>();
+        await MainThread.InvokeOnMainThreadAsync(
+            () => host.DispatchAsync(new LoginCompletedMessage(attempt.Status)));
+    }
+
+    private async Task CheckOfflineDataAsync()
+    {
+        // Jeder Fehler der Prüfung gilt als „keine Offline-Daten" — die App
+        // zeigt dann die Serverauswahl statt im Ladezustand zu verharren.
+        var hasOfflineData = false;
+        try
+        {
+            hasOfflineData = await services.GetRequiredService<CacheDatabase>().HasOfflineDataAsync();
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[ShellAppEffectHandler] Offline-Daten-Prüfung fehlgeschlagen: {ex.Message}");
+        }
+
+        var host = services.GetRequiredService<MvuHost>();
+        await MainThread.InvokeOnMainThreadAsync(
+            () => host.DispatchAsync(new OfflineDataCheckCompletedMessage(hasOfflineData)));
+    }
+
+    private void OnSessionExpired(object? sender, EventArgs e)
+    {
+        // Der API-Client läuft auf beliebigen Threads — die Message muss über
+        // den MainThread in den MVU-Zyklus.
+        _ = DispatchSessionExpiredAsync();
+    }
+
+    private async Task DispatchSessionExpiredAsync()
+    {
+        try
+        {
+            var host = services.GetRequiredService<MvuHost>();
+            await MainThread.InvokeOnMainThreadAsync(
+                () => host.DispatchAsync(new SessionExpiredMessage()));
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[ShellAppEffectHandler] SessionExpired-Dispatch fehlgeschlagen: {ex.Message}");
         }
     }
 
@@ -217,6 +312,23 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
             else if (window.Page is not Pages.ServerSetupPage)
             {
                 window.Page = services.GetRequiredService<Pages.ServerSetupPage>();
+            }
+
+            return;
+        }
+
+        // Die Anmeldemaske hat keinen Menüeintrag: beim Start wird sie als
+        // Window-Root gesetzt (die Shell existiert noch nicht), bei
+        // Sitzungsablauf als geschobene Shell-Route.
+        if (page == AppPage.Login)
+        {
+            if (window.Page is AppShell && Shell.Current is not null)
+            {
+                await Shell.Current.GoToAsync("login");
+            }
+            else if (window.Page is not Pages.LoginPage)
+            {
+                window.Page = services.GetRequiredService<Pages.LoginPage>();
             }
 
             return;

@@ -19,5 +19,12 @@ public enum AppPage
     /// Menüeintrag — wird beim Erststart als Window-Root bzw. über die
     /// registrierte Shell-Route <c>serversetup</c> erreicht.
     /// </summary>
-    ServerSetup
+    ServerSetup,
+
+    /// <summary>
+    /// Anmeldemaske. Wie <see cref="ServerSetup"/> ohne Menüeintrag — wird im
+    /// Start-Workflow als Window-Root bzw. bei Sitzungsablauf über die
+    /// registrierte Shell-Route <c>login</c> erreicht.
+    /// </summary>
+    Login
 }
