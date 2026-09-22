@@ -37,6 +37,12 @@ jobs:
       - name: Build MAUI Windows
         run: dotnet build VideoWebPlayer.Maui/VideoWebPlayer.Maui.csproj --configuration Release --framework net10.0-windows10.0.19041.0
 
+      - name: Build MAUI Android (VideoPlayer.Maui)
+        run: dotnet build VideoPlayer.Maui/VideoPlayer.Maui.csproj --no-restore --configuration Release --framework net10.0-android
+
+      - name: Build MAUI Windows (VideoPlayer.Maui)
+        run: dotnet build VideoPlayer.Maui/VideoPlayer.Maui.csproj --configuration Release --framework net10.0-windows10.0.19041.0
+
       - name: Test
         run: dotnet test VideoWebPlayer.Maui.Tests/VideoWebPlayer.Maui.Tests.csproj --no-build --configuration Release
 

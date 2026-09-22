@@ -1,5 +1,14 @@
 # Änderungsprotokoll
 
+## 2026-09-22 — App-Grundgerüst mit MVU-Struktur und Navigation (Neugestaltung, Schritt 2)
+
+- Neues Projekt `VideoPlayer.Mvu`: plattformneutrale MVU-Schicht mit eigenem schlanken Kreislauf (Modell, Messages, Update-Funktion, Effekte, `MvuHost`) — ohne externes MVU-Framework.
+- Neues Projekt `VideoPlayer.Maui`: neue MAUI-App mit Seitenmenü-Navigation (Startseite, Quellen, Favoriten, Downloads, Profil, Einstellungen), sieben Platzhalterseiten und Start-Ladeanzeige.
+- Startvorgang mit Erreichbarkeitsprüfung über `VideoPlayer.ApiClient` (`CheckHealthAsync`); Ergebnis wird auf der Startseite als Serverstatus angezeigt.
+- Zielplattformen: Windows, iOS, MacCatalyst und vorbereitet Android; die bisherige App bleibt parallel bestehen und wird nicht zur Laufzeit verwendet.
+- CI: Build-Nachweise der neuen App für Android und Windows in den PR-Checks sowie iOS in den staging-/main-Workflows ergänzt; `Set-Version.ps1` versioniert beide App-Projekte.
+- 32 neue xUnit-Tests für Update-Funktion, Host-Zyklus, Routen und Architekturverträge (insgesamt 101 Tests).
+
 ## 2026-09-22 — Server-API-Client (Neuimplementierung)
 
 - Neues plattformneutrales Projekt `VideoPlayer.ApiClient` als clientseitiger Zugriff auf die öffentliche Server-API (Anmeldung, Erreichbarkeitsprüfung, Quellen, „Neu im Programm", Weiterschauen inkl. Fortschritt/Ausblenden/Überspringen, Favoriten, Mediennachschlagen, Bildabrufe).

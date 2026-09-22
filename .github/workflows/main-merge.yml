@@ -109,6 +109,9 @@ jobs:
       - name: Build iOS
         run: dotnet build VideoWebPlayer.Maui/VideoWebPlayer.Maui.csproj --configuration Release --framework net10.0-ios --runtime iossimulator-arm64
 
+      - name: Build iOS (VideoPlayer.Maui)
+        run: dotnet build VideoPlayer.Maui/VideoPlayer.Maui.csproj --configuration Release --framework net10.0-ios --runtime iossimulator-arm64
+
       - name: Upload iOS artifact
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
