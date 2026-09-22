@@ -11,6 +11,7 @@
 - [Netzwerkstatus und Synchronisation](netzwerk-synchronisation.md) — Online↔Offline-Erkennung zur Laufzeit, automatische Wiederverbindung, Echtzeit-Ereignisse des Servers (SignalR), persistente Fortschritts-Warteschlange und Hintergrund-Synchronisation.
 - [Startseite mit gecachten Medienlisten](startseite-medienlisten.md) — „Weiterschauen", „Favoriten" und „Neu im Programm" mit Cache-First-Laden, Poster-Ablage außerhalb des Backups, ereignisgesteuerter Aktualisierung und Detail-Navigation.
 - [Quellen-Browsing und Medien-Detailseiten](quellen-browsing-details.md) — Quellenliste mit Icons und Offline-Hinweis, Genre-Filter, Textsuche und seitenweises Nachladen sowie Detailseiten für Filme, Kollektionen, Serien mit Staffeln/Episoden und die Favoriten-Markierung.
+- [Favoriten- und Profil-Seite](favoriten-profil.md) — Favoritenliste des Server-Benutzers mit Poster/Titel/Medientyp, Entfernen mit Server als führendem System, Cache-only-Anzeige offline sowie Profilansicht mit Benutzer, lokalem Profil und Abmeldung.
 
 ## Infrastruktur
 

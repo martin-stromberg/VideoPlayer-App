@@ -67,6 +67,9 @@ namespace VideoPlayer.Maui
             builder.Services.AddSingleton<SourceBrowserService>();
             builder.Services.AddSingleton<MediaDetailsService>();
             builder.Services.AddSingleton<FavoritesService>();
+            // Profil-Seite: Benutzerinfo aus Token-Claims/gespeicherter
+            // Anmelde-Kennung plus aktives lokales Profil.
+            builder.Services.AddSingleton<ProfileInfoService>();
 
             builder.Services.AddSingleton<AppShell>();
             builder.Services.AddTransient<Pages.LoadingPage>();

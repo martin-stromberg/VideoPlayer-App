@@ -159,6 +159,42 @@ public class AuthSessionServiceTests
         Assert.Equal(AuthAttemptStatus.Failed, attempt.Status);
     }
 
+    /// <summary>Prüft LogoutAsync: gibt den Client frei und entfernt Zugangsdaten und Token.</summary>
+    [Fact]
+    public async Task LogoutAsync_ClearsClientAndSecrets()
+    {
+        var handler = new StubHttpMessageHandler();
+        var service = CreateService(handler, out var secrets);
+        await secrets.SetCredentialsAsync("martin", "pw");
+        EnqueueLoginOk(handler, "jwt-logout");
+        await service.TryStoredLoginAsync(Server);
+        Assert.NotNull(service.Client);
+
+        await service.LogoutAsync();
+
+        // Die API besitzt keinen Logout-Endpunkt — die Sitzung endet
+        // lokal: Client freigegeben, Geheimnisse entfernt, keine
+        // automatische Anmeldung mehr möglich.
+        Assert.Null(service.Client);
+        Assert.Null(service.ClientBaseAddress);
+        Assert.Equal(string.Empty, secrets.GetUsername());
+        Assert.Equal(string.Empty, await secrets.GetPasswordAsync());
+        Assert.Null(await secrets.GetAuthTokenAsync());
+        Assert.False(await secrets.HasCredentialsAsync());
+    }
+
+    /// <summary>Prüft LogoutAsync: ohne Sitzung → bleibt ohne Fehler ein No-Op.</summary>
+    [Fact]
+    public async Task LogoutAsync_WithoutSession_IsNoOp()
+    {
+        var service = CreateService(new StubHttpMessageHandler(), out _);
+
+        await service.LogoutAsync();
+
+        Assert.Null(service.Client);
+        Assert.Null(service.ClientBaseAddress);
+    }
+
     /// <summary>Prüft TokenRefresh: meldet still erneut an und wiederholt den Request.</summary>
     [Fact]
     public async Task TokenRefresh_SilentlyReloginsAndRetriesRequest()

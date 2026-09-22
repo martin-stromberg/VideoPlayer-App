@@ -205,3 +205,40 @@ public sealed record ToggleFavoriteEffect(
     string MediaType,
     long MediaId,
     string Title) : AppEffect;
+
+/// <summary>
+/// Favoritenliste für die Favoriten-Seite laden: bei
+/// <paramref name="RefreshFromServer"/> zuerst die lokale Kopie
+/// <c>cached_favorites</c> vom Serverstand erneuern (online, führendes
+/// System), dann den Cache-Stand lesen; ohne Serverbezug nur den Cache
+/// lesen (Ergebnis: <c>FavoritesPageLoadedMessage</c>).
+/// </summary>
+/// <param name="RefreshFromServer"><c>true</c> = die lokale Kopie vor dem Lesen vom Serverstand erneuern (Online-Modus); <c>false</c> = nur den Cache lesen (Offline-Modus).</param>
+/// <returns>Effekt-Datensatz für das Laden der Favoritenliste.</returns>
+public sealed record LoadFavoritesPageEffect(bool RefreshFromServer) : AppEffect;
+
+/// <summary>
+/// Einen Favoriten-Eintrag über <c>api/favorites/remove</c> auf dem
+/// Server entfernen und die lokale Kopie erneuern (Ergebnis:
+/// <c>FavoriteRemoveCompletedMessage</c> + bei Erfolg
+/// <c>CachedListsChangedMessage</c>).
+/// </summary>
+/// <param name="FavoriteId">Id des zu entfernenden Favoriteneintrags.</param>
+/// <returns>Effekt-Datensatz für das Entfernen.</returns>
+public sealed record RemoveFavoriteEffect(long FavoriteId) : AppEffect;
+
+/// <summary>
+/// Profilinformationen der Profil-Seite ermitteln — Benutzername/E-Mail
+/// aus den Claims des gespeicherten Anmelde-Tokens bzw. dem gespeicherten
+/// Anmelde-Benutzernamen plus aktives lokales Profil (Ergebnis:
+/// <c>ProfileInfoLoadedMessage</c>).
+/// </summary>
+public sealed record LoadProfileInfoEffect : AppEffect;
+
+/// <summary>
+/// Sitzung lokal beenden: angemeldeten API-Client freigeben und die
+/// gespeicherten Zugangsdaten samt Token entfernen. Die API besitzt
+/// keinen Logout-Endpunkt (zustandslose JWT) — die Sitzung endet durch
+/// Verwerfen der lokalen Geheimnisse.
+/// </summary>
+public sealed record LogoutEffect : AppEffect;

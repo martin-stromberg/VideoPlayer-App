@@ -121,6 +121,12 @@ public sealed record AppModel
     /// <summary>Zustand der Medien-Detailseite.</summary>
     public MediaDetailsState MediaDetails { get; init; } = MediaDetailsState.Empty;
 
+    /// <summary>Zustand der Favoriten-Seite (Menüseite „Favoriten").</summary>
+    public FavoritesPageState FavoritesPage { get; init; } = FavoritesPageState.Initial;
+
+    /// <summary>Zustand der Profil-Seite (Menüseite „Profil").</summary>
+    public ProfilePageState Profile { get; init; } = ProfilePageState.Initial;
+
     /// <summary>Dem Anwender anzeigbarer Text zum Serverstatus.</summary>
     public string ServerHealthText => ServerHealth switch
     {

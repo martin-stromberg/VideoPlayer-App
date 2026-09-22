@@ -1,5 +1,16 @@
 # Änderungsprotokoll
 
+## 2026-09-22 — Favoriten- und Profil-Seite (Neugestaltung, Schritt 9)
+
+- Menüseite „Favoriten" ausgebaut: Kartenliste der Favoriten des am Server angemeldeten Benutzers mit Poster (`api/pictures/{id}` über `CachedPosterImage`, Titel-Fallback), Titel und Medientyp-Bezeichnung im Stil der Webanwendung; Lade-, Fehler- („Erneut laden") und Leerzustand getrennt.
+- Online bleibt der Server führend: `LoadFavoritesPageEffect` erneuert zuerst die lokale Kopie `cached_favorites` über `ServerSyncService.SyncFavoritesAsync` und zeigt danach den Cache; offline wird ausschließlich der Cache gelesen — der Effekt trägt die Entscheidung im Parameter `RefreshFromServer`, damit auch bei gesetztem Client kein vergeblicher Serveraufruf erfolgt; Offline-Banner mit Hinweis und deaktiviertem Entfernen.
+- Entfernen-Aktion je Eintrag: `api/favorites/remove` mit der Favoriten-Eintrags-ID (`FavoriteId` aus dem Cache-Eintrag, nicht der Medien-ID) über `FavoritesService.RemoveFavoriteAsync`, danach autoritative Erneuerung der Kopie; die Startseiten-Favoritenliste folgt über `CachedListsChangedMessage`; Fehlschlag behält den Eintrag und zeigt einen Hinweis.
+- Auswahl eines Favoriten öffnet die Route `mediadetails` inklusive Serienkontext-Hints (`show`/`season`/`episode`) für Episoden und Staffeln.
+- Menüseite „Profil" ausgebaut: Anzeige von Benutzername und E-Mail (Token-Claims `unique_name`/`name`/`preferred_username`/`email`, Fallback gespeicherte Kennung) über den neuen `ProfileInfoService`, aktives lokales Profil (`VIDEOPLAYER_PROFILE`, Standard `default`) und Serveradresse.
+- „Abmelden" ohne Server-Endpunkt: Ereignisverbindung trennen, `AuthSessionService.LogoutAsync` gibt den Client frei und löscht Benutzername/Passwort/Token, MVU-Rücksetzung der Sitzungsdaten (Listen, Quellen, Details, Favoriten-/Profil-Zustand) bei erhaltenen Gerätedaten und Navigation zur Anmeldemaske.
+- Neue plattformneutrale Bausteine in `VideoPlayer.Mvu`: Zustands-Records `FavoritesPageState`/`FavoriteListItem` und `ProfilePageState`/`ProfileInfo`, `ProfileInfoService`, `HomeListService.LoadFavoriteItemsAsync` (Favoriten-IDs + Serienkontext aus `cached_favorites`), `FavoritesService.RemoveFavoriteAsync`, `AuthSessionService.LogoutAsync`.
+- 44 neue xUnit-Tests für MVU-Übergänge inkl. Offline-/Veraltungs-Guards, Profil-Infos mit Token-Claims, Remove-Payload und Cache-Erneuerung, Logout sowie XAML-/Code-Behind-Verträge (insgesamt 469 Tests).
+
 ## 2026-09-22 — Quellen-Browsing und Medien-Detailseiten (Neugestaltung, Schritt 8)
 
 - Menüseite „Quellen" ausgebaut: Liste der serverseitig freigegebenen Medienbereiche (`api/Sources`) mit Icon (`api/sourceicons/{id}`) und Name; im Offline-Zustand klarer Hinweis statt leerer Liste, Ladefehler mit „Erneut laden", leere Antwort als eigener Leerzustand.
