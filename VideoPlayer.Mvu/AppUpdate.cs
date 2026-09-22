@@ -92,6 +92,7 @@ public static class AppUpdate
             SourceMediaItemSelectedMessage selected => UpdateSourceMediaItemSelected(model, selected),
             MediaDetailsRequestedMessage requested => UpdateMediaDetailsRequested(model, requested),
             MediaDetailsLoadedMessage loaded => UpdateMediaDetailsLoaded(model, loaded),
+            MediaDetailsHeaderImageLoadedMessage headerImage => UpdateMediaDetailsHeaderImageLoaded(model, headerImage),
             SeasonSelectedMessage selected => UpdateSeasonSelected(model, selected),
             FavoriteToggleRequestedMessage => UpdateFavoriteToggleRequested(model),
             FavoriteToggleCompletedMessage completed => UpdateFavoriteToggleCompleted(model, completed),
@@ -1107,15 +1108,77 @@ public static class AppUpdate
         }
 
         var error = message.Error ?? (message.Details is null ? "Die Details konnten nicht geladen werden." : null);
+        var effects = new List<AppEffect>();
+        var updated = model with
+        {
+            MediaDetails = state with
+            {
+                IsLoading = false,
+                Attempted = true,
+                Details = message.Details,
+                Error = error
+            }
+        };
+        return new AppTransition(WithDetailsHeaderLoad(updated, effects), effects);
+    }
+
+    /// <summary>
+    /// Stößt das Laden des Kopfbereichs-Bilds an, wenn die geladenen
+    /// Details eine Bildquelle benennen (Episoden-Still oder Bild-Id) und
+    /// die Verbindung steht. Ohne Quelle bzw. offline bleibt der
+    /// Kopfbereich bei Gradienten und Texten (Web-Verhalten).
+    /// </summary>
+    /// <param name="model">Aktuelles App-Model.</param>
+    /// <param name="effects">Effektliste des Übergangs, an die der Ladeeffekt angehängt wird.</param>
+    /// <returns>Das ggf. aktualisierte Model; unverändert, wenn kein Ladevorgang angestoßen wird.</returns>
+    private static AppModel WithDetailsHeaderLoad(AppModel model, List<AppEffect> effects)
+    {
+        var state = model.MediaDetails;
+        var details = state.Details;
+        if (model.ConnectionState != ConnectionState.Connected
+            || details is null
+            || (details.HeaderEpisodeId is not > 0 && details.HeaderPictureId is not > 0)
+            || state.IsHeaderImageLoading)
+        {
+            return model;
+        }
+
+        effects.Add(new LoadMediaDetailsHeaderEffect(
+            details.MediaType, details.MediaId,
+            details.HeaderPictureId, details.HeaderEpisodeId));
+        return model with
+        {
+            MediaDetails = state with { IsHeaderImageLoading = true }
+        };
+    }
+
+    private static AppTransition UpdateMediaDetailsHeaderImageLoaded(AppModel model, MediaDetailsHeaderImageLoadedMessage message)
+    {
+        var state = model.MediaDetails;
+        var details = state.Details;
+        // Verworfen, wenn die Seite zwischenzeitlich ein anderes Medium
+        // oder eine andere Bildquelle anzeigt (Staffelwechsel während
+        // des Abrufs).
+        if (details is null
+            || details.MediaType != MediaTypeNames.Normalize(message.MediaType)
+            || details.MediaId != message.MediaId
+            || details.HeaderPictureId != message.HeaderPictureId
+            || details.HeaderEpisodeId != message.HeaderEpisodeId)
+        {
+            return AppTransition.Unchanged(model);
+        }
+
+        // Ein Fehlschlag (null) löscht kein vorhandenes Bild — der
+        // Kopfbereich zeigt dann nur Gradienten und Texte (Web-Verhalten).
         return new AppTransition(
             model with
             {
                 MediaDetails = state with
                 {
-                    IsLoading = false,
-                    Attempted = true,
-                    Details = message.Details,
-                    Error = error
+                    IsHeaderImageLoading = false,
+                    HeaderImageBytes = message.ImageBytes is { Length: > 0 }
+                        ? message.ImageBytes
+                        : state.HeaderImageBytes
                 }
             },
             []);
@@ -1131,15 +1194,39 @@ public static class AppUpdate
             return AppTransition.Unchanged(model);
         }
 
-        return new AppTransition(
-            model with
+        // Web-Parität (SelectSeason): die Staffelwahl wählt die erste
+        // Episode der Staffel — der Kopfbereich folgt der Auswahl und
+        // zeigt deren Still bzw. ohne Episode das Staffel-/Serien-Banner.
+        var season = details.Seasons.FirstOrDefault(s => s.Id == message.SeasonId);
+        var firstEpisode = season?.Episodes.OrderBy(e => e.Number).FirstOrDefault();
+        var updatedDetails = details with
+        {
+            SelectedSeasonId = message.SeasonId,
+            SelectedEpisodeId = firstEpisode?.Id
+        };
+
+        var headerChanged =
+            updatedDetails.HeaderEpisodeId != details.HeaderEpisodeId
+            || updatedDetails.HeaderPictureId != details.HeaderPictureId;
+
+        var effects = new List<AppEffect>();
+        var updated = model with
+        {
+            MediaDetails = model.MediaDetails with
             {
-                MediaDetails = model.MediaDetails with
-                {
-                    Details = details with { SelectedSeasonId = message.SeasonId }
-                }
-            },
-            []);
+                Details = updatedDetails,
+                // Bei geänderter Bildquelle das alte Bild verwerfen — der
+                // Kopfbereich zeigt sonst kurz ein fremdes Still.
+                HeaderImageBytes = headerChanged ? null : model.MediaDetails.HeaderImageBytes,
+                IsHeaderImageLoading = headerChanged ? false : model.MediaDetails.IsHeaderImageLoading
+            }
+        };
+        if (headerChanged)
+        {
+            updated = WithDetailsHeaderLoad(updated, effects);
+        }
+
+        return new AppTransition(updated, effects);
     }
 
     private static AppTransition UpdateFavoriteToggleRequested(AppModel model)

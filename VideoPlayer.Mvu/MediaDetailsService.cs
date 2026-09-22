@@ -166,7 +166,8 @@ public sealed class MediaDetailsService
                         Title = title,
                         IsFavorite = await IsCachedFavoriteAsync(type, mediaId),
                         HasLocalFile = HasLocalFile(entry),
-                        IsOfflineSnapshot = true
+                        IsOfflineSnapshot = true,
+                        SelectedEpisodeId = mediaId
                     };
                 }
 
@@ -299,7 +300,8 @@ public sealed class MediaDetailsService
                 string.IsNullOrWhiteSpace(episode.Name) ? null : episode.Name);
         }
 
-        // Ohne Serienkontext: Basisdetails der Episode.
+        // Ohne Serienkontext: Basisdetails der Episode — der Kopfbereich
+        // zeigt den Still über den Episoden-Endpunkt (SelectedEpisodeId).
         return new MediaDetailsView
         {
             MediaType = "tvshowepisode",
@@ -309,7 +311,8 @@ public sealed class MediaDetailsService
             ReleaseYear = episode.ReleaseDate?.Year,
             BannerPictureId = episode.GeneratedBackgroundPictureId ?? episode.BannerPictureId ?? episode.PosterPictureId,
             PosterPictureId = episode.PosterPictureId,
-            IsFavorite = episode.IsFavorite
+            IsFavorite = episode.IsFavorite,
+            SelectedEpisodeId = episode.Id
         };
     }
 
@@ -490,7 +493,11 @@ public sealed class MediaDetailsService
             HighlightedEpisodeId = highlightedEpisodeId,
             HighlightedEpisodeTitle = highlightedEpisodeTitle,
             HasLocalFile = HasLocalFile(mediumEntry),
-            IsOfflineSnapshot = true
+            IsOfflineSnapshot = true,
+            // Kopfbereichs-Auswahl wie online: eine navigierte Episode
+            // führt die Kopfzeile (ohne Bild-Identität bleiben nur die
+            // Texte/Gradienten).
+            SelectedEpisodeId = mediaType == "tvshowepisode" ? highlightedEpisodeId : null
         };
     }
 
@@ -588,7 +595,10 @@ public sealed class MediaDetailsService
             Seasons = seasons,
             SelectedSeasonId = selected,
             HighlightedEpisodeId = highlightedEpisodeId,
-            HighlightedEpisodeTitle = highlightedEpisodeTitle
+            HighlightedEpisodeTitle = highlightedEpisodeTitle,
+            // Eine navigierte Episode führt den Kopfbereich (Still +
+            // Episoden-Informationen) wie im Web.
+            SelectedEpisodeId = mediaType == "tvshowepisode" ? highlightedEpisodeId : null
         };
     }
 
@@ -601,6 +611,8 @@ public sealed class MediaDetailsService
                 Id = s.Id,
                 Number = s.Number,
                 Name = string.IsNullOrWhiteSpace(s.Name) ? $"Staffel {s.Number}" : s.Name,
+                BannerPictureId = s.BannerPictureId ?? s.FanartPictureId ?? s.PosterPictureId,
+                Year = s.ReleaseDate?.Year ?? s.PremieredAt?.Year,
                 Episodes = s.Episodes
                     .OrderBy(e => e.Number)
                     .Select(e => new EpisodeItem
@@ -609,6 +621,7 @@ public sealed class MediaDetailsService
                         Number = e.Number,
                         Title = string.IsNullOrWhiteSpace(e.Name) ? $"Episode {e.Number}" : e.Name,
                         Plot = e.Plot,
+                        ReleaseYear = e.ReleaseDate?.Year,
                         PosterPictureId = e.GeneratedBackgroundPictureId ?? e.PosterPictureId,
                         IsHighlighted = e.Id == highlightedEpisodeId
                     })

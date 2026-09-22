@@ -64,6 +64,28 @@ Startseiten-Listen).
 | Staffel (`tvshowseason`) | Serienansicht mit vorgewählter Staffel (Serie über den `show`-Hint aufgelöst — es existiert kein eigener Staffel-Endpunkt) |
 | Episode (`tvshowepisode`) | Serienansicht mit vorgewählter Staffel und markierter Episode; ist keine Serie auflösbar, werden die Basisdetails der Episode gezeigt |
 
+### Kopfbereich der Detailseiten
+
+Jede Detailseite öffnet mit einem **vollbreiten Kopfbereich** nach
+Web-Vorbild (`tvshow-header`): das Hintergrundbild liegt bildschirmbreit
+in Cover-Darstellung unter geschichteten Dunkelgradienten (seitlicher
+Verlauf, weicher Übergang zum Seitenhintergrund, feine Trennlinie). Die
+Höhe folgt der Fensterbreite (mindestens 360, höchstens 620).
+
+- **Inhalt unten links:** Titel, eine Metazeile (Medientyp, Jahr,
+  Genres bzw. Staffel-/Episoden-Angaben) und die Handlung.
+- **Schalter:** der Favoriten-Stern liegt oben rechts auf dem Bild;
+  „Abspielen" und „Herunterladen" (bei Filmen und Episoden) unten
+  rechts.
+- **Bildquelle:** bei Serien, Staffeln, Filmen und Kollektionen das
+  Banner- bzw. Fanart-/Poster-Motiv; bei Episoden der Episoden-Still.
+  Auf der Serien- und Staffelseite wechselt der Kopfbereich mit der
+  Staffelwahl auf das Still der ersten Episode — wie in der
+  Webanwendung.
+- **Ohne Bild** (fehlende Grafik, Fehlschlag oder Offline) bleibt der
+  Kopfbereich mit Gradienten und Texten stabil — kein Layoutbruch,
+  kein Fehlerzustand.
+
 ## Favoriten
 
 - Der Stern-Schalter `☆`/`★` auf der Detailseite schaltet die
@@ -89,7 +111,15 @@ Startseiten-Listen).
   Quellenstand neu auf.
 - Plattformneutrale Dienste in `VideoPlayer.Mvu`:
   `SourceBrowserService` (Quellen/Genres/Einträge), `MediaDetailsService`
-  (Detail-Mapping je Typ), `FavoritesService` (Toggle + Cache-Sync).
+  (Detail-Mapping je Typ inkl. der Kopfbereichs-Ableitungen
+  `HeaderTitle`/`HeaderMeta`/`HeaderPlot`/`HeaderPictureId`/
+  `HeaderEpisodeId`), `FavoritesService` (Toggle + Cache-Sync).
+- Das Kopfbereichs-Bild wird flüchtig über den MVU-Kreislauf geladen
+  (`LoadMediaDetailsHeaderEffect` → `MediaDetailsHeaderImageLoadedMessage`,
+  `byte[]` im `MediaDetailsState`): Episoden über den Still-Endpunkt
+  `api/episodes/{id}/background-image`, sonst `api/pictures/{id}`;
+  verspätete Antworten abgelöster Bildquellen (z. B. nach einem
+  Staffelwechsel) werden am Identitätsabgleich verworfen.
 - Quellen-Icons und Poster nutzen die lokale Vorschaubild-Ablage
   (`previews/`, nicht backup-pflichtig) über `PosterImageService`
   (Menüeinträge) bzw. das Control `CachedPosterImage`.

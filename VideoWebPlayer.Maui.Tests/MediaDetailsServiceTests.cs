@@ -195,6 +195,48 @@ public class MediaDetailsServiceTests : IDisposable
         Assert.EndsWith("/api/items/tvshow/11", Assert.Single(handler.Requests).PathAndQuery);
     }
 
+    /// <summary>Prüft Load: bei <c>TvShow</c> → bildet die Staffel-Bannerkette und die Kopfzeilen-Jahre ab.</summary>
+    [Fact]
+    public async Task Load_TvShow_MapsSeasonBannerAndHeaderYears()
+    {
+        await LoginAsync();
+        var show = Show();
+        show.Seasons[0].BannerPictureId = 101;
+        show.Seasons[0].ReleaseDate = new DateTime(2020, 3, 1);
+        show.Seasons[1].FanartPictureId = 102; // ohne Banner → Fanart-Kette
+        show.Seasons[1].PremieredAt = new DateTime(2021, 4, 1);
+        show.Seasons[0].Episodes[0].ReleaseDate = new DateTime(2020, 3, 15);
+        handler.EnqueueJson(HttpStatusCode.OK, show);
+
+        var details = await CreateService().LoadAsync("tvshow", 11, null, null, null, null);
+
+        Assert.Equal(101, details.Seasons[0].BannerPictureId);
+        Assert.Equal(2020, details.Seasons[0].Year);
+        Assert.Equal(102, details.Seasons[1].BannerPictureId);
+        Assert.Equal(2021, details.Seasons[1].Year);
+        Assert.Equal(2020, details.Seasons[0].Episodes[0].ReleaseYear);
+        // Serienansicht ohne Episoden-Auswahl → Serien-Bildquelle
+        // (Poster 55 als Kette Banner → Fanart → Poster) im Kopfbereich.
+        Assert.Null(details.SelectedEpisodeId);
+        Assert.Null(details.HeaderEpisodeId);
+        Assert.Equal(55, details.HeaderPictureId);
+    }
+
+    /// <summary>Prüft Load: bei Episode im Serienkontext → führt die navigierte Episode den Kopfbereich.</summary>
+    [Fact]
+    public async Task Load_Episode_WithShowHint_SelectsEpisodeForHeader()
+    {
+        await LoginAsync();
+        handler.EnqueueJson(HttpStatusCode.OK, Show());
+
+        var details = await CreateService().LoadAsync("tvshowepisode", 33, "Auftakt", showId: 11, seasonId: 22, episodeId: 33);
+
+        Assert.Equal(33, details.SelectedEpisodeId);
+        Assert.Equal(33, details.HeaderEpisodeId);
+        Assert.Null(details.HeaderPictureId);
+        Assert.Equal("Auftakt", details.HeaderTitle);
+    }
+
     /// <summary>Prüft Load: bei Episode mit Show-Hint → öffnet den Show-Kontext mit Vorauswahl.</summary>
     [Fact]
     public async Task Load_Episode_WithShowHint_OpensShowContextWithPreselection()
@@ -258,6 +300,10 @@ public class MediaDetailsServiceTests : IDisposable
         Assert.Equal("Folgenhandlung", details.Plot);
         Assert.True(details.IsFavorite);
         Assert.False(details.HasSeasons);
+        // Eigenständige Episode: der Kopfbereich zeigt den Still über
+        // den Episoden-Endpunkt (SelectedEpisodeId = Medien-Id).
+        Assert.Equal(31, details.SelectedEpisodeId);
+        Assert.Equal(31, details.HeaderEpisodeId);
     }
 
     /// <summary>Prüft Load: bei Staffel mit Show-Hint → öffnet den Show-Kontext.</summary>
@@ -333,6 +379,24 @@ public class MediaDetailsServiceTests : IDisposable
     {
         await Assert.ThrowsAsync<InvalidOperationException>(
             () => CreateService().LoadAsync("tvshow", 11, null, null, null, null));
+        Assert.Empty(handler.Requests);
+    }
+
+    /// <summary>Prüft Load: ohne Client bei Episode im Serienkontext → stabiler Kopfbereich ohne Bildabruf.</summary>
+    [Fact]
+    public async Task Load_WithoutClient_EpisodeSnapshot_HasStableHeader()
+    {
+        await ShowDetailsCache.WriteAsync(cache, Show());
+
+        var details = await CreateService().LoadAsync("tvshowepisode", 33, null, showId: 11, seasonId: 22, episodeId: 33);
+
+        Assert.True(details.IsOfflineSnapshot);
+        Assert.Equal(33, details.SelectedEpisodeId);
+        Assert.Equal(33, details.HeaderEpisodeId);
+        Assert.Null(details.HeaderPictureId);
+        // Der gecachte Episodentitel führt den Kopfbereich — ohne Client
+        // wird nichts abgerufen (Lade-Gate im MVU-Update).
+        Assert.Equal("Auftakt", details.HeaderTitle);
         Assert.Empty(handler.Requests);
     }
 }
