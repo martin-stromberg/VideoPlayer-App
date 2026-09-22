@@ -83,12 +83,14 @@ public class AppUpdateTests_Connection
         Assert.Equal("martin", transition.Model.LoginUsername);
         Assert.Null(transition.Model.LoginError);
         Assert.Equal(AppPage.Home, transition.Model.CurrentPage);
-        // Verbundener Zustand: Ereignisverbindung + Voll-Sync + Navigation.
+        // Verbundener Zustand: Ereignisverbindung + Voll-Sync +
+        // Download-Wiederaufnahme + Navigation.
         Assert.True(transition.Model.IsSyncRunning);
-        Assert.Equal(3, transition.Effects.Count);
+        Assert.Equal(4, transition.Effects.Count);
         Assert.IsType<ConnectServerEventsEffect>(transition.Effects[0]);
         Assert.IsType<RunFullSyncEffect>(transition.Effects[1]);
-        var navigate = Assert.IsType<NavigateToPageEffect>(transition.Effects[2]);
+        Assert.IsType<ResumeDownloadsEffect>(transition.Effects[2]);
+        var navigate = Assert.IsType<NavigateToPageEffect>(transition.Effects[3]);
         Assert.Equal(AppPage.Home, navigate.Page);
     }
 
@@ -224,10 +226,11 @@ public class AppUpdateTests_Connection
         Assert.Equal(ConnectionState.Connected, transition.Model.ConnectionState);
         Assert.Equal(AppPage.Home, transition.Model.CurrentPage);
         Assert.True(transition.Model.IsSyncRunning);
-        Assert.Equal(3, transition.Effects.Count);
+        Assert.Equal(4, transition.Effects.Count);
         Assert.IsType<ConnectServerEventsEffect>(transition.Effects[0]);
         Assert.IsType<RunFullSyncEffect>(transition.Effects[1]);
-        var navigate = Assert.IsType<NavigateToPageEffect>(transition.Effects[2]);
+        Assert.IsType<ResumeDownloadsEffect>(transition.Effects[2]);
+        var navigate = Assert.IsType<NavigateToPageEffect>(transition.Effects[3]);
         Assert.Equal(AppPage.Home, navigate.Page);
     }
 

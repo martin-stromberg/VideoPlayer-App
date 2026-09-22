@@ -124,6 +124,9 @@ public sealed record AppModel
     /// <summary>Zustand der Favoriten-Seite (Menüseite „Favoriten").</summary>
     public FavoritesPageState FavoritesPage { get; init; } = FavoritesPageState.Initial;
 
+    /// <summary>Zustand der Downloads-Seite (Menüseite „Downloads").</summary>
+    public DownloadsPageState Downloads { get; init; } = DownloadsPageState.Initial;
+
     /// <summary>Zustand der Profil-Seite (Menüseite „Profil").</summary>
     public ProfilePageState Profile { get; init; } = ProfilePageState.Initial;
 

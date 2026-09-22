@@ -18,6 +18,8 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
     private readonly AuthSessionService authSession;
     private readonly INetworkStatusMonitor networkMonitor;
     private readonly ServerEventsService serverEvents;
+    private readonly DownloadService downloads;
+    private readonly AutoDownloadService autoDownloads;
 
     /// <summary>Initialisiert eine neue Instanz der <see cref="ShellAppEffectHandler"/>-Klasse.</summary>
     /// <param name="services">Dienstanbieter zum Auflösen der am Effekt beteiligten Dienste (inkl. <see cref="MvuHost"/>).</param>
@@ -25,18 +27,24 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
     /// <param name="authSession">Sitzungsdienst für den Anmelde-Workflow.</param>
     /// <param name="networkMonitor">Netzwerkstatus-Erkennung; meldet Wechsel in den MVU-Zyklus.</param>
     /// <param name="serverEvents">Server-Ereignisverbindung; meldet Ereignisse und Trennung in den MVU-Zyklus.</param>
+    /// <param name="downloads">Download-Verwaltung; meldet Zustands-/Fortschrittsänderungen in den MVU-Zyklus.</param>
+    /// <param name="autoDownloads">Automatischer Vorlauf der Weiterschauen-Liste.</param>
     public ShellAppEffectHandler(
         IServiceProvider services,
         IServerHealthProbe healthProbe,
         AuthSessionService authSession,
         INetworkStatusMonitor networkMonitor,
-        ServerEventsService serverEvents)
+        ServerEventsService serverEvents,
+        DownloadService downloads,
+        AutoDownloadService autoDownloads)
     {
         this.services = services;
         this.healthProbe = healthProbe;
         this.authSession = authSession;
         this.networkMonitor = networkMonitor;
         this.serverEvents = serverEvents;
+        this.downloads = downloads;
+        this.autoDownloads = autoDownloads;
 
         // Endgültig abgelehnte stille Neuanmeldung (401 ohne gültige
         // Zugangsdaten) → die App wechselt in den Anmeldezustand.
@@ -48,6 +56,12 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
         this.networkMonitor.AvailabilityChanged += OnNetworkAvailabilityChanged;
         this.serverEvents.EventReceived += OnServerEventReceived;
         this.serverEvents.ConnectionClosed += OnServerEventsConnectionClosed;
+
+        // Download-Transfers laufen auf Hintergrundthreads — Zustands-/
+        // Fortschrittsmeldungen und Entfernungen gehen über den
+        // MainThread in den MVU-Zyklus.
+        this.downloads.ItemChanged += OnDownloadItemChanged;
+        this.downloads.ItemRemoved += OnDownloadItemRemoved;
     }
 
     /// <inheritdoc/>
@@ -159,6 +173,27 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
                 break;
             case LogoutEffect:
                 await LogoutAsync();
+                break;
+            case LoadDownloadsEffect load:
+                await LoadDownloadsAsync(load.Settings);
+                break;
+            case EnqueueDownloadEffect enqueue:
+                await EnqueueDownloadAsync(enqueue, cancellationToken);
+                break;
+            case CancelDownloadEffect cancel:
+                await downloads.CancelAsync(cancel.MediaType, cancel.MediaId, cancellationToken);
+                break;
+            case DeleteDownloadEffect delete:
+                await DeleteDownloadAsync(delete.MediaType, delete.MediaId, cancellationToken);
+                break;
+            case ResumeDownloadsEffect resume:
+                await ResumeDownloadsAsync(resume.Settings, cancellationToken);
+                break;
+            case RunAutoDownloadsEffect autoRun:
+                await autoDownloads.RunAsync(autoRun.Settings, autoRun.Force, cancellationToken);
+                break;
+            case DeleteWatchedDownloadEffect deleteWatched:
+                await DeleteDownloadAsync(deleteWatched.MediaType, deleteWatched.MediaId, cancellationToken, completedOnly: true);
                 break;
         }
     }
@@ -567,6 +602,93 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
             System.Diagnostics.Debug.WriteLine($"[ShellAppEffectHandler] Abmeldung fehlgeschlagen: {ex.Message}");
         }
     }
+
+    private async Task LoadDownloadsAsync(AppSettings settings)
+    {
+        IReadOnlyList<DownloadListItem> items = [];
+        long usedBytes = 0;
+        string? error = null;
+        try
+        {
+            items = await downloads.LoadItemsAsync();
+            usedBytes = downloads.GetUsedBytes();
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[ShellAppEffectHandler] Download-Liste laden fehlgeschlagen: {ex.Message}");
+            error = "Die Downloads konnten nicht geladen werden.";
+        }
+
+        await DispatchMessageAsync(new DownloadsLoadedMessage(items, usedBytes, settings.DownloadQuotaGb, error));
+    }
+
+    private async Task EnqueueDownloadAsync(EnqueueDownloadEffect enqueue, CancellationToken cancellationToken)
+    {
+        DownloadEnqueueResult result;
+        try
+        {
+            result = await downloads.EnqueueAsync(
+                enqueue.MediaType, enqueue.MediaId, enqueue.Title, enqueue.Settings, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[ShellAppEffectHandler] Download einreihen fehlgeschlagen: {ex.Message}");
+            result = new DownloadEnqueueResult
+            {
+                Item = null,
+                Notice = "Der Download konnte nicht eingeplant werden.",
+                IsError = true
+            };
+        }
+
+        await DispatchMessageAsync(new DownloadEnqueueCompletedMessage(
+            result.Item, result.Notice, result.IsError,
+            MediaTypeNames.Normalize(enqueue.MediaType), enqueue.MediaId));
+    }
+
+    private async Task DeleteDownloadAsync(
+        string mediaType,
+        long mediaId,
+        CancellationToken cancellationToken,
+        bool completedOnly = false)
+    {
+        try
+        {
+            // Das Entfernen wird über das ItemRemoved-Ereignis des
+            // Dienstes als DownloadDeletedMessage in den MVU-Zyklus
+            // gemeldet — keine Rückmeldung nötig.
+            if (completedOnly)
+            {
+                await downloads.DeleteIfCompletedAsync(mediaType, mediaId, cancellationToken);
+            }
+            else
+            {
+                await downloads.DeleteAsync(mediaType, mediaId, cancellationToken);
+            }
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[ShellAppEffectHandler] Download löschen fehlgeschlagen: {ex.Message}");
+        }
+    }
+
+    private async Task ResumeDownloadsAsync(AppSettings settings, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await downloads.ResumeInterruptedAsync(settings, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[ShellAppEffectHandler] Download-Wiederaufnahme fehlgeschlagen: {ex.Message}");
+        }
+    }
+
+    private void OnDownloadItemChanged(object? sender, DownloadItemEventArgs e) =>
+        _ = DispatchMessageAsync(new DownloadItemChangedMessage(e.Item));
+
+    private void OnDownloadItemRemoved(object? sender, DownloadRemovedEventArgs e) =>
+        _ = DispatchMessageAsync(new DownloadDeletedMessage(e.MediaType, e.MediaId));
 
     private void OnNetworkAvailabilityChanged(object? sender, bool isOnline) =>
         _ = DispatchMessageAsync(new NetworkAvailabilityChangedMessage(isOnline));

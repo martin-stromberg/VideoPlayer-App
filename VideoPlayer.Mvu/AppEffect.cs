@@ -285,3 +285,80 @@ public sealed record ReportPlaybackProgressEffect(
 /// umschaltbaren PiP bleibt der Effekt wirkungslos.
 /// </summary>
 public sealed record TogglePictureInPictureEffect : AppEffect;
+
+/// <summary>
+/// Download-Liste aus dem Manifest laden — Einträge, Speicherbelegung
+/// und konfiguriertes Kontingent (Ergebnis: <c>DownloadsLoadedMessage</c>).
+/// Läuft ohne Serverkontakt.
+/// </summary>
+/// <param name="Settings">Aktuelle App-Einstellungen (Kontingent für die Anzeige).</param>
+/// <returns>Effekt-Datensatz für das Laden der Download-Liste.</returns>
+public sealed record LoadDownloadsEffect(AppSettings Settings) : AppEffect;
+
+/// <summary>
+/// Einen Download einreihen bzw. einen fehlgeschlagenen/abgebrochenen
+/// Auftrag erneut einreihen (Ergebnis: <c>DownloadEnqueueCompletedMessage</c>;
+/// Zustands-/Fortschrittsänderungen laufen über
+/// <c>DownloadItemChangedMessage</c>).
+/// </summary>
+/// <param name="MediaType">Medientyp (normalisiert, CLR-Konvention).</param>
+/// <param name="MediaId">Id des Mediums.</param>
+/// <param name="Title">Anzeigetitel des Downloads; <c>null</c> = Fallback.</param>
+/// <param name="Settings">Aktuelle App-Einstellungen (Kontingent, WLAN-Bedingung).</param>
+/// <returns>Effekt-Datensatz für das Einreihen.</returns>
+public sealed record EnqueueDownloadEffect(
+    string MediaType,
+    long MediaId,
+    string? Title,
+    AppSettings Settings) : AppEffect;
+
+/// <summary>
+/// Einen wartenden/laufenden Download abbrechen (Zustand →
+/// <c>cancelled</c>, Teildatei wird entfernt).
+/// </summary>
+/// <param name="MediaType">Medientyp des Downloads (normalisiert).</param>
+/// <param name="MediaId">Id des Mediums.</param>
+/// <returns>Effekt-Datensatz für den Abbruch.</returns>
+public sealed record CancelDownloadEffect(string MediaType, long MediaId) : AppEffect;
+
+/// <summary>
+/// Einen Download vollständig entfernen: laufenden Transfer abbrechen,
+/// Datei und Manifest-Zeile löschen (Ergebnis:
+/// <c>DownloadDeletedMessage</c>).
+/// </summary>
+/// <param name="MediaType">Medientyp des Downloads (normalisiert).</param>
+/// <param name="MediaId">Id des Mediums.</param>
+/// <returns>Effekt-Datensatz für das Löschen.</returns>
+public sealed record DeleteDownloadEffect(string MediaType, long MediaId) : AppEffect;
+
+/// <summary>
+/// Unterbrochene Downloads wiederaufnehmen: wartende und verwaist
+/// laufende Aufträge sowie nicht-Quota-Fehlschläge werden erneut
+/// eingeplant (der Server-Stream unterstützt keine Range-Fortsetzung —
+/// der Transfer beginnt erneut ab Byte 0). Abgebrochene Downloads und
+/// Quota-Fehlschläge bleiben unberührt.
+/// </summary>
+/// <param name="Settings">Aktuelle App-Einstellungen (Kontingent, WLAN-Bedingung).</param>
+/// <returns>Effekt-Datensatz für die Wiederaufnahme.</returns>
+public sealed record ResumeDownloadsEffect(AppSettings Settings) : AppEffect;
+
+/// <summary>
+/// Automatischen Vorlauf der Weiterschauen-Liste ausführen
+/// (<see cref="AutoDownloadService"/>): die nächsten Episoden je
+/// Weiterschauen-Eintrag einreihen, gedrosselt auf
+/// <see cref="AutoDownloadService.MinRunInterval"/>.
+/// </summary>
+/// <param name="Settings">Aktuelle App-Einstellungen.</param>
+/// <param name="Force"><c>true</c> = Throttle ignorieren (z. B. beim Einschalten der Einstellung).</param>
+/// <returns>Effekt-Datensatz für den Vorlauf-Lauf.</returns>
+public sealed record RunAutoDownloadsEffect(AppSettings Settings, bool Force) : AppEffect;
+
+/// <summary>
+/// Den abgeschlossenen Download eines als gesehen markierten Mediums
+/// entfernen (Einstellung „Gesehene Episoden automatisch löschen" —
+/// Ergebnis bei Treffer: <c>DownloadDeletedMessage</c>).
+/// </summary>
+/// <param name="MediaType">Medientyp des gesehenen Mediums (normalisiert).</param>
+/// <param name="MediaId">Id des Mediums.</param>
+/// <returns>Effekt-Datensatz für das automatische Entfernen.</returns>
+public sealed record DeleteWatchedDownloadEffect(string MediaType, long MediaId) : AppEffect;

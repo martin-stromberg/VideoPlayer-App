@@ -83,6 +83,13 @@ namespace VideoPlayer.Maui
             builder.Services.AddSingleton<PlaybackSourceService>();
             builder.Services.AddSingleton<IPictureInPictureService, PictureInPictureService>();
 
+            // Download-Verwaltung: persistente Aufträge im Download-
+            // Manifest, parallele Transfers mit Quota/WLAN-Bedingung —
+            // die Downloads-Seite speist sich über ItemChanged/ItemRemoved.
+            // AutoDownloadService: Vorlauf der Weiterschauen-Episoden.
+            builder.Services.AddSingleton<DownloadService>();
+            builder.Services.AddSingleton<AutoDownloadService>();
+
             builder.Services.AddSingleton<AppShell>();
             builder.Services.AddTransient<Pages.LoadingPage>();
             builder.Services.AddTransient<Pages.HomePage>();

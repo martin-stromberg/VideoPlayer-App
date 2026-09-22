@@ -24,10 +24,29 @@ public sealed class DownloadManifestEntry
     /// <summary>Pfad der lokalen Videodatei.</summary>
     public string FilePath { get; set; } = string.Empty;
 
-    /// <summary>Größe der Datei in Bytes.</summary>
+    /// <summary>Größe der Datei in Bytes (bei abgeschlossenen Downloads).</summary>
     public long SizeBytes { get; set; }
 
-    /// <summary>Status des Downloads (z. B. läuft, fertig, fehlgeschlagen).</summary>
+    /// <summary>Anzeigetitel des Downloads (für die Downloads-Seite ohne Server-Roundtrip).</summary>
+    public string Title { get; set; } = string.Empty;
+
+    /// <summary>Bereits übertragene Bytes des laufenden/letzten Laufs.</summary>
+    public long DownloadedBytes { get; set; }
+
+    /// <summary>Erwartete Gesamtgröße in Bytes (<c>Content-Length</c>); 0 = unbekannt.</summary>
+    public long TotalBytes { get; set; }
+
+    /// <summary>
+    /// Maschinenlesbarer Fehlercode des letzten Fehlschlags
+    /// (z. B. <c>quota_exceeded</c>, <c>network</c>, <c>http_404</c>);
+    /// leer/<c>null</c> = kein Fehler.
+    /// </summary>
+    public string? Error { get; set; }
+
+    /// <summary>
+    /// Status des Downloads (<c>queued</c>, <c>downloading</c>,
+    /// <c>completed</c>, <c>failed</c>, <c>cancelled</c>).
+    /// </summary>
     public string State { get; set; } = string.Empty;
 
     /// <summary>Zeitpunkt der letzten Aktualisierung (UTC).</summary>

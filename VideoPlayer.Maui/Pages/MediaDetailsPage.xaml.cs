@@ -127,10 +127,16 @@ public partial class MediaDetailsPage : ContentPage
         FavoriteButton.Text = details.FavoriteStarText;
         FavoriteButton.IsEnabled = !state.IsFavoriteUpdating;
 
-        // „Abspielen" nur für direkt abspielbare Medientypen (Film,
-        // Episode) — Serien/Staffeln/Kollektionen spielen über ihre
-        // Episoden- bzw. Film-Einträge.
+        // „Abspielen" und „Herunterladen" nur für direkt abspielbare
+        // Medientypen (Film, Episode) — Serien/Staffeln/Kollektionen
+        // nutzen ihre Episoden- bzw. Film-Einträge.
         PlayButton.IsVisible = details.IsPlayable;
+        DownloadButton.IsVisible = details.IsPlayable;
+
+        // Hinweis der letzten Download-Anforderung dieser Identität.
+        DownloadNoticeLabel.IsVisible = isRequested && state.DownloadNotice is not null;
+        DownloadNoticeLabel.Text = state.DownloadNotice;
+        DownloadNoticeLabel.TextColor = state.DownloadNoticeIsError ? Colors.Red : Color.FromArgb("#7BD88F");
 
         UpdateSeasonSection(details);
         UpdateCollectionSection(details);
@@ -261,5 +267,37 @@ public partial class MediaDetailsPage : ContentPage
         // gebildet.
         _ = mvuHost.DispatchAsync(new PlayRequestedMessage(
             "tvshowepisode", episode.Id, episode.Title));
+    }
+
+    private void OnDownloadClicked(object? sender, EventArgs e)
+    {
+        var details = mvuHost.Model.MediaDetails.Details;
+        if (details is null || !details.IsPlayable)
+        {
+            return;
+        }
+
+        // Bei einer navigierten Episode ist der Episodentitel
+        // aussagekräftiger als der Serienname des Kopfbereichs.
+        _ = mvuHost.DispatchAsync(new DownloadRequestedMessage(
+            details.MediaType, details.MediaId,
+            details.HighlightedEpisodeTitle ?? details.Title));
+    }
+
+    private void OnEpisodeDownloadClicked(object? sender, EventArgs e)
+    {
+        if ((sender as Element)?.BindingContext is not EpisodeItem episode)
+        {
+            return;
+        }
+
+        // „Herunterladen" direkt aus der Episodenliste — Titel mit
+        // Seriennamen für die Downloads-Liste.
+        var details = mvuHost.Model.MediaDetails.Details;
+        var title = details is null || string.IsNullOrWhiteSpace(details.Title)
+            ? episode.Title
+            : $"{details.Title} – {episode.Title}";
+        _ = mvuHost.DispatchAsync(new DownloadRequestedMessage(
+            "tvshowepisode", episode.Id, title));
     }
 }

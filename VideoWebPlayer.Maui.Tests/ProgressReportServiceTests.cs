@@ -152,6 +152,7 @@ public class ProgressReportServiceTests : IDisposable
     private sealed class FakeNetworkMonitor : INetworkStatusMonitor
     {
         public bool IsOnline { get; set; } = true;
+        public bool IsWifi { get; set; } = true;
         public event EventHandler<bool>? AvailabilityChanged;
         public void Start() { }
         public void SetOnline(bool online)

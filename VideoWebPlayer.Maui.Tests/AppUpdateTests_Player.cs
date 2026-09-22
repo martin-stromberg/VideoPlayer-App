@@ -70,21 +70,21 @@ public class AppUpdateTests_Player
         IReadOnlyList<PlayerEpisodeRef>? upcoming = null,
         TimeSpan? duration = null,
         TimeSpan? position = null) => new()
-    {
-        MediaType = "tvshowepisode",
-        MediaId = mediaId,
-        Title = "Pilot",
-        Attempted = true,
-        IsPlaying = true,
-        Duration = duration ?? TimeSpan.FromMinutes(45),
-        Position = position ?? TimeSpan.Zero,
-        UpcomingEpisodes = upcoming ?? [],
-        Source = new PlaybackSource
         {
-            Kind = PlaybackSourceKind.ServerStream,
-            Location = "http://testserver/api/items/tvshowepisode/31/stream"
-        }
-    };
+            MediaType = "tvshowepisode",
+            MediaId = mediaId,
+            Title = "Pilot",
+            Attempted = true,
+            IsPlaying = true,
+            Duration = duration ?? TimeSpan.FromMinutes(45),
+            Position = position ?? TimeSpan.Zero,
+            UpcomingEpisodes = upcoming ?? [],
+            Source = new PlaybackSource
+            {
+                Kind = PlaybackSourceKind.ServerStream,
+                Location = "http://testserver/api/items/tvshowepisode/31/stream"
+            }
+        };
 
     private static AppModel WithPlayer(PlayerState player) =>
         Connected() with { Player = player };
@@ -160,7 +160,10 @@ public class AppUpdateTests_Player
         };
         var model = WithPlayer(new PlayerState
         {
-            MediaType = "movie", MediaId = 42, IsResolving = true, Attempted = true
+            MediaType = "movie",
+            MediaId = 42,
+            IsResolving = true,
+            Attempted = true
         });
 
         var transition = AppUpdate.Update(

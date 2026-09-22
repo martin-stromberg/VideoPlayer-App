@@ -27,7 +27,8 @@ public sealed record RecordedRequest(
 /// </summary>
 public sealed class StubHttpMessageHandler : HttpMessageHandler
 {
-    private readonly Queue<Func<HttpRequestMessage, Task<HttpResponseMessage>>> responses = new();
+    private readonly object gate = new();
+    private readonly Queue<Func<HttpRequestMessage, CancellationToken, Task<HttpResponseMessage>>> responses = new();
 
     /// <summary>Die in Reihenfolge aufgezeichneten Requests.</summary>
     /// <value>Liste aller eingegangenen Requests.</value>
@@ -37,7 +38,10 @@ public sealed class StubHttpMessageHandler : HttpMessageHandler
     /// <param name="response">Die zurückzugebende Antwort.</param>
     public void Enqueue(HttpResponseMessage response)
     {
-        responses.Enqueue(_ => Task.FromResult(response));
+        lock (gate)
+        {
+            responses.Enqueue((_, _) => Task.FromResult(response));
+        }
     }
 
     /// <summary>Reiht eine Antwort mit Statuscode und optionalem JSON-Body ein.</summary>
@@ -65,14 +69,41 @@ public sealed class StubHttpMessageHandler : HttpMessageHandler
     /// <param name="exception">Die zu werfende Ausnahme.</param>
     public void EnqueueException(Exception exception)
     {
-        responses.Enqueue(_ => Task.FromException<HttpResponseMessage>(exception));
+        lock (gate)
+        {
+            responses.Enqueue((_, _) => Task.FromException<HttpResponseMessage>(exception));
+        }
     }
 
     /// <summary>Reiht ein Responder-Delegate ein, das die Antwort erzeugt.</summary>
     /// <param name="responder">Das Responder-Delegate.</param>
     public void Enqueue(Func<HttpRequestMessage, HttpResponseMessage> responder)
     {
-        responses.Enqueue(request => Task.FromResult(responder(request)));
+        lock (gate)
+        {
+            responses.Enqueue((request, _) => Task.FromResult(responder(request)));
+        }
+    }
+
+    /// <summary>Asynchrones Responder-Delegate, das das Request-Abbruchtoken beachtet.</summary>
+    /// <param name="request">Die abgesendete HTTP-Anfrage.</param>
+    /// <param name="cancellationToken">Abbruchtoken der Anfrage.</param>
+    /// <returns>Die zu liefernde HTTP-Antwort.</returns>
+    public delegate Task<HttpResponseMessage> AsyncResponder(HttpRequestMessage request, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Reiht ein asynchrones Responder-Delegate ein — etwa eine
+    /// wartende Aufgabe für Transfers, die auf einen Abbruch warten:
+    /// der Handler reicht das Request-<see cref="CancellationToken"/>
+    /// durch, sodass ein Abbruch den ausstehenden Send auflöst.
+    /// </summary>
+    /// <param name="responder">Das asynchrone Responder-Delegate.</param>
+    public void EnqueueAsyncResponder(AsyncResponder responder)
+    {
+        lock (gate)
+        {
+            responses.Enqueue((request, cancellationToken) => responder(request, cancellationToken));
+        }
     }
 
     /// <inheritdoc/>
@@ -81,19 +112,25 @@ public sealed class StubHttpMessageHandler : HttpMessageHandler
         cancellationToken.ThrowIfCancellationRequested();
 
         var body = request.Content is null ? null : await request.Content.ReadAsStringAsync(cancellationToken);
-        Requests.Add(new RecordedRequest(
-            request.Method,
-            request.RequestUri?.PathAndQuery ?? string.Empty,
-            request.Headers.Authorization?.ToString(),
-            request.Headers.TryGetValues(ClientGate.HeaderName, out var values) ? string.Join(",", values) : null,
-            body));
-
-        if (responses.Count == 0)
+        Func<HttpRequestMessage, CancellationToken, Task<HttpResponseMessage>> responder;
+        lock (gate)
         {
-            throw new InvalidOperationException($"Unerwarteter Request ohne konfigurierte Antwort: {request.Method} {request.RequestUri}");
+            Requests.Add(new RecordedRequest(
+                request.Method,
+                request.RequestUri?.PathAndQuery ?? string.Empty,
+                request.Headers.Authorization?.ToString(),
+                request.Headers.TryGetValues(ClientGate.HeaderName, out var values) ? string.Join(",", values) : null,
+                body));
+
+            if (responses.Count == 0)
+            {
+                throw new InvalidOperationException($"Unerwarteter Request ohne konfigurierte Antwort: {request.Method} {request.RequestUri}");
+            }
+
+            responder = responses.Dequeue();
         }
 
-        return await responses.Dequeue()(request);
+        return await responder(request, cancellationToken);
     }
 }
 

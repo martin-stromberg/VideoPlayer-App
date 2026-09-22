@@ -51,6 +51,13 @@
                                     HeightRequest="40"
                                     IsVisible="False"
                                     Clicked="OnPlayClicked" />
+                            <Button x:Name="DownloadButton"
+                                    Text="⤓"
+                                    FontSize="16"
+                                    WidthRequest="44"
+                                    HeightRequest="40"
+                                    IsVisible="False"
+                                    Clicked="OnDownloadClicked" />
                             <Button x:Name="FavoriteButton"
                                     Text="☆"
                                     FontSize="20"
@@ -64,6 +71,11 @@
                         <Label x:Name="GenreLabel"
                                FontSize="12"
                                TextColor="#BBBBBB" />
+                        <!-- Hinweis der letzten Download-Anforderung
+                             (eingeplant/bereits vorhanden/Fehler). -->
+                        <Label x:Name="DownloadNoticeLabel"
+                               FontSize="12"
+                               IsVisible="False" />
                     </VerticalStackLayout>
                 </Grid>
 
@@ -89,7 +101,7 @@
                                         Margin="0,0,0,8"
                                         StrokeShape="RoundRectangle 8"
                                         BackgroundColor="#23232a">
-                                    <Grid ColumnDefinitions="110,*,Auto"
+                                    <Grid ColumnDefinitions="110,*,Auto,Auto"
                                           ColumnSpacing="10">
                                         <controls:CachedPosterImage PictureId="{Binding PosterPictureId}"
                                                                     Grid.Column="0"
@@ -107,6 +119,13 @@
                                                    LineBreakMode="TailTruncation" />
                                         </VerticalStackLayout>
                                         <Button Grid.Column="2"
+                                                Text="⤓"
+                                                FontSize="16"
+                                                WidthRequest="44"
+                                                HeightRequest="44"
+                                                VerticalOptions="Center"
+                                                Clicked="OnEpisodeDownloadClicked" />
+                                        <Button Grid.Column="3"
                                                 Text="▶"
                                                 FontSize="16"
                                                 WidthRequest="44"
