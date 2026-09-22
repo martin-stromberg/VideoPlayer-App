@@ -1,0 +1,8 @@
+# Änderungsprotokoll
+
+## 2026-09-22 — Server-API-Client (Neuimplementierung)
+
+- Neues plattformneutrales Projekt `VideoPlayer.ApiClient` als clientseitiger Zugriff auf die öffentliche Server-API (Anmeldung, Erreichbarkeitsprüfung, Quellen, „Neu im Programm", Weiterschauen inkl. Fortschritt/Ausblenden/Überspringen, Favoriten, Mediennachschlagen, Bildabrufe).
+- Feste Wiederholungsstrategie: Initialversuch + bis zu 3 Wiederholungen mit Warteintervallen 1 s/2 s/4 s; einmalige Token-Erneuerung bei 401; keine Wiederholung bei eindeutigen Clientfehlern (außer 408/429).
+- Client-Gate per `X-API-Key`-Header, konfigurierbar über Umgebungsvariable `VIDEOWEBPLAYER_MAUI_API_TOKEN`, Build-Eigenschaft `VideoPlayerApiToken` oder `VideoPlayerApiClientOptions.ApiKey`.
+- 61 neue xUnit-Tests gegen einen simulierten Server (`StubHttpMessageHandler`).

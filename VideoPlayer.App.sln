@@ -9,6 +9,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "VideoWebPlayer.Maui", "Vide
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "VideoWebPlayer.Maui.Tests", "VideoWebPlayer.Maui.Tests\VideoWebPlayer.Maui.Tests.csproj", "{6FC81FCF-EB2A-4680-8B64-E048455D5527}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "VideoPlayer.ApiClient", "VideoPlayer.ApiClient\VideoPlayer.ApiClient.csproj", "{A4B7C2D1-3E5F-4A6B-9C8D-1E2F3A4B5C6D}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -55,6 +57,18 @@ Global
 		{6FC81FCF-EB2A-4680-8B64-E048455D5527}.Release|x64.Build.0 = Release|Any CPU
 		{6FC81FCF-EB2A-4680-8B64-E048455D5527}.Release|x86.ActiveCfg = Release|Any CPU
 		{6FC81FCF-EB2A-4680-8B64-E048455D5527}.Release|x86.Build.0 = Release|Any CPU
+		{A4B7C2D1-3E5F-4A6B-9C8D-1E2F3A4B5C6D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A4B7C2D1-3E5F-4A6B-9C8D-1E2F3A4B5C6D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A4B7C2D1-3E5F-4A6B-9C8D-1E2F3A4B5C6D}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{A4B7C2D1-3E5F-4A6B-9C8D-1E2F3A4B5C6D}.Debug|x64.Build.0 = Debug|Any CPU
+		{A4B7C2D1-3E5F-4A6B-9C8D-1E2F3A4B5C6D}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{A4B7C2D1-3E5F-4A6B-9C8D-1E2F3A4B5C6D}.Debug|x86.Build.0 = Debug|Any CPU
+		{A4B7C2D1-3E5F-4A6B-9C8D-1E2F3A4B5C6D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A4B7C2D1-3E5F-4A6B-9C8D-1E2F3A4B5C6D}.Release|Any CPU.Build.0 = Release|Any CPU
+		{A4B7C2D1-3E5F-4A6B-9C8D-1E2F3A4B5C6D}.Release|x64.ActiveCfg = Release|Any CPU
+		{A4B7C2D1-3E5F-4A6B-9C8D-1E2F3A4B5C6D}.Release|x64.Build.0 = Release|Any CPU
+		{A4B7C2D1-3E5F-4A6B-9C8D-1E2F3A4B5C6D}.Release|x86.ActiveCfg = Release|Any CPU
+		{A4B7C2D1-3E5F-4A6B-9C8D-1E2F3A4B5C6D}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
