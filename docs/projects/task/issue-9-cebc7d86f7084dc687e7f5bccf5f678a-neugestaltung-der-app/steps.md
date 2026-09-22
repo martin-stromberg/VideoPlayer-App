@@ -4,7 +4,7 @@ Branch: `task/issue-9-cebc7d86f7084dc687e7f5bccf5f678a-neugestaltung-der-app`
 
 | # | Titel | Abhängigkeiten | Branch | Status |
 |---|-------|----------------|--------|--------|
-| 1 | Clientseitiger Zugriff auf die Server-API (Neuimplementierung) | Keine | `task/issue-9-cebc7d86f7084dc687e7f5bccf5f678a-neugestaltung-der-app-schritt-1-api-client` | Offen |
+| 1 | Clientseitiger Zugriff auf die Server-API (Neuimplementierung) | Keine | `task/issue-9-cebc7d86f7084dc687e7f5bccf5f678a-neugestaltung-der-app-schritt-1-api-client` | In Arbeit |
 | 2 | App-Grundgerüst mit MVU-Struktur und Navigation | 1 | `task/issue-9-cebc7d86f7084dc687e7f5bccf5f678a-neugestaltung-der-app-schritt-2-mvu-grundgeruest` | Offen |
 | 3 | Einstellungsverwaltung und lokale Datenhaltung mit Backup-Trennung | 2 | `task/issue-9-cebc7d86f7084dc687e7f5bccf5f678a-neugestaltung-der-app-schritt-3-einstellungen-datenhaltung` | Offen |
 | 4 | Serververwaltung und Erststart-Einrichtung | 2, 3 | `task/issue-9-cebc7d86f7084dc687e7f5bccf5f678a-neugestaltung-der-app-schritt-4-serververwaltung-erststart` | Offen |
