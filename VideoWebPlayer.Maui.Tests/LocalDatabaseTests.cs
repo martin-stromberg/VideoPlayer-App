@@ -7,6 +7,7 @@ namespace VideoWebPlayer.Maui.Tests;
 /// Reale SQLite-Tests (sqlite-net-pcl + bundle_green laufen unter net10.0):
 /// Tabellenanlage, Roundtrips und Ablageorte der beiden Datenbanken.
 /// </summary>
+[Collection("SqliteDatabase")]
 public class LocalDatabaseTests : IDisposable
 {
     private readonly string root;

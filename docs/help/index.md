@@ -6,6 +6,7 @@
 
 - [Neues App-Grundgerüst](app-grundgeruest.md) — Startvorgang, Seitenmenü und Platzhalterseiten der neu aufgebauten App.
 - [Einstellungen und lokale Datenhaltung](einstellungen-datenhaltung.md) — Einstellungsseite, Backup-Trennung der Ablageorte, Geheimnisse und Profile.
+- [Serververwaltung und Erststart-Einrichtung](serververwaltung-erststart.md) — Erststart-Dialog, Netzwerk-Erkennung (mDNS/UDP), bekannte Server und „Server wechseln".
 
 ## Infrastruktur
 

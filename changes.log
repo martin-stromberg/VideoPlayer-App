@@ -1,5 +1,16 @@
 # Änderungsprotokoll
 
+## 2026-09-22 — Serververwaltung und Erststart-Einrichtung (Neugestaltung, Schritt 4)
+
+- Mehr-Server-Verwaltung auf der backup-pflichtigen Ablage: `KnownServersService` (VideoPlayer.Storage) verwaltet die Liste bekannter Server (`known_servers`) und den zuletzt verbundenen Server (`backup_state`-Schlüssel `LastConnectedServer`); `ServerAddress` normalisiert Adressen in die kanonische Form `scheme://host[:port][/pfad]/`.
+- Erststart-Einrichtung: Ohne hinterlegten Server zeigt die App nach dem Start den Einrichtungsdialog „Server" (neue Seite `ServerSetupPage`, `AppPage.ServerSetup`) statt der Startseite; nach erfolgreicher Einrichtung startet die App künftig direkt mit dem gespeicherten Server.
+- Netzwerk-Erkennung neu implementiert in `VideoPlayer.ApiClient.Discovery`: UDP-Broadcast `VIDEOWEBPLAYER_DISCOVERY` auf Port 5001 (`VIDEOWEBPLAYER_SERVER:`-Antworten) und mDNS-Dienstsuche auf `_http._tcp.local.` (Zeroconf); `ServerDiscoveryService` führt beide Wege parallel aus, merged und dedupliziert die Treffer.
+- Einheitlicher Prüfpfad: Manuelle Eingabe, Discovery-Auswahl und Serverwechsel werden erst nach erfolgreicher Verbindungsprüfung (`CheckHealthAsync`) gespeichert; Fehlschläge erzeugen Inline-Hinweise ohne Persistenz.
+- „Server wechseln" als dezenter Eintrag in den Einstellungen: bekannte Server auflisten, neue hinzufügen, aktiven Server wechseln — ohne die übrigen Einstellungen zu verändern; die Verwaltungsseite läuft als Shell-Route `serversetup` ohne Menüeintrag.
+- `ServerAddressProvider` auf die Serververwaltung umgestellt (zuletzt verbundener Server → `VIDEOPLAYER_SERVER_URL` → IIS-Default als Auflösungs-Fallback); einmalige Migration des bisherigen Ablage-Schlüssels `ServerAddress` in die Datenbank.
+- Discovery-Verifikation am lokalen IIS: mDNS-Announce und verwendbare UDP-Antwort fehlen serverseitig → Issues martin-stromberg/VideoPlayer#223 und #224 gemeldet; bewusst kein App-Workaround.
+- 69 neue xUnit-Tests für Normalisierung, Serververwaltung (reale SQLite-Ablage), Discovery-Protokoll inkl. echtem UDP-Roundtrip, MVU-Flüsse und UI-Verträge (insgesamt 229 Tests).
+
 ## 2026-09-22 — Einstellungsverwaltung und lokale Datenhaltung mit Backup-Trennung (Neugestaltung, Schritt 3)
 
 - Neues plattformneutrales Projekt `VideoPlayer.Storage`: Einstellungsmodell `AppSettings` mit acht Einstellungen (automatische Downloads, vorzuladende Episoden, WLAN-only-Downloads, Speicherplatzkontingent in GB mit Standard 5, automatisches Löschen gesehener Episoden, Auto-Fortsetzung mit Zeitfenster, „Als angesehen"-Zeitfenster), `AppSettingsService`/`AppSecretsService`, Profil-Isolation über `VIDEOPLAYER_PROFILE` und getrenntes Ablageort-Layout.

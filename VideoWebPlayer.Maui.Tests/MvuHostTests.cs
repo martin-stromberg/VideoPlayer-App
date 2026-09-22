@@ -23,16 +23,20 @@ public class MvuHostTests
         var cancellationToken = TestContext.Current.CancellationToken;
 
         await host.DispatchAsync(new StartupRequestedMessage(), cancellationToken);
+        // Hinterlegter Server → Health-Check → Abschluss navigiert zur Startseite.
+        await host.DispatchAsync(
+            new ServersLoadedMessage([], "http://nas/videoplayer/"), cancellationToken);
         await host.DispatchAsync(new ServerHealthCheckCompletedMessage(IsReachable: true), cancellationToken);
 
         Assert.Equal(AppPage.Home, host.Model.CurrentPage);
         Assert.Equal(ServerHealthStatus.Reachable, host.Model.ServerHealth);
         Assert.False(host.Model.IsStartupRunning);
-        Assert.Equal(4, handler.Effects.Count);
+        Assert.Equal(5, handler.Effects.Count);
         Assert.IsType<InitializeStorageEffect>(handler.Effects[0]);
         Assert.IsType<LoadSettingsEffect>(handler.Effects[1]);
-        Assert.IsType<CheckServerHealthEffect>(handler.Effects[2]);
-        Assert.IsType<NavigateToPageEffect>(handler.Effects[3]);
+        Assert.IsType<LoadServersEffect>(handler.Effects[2]);
+        Assert.IsType<CheckServerHealthEffect>(handler.Effects[3]);
+        Assert.IsType<NavigateToPageEffect>(handler.Effects[4]);
     }
 
     [Fact]

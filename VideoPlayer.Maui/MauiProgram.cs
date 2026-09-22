@@ -31,6 +31,11 @@ namespace VideoPlayer.Maui
             builder.Services.AddSingleton<BackupDatabase>();
             builder.Services.AddSingleton<CacheDatabase>();
 
+            // Serververwaltung und Netzwerk-Erkennung (mDNS + UDP-Broadcast).
+            builder.Services.AddSingleton<KnownServersService>();
+            builder.Services.AddSingleton<VideoPlayer.ApiClient.Discovery.ServerDiscoveryService>(
+                _ => VideoPlayer.ApiClient.Discovery.ServerDiscoveryService.CreateDefault());
+
             builder.Services.AddSingleton<AppShell>();
             builder.Services.AddTransient<Pages.LoadingPage>();
             builder.Services.AddTransient<Pages.HomePage>();
@@ -39,6 +44,7 @@ namespace VideoPlayer.Maui
             builder.Services.AddTransient<Pages.DownloadsPage>();
             builder.Services.AddTransient<Pages.ProfilePage>();
             builder.Services.AddTransient<Pages.SettingsPage>();
+            builder.Services.AddTransient<Pages.ServerSetupPage>();
 
             builder.ConfigureFonts(fonts =>
             {

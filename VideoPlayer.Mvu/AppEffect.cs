@@ -22,3 +22,18 @@ public sealed record LoadSettingsEffect : AppEffect;
 
 /// <summary>Einstellungen in die Ablage schreiben.</summary>
 public sealed record PersistSettingsEffect(AppSettings Settings) : AppEffect;
+
+/// <summary>
+/// Serververwaltung laden: Legacy-Migration, bekannte Server und aktive
+/// Adresse ermitteln (Ergebnis: <c>ServersLoadedMessage</c>).
+/// </summary>
+public sealed record LoadServersEffect : AppEffect;
+
+/// <summary>Netzwerk-Erkennung ausführen (Ergebnis: <c>ServerDiscoveryCompletedMessage</c>).</summary>
+public sealed record DiscoverServersEffect : AppEffect;
+
+/// <summary>Kandidatenadresse per Health-Check prüfen (Ergebnis: <c>ServerCheckCompletedMessage</c>).</summary>
+public sealed record CheckCandidateServerEffect(string Address, string? DisplayName) : AppEffect;
+
+/// <summary>Erfolgreich geprüften Server als bekannten/aktiven Server speichern.</summary>
+public sealed record PersistActiveServerEffect(string Address, string? DisplayName) : AppEffect;

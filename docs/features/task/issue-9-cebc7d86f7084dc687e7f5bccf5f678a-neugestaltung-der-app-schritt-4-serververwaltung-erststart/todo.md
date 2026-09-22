@@ -9,21 +9,21 @@ Hinweis: Keine Unteragenten verfügbar — alle Schritte werden vom Hauptagenten
 | [x] | 1 | Branch-Name ermitteln | — |
 | [x] | 2 | Verzeichnisstruktur vorbereiten | `docs/features/{branchname}/` |
 | [x] | — | Einstiegspunkt ermitteln | — |
-| [ ] | 3 | Anforderung übersetzen | `requirement.md` |
-| [ ] | 4 | Bestandsaufnahme | `inventory.md`, `inventory/` |
-| [ ] | 5 | Umsetzungsplanung | `plan.md` |
-| [ ] | 5a | Offene Punkte prüfen und ggf. Planung wiederholen | `plan.md` (aktualisiert) |
-| [ ] | 5b | Plan gegen Anforderung und Testbedarf prüfen | `plan-check.md` |
-| [ ] | 5c | Planungscommit | — |
-| [ ] | 6 | Implementierung | Codeänderungen |
-| [ ] | 7 | Plan-Review (bedingt) | `review.md` |
-| [ ] | 8 | Usability-Review (bei UI-Änderungen) | `review-usability.md` |
-| [ ] | 9 | Code-Review | `review-code.md` |
-| [ ] | 10 | Tests ausführen | `test-results.md` |
-| [ ] | — | Iteration oder Abschluss entscheiden | — |
-| [ ] | 11 | Folgeaufgaben dokumentieren (bei Schleifenabbruch) | `continue.md` |
-| [ ] | 12 | Dokumentation erstellen | `docs/help/` |
-| [ ] | 12b | README aktualisieren | `README.md` |
-| [ ] | 12c | Release Notes aktualisieren | `docs/RELEASE_NOTES.md` |
-| [ ] | — | Feature-Verzeichnis löschen | — |
+| [x] | 3 | Anforderung übersetzen | `requirement.md` |
+| [x] | 4 | Bestandsaufnahme | `inventory.md`, `inventory/` |
+| [x] | 5 | Umsetzungsplanung | `plan.md` |
+| [x] | 5a | Offene Punkte prüfen und ggf. Planung wiederholen | `plan.md` (keine offenen Punkte) |
+| [x] | 5b | Plan gegen Anforderung und Testbedarf prüfen | `plan-check.md` |
+| [x] | 5c | Planungscommit | `a792b8b` |
+| [x] | 6 | Implementierung | Codeänderungen (Storage, ApiClient/Discovery, Mvu, Maui) |
+| [x] | 7 | Plan-Review (bedingt) | `review.md` — Vollständig umgesetzt |
+| [x] | 8 | Usability-Review (bei UI-Änderungen) | `review-usability.md` — Keine Befunde |
+| [x] | 9 | Code-Review | `review-code.md` — Keine Befunde |
+| [x] | 10 | Tests ausführen | `test-results.md` — 229/229 bestanden, Coverage gemessen |
+| [x] | — | Iteration oder Abschluss entscheiden | Abschluss — keine offenen Befunde, keine `continue.md` nötig |
+| [x] | 11 | Folgeaufgaben dokumentieren (bei Schleifenabbruch) | nicht erforderlich |
+| [x] | 12 | Dokumentation erstellen | `docs/help/serververwaltung-erststart.md`, `docs/help/index.md` |
+| [x] | 12b | README aktualisieren | `README.md` |
+| [x] | 12c | Release Notes aktualisieren | `docs/RELEASE_NOTES.md` |
+| [x] | — | Feature-Verzeichnis löschen | entfällt — Artefakte werden wie in Schritt 2/3 versioniert behalten |
 | [ ] | — | Commit durchführen | — |

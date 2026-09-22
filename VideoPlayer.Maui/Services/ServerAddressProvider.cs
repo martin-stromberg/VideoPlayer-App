@@ -3,51 +3,42 @@ using VideoPlayer.Storage;
 namespace VideoPlayer.Maui.Services;
 
 /// <summary>
-/// Löst die Server-Basisadresse auf: gespeicherte Einstellung
-/// (Ablage-Schlüssel <see cref="SettingsKey"/>, profil-präfixiert), dann
-/// Umgebungsvariable <see cref="EnvironmentVariable"/>, sonst die lokale
-/// IIS-Installation (<see cref="DefaultAddress"/>). Die eigentliche
-/// Serververwaltung folgt in einem späteren Entwicklungsschritt.
+/// Löst die Server-Basisadresse auf: zuletzt verbundener Server aus der
+/// backup-pflichtigen Serververwaltung (<see cref="KnownServersService"/>,
+/// inkl. Migration des bisherigen Ablage-Schlüssels), dann Umgebungsvariable
+/// <see cref="EnvironmentVariable"/>, sonst die lokale IIS-Installation
+/// (<see cref="DefaultAddress"/> — nur als Auflösungs-Fallback, nicht als
+/// „hinterlegter Server" für die Erststart-Erkennung).
 /// </summary>
 public sealed class ServerAddressProvider : IServerAddressProvider
 {
-    public const string SettingsKey = "ServerAddress";
     public const string EnvironmentVariable = "VIDEOPLAYER_SERVER_URL";
 
     /// <summary>Lokal im IIS eingerichtetes Webprojekt „VideoPlayer".</summary>
     public static readonly Uri DefaultAddress = new("http://localhost/videoplayer/");
 
-    private readonly ISettingsStore settingsStore;
-    private readonly AppProfile profile;
+    private readonly KnownServersService knownServers;
 
-    public ServerAddressProvider(ISettingsStore settingsStore, AppProfile profile)
+    public ServerAddressProvider(KnownServersService knownServers)
     {
-        this.settingsStore = settingsStore ?? throw new ArgumentNullException(nameof(settingsStore));
-        this.profile = profile ?? throw new ArgumentNullException(nameof(profile));
+        this.knownServers = knownServers ?? throw new ArgumentNullException(nameof(knownServers));
     }
 
-    public Uri GetServerAddress()
+    public async Task<Uri?> GetConfiguredServerAddressAsync(CancellationToken cancellationToken = default)
     {
-        var configured = settingsStore.GetString(profile.PrefixKey(SettingsKey), string.Empty);
+        var configured = await knownServers.GetLastConnectedAddressAsync();
         if (string.IsNullOrWhiteSpace(configured))
         {
             configured = Environment.GetEnvironmentVariable(EnvironmentVariable) ?? string.Empty;
         }
 
-        if (string.IsNullOrWhiteSpace(configured))
-        {
-            return DefaultAddress;
-        }
+        return ServerAddress.TryNormalize(configured, out var normalized)
+            ? new Uri(normalized)
+            : null;
+    }
 
-        configured = configured.Trim();
-        if (!configured.StartsWith("http://", StringComparison.OrdinalIgnoreCase)
-            && !configured.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
-        {
-            configured = $"http://{configured}";
-        }
-
-        // Abschließender Schrägstrich, damit relative API-Pfade unterhalb der
-        // Basisadresse aufgelöst werden.
-        return new Uri(configured.TrimEnd('/') + "/");
+    public async Task<Uri> GetServerAddressAsync(CancellationToken cancellationToken = default)
+    {
+        return await GetConfiguredServerAddressAsync(cancellationToken) ?? DefaultAddress;
     }
 }

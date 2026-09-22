@@ -12,5 +12,12 @@ public enum AppPage
     Favorites,
     Downloads,
     Profile,
-    Settings
+    Settings,
+
+    /// <summary>
+    /// Server-Einrichtung/-verwaltung. Wie <see cref="Loading"/> ohne
+    /// Menüeintrag — wird beim Erststart als Window-Root bzw. über die
+    /// registrierte Shell-Route <c>serversetup</c> erreicht.
+    /// </summary>
+    ServerSetup
 }

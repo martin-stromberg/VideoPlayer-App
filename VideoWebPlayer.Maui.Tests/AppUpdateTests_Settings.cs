@@ -12,7 +12,9 @@ public class AppUpdateTests_Settings
 
         Assert.Contains(transition.Effects, e => e is InitializeStorageEffect);
         Assert.Contains(transition.Effects, e => e is LoadSettingsEffect);
-        Assert.Contains(transition.Effects, e => e is CheckServerHealthEffect);
+        // Der Health-Check folgt erst nach dem Laden der Serververwaltung
+        // (ServersLoadedMessage) — ohne Server verzweigt der Start in die Einrichtung.
+        Assert.Contains(transition.Effects, e => e is LoadServersEffect);
     }
 
     [Fact]

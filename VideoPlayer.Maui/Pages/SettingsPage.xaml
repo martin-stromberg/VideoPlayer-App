@@ -73,6 +73,14 @@
                    Keyboard="Numeric"
                    Placeholder="30 – 3600" />
 
+            <!-- Server -->
+            <Label Text="Server" FontAttributes="Bold" FontSize="16" />
+
+            <Button x:Name="ServerSwitchButton"
+                    AutomationId="ServerSwitchButton"
+                    Text="Server wechseln"
+                    Clicked="OnServerSwitchClicked" />
+
         </VerticalStackLayout>
     </ScrollView>
 
