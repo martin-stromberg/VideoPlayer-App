@@ -53,6 +53,7 @@
   <ItemGroup>
     <ProjectReference Include="..\VideoPlayer.ApiClient\VideoPlayer.ApiClient.csproj" />
     <ProjectReference Include="..\VideoPlayer.Mvu\VideoPlayer.Mvu.csproj" />
+    <ProjectReference Include="..\VideoPlayer.Storage\VideoPlayer.Storage.csproj" />
   </ItemGroup>
   <ItemGroup>
     <None Include="../LICENSE" Pack="true" PackagePath="\" />

@@ -12,8 +12,11 @@ public class AppUpdateTests_Startup
         Assert.True(transition.Model.IsStartupRunning);
         Assert.Equal(ServerHealthStatus.Checking, transition.Model.ServerHealth);
         Assert.Equal(AppPage.Loading, transition.Model.CurrentPage);
-        Assert.Single(transition.Effects);
-        Assert.IsType<CheckServerHealthEffect>(transition.Effects[0]);
+        // Start löst Ablage-Initialisierung, Einstellungs-Laden und Health-Check aus.
+        Assert.Equal(3, transition.Effects.Count);
+        Assert.IsType<InitializeStorageEffect>(transition.Effects[0]);
+        Assert.IsType<LoadSettingsEffect>(transition.Effects[1]);
+        Assert.IsType<CheckServerHealthEffect>(transition.Effects[2]);
     }
 
     [Fact]

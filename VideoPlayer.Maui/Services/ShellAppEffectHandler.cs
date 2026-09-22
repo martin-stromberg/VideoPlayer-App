@@ -1,10 +1,12 @@
 using VideoPlayer.Mvu;
+using VideoPlayer.Storage;
 
 namespace VideoPlayer.Maui.Services;
 
 /// <summary>
-/// Führt MVU-Effekte aus: Navigation über die Shell und die
-/// Server-Erreichbarkeitsprüfung über <see cref="IServerHealthProbe"/>.
+/// Führt MVU-Effekte aus: Navigation über die Shell, Server-Erreichbarkeits-
+/// prüfung über <see cref="IServerHealthProbe"/> sowie Ablage-Initialisierung
+/// und Einstellungs-Persistenz über <see cref="VideoPlayer.Storage"/>.
 /// </summary>
 public sealed class ShellAppEffectHandler : IAppEffectHandler
 {
@@ -27,6 +29,63 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
             case NavigateToPageEffect navigate:
                 await MainThread.InvokeOnMainThreadAsync(() => NavigateAsync(navigate.Page));
                 break;
+            case InitializeStorageEffect:
+                await InitializeStorageAsync();
+                break;
+            case LoadSettingsEffect:
+                await LoadSettingsAsync();
+                break;
+            case PersistSettingsEffect persist:
+                SaveSettings(persist.Settings);
+                break;
+        }
+    }
+
+    private async Task InitializeStorageAsync()
+    {
+        // Fehler der Ablage-Initialisierung dürfen den Start nicht blockieren —
+        // die App läuft mit Standardwerten weiter.
+        try
+        {
+            // Die Auflösung des Layouts legt die Verzeichnisse an und wendet den
+            // plattformseitigen Backup-Ausschluss an (AppStorageLayoutProvider).
+            _ = services.GetRequiredService<AppStorageLayout>();
+            await services.GetRequiredService<BackupDatabase>().InitializeAsync();
+            await services.GetRequiredService<CacheDatabase>().InitializeAsync();
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[ShellAppEffectHandler] Ablage-Initialisierung fehlgeschlagen: {ex.Message}");
+        }
+    }
+
+    private async Task LoadSettingsAsync()
+    {
+        AppSettings settings;
+        try
+        {
+            settings = services.GetRequiredService<AppSettingsService>().Load();
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[ShellAppEffectHandler] Einstellungen laden fehlgeschlagen: {ex.Message}");
+            settings = new AppSettings();
+        }
+
+        var host = services.GetRequiredService<MvuHost>();
+        await MainThread.InvokeOnMainThreadAsync(
+            () => host.DispatchAsync(new SettingsLoadedMessage(settings)));
+    }
+
+    private void SaveSettings(AppSettings settings)
+    {
+        try
+        {
+            services.GetRequiredService<AppSettingsService>().Save(settings);
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[ShellAppEffectHandler] Einstellungen speichern fehlgeschlagen: {ex.Message}");
         }
     }
 

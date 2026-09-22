@@ -8,6 +8,9 @@
     <Authors>Martin Stromberg</Authors>
   </PropertyGroup>
   <ItemGroup>
+    <ProjectReference Include="..\VideoPlayer.Storage\VideoPlayer.Storage.csproj" />
+  </ItemGroup>
+  <ItemGroup>
     <None Include="../LICENSE" Pack="true" PackagePath="\" />
   </ItemGroup>
 </Project>
