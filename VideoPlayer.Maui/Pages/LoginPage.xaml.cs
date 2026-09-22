@@ -13,6 +13,8 @@ public partial class LoginPage : ContentPage
     private readonly MvuHost mvuHost;
     private bool usernamePrefilled;
 
+    /// <summary>Initialisiert eine neue Instanz der <see cref="LoginPage"/>-Klasse.</summary>
+    /// <param name="mvuHost">MVU-Host; liefert den Anmeldezustand und nimmt die Benutzer-Nachrichten entgegen.</param>
     public LoginPage(MvuHost mvuHost)
     {
         InitializeComponent();
@@ -20,6 +22,7 @@ public partial class LoginPage : ContentPage
         UpdateUi(mvuHost.Model);
     }
 
+    /// <inheritdoc/>
     protected override void OnAppearing()
     {
         base.OnAppearing();
@@ -27,6 +30,7 @@ public partial class LoginPage : ContentPage
         mvuHost.ModelChanged += OnModelChanged;
     }
 
+    /// <inheritdoc/>
     protected override void OnDisappearing()
     {
         base.OnDisappearing();

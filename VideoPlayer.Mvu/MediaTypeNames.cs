@@ -12,6 +12,8 @@ namespace VideoPlayer.Mvu;
 public static class MediaTypeNames
 {
     /// <summary>Normalisierte CLR-Konvention des Medientyps; unbekannte/leere Werte werden kleingeschrieben durchgereicht.</summary>
+    /// <param name="mediaType">Der zu normalisierende Medientyp; <c>null</c> wird zu <see cref="string.Empty"/>.</param>
+    /// <returns>Der normalisierte Medientyp in CLR-Konvention.</returns>
     public static string Normalize(string? mediaType)
     {
         return mediaType?.Trim().ToLowerInvariant() switch

@@ -21,6 +21,7 @@ public class AppUpdateTests_HomeLists
         IsStartupRunning = false
     };
 
+    /// <summary>Prüft StartupRequested: lädt die Home-Listen nach der Storage-Initialisierung.</summary>
     [Fact]
     public void StartupRequested_LoadsHomeListsAfterStorageInit()
     {
@@ -34,6 +35,7 @@ public class AppUpdateTests_HomeLists
         Assert.True(loadIndex > initIndex);
     }
 
+    /// <summary>Prüft HomeListsLoaded: setzt die Listen und Flags.</summary>
     [Fact]
     public void HomeListsLoaded_SetsListsAndFlags()
     {
@@ -57,6 +59,7 @@ public class AppUpdateTests_HomeLists
         Assert.Empty(transition.Effects);
     }
 
+    /// <summary>Prüft HomeListsLoaded: bei leeren Listen → setzt die Flags zurück.</summary>
     [Fact]
     public void HomeListsLoaded_Empty_ResetsFlags()
     {
@@ -65,6 +68,7 @@ public class AppUpdateTests_HomeLists
         Assert.False(transition.Model.HasHomeContent);
     }
 
+    /// <summary>Prüft CachedListsChanged: lädt die Home-Listen neu.</summary>
     [Fact]
     public void CachedListsChanged_ReloadsHomeLists()
     {
@@ -80,6 +84,7 @@ public class AppUpdateTests_HomeLists
         Assert.Same(model, transition.Model);
     }
 
+    /// <summary>Prüft ServerEventReceived: bei vollständiger Sequenz → aktualisiert die Listen.</summary>
     [Fact]
     public void ServerEventReceived_FullSequence_RefreshesLists()
     {
@@ -100,6 +105,9 @@ public class AppUpdateTests_HomeLists
         Assert.IsType<LoadHomeListsEffect>(effect);
     }
 
+    /// <summary>Prüft ServerEventReceived: bildet die Ereignisart auf den passenden Sync-Effekt ab.</summary>
+    /// <param name="kind">Die Art.</param>
+    /// <param name="expectedEffect">Der erwartete Effekttyp.</param>
     [Theory]
     [InlineData(ServerEventKind.ContinueWatchingUpdated, typeof(SyncContinueWatchingEffect))]
     [InlineData(ServerEventKind.FavoritesChanged, typeof(SyncFavoritesEffect))]
@@ -113,6 +121,7 @@ public class AppUpdateTests_HomeLists
         Assert.Contains(transition.Effects, e => e.GetType() == expectedEffect);
     }
 
+    /// <summary>Prüft MediaItemSelected: navigiert zur Detailseite.</summary>
     [Fact]
     public void MediaItemSelected_NavigatesToDetails()
     {
@@ -127,6 +136,8 @@ public class AppUpdateTests_HomeLists
         Assert.Equal("Meine Serie", navigation.Title);
     }
 
+    /// <summary>Prüft MediaItemSelected: ohne identifizierbare Medien → keine Navigation.</summary>
+    /// <param name="id">Die ID.</param>
     [Theory]
     [InlineData(0)]
     [InlineData(-1)]
@@ -139,6 +150,7 @@ public class AppUpdateTests_HomeLists
         Assert.Empty(transition.Effects);
     }
 
+    /// <summary>Prüft MediaItemSelected: ohne Medientyp → keine Navigation.</summary>
     [Fact]
     public void MediaItemSelected_WithoutMediaType_NoNavigation()
     {

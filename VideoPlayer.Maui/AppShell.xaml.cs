@@ -2,10 +2,18 @@ using VideoPlayer.Mvu;
 
 namespace VideoPlayer.Maui
 {
+    /// <summary>
+    /// Shell-Navigation der App (Hauptmenü mit Flyout-Einträgen). Registriert
+    /// die Routen für Server-Einrichtung, Anmeldemaske, Medien-Details und
+    /// Quellen-Browsing und synchronisiert Shell-Navigationen als
+    /// <see cref="NavigatedMessage"/> in das MVU-Model.
+    /// </summary>
     public partial class AppShell : Shell
     {
         private readonly MvuHost mvuHost;
 
+        /// <summary>Initialisiert eine neue Instanz der <see cref="AppShell"/>-Klasse.</summary>
+        /// <param name="mvuHost">MVU-Host für den Dispatch der Navigations-Nachrichten.</param>
         public AppShell(MvuHost mvuHost)
         {
             InitializeComponent();

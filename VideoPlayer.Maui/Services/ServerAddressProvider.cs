@@ -12,18 +12,23 @@ namespace VideoPlayer.Maui.Services;
 /// </summary>
 public sealed class ServerAddressProvider : IServerAddressProvider
 {
+    /// <summary>Name der Umgebungsvariable für die Server-Basisadresse.</summary>
     public const string EnvironmentVariable = "VIDEOPLAYER_SERVER_URL";
 
     /// <summary>Lokal im IIS eingerichtetes Webprojekt „VideoPlayer".</summary>
+    /// <value>Fallback-Basisadresse <c>http://localhost/videoplayer/</c>.</value>
     public static readonly Uri DefaultAddress = new("http://localhost/videoplayer/");
 
     private readonly KnownServersService knownServers;
 
+    /// <summary>Initialisiert eine neue Instanz der <see cref="ServerAddressProvider"/>-Klasse.</summary>
+    /// <param name="knownServers">Serververwaltung; liefert die zuletzt verbundene Serveradresse.</param>
     public ServerAddressProvider(KnownServersService knownServers)
     {
         this.knownServers = knownServers ?? throw new ArgumentNullException(nameof(knownServers));
     }
 
+    /// <inheritdoc/>
     public async Task<Uri?> GetConfiguredServerAddressAsync(CancellationToken cancellationToken = default)
     {
         var configured = await knownServers.GetLastConnectedAddressAsync();
@@ -37,6 +42,7 @@ public sealed class ServerAddressProvider : IServerAddressProvider
             : null;
     }
 
+    /// <inheritdoc/>
     public async Task<Uri> GetServerAddressAsync(CancellationToken cancellationToken = default)
     {
         return await GetConfiguredServerAddressAsync(cancellationToken) ?? DefaultAddress;

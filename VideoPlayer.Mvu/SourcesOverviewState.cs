@@ -9,6 +9,7 @@ namespace VideoPlayer.Mvu;
 public sealed record SourcesOverviewState
 {
     /// <summary>Ausgangszustand (nichts geladen, kein Fehler).</summary>
+    /// <value>Der leere Ausgangszustand der Quellen-Übersicht.</value>
     public static SourcesOverviewState Initial { get; } = new();
 
     /// <summary>Die Quellenliste wird gerade vom Server geladen.</summary>

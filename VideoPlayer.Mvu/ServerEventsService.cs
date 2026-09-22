@@ -20,6 +20,9 @@ public sealed class ServerEventsService : IAsyncDisposable
     private IServerEventsConnection? connection;
     private string? connectedServerAddress;
 
+    /// <summary>Erstellt den Dienst.</summary>
+    /// <param name="authSession">Sitzungsdienst mit dem angemeldeten API-Client (Token-Quelle).</param>
+    /// <param name="connectionFactory">Fabrik für die eigentliche Verbindungs-Implementierung (SignalR am App-Rand).</param>
     public ServerEventsService(
         AuthSessionService authSession,
         Func<IServerEventsConnection> connectionFactory)
@@ -42,6 +45,8 @@ public sealed class ServerEventsService : IAsyncDisposable
     /// bestehende Verbindung zum selben Server bleibt bestehen; bei
     /// Serverwechsel oder getrennter Verbindung wird neu verbunden).
     /// </summary>
+    /// <param name="serverAddress">Basisadresse des Servers (Hub-Pfad wird angehängt).</param>
+    /// <param name="cancellationToken">Bricht den Verbindungsaufbau ab.</param>
     public async Task ConnectAsync(Uri serverAddress, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(serverAddress);
@@ -90,6 +95,7 @@ public sealed class ServerEventsService : IAsyncDisposable
     }
 
     /// <summary>Trennt die Ereignisverbindung, falls sie besteht.</summary>
+    /// <param name="cancellationToken">Bricht das Trennen ab.</param>
     public async Task DisconnectAsync(CancellationToken cancellationToken = default)
     {
         await gate.WaitAsync(cancellationToken);
@@ -103,6 +109,7 @@ public sealed class ServerEventsService : IAsyncDisposable
         }
     }
 
+    /// <summary>Trennt die Verbindung und gibt die Sperre frei.</summary>
     public async ValueTask DisposeAsync()
     {
         await DisconnectAsync();

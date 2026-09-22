@@ -42,6 +42,7 @@ public sealed record AppSettings
     public bool AutoDeleteWatchedEpisodes { get; init; }
 
     /// <summary>Liefert eine Kopie mit auf die zulässigen Schranken geklammerten Werten.</summary>
+    /// <returns>Eine Kopie der Einstellungen mit normalisierten Werten.</returns>
     public AppSettings Normalize() => this with
     {
         PreloadEpisodeCount = Math.Clamp(PreloadEpisodeCount, 1, 10),

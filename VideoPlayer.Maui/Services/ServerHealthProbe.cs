@@ -13,11 +13,14 @@ public sealed class ServerHealthProbe : IServerHealthProbe
 
     private readonly IServerAddressProvider addressProvider;
 
+    /// <summary>Initialisiert eine neue Instanz der <see cref="ServerHealthProbe"/>-Klasse.</summary>
+    /// <param name="addressProvider">Liefert die aufgelöste Server-Basisadresse für die parameterlose Prüfung.</param>
     public ServerHealthProbe(IServerAddressProvider addressProvider)
     {
         this.addressProvider = addressProvider;
     }
 
+    /// <inheritdoc/>
     public async Task<bool> CheckAsync(CancellationToken cancellationToken = default)
     {
         return await CheckAsync(
@@ -25,6 +28,7 @@ public sealed class ServerHealthProbe : IServerHealthProbe
             cancellationToken);
     }
 
+    /// <inheritdoc/>
     public async Task<bool> CheckAsync(Uri baseAddress, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(baseAddress);

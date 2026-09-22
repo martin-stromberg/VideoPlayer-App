@@ -8,11 +8,19 @@ using VideoWebPlayer.Maui.Services.Events;
 
 namespace VideoWebPlayer.Maui;
 
+/// <summary>
+/// Startseite der App: zeigt Carousels mit Downloads, Favoriten und
+/// "Weiterschauen"-Einträgen sowie die verfügbaren Quellen an.
+/// </summary>
 public partial class HomePage : ContentPage
 {
     private readonly HomePageViewModel _viewModel;
     private readonly ISubscribeNotificationEvent? _eventSubscriber;
 
+    /// <summary>
+    /// Erstellt eine neue Instanz der <see cref="HomePage"/> und abonniert
+    /// die Benachrichtigungs-Events zum Aktualisieren der Listen.
+    /// </summary>
     public HomePage()
     {
         InitializeComponent();
@@ -36,6 +44,7 @@ public partial class HomePage : ContentPage
         // may not be available yet in the constructor.
     }
 
+    /// <inheritdoc/>
     protected override async void OnAppearing()
     {
         base.OnAppearing();

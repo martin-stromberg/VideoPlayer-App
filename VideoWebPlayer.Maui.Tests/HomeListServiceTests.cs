@@ -21,6 +21,7 @@ public class HomeListServiceTests : IDisposable
     private readonly CacheDatabase cache;
     private readonly HomeListService service;
 
+    /// <summary>Initialisiert eine neue Instanz der Testklasse <c>HomeListServiceTests</c>.</summary>
     public HomeListServiceTests()
     {
         root = Path.Combine(Path.GetTempPath(), "videoplayer-homelists-tests", Guid.NewGuid().ToString("N"));
@@ -35,6 +36,7 @@ public class HomeListServiceTests : IDisposable
         service = new HomeListService(cache);
     }
 
+    /// <inheritdoc/>
     public void Dispose()
     {
         SQLite.SQLiteAsyncConnection.ResetPool();
@@ -67,6 +69,7 @@ public class HomeListServiceTests : IDisposable
         });
     }
 
+    /// <summary>Prüft LoadHomeLists: bei leerem Cache → gibt leere Listen zurück.</summary>
     [Fact]
     public async Task LoadHomeLists_EmptyCache_ReturnsEmptyLists()
     {
@@ -77,6 +80,7 @@ public class HomeListServiceTests : IDisposable
         Assert.Empty(lists.Recent);
     }
 
+    /// <summary>Prüft LoadHomeLists: bei <c>MapsContinueWatching</c> → bildet ContinueWatching mit Fortschritt und Poster ab.</summary>
     [Fact]
     public async Task LoadHomeLists_MapsContinueWatching_WithProgressAndPoster()
     {
@@ -122,6 +126,7 @@ public class HomeListServiceTests : IDisposable
         Assert.False(movie.ShowProgress);
     }
 
+    /// <summary>Prüft LoadHomeLists: bildet Favoriten ab.</summary>
     [Fact]
     public async Task LoadHomeLists_MapsFavorites()
     {
@@ -142,6 +147,7 @@ public class HomeListServiceTests : IDisposable
         Assert.False(movie.ShowProgress);
     }
 
+    /// <summary>Prüft LoadHomeLists: bildet die Recent-Liste ab.</summary>
     [Fact]
     public async Task LoadHomeLists_MapsRecent()
     {
@@ -169,6 +175,7 @@ public class HomeListServiceTests : IDisposable
         Assert.Equal("tvshowseason", lists.Recent[1].MediaType);
     }
 
+    /// <summary>Prüft LoadHomeLists: überspringt Einträge ohne identifizierbare Medien.</summary>
     [Fact]
     public async Task LoadHomeLists_SkipsEntriesWithoutIdentifiableMedia()
     {
@@ -191,6 +198,7 @@ public class HomeListServiceTests : IDisposable
         Assert.Equal(8, item.Id);
     }
 
+    /// <summary>Prüft LoadHomeLists: bei <c>CorruptJson</c> → gibt leere Liste zurück.</summary>
     [Fact]
     public async Task LoadHomeLists_CorruptJson_ReturnsEmptyList()
     {
@@ -206,6 +214,7 @@ public class HomeListServiceTests : IDisposable
         Assert.Empty(lists.Recent);
     }
 
+    /// <summary>Prüft LoadHomeLists: die Persistenz übersteht mehrere Lesevorgänge.</summary>
     [Fact]
     public async Task LoadHomeLists_PersistsAcrossReads()
     {

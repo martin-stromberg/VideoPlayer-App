@@ -14,6 +14,8 @@ public partial class SettingsPage : ContentPage
     private readonly MvuHost mvuHost;
     private bool suppressEvents;
 
+    /// <summary>Initialisiert eine neue Instanz der <see cref="SettingsPage"/>-Klasse.</summary>
+    /// <param name="mvuHost">MVU-Host; dient als <see cref="BindableObject.BindingContext"/> und Dispatch-Ziel der Speicher-Nachrichten.</param>
     public SettingsPage(MvuHost mvuHost)
     {
         InitializeComponent();
@@ -37,6 +39,7 @@ public partial class SettingsPage : ContentPage
         entry.Unfocused += (sender, _) => handler(sender!, EventArgs.Empty);
     }
 
+    /// <inheritdoc/>
     protected override void OnAppearing()
     {
         base.OnAppearing();
@@ -45,6 +48,7 @@ public partial class SettingsPage : ContentPage
         PopulateFromModel();
     }
 
+    /// <inheritdoc/>
     protected override void OnDisappearing()
     {
         base.OnDisappearing();
@@ -124,6 +128,8 @@ public partial class SettingsPage : ContentPage
     }
 
     /// <summary>„Server wechseln": Serververwaltung als geschobene Route öffnen.</summary>
+    /// <param name="sender">Auslösendes Steuerelement.</param>
+    /// <param name="e">Ereignisargumente.</param>
     private void OnServerSwitchClicked(object? sender, EventArgs e)
     {
         _ = mvuHost.DispatchAsync(new NavigateToMessage(AppPage.ServerSetup));
@@ -134,6 +140,8 @@ public partial class SettingsPage : ContentPage
     /// Ungültige Eingaben werden nicht übernommen; ein Inline-Hinweis wird
     /// eingeblendet und der Modellwert wiederhergestellt.
     /// </summary>
+    /// <param name="entry">Eingabefeld, dessen Text ausgewertet wird.</param>
+    /// <param name="apply">Erzeugt aus dem gelesenen Wert die Änderungsfunktion für die Einstellungen.</param>
     private void SaveNumeric(Entry entry, Func<int, Func<AppSettings, AppSettings>> apply)
     {
         if (suppressEvents)

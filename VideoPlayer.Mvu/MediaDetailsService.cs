@@ -17,6 +17,8 @@ public sealed class MediaDetailsService
 {
     private readonly AuthSessionService authSession;
 
+    /// <summary>Erstellt den Dienst.</summary>
+    /// <param name="authSession">Sitzungsdienst mit dem angemeldeten API-Client.</param>
     public MediaDetailsService(AuthSessionService authSession)
     {
         this.authSession = authSession ?? throw new ArgumentNullException(nameof(authSession));
@@ -28,6 +30,14 @@ public sealed class MediaDetailsService
     /// <paramref name="episodeId"/> sind optionale Hints aus der
     /// Listen-Auswahl (eingebetteter Objektgraph).
     /// </summary>
+    /// <param name="mediaType">Medientyp (wird normalisiert).</param>
+    /// <param name="mediaId">Id des Mediums.</param>
+    /// <param name="fallbackTitle">Fallback-Titel, falls der Server keinen Namen liefert.</param>
+    /// <param name="showId">Optionaler Hint: Id der zugehörigen Serie.</param>
+    /// <param name="seasonId">Optionaler Hint: Id der vorzuwählenden Staffel.</param>
+    /// <param name="episodeId">Optionaler Hint: Id der hervorzuhebenden Episode.</param>
+    /// <param name="cancellationToken">Bricht das Laden ab.</param>
+    /// <returns>Das Anzeigemodell der Detailseite.</returns>
     /// <exception cref="InvalidOperationException">Kein Server verbunden oder Medientyp/Identität nicht auflösbar.</exception>
     public async Task<MediaDetailsView> LoadAsync(
         string mediaType,
@@ -58,6 +68,10 @@ public sealed class MediaDetailsService
     /// Kollektion laden; antwortet der Server mit 404 (z. B. Einzelfilm
     /// ohne Kollektionshülle), wird die Film-Detailansicht geladen.
     /// </summary>
+    /// <param name="client">Der angemeldete API-Client.</param>
+    /// <param name="mediaId">Id der Kollektion bzw. des Films.</param>
+    /// <param name="cancellationToken">Bricht das Laden ab.</param>
+    /// <returns>Das Anzeigemodell der Kollektion bzw. des Films.</returns>
     private static async Task<MediaDetailsView> LoadCollectionOrMovieAsync(
         VideoPlayerApiClient client, long mediaId, CancellationToken cancellationToken)
     {
@@ -75,6 +89,12 @@ public sealed class MediaDetailsService
     /// Staffel-Aufruf: ohne Serien-Hint ist die Staffel nicht auflösbar
     /// (es existiert kein Staffel-Endpunkt) → Fehlerzustand.
     /// </summary>
+    /// <param name="client">Der angemeldete API-Client.</param>
+    /// <param name="seasonId">Id der angefragten Staffel.</param>
+    /// <param name="showId">Hint: Id der zugehörigen Serie (erforderlich).</param>
+    /// <param name="episodeId">Optionaler Hint: Id der hervorzuhebenden Episode.</param>
+    /// <param name="cancellationToken">Bricht das Laden ab.</param>
+    /// <returns>Serienansicht mit Vorwahl der Staffel.</returns>
     private static async Task<MediaDetailsView> LoadSeasonInShowContextAsync(
         VideoPlayerApiClient client, long seasonId, long? showId, long? episodeId, CancellationToken cancellationToken)
     {
@@ -94,6 +114,13 @@ public sealed class MediaDetailsService
     /// auflösen → Serienansicht mit Vorwahl; ohne Serie Basisdetails der
     /// Episode.
     /// </summary>
+    /// <param name="client">Der angemeldete API-Client.</param>
+    /// <param name="episodeId">Id der angefragten Episode.</param>
+    /// <param name="fallbackTitle">Fallback-Titel, falls die Episode keinen Namen liefert.</param>
+    /// <param name="showId">Optionaler Hint: Id der zugehörigen Serie.</param>
+    /// <param name="seasonId">Optionaler Hint: Id der vorzuwählenden Staffel.</param>
+    /// <param name="cancellationToken">Bricht das Laden ab.</param>
+    /// <returns>Serienansicht mit Vorwahl bzw. Basisdetails der Episode.</returns>
     private static async Task<MediaDetailsView> LoadEpisodeAsync(
         VideoPlayerApiClient client, long episodeId, string? fallbackTitle,
         long? showId, long? seasonId, CancellationToken cancellationToken)

@@ -19,6 +19,12 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
     private readonly INetworkStatusMonitor networkMonitor;
     private readonly ServerEventsService serverEvents;
 
+    /// <summary>Initialisiert eine neue Instanz der <see cref="ShellAppEffectHandler"/>-Klasse.</summary>
+    /// <param name="services">Dienstanbieter zum Auflösen der am Effekt beteiligten Dienste (inkl. <see cref="MvuHost"/>).</param>
+    /// <param name="healthProbe">Erreichbarkeitsprüfung für den Server.</param>
+    /// <param name="authSession">Sitzungsdienst für den Anmelde-Workflow.</param>
+    /// <param name="networkMonitor">Netzwerkstatus-Erkennung; meldet Wechsel in den MVU-Zyklus.</param>
+    /// <param name="serverEvents">Server-Ereignisverbindung; meldet Ereignisse und Trennung in den MVU-Zyklus.</param>
     public ShellAppEffectHandler(
         IServiceProvider services,
         IServerHealthProbe healthProbe,
@@ -44,6 +50,7 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
         this.serverEvents.ConnectionClosed += OnServerEventsConnectionClosed;
     }
 
+    /// <inheritdoc/>
     public async Task HandleAsync(AppEffect effect, CancellationToken cancellationToken = default)
     {
         switch (effect)

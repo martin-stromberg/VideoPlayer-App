@@ -27,6 +27,8 @@ public partial class MediaDetailsPage : ContentPage
     private bool requested;
     private bool updatingSeasonPicker;
 
+    /// <summary>Initialisiert eine neue Instanz der <see cref="MediaDetailsPage"/>-Klasse.</summary>
+    /// <param name="mvuHost">MVU-Host; liefert den Detail-Zustand und nimmt die Benutzer-Nachrichten entgegen.</param>
     public MediaDetailsPage(MvuHost mvuHost)
     {
         InitializeComponent();
@@ -72,6 +74,7 @@ public partial class MediaDetailsPage : ContentPage
         set => episodeId = long.TryParse(Uri.UnescapeDataString(value ?? string.Empty), out var id) && id > 0 ? id : null;
     }
 
+    /// <inheritdoc/>
     protected override void OnAppearing()
     {
         base.OnAppearing();

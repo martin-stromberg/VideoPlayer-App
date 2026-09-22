@@ -18,6 +18,10 @@ public sealed class ProgressReportService
     private readonly PendingProgressSyncService pendingQueue;
     private readonly INetworkStatusMonitor networkMonitor;
 
+    /// <summary>Erstellt den Dienst.</summary>
+    /// <param name="authSession">Sitzungsdienst mit dem angemeldeten API-Client.</param>
+    /// <param name="pendingQueue">Persistente Warteschlange für nicht sendbare Meldungen.</param>
+    /// <param name="networkMonitor">Netzwerkstatus-Erkennung (Online/Offline).</param>
     public ProgressReportService(
         AuthSessionService authSession,
         PendingProgressSyncService pendingQueue,
@@ -32,6 +36,11 @@ public sealed class ProgressReportService
     /// Meldet den Fortschritt eines Mediums; bei Offline oder
     /// überholbarem Sendefehler wird er persistent eingereiht.
     /// </summary>
+    /// <param name="videoType">Medientyp des Videos (Server-Konvention).</param>
+    /// <param name="videoId">Id des Videos.</param>
+    /// <param name="position">Aktuelle Wiedergabeposition.</param>
+    /// <param name="duration">Gesamtdauer des Videos.</param>
+    /// <param name="cancellationToken">Bricht die Meldung ab.</param>
     public async Task ReportProgressAsync(
         string videoType,
         int videoId,
@@ -80,6 +89,8 @@ public sealed class ProgressReportService
     /// Ein 4xx-Fehler (außer den wiederholbaren/authentifizierbaren Codes
     /// 401, 408, 429) wird bei jedem Versuch erneut scheitern.
     /// </summary>
+    /// <param name="exception">Die zu prüfende API-Ausnahme.</param>
+    /// <returns><c>true</c>, wenn der Fehler dauerhaft ist und die Meldung verworfen wird.</returns>
     internal static bool IsPermanentClientError(ApiException exception)
     {
         var status = (int?)exception.StatusCode;

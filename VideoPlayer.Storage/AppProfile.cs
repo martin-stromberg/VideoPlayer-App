@@ -32,6 +32,8 @@ public sealed class AppProfile
     public string DirectoryName => Name == DefaultName ? string.Empty : Name;
 
     /// <summary>Liefert den Ablage-Schlüssel mit Profil-Präfix.</summary>
+    /// <param name="key">Schlüssel ohne Profil-Präfix.</param>
+    /// <returns>Der Schlüssel mit vorangestelltem Profil-Präfix.</returns>
     public string PrefixKey(string key) => PreferencesPrefix + key;
 
     /// <summary>
@@ -39,6 +41,8 @@ public sealed class AppProfile
     /// <see cref="EnvironmentVariable"/>. Leere/fehlende Werte ergeben das
     /// Standardprofil.
     /// </summary>
+    /// <param name="getVariable">Optionale Umgebungsvariablen-Quelle (Standard: <see cref="Environment.GetEnvironmentVariable(string)"/>).</param>
+    /// <returns>Das aktive Profil.</returns>
     public static AppProfile FromEnvironment(Func<string, string?>? getVariable = null)
     {
         getVariable ??= Environment.GetEnvironmentVariable;
@@ -46,6 +50,8 @@ public sealed class AppProfile
     }
 
     /// <summary>Erstellt ein Profil aus einem Namen (kleingeschrieben, Fallback <c>default</c>).</summary>
+    /// <param name="name">Profilname; leere/fehlende Werte ergeben das Standardprofil.</param>
+    /// <returns>Das erstellte Profil.</returns>
     public static AppProfile Create(string? name)
     {
         if (string.IsNullOrWhiteSpace(name))

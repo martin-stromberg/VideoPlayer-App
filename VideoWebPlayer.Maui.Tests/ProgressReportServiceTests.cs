@@ -23,6 +23,7 @@ public class ProgressReportServiceTests : IDisposable
     private readonly StubHttpMessageHandler handler = new();
     private readonly AuthSessionService authSession;
 
+    /// <summary>Initialisiert eine neue Instanz der Testklasse <c>ProgressReportServiceTests</c>.</summary>
     public ProgressReportServiceTests()
     {
         root = Path.Combine(Path.GetTempPath(), "videoplayer-report-tests", Guid.NewGuid().ToString("N"));
@@ -44,6 +45,7 @@ public class ProgressReportServiceTests : IDisposable
             new RecordingDelays().Delay);
     }
 
+    /// <inheritdoc/>
     public void Dispose()
     {
         SQLite.SQLiteAsyncConnection.ResetPool();
@@ -61,6 +63,7 @@ public class ProgressReportServiceTests : IDisposable
 
     private ProgressReportService CreateService() => new(authSession, queue, monitor);
 
+    /// <summary>Prüft ReportProgress: bei Online → sendet direkt ohne Queue.</summary>
     [Fact]
     public async Task ReportProgress_Online_SendsDirectlyWithoutQueueing()
     {
@@ -83,6 +86,7 @@ public class ProgressReportServiceTests : IDisposable
         Assert.Equal(0, await queue.CountAsync());
     }
 
+    /// <summary>Prüft ReportProgress: bei Offline → reiht ohne Request ein.</summary>
     [Fact]
     public async Task ReportProgress_Offline_EnqueuesWithoutRequest()
     {
@@ -101,6 +105,7 @@ public class ProgressReportServiceTests : IDisposable
             r.PathAndQuery.EndsWith("/api/continue-watching/progress"));
     }
 
+    /// <summary>Prüft ReportProgress: ohne Client → reiht ein.</summary>
     [Fact]
     public async Task ReportProgress_WithoutClient_Enqueues()
     {
@@ -112,6 +117,7 @@ public class ProgressReportServiceTests : IDisposable
         Assert.Equal(1, await queue.CountAsync());
     }
 
+    /// <summary>Prüft ReportProgress: bei Transportfehler → reiht ein.</summary>
     [Fact]
     public async Task ReportProgress_TransportError_Enqueues()
     {
@@ -128,6 +134,7 @@ public class ProgressReportServiceTests : IDisposable
         Assert.Equal(1, await queue.CountAsync());
     }
 
+    /// <summary>Prüft ReportProgress: bei permanentem Clientfehler → verwirft den Eintrag.</summary>
     [Fact]
     public async Task ReportProgress_PermanentClientError_Discards()
     {

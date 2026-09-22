@@ -6,6 +6,9 @@ namespace VideoPlayer.ApiClient.Models;
 /// </summary>
 public class AuthToken
 {
+    /// <summary>Zugangs-Token (Bearer).</summary>
     public string Token { get; set; } = string.Empty;
+
+    /// <summary>Ablaufzeitpunkt des Tokens.</summary>
     public DateTime Expires { get; set; }
 }

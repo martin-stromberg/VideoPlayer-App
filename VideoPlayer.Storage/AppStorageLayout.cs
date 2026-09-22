@@ -22,6 +22,11 @@ public sealed class AppStorageLayout
     private readonly string cacheRoot;
     private readonly AppProfile profile;
 
+    /// <summary>Erstellt das Ablagelayout aus den plattformspezifischen Wurzeln.</summary>
+    /// <param name="backupRoot">Wurzelverzeichnis backup-pflichtiger Daten.</param>
+    /// <param name="noBackupRoot">Wurzelverzeichnis nicht backup-pflichtiger Daten.</param>
+    /// <param name="cacheRoot">Wurzelverzeichnis des Temp-Caches.</param>
+    /// <param name="profile">Aktives Profil (eigenes Unterverzeichnis je Wurzel außer beim Standardprofil).</param>
     public AppStorageLayout(string backupRoot, string noBackupRoot, string cacheRoot, AppProfile profile)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(backupRoot);
@@ -34,25 +39,46 @@ public sealed class AppStorageLayout
     }
 
     /// <summary>Backup-pflichtiges Verzeichnis (lokale Datenbank, Profildaten, Serverliste).</summary>
-    public string BackupDirectory => Scoped(backupRoot);
+    public string BackupDirectory
+    {
+        get { return Scoped(backupRoot); }
+    }
 
     /// <summary>Pfad der backup-pflichtigen Datenbankdatei.</summary>
-    public string DataDatabasePath => Path.Combine(BackupDirectory, "videoplayer.db3");
+    public string DataDatabasePath
+    {
+        get { return Path.Combine(BackupDirectory, "videoplayer.db3"); }
+    }
 
     /// <summary>Nicht backup-pflichtiges Verzeichnis (Caches, Offline-Videos, Vorschaubilder).</summary>
-    public string NoBackupDirectory => Scoped(noBackupRoot);
+    public string NoBackupDirectory
+    {
+        get { return Scoped(noBackupRoot); }
+    }
 
     /// <summary>Pfad der nicht backup-pflichtigen Cache-Datenbankdatei.</summary>
-    public string CacheDatabasePath => Path.Combine(NoBackupDirectory, "videoplayer-cache.db3");
+    public string CacheDatabasePath
+    {
+        get { return Path.Combine(NoBackupDirectory, "videoplayer-cache.db3"); }
+    }
 
     /// <summary>Offline-Videos (nicht backup-pflichtig).</summary>
-    public string VideosDirectory => Path.Combine(NoBackupDirectory, "videos");
+    public string VideosDirectory
+    {
+        get { return Path.Combine(NoBackupDirectory, "videos"); }
+    }
 
     /// <summary>Vorschaubilder (nicht backup-pflichtig).</summary>
-    public string PreviewsDirectory => Path.Combine(NoBackupDirectory, "previews");
+    public string PreviewsDirectory
+    {
+        get { return Path.Combine(NoBackupDirectory, "previews"); }
+    }
 
     /// <summary>Temp-Cache (nie gesichert, von der Plattform räumbar).</summary>
-    public string TempDirectory => Path.Combine(Scoped(cacheRoot), "videoplayer-temp");
+    public string TempDirectory
+    {
+        get { return Path.Combine(Scoped(cacheRoot), "videoplayer-temp"); }
+    }
 
     /// <summary>Legt alle Ablageverzeichnisse an.</summary>
     public void EnsureDirectoriesExist()

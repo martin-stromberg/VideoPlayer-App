@@ -3,6 +3,7 @@ using UIKit;
 
 namespace VideoPlayer.Maui
 {
+    /// <summary>Einstiegspunkt der Mac-Catalyst-App.</summary>
     public class Program
     {
         // This is the main entry point of the application.

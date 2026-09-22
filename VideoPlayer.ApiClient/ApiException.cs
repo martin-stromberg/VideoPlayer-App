@@ -7,6 +7,14 @@ namespace VideoPlayer.ApiClient;
 /// </summary>
 public class ApiException : HttpRequestException
 {
+    /// <summary>
+    /// Erstellt die Ausnahme für eine fehlgeschlagene Serveranfrage.
+    /// </summary>
+    /// <param name="endpoint">Relativer Endpunktpfad der Anfrage.</param>
+    /// <param name="statusCode">HTTP-Statuscode der Antwort, falls eine eingegangen ist.</param>
+    /// <param name="responseBody">Rohantwort des Servers, falls vorhanden.</param>
+    /// <param name="message">Fehlermeldung der Ausnahme.</param>
+    /// <param name="innerException">Ursprüngliche Ausnahme, falls vorhanden.</param>
     public ApiException(string endpoint, HttpStatusCode? statusCode, string? responseBody, string message, Exception? innerException = null)
         : base(message, innerException, statusCode)
     {

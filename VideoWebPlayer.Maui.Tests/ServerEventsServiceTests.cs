@@ -32,6 +32,7 @@ public class ServerEventsServiceTests
         await authSession.LoginAsync(Server, "martin", "pw");
     }
 
+    /// <summary>Prüft ConnectAsync: verwendet Hubadresse und Bearertoken.</summary>
     [Fact]
     public async Task ConnectAsync_UsesHubAddressAndBearerToken()
     {
@@ -49,6 +50,7 @@ public class ServerEventsServiceTests
         Assert.Equal("jwt", await connection.LastTokenProvider!());
     }
 
+    /// <summary>Prüft ConnectAsync: bei gleichem Server → ist idempotent.</summary>
     [Fact]
     public async Task ConnectAsync_SameServer_IsIdempotent()
     {
@@ -63,6 +65,7 @@ public class ServerEventsServiceTests
         Assert.Equal(0, connection.DisconnectCalls);
     }
 
+    /// <summary>Prüft ConnectAsync: bei anderem Server → verbindet erneut.</summary>
     [Fact]
     public async Task ConnectAsync_OtherServer_Reconnects()
     {
@@ -77,6 +80,7 @@ public class ServerEventsServiceTests
         Assert.Equal(1, connection.DisconnectCalls);
     }
 
+    /// <summary>Prüft EventReceived: übersetzt die Connection-Events.</summary>
     [Fact]
     public async Task EventReceived_TranslatesConnectionEvents()
     {
@@ -98,6 +102,7 @@ public class ServerEventsServiceTests
         Assert.Equal(12, received[2].Count);
     }
 
+    /// <summary>Prüft Closed: löst das Closed-Ereignis aus und erlaubt einen Reconnect.</summary>
     [Fact]
     public async Task Closed_RaisesConnectionClosedAndAllowsReconnect()
     {
@@ -119,6 +124,7 @@ public class ServerEventsServiceTests
         Assert.True(service.IsConnected);
     }
 
+    /// <summary>Prüft DisconnectAsync: stoppt und gibt die Connection frei.</summary>
     [Fact]
     public async Task DisconnectAsync_StopsAndDisposesConnection()
     {

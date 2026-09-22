@@ -3,10 +3,11 @@ using System.Globalization;
 namespace VideoWebPlayer.Maui.Converters;
 
 /// <summary>
-/// Inverts a boolean value.
+/// Invertiert einen booleschen Wert.
 /// </summary>
 public class InvertedBoolConverter : IValueConverter
 {
+    /// <inheritdoc/>
     public object? Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
     {
         if (value is bool boolValue)
@@ -16,6 +17,7 @@ public class InvertedBoolConverter : IValueConverter
         return false;
     }
 
+    /// <inheritdoc/>
     public object? ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
     {
         if (value is bool boolValue)

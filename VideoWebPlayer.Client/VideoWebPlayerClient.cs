@@ -12,11 +12,22 @@ using VideoWebPlayer.Data;
 
 namespace VideoWebPlayer.Client
 {
+    /// <summary>
+    /// HTTP-Client für die Kommunikation mit der VideoWebPlayer-Server-API.
+    /// Kapselt Authentifizierung, automatische Token-Erneuerung bei 401-Antworten
+    /// sowie alle fachlichen Endpunkte (Quellen, Medieneinträge, Favoriten,
+    /// "Weiter ansehen", Bilder).
+    /// </summary>
     public class VideoWebPlayerClient
     {
         private readonly HttpClient httpClient;
         private readonly ConcurrentDictionary<string, ProgressSendState> progressStates = new();
 
+        /// <summary>
+        /// Erstellt einen neuen Client für die VideoWebPlayer-Server-API.
+        /// </summary>
+        /// <param name="httpClient">Der für Serveranfragen verwendete HTTP-Client.</param>
+        /// <param name="logger">Logger für Diagnosemeldungen.</param>
         public VideoWebPlayerClient(HttpClient httpClient, ILogger<VideoWebPlayerClient> logger)
         {
             this.httpClient = httpClient;
@@ -38,11 +49,28 @@ namespace VideoWebPlayer.Client
             public required long DurationSeconds { get; init; }
         }
 
+        /// <summary>
+        /// Wird aufgerufen, wenn eine Anfrage mit 401 Unauthorized fehlschlägt.
+        /// Abgeleitete Klassen können hier z. B. das Token erneuern.
+        /// </summary>
+        /// <returns>
+        /// <c>true</c>, wenn ein neues Token verfügbar ist und die Anfrage wiederholt
+        /// werden soll; andernfalls <c>false</c>.
+        /// </returns>
         protected virtual Task<bool> HandleUnauthorized()
         {
             return Task.FromResult(false);
         }
 
+        /// <summary>
+        /// Führt eine GET-Anfrage an den angegebenen Endpunkt aus und deserialisiert
+        /// die JSON-Antwort. Bei 401 wird zunächst <see cref="HandleUnauthorized"/>
+        /// aufgerufen und die Anfrage ggf. wiederholt.
+        /// </summary>
+        /// <typeparam name="T">Der erwartete Antworttyp.</typeparam>
+        /// <param name="endPoint">Der abzufragende API-Endpunkt.</param>
+        /// <returns>Die deserialisierte Antwort.</returns>
+        /// <exception cref="HttpRequestException">Bei 401 ohne erfolgreiche Token-Erneuerung oder bei einem Fehlerstatuscode.</exception>
         protected virtual async Task<T> HttpGetAsync<T>(string endPoint)
         {
             async Task<HttpResponseMessage> DoRequestAsync() => await httpClient.GetAsync(endPoint);
@@ -80,6 +108,20 @@ namespace VideoWebPlayer.Client
             }) ?? throw new InvalidOperationException("Deserialization returned null.");
         }
 
+        /// <summary>
+        /// Führt eine POST-Anfrage an den angegebenen Endpunkt aus und deserialisiert
+        /// die JSON-Antwort. Bei 401 wird zunächst <see cref="HandleUnauthorized"/>
+        /// aufgerufen und die Anfrage ggf. wiederholt.
+        /// </summary>
+        /// <typeparam name="T">Der erwartete Antworttyp.</typeparam>
+        /// <param name="endPoint">Der aufzurufende API-Endpunkt.</param>
+        /// <param name="args">Der zu sendende HTTP-Inhalt.</param>
+        /// <param name="skipReauthorize">
+        /// <c>true</c>, um bei einer 401-Antwort keine erneute Autorisierung zu
+        /// versuchen (z. B. innerhalb des Login-Aufrufs selbst).
+        /// </param>
+        /// <returns>Die deserialisierte Antwort.</returns>
+        /// <exception cref="HttpRequestException">Bei 401 ohne erfolgreiche Token-Erneuerung oder bei einem Fehlerstatuscode.</exception>
         protected virtual async Task<T> HttpPostAsync<T>(string endPoint, HttpContent args, bool skipReauthorize = false)
         {
             async Task<HttpResponseMessage> DoRequestAsync() => await httpClient.PostAsync(endPoint, args);
@@ -125,6 +167,17 @@ namespace VideoWebPlayer.Client
             }) ?? throw new InvalidOperationException("Deserialization returned null.");
         }
 
+        /// <summary>
+        /// Führt eine POST-Anfrage an den angegebenen Endpunkt aus, ohne eine
+        /// Antwort zu deserialisieren. Bei 401 wird zunächst
+        /// <see cref="HandleUnauthorized"/> aufgerufen und die Anfrage ggf. wiederholt.
+        /// </summary>
+        /// <param name="endPoint">Der aufzurufende API-Endpunkt.</param>
+        /// <param name="args">Der zu sendende HTTP-Inhalt.</param>
+        /// <param name="skipReauthorize">
+        /// <c>true</c>, um bei einer 401-Antwort keine erneute Autorisierung zu versuchen.
+        /// </param>
+        /// <exception cref="HttpRequestException">Bei 401 ohne erfolgreiche Token-Erneuerung oder bei einem Fehlerstatuscode.</exception>
         protected virtual async Task HttpPostAsync(string endPoint, HttpContent args, bool skipReauthorize = false)
         {
             async Task<HttpResponseMessage> DoRequestAsync() => await httpClient.PostAsync(endPoint, args);
@@ -160,8 +213,12 @@ namespace VideoWebPlayer.Client
 
         #region Authentication
         /// <summary>
-        /// Authenticates the user and stores the authorization token.
+        /// Authentifiziert den Benutzer am Login-Endpunkt und speichert das
+        /// zurückgegebene Autorisierungstoken im HTTP-Client.
         /// </summary>
+        /// <param name="email">E-Mail-Adresse des Benutzers.</param>
+        /// <param name="password">Passwort des Benutzers.</param>
+        /// <returns>Das vom Server zurückgegebene Autorisierungstoken.</returns>
         public async Task<AuthorizationToken?> AuthenticateAsync(string email, string password)
         {
             var request = new AuthenticationRequest { Email = email, Password = password };
@@ -172,6 +229,10 @@ namespace VideoWebPlayer.Client
             return token;
         }
 
+        /// <summary>
+        /// Setzt das Bearer-Token im Authorization-Header des HTTP-Clients.
+        /// </summary>
+        /// <param name="token">Das zu setzende Autorisierungstoken.</param>
         public virtual void SetAuthorizationToken(AuthorizationToken token)
         {
             if (token is not null)
@@ -181,6 +242,9 @@ namespace VideoWebPlayer.Client
             }
         }
 
+        /// <summary>
+        /// Aktuell gesetztes Bearer-Token oder <c>null</c>, wenn keines gesetzt ist.
+        /// </summary>
         public string? AuthorizationToken
         {
             get
@@ -190,22 +254,35 @@ namespace VideoWebPlayer.Client
         }
 
         /// <summary>
-        /// Ensures an authorization token is available for the current user.
-        /// The default implementation does nothing; derived classes may impersonate.
+        /// Stellt sicher, dass für den aktuellen Benutzer ein Autorisierungstoken
+        /// verfügbar ist. Die Standardimplementierung tut nichts; abgeleitete
+        /// Klassen können hier eine Impersonation durchführen.
         /// </summary>
+        /// <param name="user">Der aktuelle Benutzer, für den ein Token sichergestellt werden soll.</param>
+        /// <param name="cancellationToken">Token zum Abbrechen des Vorgangs.</param>
         public virtual Task EnsureAuthorizationTokenAsync(ClaimsPrincipal? user, CancellationToken cancellationToken = default)
         {
             return Task.CompletedTask;
         }
 
+        /// <summary>
+        /// Gibt an, ob sich der Client noch in der Initialisierungsphase befindet.
+        /// </summary>
         public bool Initializing { get; set; }
+        /// <summary>
+        /// Logger für Diagnosemeldungen.
+        /// </summary>
         protected ILogger<VideoWebPlayerClient> Logger { get; }
         #endregion
 
         #region HealthCheck
         /// <summary>
-        /// Checks if the server is reachable and healthy.
+        /// Prüft, ob der Server erreichbar und betriebsbereit ist.
         /// </summary>
+        /// <returns>
+        /// <c>true</c>, wenn der Server einen Erfolgsstatuscode zurückgibt;
+        /// andernfalls <c>false</c>.
+        /// </returns>
         public async Task<bool> HealthCheckAsync()
         {
             try
@@ -221,6 +298,10 @@ namespace VideoWebPlayer.Client
         #endregion
 
         #region Sources
+        /// <summary>
+        /// Fragt alle verfügbaren Medienquellen vom Server ab.
+        /// </summary>
+        /// <returns>Liste der Medienquellen; bei einem Fehler eine leere Liste.</returns>
         public async Task<IEnumerable<DtoMediaSource>> RequestSourcesAsync()
         {
             try
@@ -232,6 +313,11 @@ namespace VideoWebPlayer.Client
                 return new DtoMediaSource[0];
             }
         }
+        /// <summary>
+        /// Fragt eine einzelne Medienquelle vom Server ab.
+        /// </summary>
+        /// <param name="sourceId">ID der Medienquelle.</param>
+        /// <returns>Die Medienquelle oder <c>null</c> bei einem Fehler.</returns>
         public async Task<DtoMediaSource?> RequestSourceAsync(long sourceId)
         {
             try
@@ -243,6 +329,11 @@ namespace VideoWebPlayer.Client
                 return null;
             }
         }
+        /// <summary>
+        /// Fragt die Genres einer Medienquelle vom Server ab.
+        /// </summary>
+        /// <param name="sourceId">ID der Medienquelle.</param>
+        /// <returns>Die Genres der Quelle oder <c>null</c> bei einem Fehler.</returns>
         public async Task<SourceGenresDto?> RequestSourceGenresAsync(long sourceId)
         {
             try
@@ -257,6 +348,10 @@ namespace VideoWebPlayer.Client
         #endregion
 
         #region Recent Entries
+        /// <summary>
+        /// Fragt die Liste der kürzlich hinzugefügten Medieneinträge ab.
+        /// </summary>
+        /// <returns>Liste der kürzlich hinzugefügten Einträge.</returns>
         public async Task<IEnumerable<DtoRecentEntry>> RequestRecentEntriesAsync()
         {
             return await HttpGetAsync<DtoRecentEntry[]>("api/items/recent");
@@ -264,11 +359,21 @@ namespace VideoWebPlayer.Client
         #endregion
 
         #region Continue Watching
+        /// <summary>
+        /// Fragt die "Weiter ansehen"-Liste des aktuellen Benutzers ab.
+        /// </summary>
+        /// <returns>Liste der "Weiter ansehen"-Einträge.</returns>
         public async Task<IEnumerable<ContinueWatchingDto>> RequestContinueWatchingAsync()
         {
             return await HttpGetAsync<ContinueWatchingDto[]>("api/continue-watching");
         }
 
+        /// <summary>
+        /// Blendet einen Eintrag der "Weiter ansehen"-Liste aus.
+        /// </summary>
+        /// <param name="mediaType">Medientyp des Eintrags (z. B. "movie" oder "episode").</param>
+        /// <param name="mediaId">ID des Medieneintrags.</param>
+        /// <returns>Ergebnis der Mutation.</returns>
         public async Task<ContinueWatchingMutationResult> HideContinueWatchingAsync(string mediaType, long mediaId)
         {
             var json = JsonSerializer.Serialize(new { MediaType = mediaType, MediaId = mediaId });
@@ -277,6 +382,12 @@ namespace VideoWebPlayer.Client
                 new StringContent(json, System.Text.Encoding.UTF8, new System.Net.Http.Headers.MediaTypeHeaderValue("application/json")));
         }
 
+        /// <summary>
+        /// Überspringt einen Eintrag der "Weiter ansehen"-Liste.
+        /// </summary>
+        /// <param name="mediaType">Medientyp des Eintrags (z. B. "movie" oder "episode").</param>
+        /// <param name="mediaId">ID des Medieneintrags.</param>
+        /// <returns>Ergebnis der Mutation.</returns>
         public async Task<ContinueWatchingMutationResult> SkipContinueWatchingAsync(string mediaType, long mediaId)
         {
             var json = JsonSerializer.Serialize(new { MediaType = mediaType, MediaId = mediaId });
@@ -287,16 +398,29 @@ namespace VideoWebPlayer.Client
         #endregion
 
         #region Favorites
+        /// <summary>
+        /// Fragt die Favoritenliste des aktuellen Benutzers ab.
+        /// </summary>
+        /// <returns>Liste der Favoriten-Einträge.</returns>
         public async Task<IEnumerable<DtoFavoriteEntry>> RequestFavoritesAsync()
         {
             return await HttpGetAsync<DtoFavoriteEntry[]>("api/favorites");
         }
+        /// <summary>
+        /// Schaltet den Favoritenstatus eines Medieneintrags um.
+        /// </summary>
+        /// <param name="entry">Der Medieneintrag, dessen Favoritenstatus umgeschaltet wird.</param>
+        /// <returns>Der neue Favoritenstatus (<c>true</c> = Favorit).</returns>
         public async Task<bool> ToggleFavorite(DtoMediaEntry entry)
         {
             var json = JsonSerializer.Serialize(entry);
             return await HttpPostAsync<bool>("api/favorites/toggle", new StringContent(json, new System.Net.Http.Headers.MediaTypeHeaderValue("application/json")));
         }
 
+        /// <summary>
+        /// Entfernt einen Favoriten-Eintrag.
+        /// </summary>
+        /// <param name="favoriteId">ID des zu entfernenden Favoriten-Eintrags.</param>
         public async Task RemoveFavoriteAsync(long favoriteId)
         {
             var json = JsonSerializer.Serialize(new { Id = favoriteId, UserId = "anonymous" });
@@ -305,6 +429,16 @@ namespace VideoWebPlayer.Client
         #endregion
 
         #region Media Entries
+        /// <summary>
+        /// Fragt die Medieneinträge einer Medienquelle seitenweise ab, optional
+        /// gefiltert nach Suchtext und Genre.
+        /// </summary>
+        /// <param name="mediaSourceId">ID der Medienquelle.</param>
+        /// <param name="Page">Seitennummer (0-basiert).</param>
+        /// <param name="PageSize">Anzahl der Einträge pro Seite.</param>
+        /// <param name="searchText">Optionaler Suchtext zur Filterung.</param>
+        /// <param name="genreId">Optionale Genre-ID zur Filterung (0 = kein Filter).</param>
+        /// <returns>Liste der Medieneinträge der angeforderten Seite.</returns>
         public async Task<List<MediaEntryDto>> RequestSourceItems(long mediaSourceId, int Page = 0, int PageSize = 30, string searchText = "", long genreId = 0)
         {
             var url = $"/api/items?mediaSourceId={mediaSourceId}&page={Page}&size={PageSize}";
@@ -315,11 +449,21 @@ namespace VideoWebPlayer.Client
             return await HttpGetAsync<List<MediaEntryDto>>(url);
         }
 
+        /// <summary>
+        /// Fragt eine Filmsammlung vom Server ab.
+        /// </summary>
+        /// <param name="id">ID der Filmsammlung.</param>
+        /// <returns>Die Filmsammlung als Medieneintrag.</returns>
         public async Task<DtoMediaEntry> RequestMovieCollectionAsync(long id)
         {
             return await HttpGetAsync<DtoMovieCollection>($"api/items/moviecollection/{id}");
         }
 
+        /// <summary>
+        /// Fragt einen Film vom Server ab.
+        /// </summary>
+        /// <param name="id">ID des Films.</param>
+        /// <returns>Der Film oder <c>null</c> bei einem Fehler.</returns>
         public async Task<DtoMovie?> RequestMovieAsync(long id)
         {
             try
@@ -332,11 +476,21 @@ namespace VideoWebPlayer.Client
             }
         }
 
+        /// <summary>
+        /// Fragt eine Fernsehserie vom Server ab.
+        /// </summary>
+        /// <param name="id">ID der Serie.</param>
+        /// <returns>Die Serie als Medieneintrag.</returns>
         public async Task<DtoMediaEntry> RequestTVShowAsync(long id)
         {
             return await HttpGetAsync<DtoTVShow>($"api/items/tvshow/{id}");
         }
 
+        /// <summary>
+        /// Fragt eine Episode einer Fernsehserie vom Server ab.
+        /// </summary>
+        /// <param name="id">ID der Episode.</param>
+        /// <returns>Die Episode oder <c>null</c> bei einem Fehler.</returns>
         public async Task<DtoTVShowEpisode?> RequestTVShowEpisodeAsync(long id)
         {
             try
@@ -349,6 +503,10 @@ namespace VideoWebPlayer.Client
             }
         }
 
+        /// <summary>
+        /// Fragt die verfügbaren Genre-Auswahloptionen vom Server ab.
+        /// </summary>
+        /// <returns>Liste der Genre-Optionen; bei einem Fehler eine leere Liste.</returns>
         public async Task<List<DtoGenreOption>> RequestGenreOptionsAsync()
         {
             try
@@ -361,6 +519,10 @@ namespace VideoWebPlayer.Client
             }
         }
 
+        /// <summary>
+        /// Speichert geänderte Metadaten eines Medieneintrags auf dem Server.
+        /// </summary>
+        /// <param name="request">Die Metadaten-Aktualisierungsanfrage.</param>
         public async Task SaveMetadataAsync(MediaMetadataUpdateRequest request)
         {
             var json = JsonSerializer.Serialize(request);
@@ -373,18 +535,23 @@ namespace VideoWebPlayer.Client
 
         #region Continue Watching
         /// <summary>
-        /// Gets the current user's continue-watching list.
+        /// Ruft die "Weiter ansehen"-Liste des aktuellen Benutzers ab.
         /// </summary>
+        /// <returns>Liste der "Weiter ansehen"-Einträge.</returns>
         public async Task<List<ContinueWatchingDto>> GetContinueWatchingAsync()
         {
             return await HttpGetAsync<List<ContinueWatchingDto>>("api/continue-watching");
         }
 
         /// <summary>
-        /// Reports playback progress for the current user.
+        /// Meldet den Wiedergabefortschritt des aktuellen Benutzers an den Server.
         /// Coalescing: Für ein MediaItem läuft nur ein Request gleichzeitig.
         /// Währenddessen wird genau eine letzte Meldung gepuffert (überschreibend).
         /// </summary>
+        /// <param name="mediaType">Medientyp des Eintrags (z. B. "movie" oder "episode").</param>
+        /// <param name="mediaId">ID des Medieneintrags.</param>
+        /// <param name="positionSeconds">Aktuelle Wiedergabeposition in Sekunden.</param>
+        /// <param name="durationSeconds">Gesamtdauer des Mediums in Sekunden.</param>
         public async Task ReportPlaybackProgressAsync(string mediaType, long mediaId, long positionSeconds, long durationSeconds)
         {
             var key = $"{mediaType}:{mediaId}";

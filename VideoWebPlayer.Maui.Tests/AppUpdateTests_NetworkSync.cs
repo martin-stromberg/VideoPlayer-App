@@ -20,6 +20,7 @@ public class AppUpdateTests_NetworkSync
         IsStartupRunning = false
     };
 
+    /// <summary>Prüft StartupRequested: enthält Monitoringeffekt.</summary>
     [Fact]
     public void StartupRequested_IncludesMonitoringEffect()
     {
@@ -28,6 +29,7 @@ public class AppUpdateTests_NetworkSync
         Assert.Contains(transition.Effects, e => e is StartNetworkMonitoringEffect);
     }
 
+    /// <summary>Prüft NetworkLost: bei <c>FromConnected</c> → wechselt in den Offline-Zustand und trennt Events.</summary>
     [Fact]
     public void NetworkLost_FromConnected_EntersOfflineAndDisconnectsEvents()
     {
@@ -43,6 +45,7 @@ public class AppUpdateTests_NetworkSync
         Assert.Contains(transition.Effects, e => e is DisconnectServerEventsEffect);
     }
 
+    /// <summary>Prüft NetworkLost: bei <c>InNeedsLogin</c> → aktualisiert nur den Online-Status.</summary>
     [Fact]
     public void NetworkLost_InNeedsLogin_OnlyUpdatesIsOnline()
     {
@@ -60,6 +63,7 @@ public class AppUpdateTests_NetworkSync
         Assert.Empty(transition.Effects);
     }
 
+    /// <summary>Prüft NetworkRestored: nach Offline → startet den Health-Check.</summary>
     [Fact]
     public void NetworkRestored_FromOffline_RunsHealthCheck()
     {
@@ -79,6 +83,7 @@ public class AppUpdateTests_NetworkSync
         Assert.Contains(transition.Effects, e => e is CheckServerHealthEffect);
     }
 
+    /// <summary>Prüft NetworkRestored: bei <c>InNeedsServerSetup</c> → aktualisiert nur den Online-Status.</summary>
     [Fact]
     public void NetworkRestored_InNeedsServerSetup_OnlyUpdatesIsOnline()
     {
@@ -96,6 +101,7 @@ public class AppUpdateTests_NetworkSync
         Assert.Empty(transition.Effects);
     }
 
+    /// <summary>Prüft AutoLoginSucceeded: auf einer Menüseite → verbindet Events und synchronisiert ohne Navigation.</summary>
     [Fact]
     public void AutoLoginSucceeded_OnMenuPage_ConnectsEventsAndSyncsWithoutNavigation()
     {
@@ -120,6 +126,7 @@ public class AppUpdateTests_NetworkSync
         Assert.DoesNotContain(transition.Effects, e => e is NavigateToPageEffect);
     }
 
+    /// <summary>Prüft LoginSucceeded: bei <c>OnLoginPage</c> → navigiert Home und synchronisiert.</summary>
     [Fact]
     public void LoginSucceeded_OnLoginPage_NavigatesHomeAndSyncs()
     {
@@ -145,6 +152,7 @@ public class AppUpdateTests_NetworkSync
             e is NavigateToPageEffect n && n.Page == AppPage.Home);
     }
 
+    /// <summary>Prüft OfflineDataCheck: auf einer Menüseite → behält die Seite.</summary>
     [Fact]
     public void OfflineDataCheck_OnMenuPage_KeepsPage()
     {
@@ -164,6 +172,9 @@ public class AppUpdateTests_NetworkSync
         Assert.DoesNotContain(transition.Effects, e => e is NavigateToPageEffect);
     }
 
+    /// <summary>Prüft ServerEventReceived: bildet die Ereignisart auf den passenden Sync-Effekt ab.</summary>
+    /// <param name="kind">Die Art.</param>
+    /// <param name="expectedEffect">Der erwartete Effekttyp.</param>
     [Theory]
     [InlineData(ServerEventKind.ContinueWatchingUpdated, typeof(SyncContinueWatchingEffect))]
     [InlineData(ServerEventKind.FavoritesChanged, typeof(SyncFavoritesEffect))]
@@ -177,6 +188,7 @@ public class AppUpdateTests_NetworkSync
         Assert.Contains(transition.Effects, e => e.GetType() == expectedEffect);
     }
 
+    /// <summary>Prüft ServerEventReceived: bei <c>WhenNotConnected</c> → ignoriert.</summary>
     [Fact]
     public void ServerEventReceived_WhenNotConnected_Ignored()
     {
@@ -190,6 +202,7 @@ public class AppUpdateTests_NetworkSync
         Assert.Equal(ConnectionState.Offline, transition.Model.ConnectionState);
     }
 
+    /// <summary>Prüft ServerEventsClosed: bei <c>WhenConnectedOnline</c> → verbindet erneut.</summary>
     [Fact]
     public void ServerEventsClosed_WhenConnectedOnline_Reconnects()
     {
@@ -201,6 +214,7 @@ public class AppUpdateTests_NetworkSync
             e is ConnectServerEventsEffect c && c.ServerAddress == Server);
     }
 
+    /// <summary>Prüft ServerEventsClosed: bei Offline → wird ignoriert.</summary>
     [Fact]
     public void ServerEventsClosed_WhenOffline_Ignored()
     {
@@ -215,6 +229,7 @@ public class AppUpdateTests_NetworkSync
         Assert.Empty(transition.Effects);
     }
 
+    /// <summary>Prüft SynchronizationCompleted: setzt das Sync-Flag zurück.</summary>
     [Fact]
     public void SynchronizationCompleted_ClearsSyncFlag()
     {
@@ -231,6 +246,7 @@ public class AppUpdateTests_NetworkSync
         Assert.IsType<LoadHomeListsEffect>(effect);
     }
 
+    /// <summary>Prüft SessionExpired: trennt Events.</summary>
     [Fact]
     public void SessionExpired_DisconnectsEvents()
     {

@@ -5,6 +5,9 @@ namespace VideoWebPlayer.Maui.Tests;
 /// <summary>Normalisierung von Serveradressen in die kanonische Speicherform.</summary>
 public class ServerAddressTests
 {
+    /// <summary>Prüft TryNormalize: bei gültiger Eingabe → erzeugt die kanonische Form.</summary>
+    /// <param name="input">Die Eingabe.</param>
+    /// <param name="expected">Der erwartete Wert.</param>
     [Theory]
     [InlineData("http://server/videoplayer", "http://server/videoplayer/")]
     [InlineData("http://server/videoplayer/", "http://server/videoplayer/")]
@@ -18,6 +21,8 @@ public class ServerAddressTests
         Assert.Equal(expected, normalized);
     }
 
+    /// <summary>Prüft TryNormalize: bei ungültiger Eingabe → gibt false zurück.</summary>
+    /// <param name="input">Die Eingabe.</param>
     [Theory]
     [InlineData(null)]
     [InlineData("")]
@@ -30,6 +35,7 @@ public class ServerAddressTests
         Assert.Equal(string.Empty, normalized);
     }
 
+    /// <summary>Prüft TryNormalize: der Host wird kleingeschrieben.</summary>
     [Fact]
     public void TryNormalize_HostIsLowerCased()
     {
@@ -37,6 +43,7 @@ public class ServerAddressTests
         Assert.Equal("http://nas.local:8080/App/", normalized);
     }
 
+    /// <summary>Prüft Normalize: bei ungültiger Eingabe → wirft.</summary>
     [Fact]
     public void Normalize_InvalidInput_Throws()
     {

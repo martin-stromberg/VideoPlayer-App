@@ -15,6 +15,7 @@ public class ConnectionWorkflowContractTests
     private static string MauiFile(params string[] parts) =>
         File.ReadAllText(Path.Combine(new[] { Root, "VideoPlayer.Maui" }.Concat(parts).ToArray()));
 
+    /// <summary>Prüft LoginPage: existiert mit Zugangsdaten-Eingabefeldern.</summary>
     [Fact]
     public void LoginPage_ExistsWithCredentialsInput()
     {
@@ -36,6 +37,7 @@ public class ConnectionWorkflowContractTests
         Assert.Contains("ServerLabel", xaml, StringComparison.Ordinal);
     }
 
+    /// <summary>Prüft LoginPage: die Steuerelemente haben AutomationIds.</summary>
     [Fact]
     public void LoginPage_ControlsHaveAutomationIds()
     {
@@ -57,6 +59,7 @@ public class ConnectionWorkflowContractTests
         }
     }
 
+    /// <summary>Prüft LoginPage: im Code-Behind werden MVU-Nachrichten dispatcht.</summary>
     [Fact]
     public void LoginPage_CodeBehind_DispatchesMvuMessages()
     {
@@ -69,6 +72,7 @@ public class ConnectionWorkflowContractTests
         Assert.DoesNotContain("Guid", code, StringComparison.Ordinal);
     }
 
+    /// <summary>Prüft AppShell: bei <c>RegistersLoginRoute</c> → registriert die Route ohne Flyout-Eintrag.</summary>
     [Fact]
     public void AppShell_RegistersLoginRoute_WithoutFlyoutItem()
     {
@@ -82,6 +86,7 @@ public class ConnectionWorkflowContractTests
         Assert.DoesNotContain("LoginPage", xaml, StringComparison.Ordinal);
     }
 
+    /// <summary>Prüft LoadingPage: bindet den Startup-Statustext.</summary>
     [Fact]
     public void LoadingPage_BindsStartupStatusText()
     {
@@ -91,6 +96,7 @@ public class ConnectionWorkflowContractTests
         Assert.Contains("Model.StartupStatusText", xaml, StringComparison.Ordinal);
     }
 
+    /// <summary>Prüft HomePage: zeigt das Offline-Banner.</summary>
     [Fact]
     public void HomePage_ShowsOfflineBanner()
     {
@@ -103,6 +109,7 @@ public class ConnectionWorkflowContractTests
         Assert.Contains("ModelChanged", code, StringComparison.Ordinal);
     }
 
+    /// <summary>Prüft MauiProgram: registriert die Auth-Services und die Login-Seite.</summary>
     [Fact]
     public void MauiProgram_RegistersAuthServicesAndLoginPage()
     {
@@ -113,6 +120,7 @@ public class ConnectionWorkflowContractTests
         Assert.Contains("AppSecretsService", program, StringComparison.Ordinal);
     }
 
+    /// <summary>Prüft EffectHandler: behandelt alle Connection-Effekte.</summary>
     [Fact]
     public void EffectHandler_HandlesAllConnectionEffects()
     {
@@ -136,6 +144,7 @@ public class ConnectionWorkflowContractTests
         Assert.Contains("HasOfflineDataAsync", handler, StringComparison.Ordinal);
     }
 
+    /// <summary>Prüft AuthSessionService: verdrahtet TokenRefresher und sicheren Storage.</summary>
     [Fact]
     public void AuthSessionService_WiresTokenRefresherAndSecureStorage()
     {

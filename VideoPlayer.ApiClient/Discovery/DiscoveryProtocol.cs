@@ -22,6 +22,9 @@ public static class DiscoveryProtocol
     public const string MdnsServiceType = "_http._tcp.local.";
 
     /// <summary>Extrahiert die Serveradresse aus einer UDP-Antwort.</summary>
+    /// <param name="datagramText">Empfangener Antworttext.</param>
+    /// <param name="address">Extrahierte Serveradresse; leer, wenn die Antwort nicht dem Protokoll entspricht.</param>
+    /// <returns><c>true</c>, wenn die Antwort dem Präfix entspricht und eine nicht-leere Adresse enthält.</returns>
     public static bool TryParseResponse(string? datagramText, out string address)
     {
         address = string.Empty;

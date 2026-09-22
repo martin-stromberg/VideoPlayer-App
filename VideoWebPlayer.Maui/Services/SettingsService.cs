@@ -5,6 +5,9 @@ using System.Net.Sockets;
 
 namespace VideoWebPlayer.Maui.Services;
 
+/// <summary>
+/// Speichert App-Einstellungen und Zugangsdaten profilabhängig in Preferences bzw. SecureStorage.
+/// </summary>
 public class SettingsService : ISettingsService
 {
     private const string ServerKey = "ServerAddress";
@@ -69,20 +72,24 @@ public class SettingsService : ISettingsService
         return legacyValue;
     }
 
+    /// <inheritdoc/>
     public string? ServerAddress => Preferences.Default.Get(GetPrefixedKey(ServerKey), string.Empty);
 
+    /// <inheritdoc/>
     public int PlaybackCacheRetentionDays
     {
         get => ClampDays(Preferences.Default.Get(GetPrefixedKey(PlaybackCacheDaysKey), 1));
         set => Preferences.Default.Set(GetPrefixedKey(PlaybackCacheDaysKey), ClampDays(value));
     }
 
+    /// <inheritdoc/>
     public int WatchlistCacheRetentionDays
     {
         get => ClampDays(Preferences.Default.Get(GetPrefixedKey(WatchlistCacheDaysKey), 3));
         set => Preferences.Default.Set(GetPrefixedKey(WatchlistCacheDaysKey), ClampDays(value));
     }
 
+    /// <inheritdoc/>
     public int DownloadRetentionDays
     {
         get => ClampDays(Preferences.Default.Get(GetPrefixedKey(DownloadRetentionDaysKey), 7));
@@ -96,43 +103,51 @@ public class SettingsService : ISettingsService
         return days;
     }
 
+    /// <inheritdoc/>
     public bool HasServerAddress()
     {
         var value = Preferences.Default.Get(GetPrefixedKey(ServerKey), string.Empty);
         return !string.IsNullOrWhiteSpace(value);
     }
 
+    /// <inheritdoc/>
     public void SetServerAddress(string address)
     {
         Preferences.Default.Set(GetPrefixedKey(ServerKey), address ?? string.Empty);
     }
 
+    /// <inheritdoc/>
     public void ClearServerAddress()
     {
         Preferences.Default.Remove(GetPrefixedKey(ServerKey));
     }
 
+    /// <inheritdoc/>
     public string GetUsername()
     {
         return Preferences.Default.Get(GetPrefixedKey(UserKey), string.Empty);
     }
 
+    /// <inheritdoc/>
     public string GetPassword()
     {
         return GetMigratedSecureValue(PasswordKey);
     }
 
+    /// <inheritdoc/>
     public bool HasCredentials()
     {
         return !string.IsNullOrWhiteSpace(GetUsername()) && !string.IsNullOrWhiteSpace(GetPassword());
     }
 
+    /// <inheritdoc/>
     public void SetCredentials(string username, string password)
     {
         Preferences.Default.Set(GetPrefixedKey(UserKey), username ?? string.Empty);
         WriteSecureValue(GetPrefixedKey(PasswordKey), password);
     }
 
+    /// <inheritdoc/>
     public void ClearCredentials()
     {
         Preferences.Default.Remove(GetPrefixedKey(UserKey));
@@ -140,26 +155,20 @@ public class SettingsService : ISettingsService
         ClearAuthToken();
     }
 
-    /// <summary>
-    /// Gets the authentication token for the current profile.
-    /// </summary>
+    /// <inheritdoc/>
     public string? GetAuthToken()
     {
         return GetMigratedSecureValue(AuthTokenKey);
     }
 
-    /// <summary>
-    /// Sets the authentication token for the current profile.
-    /// </summary>
+    /// <inheritdoc/>
     public void SetAuthToken(string token)
     {
         WriteSecureValue(GetPrefixedKey(AuthTokenKey), token);
         Preferences.Default.Remove(GetPrefixedKey(AuthTokenKey));
     }
 
-    /// <summary>
-    /// Clears the authentication token for the current profile.
-    /// </summary>
+    /// <inheritdoc/>
     public void ClearAuthToken()
     {
         Preferences.Default.Remove(GetPrefixedKey(AuthTokenKey));
@@ -167,6 +176,7 @@ public class SettingsService : ISettingsService
     }
 
     // mDNS Discovery (Zeroconf)
+    /// <inheritdoc/>
     public async Task<IReadOnlyList<string>> DiscoverServersAsync(int timeoutMs = 3000)
     {
         var found = new List<string>();
@@ -188,6 +198,7 @@ public class SettingsService : ISettingsService
     }
 
     // UDP Broadcast Discovery (Fallback)
+    /// <inheritdoc/>
     public async Task<IReadOnlyList<string>> DiscoverServersUdpAsync(int port = 5001, int timeoutMs = 2000)
     {
         var found = new List<string>();

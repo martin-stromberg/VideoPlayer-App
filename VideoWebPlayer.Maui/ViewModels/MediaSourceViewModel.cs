@@ -3,6 +3,9 @@ using System.Runtime.CompilerServices;
 
 namespace VideoWebPlayer.Maui.ViewModels;
 
+/// <summary>
+/// ViewModel für eine Medienquelle (Source), die in der Quellenübersicht angezeigt wird.
+/// </summary>
 public class MediaSourceViewModel : INotifyPropertyChanged
 {
     private long _id;
@@ -11,6 +14,9 @@ public class MediaSourceViewModel : INotifyPropertyChanged
     private long? _iconPictureId;
     private ImageSource? _iconImageSource;
 
+    /// <summary>
+    /// Die ID der Medienquelle.
+    /// </summary>
     public long Id
     {
         get => _id;
@@ -24,6 +30,9 @@ public class MediaSourceViewModel : INotifyPropertyChanged
         }
     }
 
+    /// <summary>
+    /// Der Anzeigename der Medienquelle.
+    /// </summary>
     public string? Name
     {
         get => _name;
@@ -37,6 +46,9 @@ public class MediaSourceViewModel : INotifyPropertyChanged
         }
     }
 
+    /// <summary>
+    /// Das Icon der Medienquelle (z. B. ein Emoji oder Symbol), falls kein Bild geladen wurde.
+    /// </summary>
     public string? Icon
     {
         get => _icon;
@@ -50,6 +62,9 @@ public class MediaSourceViewModel : INotifyPropertyChanged
         }
     }
 
+    /// <summary>
+    /// Die Bild-ID des Quellen-Icons, über die das Bild per API-Client angefordert werden kann.
+    /// </summary>
     public long? IconPictureId
     {
         get => _iconPictureId;
@@ -63,6 +78,9 @@ public class MediaSourceViewModel : INotifyPropertyChanged
         }
     }
 
+    /// <summary>
+    /// Die geladene Bildquelle für das Icon der Medienquelle.
+    /// </summary>
     public ImageSource? IconImageSource
     {
         get => _iconImageSource;
@@ -76,8 +94,13 @@ public class MediaSourceViewModel : INotifyPropertyChanged
         }
     }
 
+    /// <inheritdoc/>
     public event PropertyChangedEventHandler? PropertyChanged;
 
+    /// <summary>
+    /// Löst das <see cref="PropertyChanged"/>-Ereignis aus.
+    /// </summary>
+    /// <param name="propertyName">Der Name der geänderten Eigenschaft (wird automatisch ermittelt).</param>
     protected virtual void OnPropertyChanged([CallerMemberName] string? propertyName = null)
     {
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));

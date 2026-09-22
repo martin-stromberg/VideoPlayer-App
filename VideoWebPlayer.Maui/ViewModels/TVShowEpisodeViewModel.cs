@@ -4,6 +4,9 @@ using System.Runtime.CompilerServices;
 
 namespace VideoWebPlayer.Maui.ViewModels;
 
+/// <summary>
+/// ViewModel für eine einzelne Episode einer TV-Show in der Episodenliste.
+/// </summary>
 public class TVShowEpisodeViewModel : INotifyPropertyChanged
 {
     private string? _title;
@@ -16,6 +19,9 @@ public class TVShowEpisodeViewModel : INotifyPropertyChanged
     private bool _isDownloaded;
     private bool _isFavorite;
 
+    /// <summary>
+    /// Der Titel der Episode.
+    /// </summary>
     public string? Title
     {
         get => _title;
@@ -29,6 +35,9 @@ public class TVShowEpisodeViewModel : INotifyPropertyChanged
         }
     }
 
+    /// <summary>
+    /// Die Handlungsbeschreibung der Episode.
+    /// </summary>
     public string? Plot
     {
         get => _plot;
@@ -42,6 +51,9 @@ public class TVShowEpisodeViewModel : INotifyPropertyChanged
         }
     }
 
+    /// <summary>
+    /// Die URL des Episoden-Bildes (relativ zur API oder absolut).
+    /// </summary>
     public string? ImageUrl
     {
         get => _imageUrl;
@@ -55,9 +67,14 @@ public class TVShowEpisodeViewModel : INotifyPropertyChanged
         }
     }
 
-    // Optional: store the original poster picture id so callers can request images via API client
+    /// <summary>
+    /// Optional: die ursprüngliche Poster-Bild-ID, damit Aufrufer Bilder über den API-Client anfordern können.
+    /// </summary>
     public long? PosterPictureId { get; set; }
 
+    /// <summary>
+    /// Die geladene Bildquelle für das Episoden-Bild.
+    /// </summary>
     public ImageSource? ImageSource
     {
         get => _imageSource;
@@ -71,6 +88,9 @@ public class TVShowEpisodeViewModel : INotifyPropertyChanged
         }
     }
 
+    /// <summary>
+    /// Die ID der Episode.
+    /// </summary>
     public long EpisodeId
     {
         get => _episodeId;
@@ -84,6 +104,9 @@ public class TVShowEpisodeViewModel : INotifyPropertyChanged
         }
     }
 
+    /// <summary>
+    /// Die Episodennummer innerhalb der Staffel.
+    /// </summary>
     public int EpisodeNumber
     {
         get => _episodeNumber;
@@ -97,6 +120,9 @@ public class TVShowEpisodeViewModel : INotifyPropertyChanged
         }
     }
 
+    /// <summary>
+    /// Die Nummer der Staffel, zu der die Episode gehört.
+    /// </summary>
     public int SeasonNumber
     {
         get => _seasonNumber;
@@ -110,6 +136,9 @@ public class TVShowEpisodeViewModel : INotifyPropertyChanged
         }
     }
 
+    /// <summary>
+    /// Gibt an, ob die Episode lokal heruntergeladen wurde.
+    /// </summary>
     public bool IsDownloaded
     {
         get => _isDownloaded;
@@ -123,6 +152,9 @@ public class TVShowEpisodeViewModel : INotifyPropertyChanged
         }
     }
 
+    /// <summary>
+    /// Gibt an, ob die Episode als Favorit markiert ist.
+    /// </summary>
     public bool IsFavorite
     {
         get => _isFavorite;
@@ -137,10 +169,18 @@ public class TVShowEpisodeViewModel : INotifyPropertyChanged
         }
     }
 
+    /// <summary>
+    /// Das Stern-Symbol für den Favoritenstatus der Episode (gefüllt = Favorit, leer = kein Favorit).
+    /// </summary>
     public string FavoriteStarText => IsFavorite ? "★" : "☆";
 
+    /// <inheritdoc/>
     public event PropertyChangedEventHandler? PropertyChanged;
 
+    /// <summary>
+    /// Löst das <see cref="PropertyChanged"/>-Ereignis aus.
+    /// </summary>
+    /// <param name="propertyName">Der Name der geänderten Eigenschaft (wird automatisch ermittelt).</param>
     protected virtual void OnPropertyChanged([CallerMemberName] string? propertyName = null)
     {
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));

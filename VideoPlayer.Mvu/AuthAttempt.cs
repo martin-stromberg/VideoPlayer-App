@@ -24,6 +24,9 @@ public enum AuthAttemptStatus
 /// (nicht geheimen) gespeicherten bzw. eingegebenen Benutzernamen zur
 /// Vorbefüllung der Anmeldemaske.
 /// </summary>
+/// <param name="Status">Ergebnis des Anmeldeversuchs.</param>
+/// <param name="Username">Gespeicherter bzw. eingegebener Benutzername; <c>null</c>, wenn keiner bekannt ist.</param>
+/// <returns>Ergebnistransport des Anmeldeversuchs.</returns>
 public sealed record AuthAttempt(AuthAttemptStatus Status, string? Username = null)
 {
     /// <summary>Die Anmeldung war erfolgreich.</summary>

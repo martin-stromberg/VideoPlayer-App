@@ -1,7 +1,15 @@
 ﻿namespace VideoWebPlayer.Maui
 {
+    /// <summary>
+    /// Shell-Container der App: stellt das Flyout-Menü bereit, registriert
+    /// Navigation-Routen und füllt die Quellen dynamisch aus dem Server.
+    /// </summary>
     public partial class AppShell : Shell
     {
+        /// <summary>
+        /// Erstellt eine neue Instanz der <see cref="AppShell"/>, registriert die
+        /// Shell-Routen und lädt die Quellen-Einträge für das Flyout-Menü.
+        /// </summary>
         public AppShell()
         {
             InitializeComponent();

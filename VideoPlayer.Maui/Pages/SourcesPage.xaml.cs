@@ -12,6 +12,8 @@ public partial class SourcesPage : ContentPage
 {
     private readonly MvuHost mvuHost;
 
+    /// <summary>Initialisiert eine neue Instanz der <see cref="SourcesPage"/>-Klasse.</summary>
+    /// <param name="mvuHost">MVU-Host; dient als <see cref="BindableObject.BindingContext"/> und Dispatch-Ziel der Quellen-Nachrichten.</param>
     public SourcesPage(MvuHost mvuHost)
     {
         InitializeComponent();
@@ -21,6 +23,7 @@ public partial class SourcesPage : ContentPage
         UpdateUi(mvuHost.Model);
     }
 
+    /// <inheritdoc/>
     protected override void OnAppearing()
     {
         base.OnAppearing();

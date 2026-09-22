@@ -39,6 +39,7 @@ public class AuthSessionServiceTests
     private static void EnqueueLoginOk(StubHttpMessageHandler handler, string token = "jwt-token") =>
         handler.EnqueueJson(HttpStatusCode.OK, new { token, expires = "2030-01-01T00:00:00Z" });
 
+    /// <summary>Prüft TryStoredLogin: ohne Zugangsdaten → gibt MissingCredentials zurück.</summary>
     [Fact]
     public async Task TryStoredLogin_WithoutCredentials_ReturnsMissingCredentials()
     {
@@ -50,6 +51,7 @@ public class AuthSessionServiceTests
         Assert.Null(service.Client);
     }
 
+    /// <summary>Prüft TryStoredLogin: bei nur gespeichertem Benutzernamen → gibt MissingCredentials mit Benutzername zurück.</summary>
     [Fact]
     public async Task TryStoredLogin_UsernameOnly_ReturnsMissingCredentialsWithUsername()
     {
@@ -70,6 +72,7 @@ public class AuthSessionServiceTests
         Assert.Equal("martin", attempt.Username);
     }
 
+    /// <summary>Prüft TryStoredLogin: bei Erfolg → speichert das Token und stellt den Client bereit.</summary>
     [Fact]
     public async Task TryStoredLogin_Success_StoresTokenAndProvidesClient()
     {
@@ -87,6 +90,7 @@ public class AuthSessionServiceTests
         Assert.Equal("jwt-stored", await secrets.GetAuthTokenAsync());
     }
 
+    /// <summary>Prüft TryStoredLogin: bei ungültigen Zugangsdaten → gibt InvalidCredentials zurück.</summary>
     [Fact]
     public async Task TryStoredLogin_InvalidCredentials_ReturnsInvalidCredentials()
     {
@@ -102,6 +106,7 @@ public class AuthSessionServiceTests
         Assert.Null(service.Client);
     }
 
+    /// <summary>Prüft TryStoredLogin: bei Transportfehler → gibt Server nicht erreichbar zurück.</summary>
     [Fact]
     public async Task TryStoredLogin_TransportError_ReturnsServerUnreachable()
     {
@@ -120,6 +125,7 @@ public class AuthSessionServiceTests
         Assert.Equal(4, handler.Requests.Count);
     }
 
+    /// <summary>Prüft LoginAsync: bei Erfolg → speichert Zugangsdaten und Token.</summary>
     [Fact]
     public async Task LoginAsync_Success_SavesCredentialsAndToken()
     {
@@ -136,6 +142,7 @@ public class AuthSessionServiceTests
         Assert.NotNull(service.Client);
     }
 
+    /// <summary>Prüft LoginAsync: bei Serverfehler → gibt einen Fehlschlag zurück.</summary>
     [Fact]
     public async Task LoginAsync_ServerError_ReturnsFailed()
     {
@@ -152,6 +159,7 @@ public class AuthSessionServiceTests
         Assert.Equal(AuthAttemptStatus.Failed, attempt.Status);
     }
 
+    /// <summary>Prüft TokenRefresh: meldet still erneut an und wiederholt den Request.</summary>
     [Fact]
     public async Task TokenRefresh_SilentlyReloginsAndRetriesRequest()
     {
@@ -179,6 +187,7 @@ public class AuthSessionServiceTests
         Assert.Equal(0, expired);
     }
 
+    /// <summary>Prüft TokenRefresh: ohne Zugangsdaten → löst das SessionExpired-Ereignis aus.</summary>
     [Fact]
     public async Task TokenRefresh_WithoutCredentials_RaisesSessionExpired()
     {
@@ -201,6 +210,7 @@ public class AuthSessionServiceTests
         Assert.Null(await secrets.GetAuthTokenAsync());
     }
 
+    /// <summary>Prüft TokenRefresh: bei <c>RejectedCredentials</c> → löst das SessionExpired-Ereignis aus.</summary>
     [Fact]
     public async Task TokenRefresh_RejectedCredentials_RaisesSessionExpired()
     {
@@ -221,6 +231,7 @@ public class AuthSessionServiceTests
         Assert.Null(await secrets.GetAuthTokenAsync());
     }
 
+    /// <summary>Prüft TokenRefresh: bei transientem Fehler → löst das SessionExpired-Ereignis nicht aus.</summary>
     [Fact]
     public async Task TokenRefresh_TransientError_DoesNotRaiseSessionExpired()
     {

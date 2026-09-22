@@ -30,6 +30,9 @@ public static class AppRoutes
     ];
 
     /// <summary>Liefert die Shell-Route einer Menüseite.</summary>
+    /// <param name="page">Die Menüseite.</param>
+    /// <returns>Der Routenname der Seite.</returns>
+    /// <exception cref="ArgumentOutOfRangeException">Für die Seite existiert keine Menü-Route.</exception>
     public static string ToRoute(AppPage page)
     {
         if (Routes.TryGetValue(page, out var route))
@@ -44,6 +47,9 @@ public static class AppRoutes
     /// Ermittelt zu einem Shell-Navigationsziel (z. B. <c>//sources/SourcesPage</c>)
     /// die zugehörige Menüseite.
     /// </summary>
+    /// <param name="location">Das Shell-Navigationsziel (Pfad mit optionalen Query-Parametern).</param>
+    /// <param name="page">Die ermittelte Menüseite; bei <c>false</c> der Standardwert.</param>
+    /// <returns><c>true</c>, wenn ein Pfadsegment einer Menü-Route entspricht.</returns>
     public static bool TryGetPage(string? location, out AppPage page)
     {
         page = default;

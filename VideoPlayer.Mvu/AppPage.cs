@@ -6,12 +6,25 @@ namespace VideoPlayer.Mvu;
 /// </summary>
 public enum AppPage
 {
+    /// <summary>Start-Ladeanzeige (kein Menüeintrag).</summary>
     Loading,
+
+    /// <summary>Startseite mit den Listen „Weiterschauen", „Favoriten" und „Neu im Programm".</summary>
     Home,
+
+    /// <summary>Menüseite „Quellen" (freigegebene Medienbereiche des Servers).</summary>
     Sources,
+
+    /// <summary>Menüseite „Favoriten".</summary>
     Favorites,
+
+    /// <summary>Menüseite „Downloads".</summary>
     Downloads,
+
+    /// <summary>Menüseite „Profil".</summary>
     Profile,
+
+    /// <summary>Menüseite „Einstellungen".</summary>
     Settings,
 
     /// <summary>

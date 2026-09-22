@@ -12,11 +12,14 @@ public sealed class SecureStorageSecretStore : ISecretStore
 {
     private readonly ISecureStorage secureStorage;
 
+    /// <summary>Initialisiert eine neue Instanz der <see cref="SecureStorageSecretStore"/>-Klasse.</summary>
+    /// <param name="secureStorage">Sichere Plattformablage (<c>SecureStorage.Default</c>).</param>
     public SecureStorageSecretStore(ISecureStorage secureStorage)
     {
         this.secureStorage = secureStorage ?? throw new ArgumentNullException(nameof(secureStorage));
     }
 
+    /// <inheritdoc/>
     public async Task<string?> GetAsync(string key)
     {
         try
@@ -32,6 +35,7 @@ public sealed class SecureStorageSecretStore : ISecretStore
         }
     }
 
+    /// <inheritdoc/>
     public async Task SetAsync(string key, string value)
     {
         if (string.IsNullOrEmpty(value))
@@ -43,6 +47,7 @@ public sealed class SecureStorageSecretStore : ISecretStore
         await secureStorage.SetAsync(key, value);
     }
 
+    /// <inheritdoc/>
     public Task<bool> RemoveAsync(string key)
     {
         return Task.FromResult(secureStorage.Remove(key));

@@ -14,6 +14,8 @@ public partial class ServerSetupPage : ContentPage
 {
     private readonly MvuHost mvuHost;
 
+    /// <summary>Initialisiert eine neue Instanz der <see cref="ServerSetupPage"/>-Klasse.</summary>
+    /// <param name="mvuHost">MVU-Host; liefert den Einrichtungszustand und nimmt die Benutzer-Nachrichten entgegen.</param>
     public ServerSetupPage(MvuHost mvuHost)
     {
         InitializeComponent();
@@ -21,6 +23,7 @@ public partial class ServerSetupPage : ContentPage
         UpdateUi(mvuHost.Model);
     }
 
+    /// <inheritdoc/>
     protected override void OnAppearing()
     {
         base.OnAppearing();
@@ -30,6 +33,7 @@ public partial class ServerSetupPage : ContentPage
         _ = mvuHost.DispatchAsync(new LoadServersRequestedMessage());
     }
 
+    /// <inheritdoc/>
     protected override void OnDisappearing()
     {
         base.OnDisappearing();

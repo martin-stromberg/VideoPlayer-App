@@ -7,8 +7,11 @@ using VideoWebPlayer.Maui.Tests.Stubs;
 
 namespace VideoWebPlayer.Maui.Tests;
 
+/// <summary>Tests der Endpoint-URLs und HTTP-Methoden des <c>VideoPlayerApiClient</c>.</summary>
 public class VideoPlayerApiClientTests_Endpoints
 {
+    /// <summary>Liefert die Endpoint-Testfälle als Theory-Datenquelle.</summary>
+    /// <returns>Argumentensätze mit Name, Methode, Pfad und Antwort-Body.</returns>
     public static IEnumerable<object[]> EndpointCases()
     {
         yield return Case("Sources", HttpMethod.Get, "/api/Sources", "[]",
@@ -58,6 +61,12 @@ public class VideoPlayerApiClientTests_Endpoints
         }
     }
 
+    /// <summary>Prüft Endpoint: verwendet die erwartete Methode und den erwarteten Pfad.</summary>
+    /// <param name="name">Der Name.</param>
+    /// <param name="expectedMethod">Die erwartete HTTP-Methode.</param>
+    /// <param name="expectedPath">Der erwartete Request-Pfad.</param>
+    /// <param name="responseBody">Der Antwort-Body.</param>
+    /// <param name="invoke">Die Invoke-Action.</param>
     [Theory]
     [MemberData(nameof(EndpointCases))]
     public async Task Endpoint_UsesExpectedMethodAndPath(
@@ -89,6 +98,7 @@ public class VideoPlayerApiClientTests_Endpoints
         Assert.Equal("test-api-key", request.ApiKey);
     }
 
+    /// <summary>Prüft GetRecentEntriesAsync: deserialisiert polymorphe Einträge.</summary>
     [Fact]
     public async Task GetRecentEntriesAsync_DeserializesPolymorphicEntries()
     {
@@ -110,6 +120,7 @@ public class VideoPlayerApiClientTests_Endpoints
         Assert.Equal("Handlung", movie.Plot);
     }
 
+    /// <summary>Prüft GetContinueWatchingAsync: deserialisiert Einträge.</summary>
     [Fact]
     public async Task GetContinueWatchingAsync_DeserializesEntries()
     {
@@ -131,6 +142,7 @@ public class VideoPlayerApiClientTests_Endpoints
         Assert.IsType<Movie>(entry.Entry);
     }
 
+    /// <summary>Prüft GetFavoritesAsync: deserialisiert Einträge.</summary>
     [Fact]
     public async Task GetFavoritesAsync_DeserializesEntries()
     {
@@ -148,6 +160,7 @@ public class VideoPlayerApiClientTests_Endpoints
         Assert.Equal("Serie", show.Name);
     }
 
+    /// <summary>Prüft GetTvShowAsync: deserialisiert Staffeln und Episoden.</summary>
     [Fact]
     public async Task GetTvShowAsync_DeserializesSeasonsAndEpisodes()
     {
@@ -168,6 +181,7 @@ public class VideoPlayerApiClientTests_Endpoints
         Assert.Equal(1, episode.Number);
     }
 
+    /// <summary>Prüft GetSourcesAsync: deserialisiert Quellen.</summary>
     [Fact]
     public async Task GetSourcesAsync_DeserializesSources()
     {
@@ -185,6 +199,7 @@ public class VideoPlayerApiClientTests_Endpoints
         Assert.Equal(3, source.IconPictureId);
     }
 
+    /// <summary>Prüft GetSourceItemsAsync: deserialisiert Zusammenfassungen.</summary>
     [Fact]
     public async Task GetSourceItemsAsync_DeserializesSummaries()
     {
@@ -203,6 +218,7 @@ public class VideoPlayerApiClientTests_Endpoints
         Assert.Equal(6, item.PictureId);
     }
 
+    /// <summary>Prüft GetPictureAsync: gibt Bytes zurück.</summary>
     [Fact]
     public async Task GetPictureAsync_ReturnsBytes()
     {

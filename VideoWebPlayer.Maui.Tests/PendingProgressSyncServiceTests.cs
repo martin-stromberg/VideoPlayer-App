@@ -14,6 +14,7 @@ public class PendingProgressSyncServiceTests : IDisposable
     private readonly string root;
     private readonly AppStorageLayout layout;
 
+    /// <summary>Initialisiert eine neue Instanz der Testklasse <c>PendingProgressSyncServiceTests</c>.</summary>
     public PendingProgressSyncServiceTests()
     {
         root = Path.Combine(Path.GetTempPath(), "videoplayer-queue-tests", Guid.NewGuid().ToString("N"));
@@ -25,6 +26,7 @@ public class PendingProgressSyncServiceTests : IDisposable
         layout.EnsureDirectoriesExist();
     }
 
+    /// <inheritdoc/>
     public void Dispose()
     {
         SQLite.SQLiteAsyncConnection.ResetPool();
@@ -41,6 +43,7 @@ public class PendingProgressSyncServiceTests : IDisposable
         return new PendingProgressSyncService(db);
     }
 
+    /// <summary>Prüft Enqueue: speichert Position und Duration.</summary>
     [Fact]
     public async Task Enqueue_StoresPositionAndDuration()
     {
@@ -55,6 +58,7 @@ public class PendingProgressSyncServiceTests : IDisposable
         Assert.Equal(TimeSpan.FromMinutes(90).Ticks, entry.DurationTicks);
     }
 
+    /// <summary>Prüft Enqueue: bei gleichen Medien → behält nur die letzte Position.</summary>
     [Fact]
     public async Task Enqueue_SameMedia_KeepsOnlyLatestPosition()
     {
@@ -68,6 +72,7 @@ public class PendingProgressSyncServiceTests : IDisposable
         Assert.Equal(1, await queue.CountAsync());
     }
 
+    /// <summary>Prüft GetPending: ordnet die Einträge chronologisch.</summary>
     [Fact]
     public async Task GetPending_OrdersChronologically()
     {
@@ -82,6 +87,7 @@ public class PendingProgressSyncServiceTests : IDisposable
         Assert.Equal([1, 2, 3], pending.Select(e => e.VideoId).ToArray());
     }
 
+    /// <summary>Prüft RemoveForMedia: entfernt nur die betreffenden Medien.</summary>
     [Fact]
     public async Task RemoveForMedia_RemovesOnlyThatMedia()
     {
@@ -98,6 +104,7 @@ public class PendingProgressSyncServiceTests : IDisposable
         Assert.Equal(2, await queue.CountAsync());
     }
 
+    /// <summary>Prüft Pending: übersteht ein erneutes Öffnen der Datenbank.</summary>
     [Fact]
     public async Task Pending_SurvivesDatabaseReopen()
     {

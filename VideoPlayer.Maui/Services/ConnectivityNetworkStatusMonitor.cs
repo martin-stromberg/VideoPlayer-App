@@ -13,11 +13,14 @@ public sealed class ConnectivityNetworkStatusMonitor : INetworkStatusMonitor
 {
     private bool started;
 
+    /// <inheritdoc/>
     public bool IsOnline =>
         Connectivity.Current.NetworkAccess is NetworkAccess.Internet or NetworkAccess.ConstrainedInternet;
 
+    /// <inheritdoc/>
     public event EventHandler<bool>? AvailabilityChanged;
 
+    /// <inheritdoc/>
     public void Start()
     {
         if (started)

@@ -15,6 +15,9 @@ public sealed class FavoritesService
     private readonly AuthSessionService authSession;
     private readonly ServerSyncService syncService;
 
+    /// <summary>Erstellt den Dienst.</summary>
+    /// <param name="authSession">Sitzungsdienst mit dem angemeldeten API-Client.</param>
+    /// <param name="syncService">Synchronisationsdienst für die lokale Favoriten-Kopie.</param>
     public FavoritesService(AuthSessionService authSession, ServerSyncService syncService)
     {
         this.authSession = authSession ?? throw new ArgumentNullException(nameof(authSession));
@@ -24,6 +27,10 @@ public sealed class FavoritesService
     /// <summary>
     /// Schaltet die Favoriten-Markierung des Mediums um.
     /// </summary>
+    /// <param name="mediaType">Medientyp (wird für den Toggle-Request normalisiert).</param>
+    /// <param name="mediaId">Id des Mediums.</param>
+    /// <param name="title">Anzeigetitel des Mediums.</param>
+    /// <param name="cancellationToken">Bricht den Aufruf ab.</param>
     /// <returns>
     /// Neuer Favoriten-Zustand laut Server; <c>null</c>, wenn kein
     /// angemeldeter Client vorhanden ist (offline).
@@ -51,6 +58,10 @@ public sealed class FavoritesService
     /// Toggle-Request (polymorphes <c>$type</c>); unbekannte Typen fallen
     /// auf die Basisklasse zurück.
     /// </summary>
+    /// <param name="mediaType">Medientyp (wird normalisiert).</param>
+    /// <param name="id">Id des Mediums.</param>
+    /// <param name="name">Anzeigename des Mediums.</param>
+    /// <returns>Der typkorrekte <see cref="MediaEntry"/>.</returns>
     internal static MediaEntry CreateEntry(string mediaType, long id, string name)
     {
         return MediaTypeNames.Normalize(mediaType) switch

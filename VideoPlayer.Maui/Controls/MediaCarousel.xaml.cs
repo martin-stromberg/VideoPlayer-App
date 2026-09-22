@@ -10,12 +10,14 @@ namespace VideoPlayer.Maui.Controls;
 /// </summary>
 public partial class MediaCarousel : ContentView
 {
+    /// <value>Bindable Property für <see cref="Title"/> — Abschnittsüberschrift der Liste.</value>
     public static readonly BindableProperty TitleProperty = BindableProperty.Create(
         nameof(Title),
         typeof(string),
         typeof(MediaCarousel),
         string.Empty);
 
+    /// <value>Bindable Property für <see cref="Items"/> — einzublendende Einträge; leer = Abschnitt ausgeblendet.</value>
     public static readonly BindableProperty ItemsProperty = BindableProperty.Create(
         nameof(Items),
         typeof(IReadOnlyList<HomeMediaItem>),
@@ -23,6 +25,7 @@ public partial class MediaCarousel : ContentView
         null,
         propertyChanged: OnItemsChanged);
 
+    /// <summary>Initialisiert eine neue Instanz der <see cref="MediaCarousel"/>-Klasse.</summary>
     public MediaCarousel()
     {
         InitializeComponent();

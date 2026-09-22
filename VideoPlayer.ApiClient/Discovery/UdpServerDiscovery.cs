@@ -27,12 +27,15 @@ public sealed class UdpServerDiscovery : IServerDiscovery
     }
 
     /// <summary>Testbarer Konstruktor: Ziel-Endpunkt und Zeitfenster injizierbar.</summary>
+    /// <param name="target">Ziel-Endpunkt der Broadcast-Abfrage.</param>
+    /// <param name="timeout">Zeitfenster für den Empfang von Antworten.</param>
     internal UdpServerDiscovery(IPEndPoint target, TimeSpan timeout)
     {
         this.target = target;
         this.timeout = timeout;
     }
 
+    /// <inheritdoc/>
     public async Task<IReadOnlyList<DiscoveredServer>> DiscoverAsync(CancellationToken cancellationToken = default)
     {
         var found = new List<DiscoveredServer>();
@@ -97,6 +100,9 @@ public sealed class UdpServerDiscovery : IServerDiscovery
     /// Responder-Adresse ersetzt — der Server meint mit „localhost" sich
     /// selbst.
     /// </summary>
+    /// <param name="announced">Vom Server gemeldete Adresse (ggf. ohne Schema).</param>
+    /// <param name="responder">IP-Adresse des antwortenden Hosts.</param>
+    /// <returns>Normalisierte Adresse (<c>scheme://host[:port][/pfad]/</c>) oder <c>null</c> bei ungültiger Eingabe.</returns>
     internal static string? ResolveAnnouncedAddress(string announced, IPAddress responder)
     {
         var candidate = announced;

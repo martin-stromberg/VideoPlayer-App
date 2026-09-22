@@ -8,6 +8,7 @@ public static class SqliteBootstrap
 {
     private static int initialized;
 
+    /// <summary>Führt die Initialisierung einmalig aus (threadsicher, idempotent).</summary>
     public static void EnsureInitialized()
     {
         if (Interlocked.Exchange(ref initialized, 1) == 0)

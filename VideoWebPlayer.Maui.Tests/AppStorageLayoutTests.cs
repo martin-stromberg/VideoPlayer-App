@@ -2,15 +2,18 @@ using VideoPlayer.Storage;
 
 namespace VideoWebPlayer.Maui.Tests;
 
+/// <summary>Tests für <c>AppStorageLayout</c>.</summary>
 public class AppStorageLayoutTests : IDisposable
 {
     private readonly string root;
 
+    /// <summary>Initialisiert eine neue Instanz der Testklasse <c>AppStorageLayoutTests</c>.</summary>
     public AppStorageLayoutTests()
     {
         root = Path.Combine(Path.GetTempPath(), "videoplayer-layout-tests", Guid.NewGuid().ToString("N"));
     }
 
+    /// <inheritdoc/>
     public void Dispose()
     {
         if (Directory.Exists(root))
@@ -28,6 +31,7 @@ public class AppStorageLayoutTests : IDisposable
             profile: AppProfile.Create(profile));
     }
 
+    /// <summary>Prüft SeparatesBackupAndNoBackupRoots: trennt Backup- und NoBackup-Wurzeln.</summary>
     [Fact]
     public void SeparatesBackupAndNoBackupRoots()
     {
@@ -45,6 +49,7 @@ public class AppStorageLayoutTests : IDisposable
         Assert.StartsWith(Path.Combine(root, "cache"), layout.TempDirectory);
     }
 
+    /// <summary>Prüft Profiles: liefert isolierte Verzeichnisse.</summary>
     [Fact]
     public void Profiles_GetIsolatedDirectories()
     {
@@ -58,6 +63,7 @@ public class AppStorageLayoutTests : IDisposable
         Assert.Contains("work", workLayout.BackupDirectory, StringComparison.Ordinal);
     }
 
+    /// <summary>Prüft EnsureDirectoriesExist: legt alle Verzeichnisse an.</summary>
     [Fact]
     public void EnsureDirectoriesExist_CreatesAll()
     {
@@ -72,6 +78,7 @@ public class AppStorageLayoutTests : IDisposable
         Assert.True(Directory.Exists(layout.TempDirectory));
     }
 
+    /// <summary>Prüft Constructor: lehnt leere Wurzelverzeichnisse ab.</summary>
     [Fact]
     public void Constructor_RejectsEmptyRoots()
     {

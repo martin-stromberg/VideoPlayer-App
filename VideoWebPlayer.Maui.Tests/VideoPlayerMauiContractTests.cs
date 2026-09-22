@@ -29,6 +29,7 @@ public class VideoPlayerMauiContractTests
         return XDocument.Load(Path.Combine(Root, "VideoPlayer.Maui", "AppShell.xaml"));
     }
 
+    /// <summary>Prüft AppShell: verwendet Flyout-Navigation.</summary>
     [Fact]
     public void AppShell_IsFlyoutNavigation()
     {
@@ -37,6 +38,7 @@ public class VideoPlayerMauiContractTests
         Assert.Equal("Flyout", (string?)shell.Attribute("FlyoutBehavior"));
     }
 
+    /// <summary>Prüft AppShell: enthält alle Menüeinträge.</summary>
     [Fact]
     public void AppShell_ContainsAllMenuEntries()
     {
@@ -52,6 +54,7 @@ public class VideoPlayerMauiContractTests
         }
     }
 
+    /// <summary>Prüft AppShell: die Menüeinträge binden auf vorhandene Seiten.</summary>
     [Fact]
     public void AppShell_MenuEntries_BindToExistingPages()
     {
@@ -77,6 +80,7 @@ public class VideoPlayerMauiContractTests
         }
     }
 
+    /// <summary>Prüft NewApp: das Projekt zielt auf die erforderlichen Plattformen.</summary>
     [Fact]
     public void NewApp_ProjectTargetsRequiredPlatforms()
     {
@@ -89,6 +93,7 @@ public class VideoPlayerMauiContractTests
         Assert.Contains("VideoPlayer.Mvu.csproj", csproj, StringComparison.Ordinal);
     }
 
+    /// <summary>Prüft NewApp: referenziert keine Legacy- oder externen MVU-Frameworks.</summary>
     [Fact]
     public void NewApp_DoesNotReferenceLegacyOrExternalMvuFrameworks()
     {
@@ -100,6 +105,7 @@ public class VideoPlayerMauiContractTests
         Assert.DoesNotContain("Comet", csproj, StringComparison.OrdinalIgnoreCase);
     }
 
+    /// <summary>Prüft NewApp: der Health-Check ist an den API-Client verdrahtet.</summary>
     [Fact]
     public void NewApp_HealthCheckWiredToApiClient()
     {

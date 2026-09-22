@@ -13,14 +13,25 @@ public sealed class SignalRServerEventsConnection : IServerEventsConnection
 {
     private HubConnection? connection;
 
+    /// <inheritdoc/>
     public bool IsConnected => connection?.State == HubConnectionState.Connected;
 
+    /// <inheritdoc/>
     public event EventHandler? ContinueWatchingUpdated;
+
+    /// <inheritdoc/>
     public event EventHandler? FavoritesChanged;
+
+    /// <inheritdoc/>
     public event EventHandler<NewVideosScannedEventArgs>? NewVideosScanned;
+
+    /// <inheritdoc/>
     public event EventHandler<string>? StatusChanged;
+
+    /// <inheritdoc/>
     public event EventHandler? Closed;
 
+    /// <inheritdoc/>
     public async Task ConnectAsync(
         Uri hubAddress,
         Func<Task<string?>> accessTokenProvider,
@@ -67,6 +78,7 @@ public sealed class SignalRServerEventsConnection : IServerEventsConnection
         connection = next;
     }
 
+    /// <inheritdoc/>
     public async Task DisconnectAsync(CancellationToken cancellationToken = default)
     {
         if (connection is not null)
@@ -75,6 +87,7 @@ public sealed class SignalRServerEventsConnection : IServerEventsConnection
         }
     }
 
+    /// <inheritdoc/>
     public async ValueTask DisposeAsync()
     {
         if (connection is not null)

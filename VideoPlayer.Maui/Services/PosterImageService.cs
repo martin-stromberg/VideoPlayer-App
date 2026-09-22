@@ -17,6 +17,9 @@ public sealed class PosterImageService
     private readonly System.Collections.Concurrent.ConcurrentDictionary<long, ImageSource> memoryCache = new();
     private readonly System.Collections.Concurrent.ConcurrentDictionary<long, ImageSource> iconMemoryCache = new();
 
+    /// <summary>Initialisiert eine neue Instanz der <see cref="PosterImageService"/>-Klasse.</summary>
+    /// <param name="authSession">Sitzungsdienst; liefert den angemeldeten API-Client für Bildabrufe.</param>
+    /// <param name="layout">Ablage-Layout mit dem nicht backup-pflichtigen Vorschaubild-Verzeichnis.</param>
     public PosterImageService(AuthSessionService authSession, AppStorageLayout layout)
     {
         this.authSession = authSession ?? throw new ArgumentNullException(nameof(authSession));
@@ -29,6 +32,9 @@ public sealed class PosterImageService
     /// <c>null</c>, wenn kein Bild verfügbar ist (offline, fehlende
     /// Verbindung, Serverfehler) — die Karte zeigt dann den Titel.
     /// </summary>
+    /// <param name="pictureId">Server-Bild-Id des Posters (<c>api/pictures/{id}</c>).</param>
+    /// <param name="cancellationToken">Bricht den Bildabruf ab.</param>
+    /// <returns>Die Bildquelle oder <c>null</c>, wenn kein Bild verfügbar ist.</returns>
     public async Task<ImageSource?> GetImageSourceAsync(long pictureId, CancellationToken cancellationToken = default)
     {
         if (pictureId <= 0)
@@ -84,6 +90,9 @@ public sealed class PosterImageService
     /// nicht backup-pflichtigen <see cref="AppStorageLayout.PreviewsDirectory"/>).
     /// <c>null</c>, wenn kein Icon verfügbar ist.
     /// </summary>
+    /// <param name="pictureId">Server-Bild-Id des Quellen-Icons (<c>api/sourceicons/{id}</c>).</param>
+    /// <param name="cancellationToken">Bricht den Icon-Abruf ab.</param>
+    /// <returns>Die Bildquelle oder <c>null</c>, wenn kein Icon verfügbar ist.</returns>
     public async Task<ImageSource?> GetSourceIconSourceAsync(long pictureId, CancellationToken cancellationToken = default)
     {
         if (pictureId <= 0)

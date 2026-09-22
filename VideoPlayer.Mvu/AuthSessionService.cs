@@ -21,6 +21,8 @@ public sealed class AuthSessionService
     private readonly Func<Uri, HttpClient> httpClientFactory;
     private readonly Func<TimeSpan, CancellationToken, Task>? delayAsync;
 
+    /// <summary>Erstellt den Dienst mit der produktiven <see cref="HttpClient"/>-Erzeugung.</summary>
+    /// <param name="secrets">Ablage der Zugangsdaten und Anmelde-Token.</param>
     public AuthSessionService(AppSecretsService secrets)
         : this(secrets, null, null)
     {
@@ -31,6 +33,9 @@ public sealed class AuthSessionService
     /// und optionaler Warte-Implementierung für die Wiederholungsstrategie
     /// (für Tests; produktiv wird ein Client mit Basisadresse und Timeout erzeugt).
     /// </summary>
+    /// <param name="secrets">Ablage der Zugangsdaten und Anmelde-Token.</param>
+    /// <param name="httpClientFactory">Fabrik für <see cref="HttpClient"/> pro Serveradresse; <c>null</c> = produktive Erzeugung mit Timeout.</param>
+    /// <param name="delayAsync">Optionale Warte-Implementierung der Wiederholungsstrategie (Tests); <c>null</c> = <see cref="Task.Delay(TimeSpan, CancellationToken)"/>.</param>
     public AuthSessionService(
         AppSecretsService secrets,
         Func<Uri, HttpClient>? httpClientFactory,
@@ -65,6 +70,9 @@ public sealed class AuthSessionService
     /// Der gelieferte <see cref="AuthAttempt.Username"/> ist der gespeicherte,
     /// nicht geheime Benutzername (Vorbefüllung der Anmeldemaske).
     /// </summary>
+    /// <param name="serverAddress">Adresse des Servers, an dem angemeldet wird.</param>
+    /// <param name="cancellationToken">Bricht die Anmeldung ab.</param>
+    /// <returns>Das Ergebnis des Anmeldeversuchs.</returns>
     public async Task<AuthAttempt> TryStoredLoginAsync(Uri serverAddress, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(serverAddress);
@@ -84,6 +92,11 @@ public sealed class AuthSessionService
     /// Manuelle Anmeldung mit eingegebenen Zugangsdaten; bei Erfolg werden
     /// Zugangsdaten und Token gespeichert und <see cref="Client"/> gesetzt.
     /// </summary>
+    /// <param name="serverAddress">Adresse des Servers, an dem angemeldet wird.</param>
+    /// <param name="username">Benutzername (wird getrimmt).</param>
+    /// <param name="password">Passwort.</param>
+    /// <param name="cancellationToken">Bricht die Anmeldung ab.</param>
+    /// <returns>Das Ergebnis des Anmeldeversuchs.</returns>
     public async Task<AuthAttempt> LoginAsync(
         Uri serverAddress,
         string username,
@@ -140,6 +153,8 @@ public sealed class AuthSessionService
     /// Erstellt einen API-Client für die Serveradresse mit verdrahteter
     /// stiller Neuanmeldung (<see cref="VideoPlayerApiClientOptions.TokenRefresher"/>).
     /// </summary>
+    /// <param name="serverAddress">Basisadresse des Servers.</param>
+    /// <returns>Der konfigurierte API-Client.</returns>
     private VideoPlayerApiClient CreateClient(Uri serverAddress)
     {
         var http = httpClientFactory(serverAddress);
@@ -158,6 +173,9 @@ public sealed class AuthSessionService
     /// <see cref="SessionExpired"/> ausgelöst und <c>null</c> geliefert;
     /// bei vorübergehenden Fehlern nur <c>null</c>.
     /// </summary>
+    /// <param name="serverAddress">Adresse des Servers, an dem neu angemeldet wird.</param>
+    /// <param name="cancellationToken">Bricht die Neuanmeldung ab.</param>
+    /// <returns>Das neue Anmelde-Token; <c>null</c> bei Fehlschlag.</returns>
     private async Task<AuthToken?> SilentReloginAsync(Uri serverAddress, CancellationToken cancellationToken)
     {
         if (!await secrets.HasCredentialsAsync())

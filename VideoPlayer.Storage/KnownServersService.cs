@@ -18,6 +18,10 @@ public sealed class KnownServersService
     private readonly ISettingsStore settingsStore;
     private readonly AppProfile profile;
 
+    /// <summary>Erstellt den Dienst.</summary>
+    /// <param name="database">Backup-pflichtige Datenbank für die Serverliste.</param>
+    /// <param name="settingsStore">Nicht-geheime Ablage (Legacy-Schlüssel der Migration).</param>
+    /// <param name="profile">Aktives Profil für die Schlüssel-Präfixe.</param>
     public KnownServersService(BackupDatabase database, ISettingsStore settingsStore, AppProfile profile)
     {
         this.database = database ?? throw new ArgumentNullException(nameof(database));
@@ -26,6 +30,7 @@ public sealed class KnownServersService
     }
 
     /// <summary>Alle bekannten Server, zuletzt verwendet zuerst.</summary>
+    /// <returns>Liste der bekannten Server (ggf. leer).</returns>
     public async Task<IReadOnlyList<KnownServer>> GetAllAsync()
     {
         var entries = await database.Connection
@@ -44,6 +49,7 @@ public sealed class KnownServersService
     }
 
     /// <summary>Adresse des zuletzt verbundenen Servers oder <c>null</c>.</summary>
+    /// <returns>Die kanonische Adresse oder <c>null</c>, wenn noch keine Verbindung bestand.</returns>
     public async Task<string?> GetLastConnectedAddressAsync()
     {
         var state = await database.Connection
@@ -56,6 +62,9 @@ public sealed class KnownServersService
     /// <c>known_servers</c> (inkl. <c>LastUsedAtUtc</c>) und Setzen des
     /// zuletzt verbundenen Servers in <c>backup_state</c>.
     /// </summary>
+    /// <param name="address">Serveradresse (wird normalisiert).</param>
+    /// <param name="displayName">Optionaler Anzeigename; leere Werte lassen den bisherigen Namen unverändert.</param>
+    /// <returns>Der gespeicherte bekannte Server.</returns>
     public async Task<KnownServer> SetActiveServerAsync(string address, string? displayName = null)
     {
         var normalized = ServerAddress.Normalize(address);

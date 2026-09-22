@@ -5,8 +5,18 @@ using VideoPlayer.Storage;
 
 namespace VideoPlayer.Maui
 {
+    /// <summary>
+    /// Einstiegspunkt der MAUI-App: baut die <see cref="MauiApp"/> mit
+    /// Dependency-Injection-Registrierungen für MVU-Host, Effekt-Handler,
+    /// lokale Ablage, Serververwaltung, Synchronisation und alle Seiten.
+    /// </summary>
     public static class MauiProgram
     {
+        /// <summary>
+        /// Erstellt und konfiguriert die <see cref="MauiApp"/> der Anwendung
+        /// (Dienste, Seiten, Schriftarten, Debug-Logging).
+        /// </summary>
+        /// <returns>Die konfigurierte <see cref="MauiApp"/>-Instanz.</returns>
         public static MauiApp CreateMauiApp()
         {
             var builder = MauiApp.CreateBuilder();

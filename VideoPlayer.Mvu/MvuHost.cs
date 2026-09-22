@@ -14,6 +14,9 @@ public sealed class MvuHost : INotifyPropertyChanged
     private readonly Func<AppModel, AppMessage, AppTransition> update;
     private readonly SemaphoreSlim gate = new(1, 1);
 
+    /// <summary>Erstellt den Host.</summary>
+    /// <param name="effectHandler">Handler, der die Effekte am App-Rand ausführt.</param>
+    /// <param name="update">Update-Funktion des MVU-Zyklus; <c>null</c> = <see cref="AppUpdate.Update"/> (für Tests ersetzbar).</param>
     public MvuHost(
         IAppEffectHandler effectHandler,
         Func<AppModel, AppMessage, AppTransition>? update = null)
@@ -23,17 +26,21 @@ public sealed class MvuHost : INotifyPropertyChanged
     }
 
     /// <summary>Aktuelles, unveränderliches App-Model.</summary>
+    /// <value>Das zuletzt angewendete Model.</value>
     public AppModel Model { get; private set; } = new();
 
     /// <summary>Wird nach jedem angewendeten Update ausgelöst.</summary>
     public event EventHandler? ModelChanged;
 
+    /// <summary>Benachrichtigt Bindings über die Änderung von <see cref="Model"/>.</summary>
     public event PropertyChangedEventHandler? PropertyChanged;
 
     /// <summary>
     /// Wendet eine Nachricht auf das Model an und führt die resultierenden
     /// Effekte nacheinander aus.
     /// </summary>
+    /// <param name="message">Die anzuwendende Nachricht.</param>
+    /// <param name="cancellationToken">Bricht den Dispatch bzw. die Effektausführung ab.</param>
     public async Task DispatchAsync(AppMessage message, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(message);

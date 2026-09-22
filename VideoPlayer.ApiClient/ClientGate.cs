@@ -9,11 +9,23 @@ namespace VideoPlayer.ApiClient;
 /// </summary>
 public static class ClientGate
 {
+    /// <summary>HTTP-Headername, über den der API-Schlüssel gesendet wird.</summary>
     public const string HeaderName = "X-API-Key";
+
+    /// <summary>Umgebungsvariable mit dem API-Schlüssel (höchste Priorität).</summary>
     public const string ApiTokenEnvironmentVariable = "VIDEOWEBPLAYER_MAUI_API_TOKEN";
+
+    /// <summary>Assembly-Metadata-Schlüssel, über den der API-Schlüssel beim Build injiziert wird.</summary>
     public const string ApiTokenAssemblyMetadataKey = "VideoPlayer.ApiClient.ApiToken";
+
+    /// <summary>Platzhalter, wenn weder Umgebungsvariable noch Assembly-Metadata einen Schlüssel liefern.</summary>
     public const string ApiTokenPlaceholder = "<MAUI_CLIENT_API_TOKEN>";
 
+    /// <summary>
+    /// Löst den API-Schlüssel auf: Umgebungsvariable vor Assembly-Metadata
+    /// vor Platzhalter.
+    /// </summary>
+    /// <returns>Der aufgelöste API-Schlüssel bzw. der Platzhalter.</returns>
     public static string Resolve()
     {
         return Resolve(

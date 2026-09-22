@@ -14,6 +14,10 @@ public enum ServerEventKind
 }
 
 /// <summary>Argumente eines vom Server empfangenen Ereignisses.</summary>
+/// <param name="kind">Art des Ereignisses.</param>
+/// <param name="sourceId">Bei <see cref="ServerEventKind.NewVideosScanned"/> die betroffene Quelle; sonst <c>null</c>.</param>
+/// <param name="count">Bei <see cref="ServerEventKind.NewVideosScanned"/> die Anzahl neuer Videos; sonst <c>null</c>.</param>
+/// <returns>Ereignisargumente des empfangenen Server-Ereignisses.</returns>
 public sealed class ServerEventReceivedEventArgs(ServerEventKind kind, long? sourceId = null, int? count = null)
     : EventArgs
 {

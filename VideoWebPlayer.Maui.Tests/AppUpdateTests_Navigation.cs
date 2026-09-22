@@ -2,11 +2,16 @@ using VideoPlayer.Mvu;
 
 namespace VideoWebPlayer.Maui.Tests;
 
+/// <summary>Tests für <c>AppUpdate.Update</c> – Bereich Navigation.</summary>
 public class AppUpdateTests_Navigation
 {
+    /// <summary>Alle Menüseiten als Theory-Datenquelle.</summary>
+    /// <value>Je ein Argumentensatz pro Menüseite.</value>
     public static IEnumerable<object[]> MenuPages =>
         AppRoutes.MenuPages.Select(page => new object[] { page });
 
+    /// <summary>Prüft Update: bei <c>NavigateTo</c> → setzt Seite und löst Effekt aus.</summary>
+    /// <param name="page">Die Seite.</param>
     [Theory]
     [MemberData(nameof(MenuPages))]
     public void Update_NavigateTo_SetsPageAndEmitsEffect(AppPage page)
@@ -27,6 +32,7 @@ public class AppUpdateTests_Navigation
         }
     }
 
+    /// <summary>Prüft Update: bei <c>NavigateTo</c> auf gleicher Seite → kein Effekt.</summary>
     [Fact]
     public void Update_NavigateTo_SamePage_NoEffect()
     {
@@ -38,6 +44,7 @@ public class AppUpdateTests_Navigation
         Assert.Empty(transition.Effects);
     }
 
+    /// <summary>Prüft Update: bei <c>NavigateTo</c> nach <c>Loading</c> → wird ignoriert.</summary>
     [Fact]
     public void Update_NavigateTo_Loading_IsIgnored()
     {
@@ -49,6 +56,7 @@ public class AppUpdateTests_Navigation
         Assert.Empty(transition.Effects);
     }
 
+    /// <summary>Prüft Update: bei einer Navigated-Nachricht → aktualisiert nur das Model.</summary>
     [Fact]
     public void Update_NavigatedMessage_OnlyUpdatesModel()
     {
@@ -60,6 +68,7 @@ public class AppUpdateTests_Navigation
         Assert.Empty(transition.Effects);
     }
 
+    /// <summary>Prüft Update: bei einer Navigated-Nachricht auf gleicher Seite → keine Änderung.</summary>
     [Fact]
     public void Update_NavigatedMessage_SamePage_NoChange()
     {

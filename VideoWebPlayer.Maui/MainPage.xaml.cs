@@ -7,6 +7,10 @@ namespace VideoWebPlayer.Maui
 {
     using Microsoft.Maui.Devices;
 
+    /// <summary>
+    /// Hauptseite der App: führt den Startup-Workflow (Server-Verbindung, Login,
+    /// Offline-Fallback) aus und zeigt anschließend die Home-Ansicht an.
+    /// </summary>
     public partial class MainPage : ContentPage
     {
         private readonly ISettingsService _settings;
@@ -17,6 +21,13 @@ namespace VideoWebPlayer.Maui
         private HomePageViewModel _viewModel;
         private readonly VideoWebPlayer.Maui.Services.Events.ISubscribeNotificationEvent? _eventSubscriber;
 
+        /// <summary>
+        /// Erstellt eine neue Instanz der <see cref="MainPage"/>.
+        /// </summary>
+        /// <param name="settings">Der Einstellungsdienst; bei <c>null</c> wird ein Standard-<see cref="Services.SettingsService"/> verwendet.</param>
+        /// <param name="connection">Der Verbindungsdienst; bei <c>null</c> wird ein Standard-<see cref="Services.ConnectionService"/> verwendet.</param>
+        /// <param name="auth">Der Authentifizierungsdienst; bei <c>null</c> wird ein Standard-<see cref="Services.AuthService"/> verwendet.</param>
+        /// <param name="services">Der ServiceProvider zum Auflösen weiterer Dienste und Pages.</param>
         public MainPage(ISettingsService? settings, IConnectionService? connection, IAuthService? auth, IServiceProvider services)
         {
             InitializeComponent();
@@ -246,6 +257,7 @@ namespace VideoWebPlayer.Maui
             _ = RunStartupWorkflowAsync();
         }
 
+        /// <inheritdoc/>
         protected override void OnAppearing()
         {
             base.OnAppearing();

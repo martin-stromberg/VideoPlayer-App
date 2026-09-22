@@ -15,6 +15,7 @@ public sealed class MdnsServerDiscovery : IServerDiscovery
 
     private readonly TimeSpan timeout;
 
+    /// <summary>Erstellt die Erkennung mit dem Standard-Zeitfenster (3 s).</summary>
     public MdnsServerDiscovery()
         : this(DefaultTimeout)
     {
@@ -25,6 +26,7 @@ public sealed class MdnsServerDiscovery : IServerDiscovery
         this.timeout = timeout;
     }
 
+    /// <inheritdoc/>
     public async Task<IReadOnlyList<DiscoveredServer>> DiscoverAsync(CancellationToken cancellationToken = default)
     {
         var found = new List<DiscoveredServer>();

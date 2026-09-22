@@ -26,6 +26,7 @@ public class FavoritesServiceTests : IDisposable
     private readonly AuthSessionService authSession;
     private readonly ServerSyncService syncService;
 
+    /// <summary>Initialisiert eine neue Instanz der Testklasse <c>FavoritesServiceTests</c>.</summary>
     public FavoritesServiceTests()
     {
         root = Path.Combine(Path.GetTempPath(), "videoplayer-fav-tests", Guid.NewGuid().ToString("N"));
@@ -49,6 +50,7 @@ public class FavoritesServiceTests : IDisposable
         syncService = new ServerSyncService(authSession, new PendingProgressSyncService(backup), cache);
     }
 
+    /// <inheritdoc/>
     public void Dispose()
     {
         SQLite.SQLiteAsyncConnection.ResetPool();
@@ -67,6 +69,7 @@ public class FavoritesServiceTests : IDisposable
         handler.Requests.Clear();
     }
 
+    /// <summary>Prüft Toggle: bei <c>SendsEntry</c> → sendet den Eintrag und aktualisiert die gecachten Favoriten.</summary>
     [Fact]
     public async Task Toggle_SendsEntry_AndRefreshesCachedFavorites()
     {
@@ -97,6 +100,7 @@ public class FavoritesServiceTests : IDisposable
         Assert.Equal(11, entry.VideoId);
     }
 
+    /// <summary>Prüft Toggle: bei <c>RemovedFavorite</c> → leert die Cache-Kopie.</summary>
     [Fact]
     public async Task Toggle_RemovedFavorite_EmptiesCacheCopy()
     {
@@ -110,6 +114,7 @@ public class FavoritesServiceTests : IDisposable
         Assert.Empty(await cache.Connection.Table<CachedFavoritesEntry>().ToListAsync());
     }
 
+    /// <summary>Prüft Toggle: ohne Client → gibt null zurück und fordert nichts an.</summary>
     [Fact]
     public async Task Toggle_WithoutClient_ReturnsNull_NoRequests()
     {
@@ -119,6 +124,9 @@ public class FavoritesServiceTests : IDisposable
         Assert.Empty(handler.Requests);
     }
 
+    /// <summary>Prüft CreateEntry: bildet auf den korrekten Eintragstyp ab.</summary>
+    /// <param name="mediaType">Der Medientyp.</param>
+    /// <param name="expected">Der erwartete Wert.</param>
     [Theory]
     [InlineData("movie", typeof(Movie))]
     [InlineData("moviecollection", typeof(MovieCollection))]

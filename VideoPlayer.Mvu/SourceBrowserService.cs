@@ -3,6 +3,10 @@ using VideoPlayer.ApiClient.Models;
 namespace VideoPlayer.Mvu;
 
 /// <summary>Ergebnis einer geladenen Eintragsseite des Quellen-Browsers.</summary>
+/// <param name="Page">Geladene Seite (0-basiert).</param>
+/// <param name="Items">Die Einträge der Seite.</param>
+/// <param name="HasMore"><c>true</c>, solange weitere Seiten erwartet werden.</param>
+/// <returns>Ergebnis-Datensatz der Eintragsseite.</returns>
 public sealed record SourceItemsPage(
     int Page,
     IReadOnlyList<SourceMediaItem> Items,
@@ -23,12 +27,17 @@ public sealed class SourceBrowserService
 
     private readonly AuthSessionService authSession;
 
+    /// <summary>Erstellt den Dienst.</summary>
+    /// <param name="authSession">Sitzungsdienst mit dem angemeldeten API-Client.</param>
     public SourceBrowserService(AuthSessionService authSession)
     {
         this.authSession = authSession ?? throw new ArgumentNullException(nameof(authSession));
     }
 
     /// <summary>Lädt die freigegebenen Quellen (entspricht den Daten der Server-API).</summary>
+    /// <param name="cancellationToken">Bricht das Laden ab.</param>
+    /// <returns>Die freigegebenen Quellen.</returns>
+    /// <exception cref="InvalidOperationException">Kein Server verbunden.</exception>
     public async Task<IReadOnlyList<SourceItem>> LoadSourcesAsync(CancellationToken cancellationToken = default)
     {
         var client = authSession.Client
@@ -59,6 +68,9 @@ public sealed class SourceBrowserService
     /// „Alle" (<see cref="SourceGenreItem.Id"/> = 0 = kein Filter)
     /// vorangestellt — Muster des Altbestands.
     /// </summary>
+    /// <param name="sourceId">Id der Quelle, deren Genres geladen werden.</param>
+    /// <param name="cancellationToken">Bricht das Laden ab.</param>
+    /// <returns>Die Genres der Quelle mit vorangestelltem „Alle"-Eintrag.</returns>
     public async Task<IReadOnlyList<SourceGenreItem>> LoadGenresAsync(long sourceId, CancellationToken cancellationToken = default)
     {
         var genres = new List<SourceGenreItem>
@@ -93,6 +105,13 @@ public sealed class SourceBrowserService
     /// <see cref="SourceItemsPage.HasMore"/> ist wahr, solange die Seite
     /// voll gefüllt zurückkommt.
     /// </summary>
+    /// <param name="sourceId">Id der Quelle.</param>
+    /// <param name="page">Zu ladende Seite (0-basiert).</param>
+    /// <param name="searchText">Suchtext; <c>null</c>/leer = keine Suche.</param>
+    /// <param name="genreId">Genre-Filter; <c>null</c>/0 = kein Filter.</param>
+    /// <param name="cancellationToken">Bricht das Laden ab.</param>
+    /// <returns>Die geladene Eintragsseite.</returns>
+    /// <exception cref="InvalidOperationException">Kein Server verbunden.</exception>
     public async Task<SourceItemsPage> LoadItemsAsync(
         long sourceId,
         int page,
@@ -133,6 +152,8 @@ public sealed class SourceBrowserService
     /// „Film"-Einträge der Quellenliste zur Kollektionsansicht (der Server
     /// gruppiert Filme in Kollektionen), alles Übrige zur Serienansicht.
     /// </summary>
+    /// <param name="type">Typbezeichner der Server-Summary.</param>
+    /// <returns>Der normalisierte Medientyp in CLR-Konvention.</returns>
     internal static string MapSummaryType(string type)
     {
         return type.Trim().ToLowerInvariant() switch

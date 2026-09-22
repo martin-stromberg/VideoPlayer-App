@@ -17,6 +17,8 @@ public partial class SourceOverviewPage : ContentPage
     private long sourceId;
     private string? sourceName;
 
+    /// <summary>Initialisiert eine neue Instanz der <see cref="SourceOverviewPage"/>-Klasse.</summary>
+    /// <param name="mvuHost">MVU-Host; dient als <see cref="BindableObject.BindingContext"/> und Dispatch-Ziel der Browser-Nachrichten.</param>
     public SourceOverviewPage(MvuHost mvuHost)
     {
         InitializeComponent();
@@ -42,6 +44,7 @@ public partial class SourceOverviewPage : ContentPage
         }
     }
 
+    /// <inheritdoc/>
     protected override void OnAppearing()
     {
         base.OnAppearing();

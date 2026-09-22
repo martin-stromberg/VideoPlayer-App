@@ -7,6 +7,7 @@ namespace VideoPlayer.Mvu;
 public sealed record HomeLists
 {
     /// <summary>Leeres Ergebnis (kein gecachter Inhalt).</summary>
+    /// <value>Ergebnisbündel mit drei leeren Listen.</value>
     public static readonly HomeLists Empty = new();
 
     /// <summary>„Weiterschauen" (Cache-Schlüssel <c>continue_watching</c>).</summary>

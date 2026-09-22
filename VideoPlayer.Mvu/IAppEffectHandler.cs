@@ -6,5 +6,8 @@ namespace VideoPlayer.Mvu;
 /// </summary>
 public interface IAppEffectHandler
 {
+    /// <summary>Führt einen einzelnen Effekt aus (Navigation, Server-Aufrufe o. ä.).</summary>
+    /// <param name="effect">Der auszuführende Effekt.</param>
+    /// <param name="cancellationToken">Bricht die Ausführung ab.</param>
     Task HandleAsync(AppEffect effect, CancellationToken cancellationToken = default);
 }

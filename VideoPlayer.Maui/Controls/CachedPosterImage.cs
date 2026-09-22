@@ -11,6 +11,7 @@ namespace VideoPlayer.Maui.Controls;
 /// </summary>
 public sealed class CachedPosterImage : Image
 {
+    /// <value>Bindable Property für <see cref="PictureId"/> — Server-Bild-Id (<c>api/pictures/{id}</c>) des anzuzeigenden Posters.</value>
     public static readonly BindableProperty PictureIdProperty = BindableProperty.Create(
         nameof(PictureId),
         typeof(long?),

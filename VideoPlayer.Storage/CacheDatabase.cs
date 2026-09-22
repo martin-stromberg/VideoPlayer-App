@@ -13,6 +13,8 @@ public sealed class CacheDatabase
 {
     private readonly Lazy<SQLiteAsyncConnection> connection;
 
+    /// <summary>Erstellt die Datenbank; die Verbindung wird erst bei Bedarf geöffnet.</summary>
+    /// <param name="layout">Ablagelayout mit dem Datenbankpfad.</param>
     public CacheDatabase(AppStorageLayout layout)
     {
         ArgumentNullException.ThrowIfNull(layout);
@@ -39,6 +41,7 @@ public sealed class CacheDatabase
     /// oder Download-Manifesteinträge) — Grundlage für den Offline-Zustand
     /// des Verbindungs-Workflows.
     /// </summary>
+    /// <returns><c>true</c>, wenn mindestens ein Cache- oder Download-Eintrag vorliegt.</returns>
     public async Task<bool> HasOfflineDataAsync()
     {
         var cachedLists = await Connection.Table<CachedListEntry>().CountAsync();

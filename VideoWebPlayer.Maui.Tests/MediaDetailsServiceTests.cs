@@ -20,6 +20,7 @@ public class MediaDetailsServiceTests
     private readonly StubHttpMessageHandler handler = new();
     private readonly AuthSessionService authSession;
 
+    /// <summary>Initialisiert eine neue Instanz der Testklasse <c>MediaDetailsServiceTests</c>.</summary>
     public MediaDetailsServiceTests()
     {
         var secrets = new AppSecretsService(
@@ -69,6 +70,7 @@ public class MediaDetailsServiceTests
         ]
     };
 
+    /// <summary>Prüft Load: bei einem Film → bildet die Basisdetails ab.</summary>
     [Fact]
     public async Task Load_Movie_MapsBasicDetails()
     {
@@ -100,6 +102,7 @@ public class MediaDetailsServiceTests
         Assert.EndsWith("/api/items/movie/42", Assert.Single(handler.Requests).PathAndQuery);
     }
 
+    /// <summary>Prüft Load: bei <c>MovieCollection</c> → bildet die enthaltenen Filme ab.</summary>
     [Fact]
     public async Task Load_MovieCollection_MapsContainedMovies()
     {
@@ -129,6 +132,7 @@ public class MediaDetailsServiceTests
         Assert.EndsWith("/api/items/moviecollection/7", Assert.Single(handler.Requests).PathAndQuery);
     }
 
+    /// <summary>Prüft Load: bei <c>MovieCollection</c>, wenn nicht gefunden → fällt auf Film zurück.</summary>
     [Fact]
     public async Task Load_MovieCollection_NotFound_FallsBackToMovie()
     {
@@ -144,6 +148,7 @@ public class MediaDetailsServiceTests
         Assert.Equal("Einzelfilm", details.Title);
     }
 
+    /// <summary>Prüft Load: bei <c>TvShow</c> → bildet Staffeln und Episoden ab.</summary>
     [Fact]
     public async Task Load_TvShow_MapsSeasonsAndEpisodes()
     {
@@ -165,6 +170,7 @@ public class MediaDetailsServiceTests
         Assert.EndsWith("/api/items/tvshow/11", Assert.Single(handler.Requests).PathAndQuery);
     }
 
+    /// <summary>Prüft Load: bei Episode mit Show-Hint → öffnet den Show-Kontext mit Vorauswahl.</summary>
     [Fact]
     public async Task Load_Episode_WithShowHint_OpensShowContextWithPreselection()
     {
@@ -184,6 +190,7 @@ public class MediaDetailsServiceTests
         Assert.Single(handler.Requests);
     }
 
+    /// <summary>Prüft Load: bei Episode ohne Hint → löst die Show über die eingebettete Staffel auf.</summary>
     [Fact]
     public async Task Load_Episode_WithoutHint_ResolvesShowViaEmbeddedSeason()
     {
@@ -205,6 +212,7 @@ public class MediaDetailsServiceTests
         Assert.Equal(2, handler.Requests.Count);
     }
 
+    /// <summary>Prüft Load: bei Episode ohne Show → zeigt die Basisdetails.</summary>
     [Fact]
     public async Task Load_Episode_WithoutShow_ShowsBasicDetails()
     {
@@ -227,6 +235,7 @@ public class MediaDetailsServiceTests
         Assert.False(details.HasSeasons);
     }
 
+    /// <summary>Prüft Load: bei Staffel mit Show-Hint → öffnet den Show-Kontext.</summary>
     [Fact]
     public async Task Load_Season_WithShowHint_OpensShowContext()
     {
@@ -241,6 +250,7 @@ public class MediaDetailsServiceTests
         Assert.True(details.HasSeasons);
     }
 
+    /// <summary>Prüft Load: bei Staffel, bei <c>WithoutShowHint</c> → schlägt fehl.</summary>
     [Fact]
     public async Task Load_Season_WithoutShowHint_Fails()
     {
@@ -251,6 +261,7 @@ public class MediaDetailsServiceTests
         Assert.Empty(handler.Requests);
     }
 
+    /// <summary>Prüft Load: bei unbekanntem Typ → schlägt fehl.</summary>
     [Fact]
     public async Task Load_UnknownType_Fails()
     {
@@ -260,6 +271,7 @@ public class MediaDetailsServiceTests
             () => CreateService().LoadAsync("video", 1, null, null, null, null));
     }
 
+    /// <summary>Prüft Load: ohne Client → wirft.</summary>
     [Fact]
     public async Task Load_WithoutClient_Throws()
     {

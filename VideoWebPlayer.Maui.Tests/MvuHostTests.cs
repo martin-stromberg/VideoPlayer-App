@@ -2,6 +2,7 @@ using VideoPlayer.Mvu;
 
 namespace VideoWebPlayer.Maui.Tests;
 
+/// <summary>Tests für <c>MvuHost</c>.</summary>
 public class MvuHostTests
 {
     private sealed class RecordingEffectHandler : IAppEffectHandler
@@ -15,6 +16,7 @@ public class MvuHostTests
         }
     }
 
+    /// <summary>Prüft DispatchAsync: aktualisiert Model und führt Effekte aus.</summary>
     [Fact]
     public async Task DispatchAsync_UpdatesModelAndExecutesEffects()
     {
@@ -53,6 +55,7 @@ public class MvuHostTests
         Assert.IsType<NavigateToPageEffect>(handler.Effects[9]);
     }
 
+    /// <summary>Prüft DispatchAsync: löst die ModelChanged- und PropertyChanged-Ereignisse aus.</summary>
     [Fact]
     public async Task DispatchAsync_RaisesModelChangedAndPropertyChanged()
     {
@@ -75,6 +78,7 @@ public class MvuHostTests
         Assert.Equal(1, propertyChanged);
     }
 
+    /// <summary>Prüft DispatchAsync: bei NoOp-Nachricht → führt weiterhin keine Effekte aus.</summary>
     [Fact]
     public async Task DispatchAsync_NoOpMessage_StillExecutesNoEffects()
     {

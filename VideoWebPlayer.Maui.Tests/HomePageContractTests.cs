@@ -15,6 +15,7 @@ public class HomePageContractTests
     private static string Read(params string[] parts) =>
         File.ReadAllText(Path.Combine(new[] { Root }.Concat(parts).ToArray()));
 
+    /// <summary>Prüft HomePage: zeigt drei horizontale Medienlisten.</summary>
     [Fact]
     public void HomePage_ShowsThreeHorizontalMediaLists()
     {
@@ -32,6 +33,7 @@ public class HomePageContractTests
         Assert.Contains("ServerStatusLabel", xaml, StringComparison.Ordinal);
     }
 
+    /// <summary>Prüft MediaCarousel: Einträge sind tippbar und Poster werden über den Cache geladen.</summary>
     [Fact]
     public void MediaCarousel_ItemsAreTappable_PostersViaCache()
     {
@@ -45,6 +47,7 @@ public class HomePageContractTests
         Assert.Contains("{Binding Progress}", xaml, StringComparison.Ordinal);
     }
 
+    /// <summary>Prüft HomePage: die Auswahl dispatcht eine MediaItemSelected-Nachricht.</summary>
     [Fact]
     public void HomePage_SelectionDispatchesMediaItemSelected()
     {
@@ -54,6 +57,7 @@ public class HomePageContractTests
         Assert.Contains("DispatchAsync", code, StringComparison.Ordinal);
     }
 
+    /// <summary>Prüft MediaDetails: bei <c>RouteRegistered</c> → die Seite liest die Query-Parameter.</summary>
     [Fact]
     public void MediaDetails_RouteRegistered_AndPageReadsQueryParameters()
     {
@@ -69,6 +73,7 @@ public class HomePageContractTests
         Assert.Contains("QueryProperty", page, StringComparison.Ordinal);
     }
 
+    /// <summary>Prüft ShellAppEffectHandler: bei <c>HandlesNewEffects</c> → benachrichtigt über Listenänderungen.</summary>
     [Fact]
     public void ShellAppEffectHandler_HandlesNewEffects_AndNotifiesListChanges()
     {
@@ -82,6 +87,7 @@ public class HomePageContractTests
         Assert.Contains("MainThread", handler, StringComparison.Ordinal);
     }
 
+    /// <summary>Prüft MauiProgram: registriert die Home-Services und die Details-Seite.</summary>
     [Fact]
     public void MauiProgram_RegistersHomeServicesAndDetailsPage()
     {
@@ -92,6 +98,7 @@ public class HomePageContractTests
         Assert.Contains("MediaDetailsPage", program, StringComparison.Ordinal);
     }
 
+    /// <summary>Prüft PosterImageService: verwendet das NoBackup-Vorschauverzeichnis.</summary>
     [Fact]
     public void PosterImageService_UsesNonBackupPreviewDirectory()
     {

@@ -16,6 +16,7 @@ public class NetworkSyncContractTests
     private static string MauiFile(params string[] parts) =>
         File.ReadAllText(Path.Combine(new[] { Root, "VideoPlayer.Maui" }.Concat(parts).ToArray()));
 
+    /// <summary>Prüft MauiProgram: registriert die Netzwerk- und Sync-Services.</summary>
     [Fact]
     public void MauiProgram_RegistersNetworkAndSyncServices()
     {
@@ -31,6 +32,7 @@ public class NetworkSyncContractTests
         Assert.Contains("ServerSyncService", program, StringComparison.Ordinal);
     }
 
+    /// <summary>Prüft Csproj: referenziert den SignalR-Client.</summary>
     [Fact]
     public void Csproj_ReferencesSignalRClient()
     {
@@ -39,6 +41,7 @@ public class NetworkSyncContractTests
         Assert.Contains("Microsoft.AspNetCore.SignalR.Client", csproj, StringComparison.Ordinal);
     }
 
+    /// <summary>Prüft EffectHandler: behandelt alle NetworkSync-Effekte.</summary>
     [Fact]
     public void EffectHandler_HandlesAllNetworkSyncEffects()
     {
@@ -65,6 +68,7 @@ public class NetworkSyncContractTests
         Assert.Contains("ConnectionClosed", handler, StringComparison.Ordinal);
     }
 
+    /// <summary>Prüft SignalRConnection: bildet die Server-Hub-Events ab.</summary>
     [Fact]
     public void SignalRConnection_MapsServerHubEvents()
     {
@@ -84,6 +88,7 @@ public class NetworkSyncContractTests
         Assert.Contains("hubs/mediaupdate", service, StringComparison.Ordinal);
     }
 
+    /// <summary>Prüft NetworkMonitor: verwendet MAUI Connectivity.</summary>
     [Fact]
     public void NetworkMonitor_UsesMauiConnectivity()
     {

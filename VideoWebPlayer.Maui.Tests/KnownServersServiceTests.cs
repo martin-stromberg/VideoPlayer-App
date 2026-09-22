@@ -17,11 +17,13 @@ public class KnownServersServiceTests : IDisposable
     private readonly InMemorySettingsStore settingsStore = new();
     private readonly AppProfile profile = AppProfile.Create(null);
 
+    /// <summary>Initialisiert eine neue Instanz der Testklasse <c>KnownServersServiceTests</c>.</summary>
     public KnownServersServiceTests()
     {
         root = Path.Combine(Path.GetTempPath(), "videoplayer-server-tests", Guid.NewGuid().ToString("N"));
     }
 
+    /// <inheritdoc/>
     public void Dispose()
     {
         SQLite.SQLiteAsyncConnection.ResetPool();
@@ -45,6 +47,7 @@ public class KnownServersServiceTests : IDisposable
         return new KnownServersService(database, settingsStore, profile);
     }
 
+    /// <summary>Prüft Initially: kein Server und kein LastConnected vorhanden.</summary>
     [Fact]
     public async Task Initially_NoServersNoLastConnected()
     {
@@ -54,6 +57,7 @@ public class KnownServersServiceTests : IDisposable
         Assert.Null(await service.GetLastConnectedAddressAsync());
     }
 
+    /// <summary>Prüft SetActiveServer: fügt den Eintrag ein und setzt LastConnected.</summary>
     [Fact]
     public async Task SetActiveServer_InsertsEntryAndLastConnected()
     {
@@ -70,6 +74,7 @@ public class KnownServersServiceTests : IDisposable
         Assert.Equal("http://nas/videoplayer/", entry.Address);
     }
 
+    /// <summary>Prüft SetActiveServer: bei gleicher Adresse → Upsert ohne Duplikat.</summary>
     [Fact]
     public async Task SetActiveServer_SameAddress_UpsertsWithoutDuplicate()
     {
@@ -84,6 +89,7 @@ public class KnownServersServiceTests : IDisposable
         Assert.Equal("NAS neu", second.DisplayName);
     }
 
+    /// <summary>Prüft SetActiveServer: ordnet nach LastUsed absteigend.</summary>
     [Fact]
     public async Task SetActiveServer_OrdersByLastUsedDescending()
     {
@@ -99,6 +105,7 @@ public class KnownServersServiceTests : IDisposable
         Assert.Equal("http://zwei/", await service.GetLastConnectedAddressAsync());
     }
 
+    /// <summary>Prüft SetActiveServer: bei ungültiger Adresse → wirft.</summary>
     [Fact]
     public async Task SetActiveServer_InvalidAddress_Throws()
     {
@@ -108,6 +115,7 @@ public class KnownServersServiceTests : IDisposable
             () => service.SetActiveServerAsync("ftp://server/"));
     }
 
+    /// <summary>Prüft MigrateLegacy: verschiebt Adresse in Datenbank.</summary>
     [Fact]
     public async Task MigrateLegacy_MovesAddressIntoDatabase()
     {
@@ -122,6 +130,7 @@ public class KnownServersServiceTests : IDisposable
         Assert.False(settingsStore.Contains(legacyKey));
     }
 
+    /// <summary>Prüft MigrateLegacy: bei ungültiger Adresse → wird ohne Eintrag verworfen.</summary>
     [Fact]
     public async Task MigrateLegacy_InvalidAddress_IsDroppedWithoutEntry()
     {
@@ -136,6 +145,7 @@ public class KnownServersServiceTests : IDisposable
         Assert.False(settingsStore.Contains(legacyKey));
     }
 
+    /// <summary>Prüft MigrateLegacy: bei <c>WithoutLegacyValue</c> → ist ein No-Op.</summary>
     [Fact]
     public async Task MigrateLegacy_WithoutLegacyValue_IsNoOp()
     {
@@ -147,6 +157,7 @@ public class KnownServersServiceTests : IDisposable
         Assert.Null(await service.GetLastConnectedAddressAsync());
     }
 
+    /// <summary>Prüft ServersLandInBackupDatabase: landen in der Backup-Datenbank, nicht im Cache.</summary>
     [Fact]
     public async Task ServersLandInBackupDatabase_NotInCache()
     {

@@ -33,6 +33,7 @@ public class SettingsStorageContractTests
         return File.ReadAllText(Path.Combine([Root, "VideoPlayer.Maui", .. parts]));
     }
 
+    /// <summary>Prüft SettingsPage: enthält alle Einstellungsteuerelemente.</summary>
     [Fact]
     public void SettingsPage_ContainsAllSettingControls()
     {
@@ -56,6 +57,7 @@ public class SettingsStorageContractTests
             Assert.Equal("Numeric", (string?)e.Attribute("Keyboard")));
     }
 
+    /// <summary>Prüft SettingsPage: verdrahtet MVU-Host und Speichern-Nachricht.</summary>
     [Fact]
     public void SettingsPage_WiresMvuHostAndSaveMessage()
     {
@@ -66,6 +68,7 @@ public class SettingsStorageContractTests
         Assert.Contains("ModelChanged", codeBehind, StringComparison.Ordinal);
     }
 
+    /// <summary>Prüft MauiProgram: registriert die Storage-Services.</summary>
     [Fact]
     public void MauiProgram_RegistersStorageServices()
     {
@@ -81,6 +84,7 @@ public class SettingsStorageContractTests
         Assert.Contains("CacheDatabase", mauiProgram, StringComparison.Ordinal);
     }
 
+    /// <summary>Prüft EffectHandler: behandelt alle Storage-Effekte.</summary>
     [Fact]
     public void EffectHandler_HandlesAllStorageEffects()
     {
@@ -92,6 +96,7 @@ public class SettingsStorageContractTests
         Assert.Contains("SettingsLoadedMessage", handler, StringComparison.Ordinal);
     }
 
+    /// <summary>Prüft ServerAddressProvider: verwendet den KnownServersService.</summary>
     [Fact]
     public void ServerAddressProvider_UsesKnownServersService()
     {
@@ -105,6 +110,7 @@ public class SettingsStorageContractTests
         Assert.DoesNotContain("Preferences.Default", provider, StringComparison.Ordinal);
     }
 
+    /// <summary>Prüft NoDirectPlatformStorageAccess: kein direkter Zugriff auf Plattform-Storage.</summary>
     [Fact]
     public void NoDirectPlatformStorageAccess()
     {
@@ -135,6 +141,7 @@ public class SettingsStorageContractTests
         }
     }
 
+    /// <summary>Prüft IosBackupExclusion: ist implementiert.</summary>
     [Fact]
     public void IosBackupExclusion_IsImplemented()
     {
@@ -145,6 +152,7 @@ public class SettingsStorageContractTests
         Assert.Contains("SetSkipBackupAttribute", provider, StringComparison.Ordinal);
     }
 
+    /// <summary>Prüft WindowsRoaming: wird für das Backup-Wurzelverzeichnis verwendet.</summary>
     [Fact]
     public void WindowsRoaming_IsUsedForBackupRoot()
     {
@@ -155,6 +163,7 @@ public class SettingsStorageContractTests
         Assert.Contains("SpecialFolder.ApplicationData", provider, StringComparison.Ordinal);
     }
 
+    /// <summary>Prüft StorageProject: wird von allen Projekten referenziert.</summary>
     [Fact]
     public void StorageProject_IsReferencedEverywhere()
     {

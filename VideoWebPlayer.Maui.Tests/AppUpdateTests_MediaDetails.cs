@@ -51,6 +51,7 @@ public class AppUpdateTests_MediaDetails
 
     // --- Detail-Ladung ---
 
+    /// <summary>Prüft MediaDetailsRequested: bei <c>StartsLoading</c> → übergibt die Hints.</summary>
     [Fact]
     public void MediaDetailsRequested_StartsLoading_WithHints()
     {
@@ -71,6 +72,7 @@ public class AppUpdateTests_MediaDetails
         Assert.Equal(31, effect.EpisodeId);
     }
 
+    /// <summary>Prüft MediaDetailsRequested: bei ungültiger Identität → zeigt einen Fehler.</summary>
     [Fact]
     public void MediaDetailsRequested_InvalidIdentity_ShowsError()
     {
@@ -82,6 +84,7 @@ public class AppUpdateTests_MediaDetails
         Assert.Empty(transition.Effects);
     }
 
+    /// <summary>Prüft MediaDetailsRequested: bei <c>SameTargetAlreadyLoaded</c> → kein zweiter Ladevorgang.</summary>
     [Fact]
     public void MediaDetailsRequested_SameTargetAlreadyLoaded_NoSecondRun()
     {
@@ -95,6 +98,7 @@ public class AppUpdateTests_MediaDetails
         Assert.Empty(transition.Effects);
     }
 
+    /// <summary>Prüft MediaDetailsLoaded: setzt Details.</summary>
     [Fact]
     public void MediaDetailsLoaded_SetsDetails()
     {
@@ -119,6 +123,7 @@ public class AppUpdateTests_MediaDetails
         Assert.False(transition.Model.MediaDetails.HasError);
     }
 
+    /// <summary>Prüft MediaDetailsLoaded: bei veralteter Antwort → wird verworfen.</summary>
     [Fact]
     public void MediaDetailsLoaded_StaleResponse_IsDiscarded()
     {
@@ -140,6 +145,7 @@ public class AppUpdateTests_MediaDetails
         Assert.Same(model, transition.Model);
     }
 
+    /// <summary>Prüft MediaDetailsLoaded: bei Fehler → setzt Fehlerzustand.</summary>
     [Fact]
     public void MediaDetailsLoaded_Error_SetsErrorState()
     {
@@ -159,6 +165,7 @@ public class AppUpdateTests_MediaDetails
 
     // --- Staffelwahl ---
 
+    /// <summary>Prüft SeasonSelected: wechselt die ausgewählte Staffel.</summary>
     [Fact]
     public void SeasonSelected_SwitchesSelectedSeason()
     {
@@ -170,6 +177,7 @@ public class AppUpdateTests_MediaDetails
         Assert.Empty(transition.Effects);
     }
 
+    /// <summary>Prüft SeasonSelected: bei gleicher Staffel → keine Änderung.</summary>
     [Fact]
     public void SeasonSelected_SameSeason_NoChange()
     {
@@ -182,6 +190,7 @@ public class AppUpdateTests_MediaDetails
 
     // --- Favoriten ---
 
+    /// <summary>Prüft FavoriteToggleRequested: löst den ToggleFavorite-Effekt aus.</summary>
     [Fact]
     public void FavoriteToggleRequested_EmitsToggleEffect()
     {
@@ -196,6 +205,7 @@ public class AppUpdateTests_MediaDetails
         Assert.Equal("Serie", effect.Title);
     }
 
+    /// <summary>Prüft FavoriteToggleRequested: ohne Details → wird ignoriert.</summary>
     [Fact]
     public void FavoriteToggleRequested_WithoutDetails_IsIgnored()
     {
@@ -204,6 +214,7 @@ public class AppUpdateTests_MediaDetails
         Assert.Empty(transition.Effects);
     }
 
+    /// <summary>Prüft FavoriteToggleCompleted: wendet den Serverzustand an.</summary>
     [Fact]
     public void FavoriteToggleCompleted_AppliesServerState()
     {
@@ -219,6 +230,7 @@ public class AppUpdateTests_MediaDetails
         Assert.Null(state.FavoriteError);
     }
 
+    /// <summary>Prüft FavoriteToggleCompleted: bei Fehlschlag → behält Zustand und setzt Fehler.</summary>
     [Fact]
     public void FavoriteToggleCompleted_Failure_KeepsStateAndSetsError()
     {
@@ -234,6 +246,7 @@ public class AppUpdateTests_MediaDetails
         Assert.NotNull(state.FavoriteError);
     }
 
+    /// <summary>Prüft FavoriteToggleCompleted: bei anderen Medien → wird verworfen.</summary>
     [Fact]
     public void FavoriteToggleCompleted_OtherMedia_IsDiscarded()
     {

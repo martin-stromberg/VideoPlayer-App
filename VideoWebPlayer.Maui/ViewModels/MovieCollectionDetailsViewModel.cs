@@ -8,6 +8,9 @@ using VideoWebPlayer.Maui.Components;
 
 namespace VideoWebPlayer.Maui.ViewModels;
 
+/// <summary>
+/// ViewModel für die Detailseite einer Film-Collection mit Banner, Filmliste und Favoritenstatus.
+/// </summary>
 public class MovieCollectionDetailsViewModel : INotifyPropertyChanged, IMediaBannerViewModel
 {
     private readonly VideoWebPlayerClient? _client;
@@ -22,8 +25,14 @@ public class MovieCollectionDetailsViewModel : INotifyPropertyChanged, IMediaBan
     private int _selectedMovieIndex = -1;
     private bool _isSelectedMovieFavorite;
 
+    /// <summary>
+    /// Die ID der Film-Collection.
+    /// </summary>
     public long CollectionId { get; }
 
+    /// <summary>
+    /// Der Titel der Collection.
+    /// </summary>
     public string? Title
     {
         get => _title;
@@ -37,6 +46,9 @@ public class MovieCollectionDetailsViewModel : INotifyPropertyChanged, IMediaBan
         }
     }
 
+    /// <summary>
+    /// Die Handlungsbeschreibung des aktuell ausgewählten Films.
+    /// </summary>
     public string? Plot
     {
         get => _plot;
@@ -50,6 +62,9 @@ public class MovieCollectionDetailsViewModel : INotifyPropertyChanged, IMediaBan
         }
     }
 
+    /// <summary>
+    /// Die Genre-Namen des aktuell ausgewählten Films als Text.
+    /// </summary>
     public string? GenreNames
     {
         get => _genreNames;
@@ -63,6 +78,9 @@ public class MovieCollectionDetailsViewModel : INotifyPropertyChanged, IMediaBan
         }
     }
 
+    /// <summary>
+    /// Das Erscheinungsjahr des aktuell ausgewählten Films.
+    /// </summary>
     public string? ReleaseYear
     {
         get => _releaseYear;
@@ -76,6 +94,9 @@ public class MovieCollectionDetailsViewModel : INotifyPropertyChanged, IMediaBan
         }
     }
 
+    /// <summary>
+    /// Die Bildquelle des aktuell angezeigten Banners (Collection- oder Film-Banner).
+    /// </summary>
     public ImageSource? DisplayBannerSource
     {
         get => _displayBannerSource;
@@ -89,6 +110,9 @@ public class MovieCollectionDetailsViewModel : INotifyPropertyChanged, IMediaBan
         }
     }
 
+    /// <summary>
+    /// Die aus dem Banner-Bild extrahierte Hintergrundfarbe.
+    /// </summary>
     public Color DisplayBannerBackgroundColor
     {
         get => _displayBannerBackgroundColor;
@@ -102,6 +126,9 @@ public class MovieCollectionDetailsViewModel : INotifyPropertyChanged, IMediaBan
         }
     }
 
+    /// <summary>
+    /// Gibt an, ob die Daten der Collection gerade geladen werden.
+    /// </summary>
     public bool IsLoading
     {
         get => _isLoading;
@@ -115,6 +142,9 @@ public class MovieCollectionDetailsViewModel : INotifyPropertyChanged, IMediaBan
         }
     }
 
+    /// <summary>
+    /// Der Index des aktuell ausgewählten Films in <see cref="Movies"/> (-1 = keine Auswahl).
+    /// </summary>
     public int SelectedMovieIndex
     {
         get => _selectedMovieIndex;
@@ -136,6 +166,9 @@ public class MovieCollectionDetailsViewModel : INotifyPropertyChanged, IMediaBan
         }
     }
 
+    /// <summary>
+    /// Gibt an, ob der aktuell ausgewählte Film als Favorit markiert ist.
+    /// </summary>
     public bool IsSelectedMovieFavorite
     {
         get => _isSelectedMovieFavorite;
@@ -150,18 +183,35 @@ public class MovieCollectionDetailsViewModel : INotifyPropertyChanged, IMediaBan
         }
     }
 
+    /// <summary>
+    /// Das Stern-Symbol für den Favoritenstatus des ausgewählten Films (gefüllt = Favorit, leer = kein Favorit).
+    /// </summary>
     public string SelectedMovieFavoriteStarText => IsSelectedMovieFavorite ? "★" : "☆";
 
+    /// <summary>
+    /// Die Filme der Collection.
+    /// </summary>
+    /// <value>Liste der Filme; initial leer.</value>
     public ObservableCollection<MediaItemViewModel> Movies { get; } = new();
 
+    /// <summary>
+    /// Der aktuell ausgewählte Film oder <c>null</c>, wenn keine gültige Auswahl vorliegt.
+    /// </summary>
     public MediaItemViewModel? SelectedMovie => SelectedMovieIndex >= 0 && SelectedMovieIndex < Movies.Count
         ? Movies[SelectedMovieIndex]
         : null;
 
+    /// <summary>
+    /// Gibt an, ob die Filmliste angezeigt werden soll (nur bei mehr als einem Film).
+    /// </summary>
     public bool ShowMoviesList => Movies.Count > 1;
 
     private readonly Dictionary<long, DtoMovie> _movieDetailsCache = new();
 
+    /// <summary>
+    /// Erstellt eine neue Instanz des <see cref="MovieCollectionDetailsViewModel"/>.
+    /// </summary>
+    /// <param name="collectionId">Die ID der anzuzeigenden Film-Collection.</param>
     public MovieCollectionDetailsViewModel(long collectionId)
     {
         CollectionId = collectionId;
@@ -169,6 +219,10 @@ public class MovieCollectionDetailsViewModel : INotifyPropertyChanged, IMediaBan
         _client = App.ServiceProvider?.GetService<VideoWebPlayerClient>();
     }
 
+    /// <summary>
+    /// Lädt die Collection-Daten (Banner, Filme, Favoritenstatus) vom Server.
+    /// </summary>
+    /// <param name="initialMovieId">Optionale ID eines Films, der nach dem Laden ausgewählt werden soll.</param>
     public async Task LoadDataAsync(long? initialMovieId = null)
     {
         if (_client == null)
@@ -265,6 +319,9 @@ public class MovieCollectionDetailsViewModel : INotifyPropertyChanged, IMediaBan
         }
     }
 
+    /// <summary>
+    /// Schaltet den Favoritenstatus des aktuell ausgewählten Films auf dem Server um.
+    /// </summary>
     public async Task ToggleSelectedMovieFavoriteAsync()
     {
         if (_client == null)
@@ -466,8 +523,10 @@ public class MovieCollectionDetailsViewModel : INotifyPropertyChanged, IMediaBan
         }
     }
 
+    /// <inheritdoc/>
     public bool ShouldShowPlayButton => SelectedMovie != null;
 
+    /// <inheritdoc/>
     public async Task<(long VideoId, string VideoType, string Title)?> GetVideoInfoForPlaybackAsync()
     {
         var movie = SelectedMovie;
@@ -497,8 +556,13 @@ public class MovieCollectionDetailsViewModel : INotifyPropertyChanged, IMediaBan
         return result;
     }
 
+    /// <inheritdoc/>
     public event PropertyChangedEventHandler? PropertyChanged;
 
+    /// <summary>
+    /// Löst das <see cref="PropertyChanged"/>-Ereignis aus.
+    /// </summary>
+    /// <param name="propertyName">Der Name der geänderten Eigenschaft (wird automatisch ermittelt).</param>
     protected virtual void OnPropertyChanged([CallerMemberName] string? propertyName = null)
     {
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));

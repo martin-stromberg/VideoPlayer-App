@@ -2,8 +2,10 @@ using VideoPlayer.Storage;
 
 namespace VideoWebPlayer.Maui.Tests;
 
+/// <summary>Tests für <c>AppSettings</c>.</summary>
 public class AppSettingsTests
 {
+    /// <summary>Prüft Defaults: alle Standardwerte haben die erwarteten Werte.</summary>
     [Fact]
     public void Defaults_AreExpected()
     {
@@ -20,6 +22,9 @@ public class AppSettingsTests
         Assert.False(settings.AutoDeleteWatchedEpisodes);
     }
 
+    /// <summary>Prüft Normalize: begrenzt die Preload-Episodenanzahl.</summary>
+    /// <param name="input">Die Eingabe.</param>
+    /// <param name="expected">Der erwartete Wert.</param>
     [Theory]
     [InlineData(0, 1)]
     [InlineData(-5, 1)]
@@ -30,6 +35,9 @@ public class AppSettingsTests
         Assert.Equal(expected, new AppSettings { PreloadEpisodeCount = input }.Normalize().PreloadEpisodeCount);
     }
 
+    /// <summary>Prüft Normalize: begrenzt die AutoResume-Restsekunden.</summary>
+    /// <param name="input">Die Eingabe.</param>
+    /// <param name="expected">Der erwartete Wert.</param>
     [Theory]
     [InlineData(0, 30)]
     [InlineData(4000, 3600)]
@@ -39,6 +47,9 @@ public class AppSettingsTests
         Assert.Equal(expected, new AppSettings { AutoResumeRemainingSeconds = input }.Normalize().AutoResumeRemainingSeconds);
     }
 
+    /// <summary>Prüft Normalize: begrenzt das WatchedEnd-Fenster in Sekunden.</summary>
+    /// <param name="input">Die Eingabe.</param>
+    /// <param name="expected">Der erwartete Wert.</param>
     [Theory]
     [InlineData(0, 30)]
     [InlineData(9999, 3600)]
@@ -48,6 +59,9 @@ public class AppSettingsTests
         Assert.Equal(expected, new AppSettings { WatchedEndWindowSeconds = input }.Normalize().WatchedEndWindowSeconds);
     }
 
+    /// <summary>Prüft Normalize: begrenzt das Downloadkontingent in GB.</summary>
+    /// <param name="input">Die Eingabe.</param>
+    /// <param name="expected">Der erwartete Wert.</param>
     [Theory]
     [InlineData(0, 1)]
     [InlineData(-3, 1)]
@@ -58,6 +72,7 @@ public class AppSettingsTests
         Assert.Equal(expected, new AppSettings { DownloadQuotaGb = input }.Normalize().DownloadQuotaGb);
     }
 
+    /// <summary>Prüft Normalize: lässt boolesche Werte unverändert.</summary>
     [Fact]
     public void Normalize_LeavesBooleansUntouched()
     {

@@ -17,6 +17,7 @@ public class SourcesContractTests
     private static string Read(params string[] parts) =>
         File.ReadAllText(Path.Combine(new[] { Root }.Concat(parts).ToArray()));
 
+    /// <summary>Prüft SourcesPage: zeigt Quellen mit Icons und Offline-Hinweis.</summary>
     [Fact]
     public void SourcesPage_ShowsSources_WithIcons_AndOfflineHint()
     {
@@ -31,6 +32,7 @@ public class SourcesContractTests
         Assert.Contains("RetryButton", xaml, StringComparison.Ordinal);
     }
 
+    /// <summary>Prüft SourcesPage: dispatcht die Öffnen- und Auswahl-Nachrichten.</summary>
     [Fact]
     public void SourcesPage_DispatchesOpenAndSelection()
     {
@@ -41,6 +43,7 @@ public class SourcesContractTests
         Assert.Contains("DispatchAsync", code, StringComparison.Ordinal);
     }
 
+    /// <summary>Prüft SourceOverviewPage: hat Genre-Bar, Suche und ein inkrementelles Raster.</summary>
     [Fact]
     public void SourceOverviewPage_HasGenreBar_Search_AndIncrementalGrid()
     {
@@ -54,6 +57,7 @@ public class SourcesContractTests
         Assert.Contains("CachedPosterImage", xaml, StringComparison.Ordinal);
     }
 
+    /// <summary>Prüft SourceOverviewPage: dispatcht Browsernachrichten.</summary>
     [Fact]
     public void SourceOverviewPage_DispatchesBrowserMessages()
     {
@@ -67,6 +71,7 @@ public class SourcesContractTests
         Assert.Contains("SourceMediaItemSelectedMessage", code, StringComparison.Ordinal);
     }
 
+    /// <summary>Prüft MediaDetailsPage: hat Staffel-Picker, Episoden, Collection- und Favoriten-Eintrag.</summary>
     [Fact]
     public void MediaDetailsPage_HasSeasonPicker_Episodes_Collection_AndFavorite()
     {
@@ -80,6 +85,7 @@ public class SourcesContractTests
         Assert.Contains("FavoriteButton", xaml, StringComparison.Ordinal);
     }
 
+    /// <summary>Prüft MediaDetailsPage: dispatcht Detailsnachrichten.</summary>
     [Fact]
     public void MediaDetailsPage_DispatchesDetailsMessages()
     {
@@ -90,6 +96,7 @@ public class SourcesContractTests
         Assert.Contains("FavoriteToggleRequestedMessage", code, StringComparison.Ordinal);
     }
 
+    /// <summary>Prüft Shell: bei <c>RegistersSourceOverviewRoute</c> → registriert die Route mit Query-Parameter.</summary>
     [Fact]
     public void Shell_RegistersSourceOverviewRoute_WithQueryParameters()
     {
@@ -102,6 +109,7 @@ public class SourcesContractTests
         Assert.Contains("QueryProperty", page, StringComparison.Ordinal);
     }
 
+    /// <summary>Prüft EffectHandler: bei <c>HandlesStep8Effects</c> → aktualisiert die Favoriten-Caches.</summary>
     [Fact]
     public void EffectHandler_HandlesStep8Effects_AndRefreshesFavoriteCaches()
     {
@@ -118,6 +126,7 @@ public class SourcesContractTests
         Assert.Contains("CachedListsChangedMessage", handler, StringComparison.Ordinal);
     }
 
+    /// <summary>Prüft MauiProgram: registriert die Step-8-Services und Seiten.</summary>
     [Fact]
     public void MauiProgram_RegistersStep8ServicesAndPages()
     {

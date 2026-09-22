@@ -22,6 +22,7 @@ public class AppUpdateTests_Connection
 
     // ---- OfflineDataCheckCompletedMessage ----
 
+    /// <summary>Prüft OfflineDataCheckCompleted: mit Daten → wechselt in den Offlinezustand.</summary>
     [Fact]
     public void OfflineDataCheckCompleted_WithData_EntersOfflineState()
     {
@@ -38,6 +39,7 @@ public class AppUpdateTests_Connection
         Assert.Equal(AppPage.Home, navigate.Page);
     }
 
+    /// <summary>Prüft OfflineDataCheckCompleted: ohne Daten → wechselt zum Server-Setup.</summary>
     [Fact]
     public void OfflineDataCheckCompleted_WithoutData_GoesToServerSetup()
     {
@@ -54,6 +56,7 @@ public class AppUpdateTests_Connection
         Assert.Equal(AppPage.ServerSetup, navigate.Page);
     }
 
+    /// <summary>Prüft OfflineDataCheckCompleted: ohne Daten, wenn bereits auf dem Setup → keine Navigation.</summary>
     [Fact]
     public void OfflineDataCheckCompleted_WithoutData_AlreadyOnSetup_NoNavigation()
     {
@@ -67,6 +70,7 @@ public class AppUpdateTests_Connection
 
     // ---- AutoLoginCompletedMessage ----
 
+    /// <summary>Prüft AutoLoginCompleted: bei Erfolg → verbindet und navigiert zur Home-Seite.</summary>
     [Fact]
     public void AutoLoginCompleted_Succeeded_ConnectsAndNavigatesHome()
     {
@@ -88,6 +92,7 @@ public class AppUpdateTests_Connection
         Assert.Equal(AppPage.Home, navigate.Page);
     }
 
+    /// <summary>Prüft AutoLoginCompleted: bei fehlenden Zugangsdaten → navigiert ohne Fehler zur Login-Seite.</summary>
     [Fact]
     public void AutoLoginCompleted_MissingCredentials_NavigatesToLoginWithoutError()
     {
@@ -105,6 +110,9 @@ public class AppUpdateTests_Connection
         Assert.Equal(AppPage.Login, navigate.Page);
     }
 
+    /// <summary>Prüft AutoLoginCompleted: bei Fehlschlag → navigiert mit Fehlermeldung zur Login-Seite.</summary>
+    /// <param name="status">Der Status.</param>
+    /// <param name="expectedError">Der erwartete Fehlertext.</param>
     [Theory]
     [InlineData(AuthAttemptStatus.InvalidCredentials, AppUpdate.InvalidCredentialsError)]
     [InlineData(AuthAttemptStatus.ServerUnreachable, AppUpdate.LoginUnreachableError)]
@@ -121,6 +129,7 @@ public class AppUpdateTests_Connection
         Assert.Single(transition.Effects);
     }
 
+    /// <summary>Prüft AutoLoginCompleted: vom Server-Setup kommend → stoppt den Prüfindikator.</summary>
     [Fact]
     public void AutoLoginCompleted_FromServerSetup_StopsCheckIndicator()
     {
@@ -144,6 +153,9 @@ public class AppUpdateTests_Connection
 
     // ---- LoginSubmittedMessage / LoginCompletedMessage ----
 
+    /// <summary>Prüft LoginSubmitted: bei leeren Feldern → zeigt einen Fehler ohne Effekt.</summary>
+    /// <param name="username">Der Benutzername.</param>
+    /// <param name="password">Das Passwort.</param>
     [Theory]
     [InlineData("", "secret")]
     [InlineData("martin", "")]
@@ -160,6 +172,7 @@ public class AppUpdateTests_Connection
         Assert.Equal(AppPage.Login, transition.Model.CurrentPage);
     }
 
+    /// <summary>Prüft LoginSubmitted: bei gültigen Eingaben → startet den Login-Effekt.</summary>
     [Fact]
     public void LoginSubmitted_Valid_StartsLoginEffect()
     {
@@ -181,6 +194,7 @@ public class AppUpdateTests_Connection
         Assert.Equal("secret", login.Password);
     }
 
+    /// <summary>Prüft LoginSubmitted: bei <c>WithoutActiveServer</c> → wechselt zur Setup-Seite.</summary>
     [Fact]
     public void LoginSubmitted_WithoutActiveServer_GoesToSetup()
     {
@@ -192,6 +206,7 @@ public class AppUpdateTests_Connection
         Assert.Equal(ConnectionState.NeedsServerSetup, transition.Model.ConnectionState);
     }
 
+    /// <summary>Prüft LoginCompleted: bei Erfolg → verbindet und navigiert zur Home-Seite.</summary>
     [Fact]
     public void LoginCompleted_Succeeded_ConnectsAndNavigatesHome()
     {
@@ -216,6 +231,9 @@ public class AppUpdateTests_Connection
         Assert.Equal(AppPage.Home, navigate.Page);
     }
 
+    /// <summary>Prüft LoginCompleted: bei Fehlschlag → zeigt den Fehler und bleibt auf der Login-Seite.</summary>
+    /// <param name="status">Der Status.</param>
+    /// <param name="expectedError">Der erwartete Fehlertext.</param>
     [Theory]
     [InlineData(AuthAttemptStatus.InvalidCredentials, AppUpdate.InvalidCredentialsError)]
     [InlineData(AuthAttemptStatus.ServerUnreachable, AppUpdate.LoginUnreachableError)]
@@ -240,6 +258,7 @@ public class AppUpdateTests_Connection
 
     // ---- SessionExpiredMessage ----
 
+    /// <summary>Prüft SessionExpired: bei <c>FromConnected</c> → navigiert zur Login-Seite.</summary>
     [Fact]
     public void SessionExpired_FromConnected_NavigatesToLogin()
     {
@@ -262,6 +281,7 @@ public class AppUpdateTests_Connection
         Assert.Equal(AppPage.Login, navigate.Page);
     }
 
+    /// <summary>Prüft SessionExpired: bei <c>WhenAlreadyNeedsLogin</c> → keine Effekte.</summary>
     [Fact]
     public void SessionExpired_WhenAlreadyNeedsLogin_NoEffects()
     {
@@ -279,6 +299,8 @@ public class AppUpdateTests_Connection
 
     // ---- Zustandsgesteuerte Navigation (Guards) ----
 
+    /// <summary>Prüft NavigateTo: auf einer Menüseite → blockiert, solange ein Workflow aussteht.</summary>
+    /// <param name="state">Der Zustand.</param>
     [Theory]
     [InlineData(ConnectionState.NeedsLogin)]
     [InlineData(ConnectionState.NeedsServerSetup)]
@@ -297,6 +319,7 @@ public class AppUpdateTests_Connection
         Assert.Empty(transition.Effects);
     }
 
+    /// <summary>Prüft NavigateTo: zum Server-Setup → ist von der Login-Seite aus erlaubt.</summary>
     [Fact]
     public void NavigateTo_ServerSetup_AllowedFromLogin()
     {
@@ -315,6 +338,9 @@ public class AppUpdateTests_Connection
         Assert.Equal(AppPage.ServerSetup, navigate.Page);
     }
 
+    /// <summary>Prüft Navigated: auf einer Menüseite bei ausstehendem Workflow → navigiert zurück.</summary>
+    /// <param name="state">Der Zustand.</param>
+    /// <param name="expectedTarget">Das erwartete Navigationsziel.</param>
     [Theory]
     [InlineData(ConnectionState.NeedsLogin, AppPage.Login)]
     [InlineData(ConnectionState.NeedsServerSetup, AppPage.ServerSetup)]
@@ -336,6 +362,7 @@ public class AppUpdateTests_Connection
         Assert.Equal(expectedTarget, navigate.Page);
     }
 
+    /// <summary>Prüft Navigated: auf einer Menüseite bei <c>WhenConnected</c> → aktualisiert das Model.</summary>
     [Fact]
     public void Navigated_MenuPage_WhenConnected_UpdatesModel()
     {
@@ -354,6 +381,7 @@ public class AppUpdateTests_Connection
 
     // ---- Serverwechsel löst Anmeldung aus ----
 
+    /// <summary>Prüft ServerCheckCompleted: bei Erfolg → persistiert den Server und löst AutoLogin aus.</summary>
     [Fact]
     public void ServerCheckCompleted_Success_EmitsPersistAndAutoLogin()
     {

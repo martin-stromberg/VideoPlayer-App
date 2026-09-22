@@ -3,8 +3,10 @@ using VideoPlayer.Storage;
 
 namespace VideoWebPlayer.Maui.Tests;
 
+/// <summary>Tests für <c>AppUpdate.Update</c> – Bereich Startup.</summary>
 public class AppUpdateTests_Startup
 {
+    /// <summary>Prüft Update: bei <c>StartupRequested</c> → setzt Checking und lädt Storage, Einstellungen und Server.</summary>
     [Fact]
     public void Update_StartupRequested_SetsCheckingAndLoadsStorageSettingsServers()
     {
@@ -25,6 +27,7 @@ public class AppUpdateTests_Startup
         Assert.IsType<LoadHomeListsEffect>(transition.Effects[4]);
     }
 
+    /// <summary>Prüft Update: bei <c>StartupRequested</c> während eines laufenden Checks → keine Effekte.</summary>
     [Fact]
     public void Update_StartupRequested_WhenAlreadyChecking_NoEffects()
     {
@@ -36,6 +39,7 @@ public class AppUpdateTests_Startup
         Assert.Empty(transition.Effects);
     }
 
+    /// <summary>Prüft Update: bei <c>ServersLoaded</c> mit aktivem Server während des Startups → löst den Health-Check aus.</summary>
     [Fact]
     public void Update_ServersLoaded_WithActiveServer_DuringStartup_EmitsHealthCheck()
     {
@@ -57,6 +61,7 @@ public class AppUpdateTests_Startup
         Assert.Equal(AppPage.Loading, transition.Model.CurrentPage);
     }
 
+    /// <summary>Prüft Update: bei <c>ServersLoaded</c> mit aktivem Server nach dem Startup → aktualisiert nur das Model.</summary>
     [Fact]
     public void Update_ServersLoaded_WithActiveServer_AfterStartup_OnlyUpdatesModel()
     {
@@ -73,6 +78,7 @@ public class AppUpdateTests_Startup
         Assert.Equal(AppPage.ServerSetup, transition.Model.CurrentPage);
     }
 
+    /// <summary>Prüft Update: bei <c>ServersLoaded</c> ohne Server → navigiert zum Setup.</summary>
     [Fact]
     public void Update_ServersLoaded_WithoutServer_NavigatesToSetup()
     {
@@ -90,6 +96,7 @@ public class AppUpdateTests_Startup
         Assert.Equal(AppPage.ServerSetup, navigate.Page);
     }
 
+    /// <summary>Prüft Update: bei <c>ServersLoaded</c> ohne Server, wenn bereits auf dem Setup → keine Navigation.</summary>
     [Fact]
     public void Update_ServersLoaded_WithoutServer_AlreadyOnSetup_NoNavigation()
     {
@@ -101,6 +108,7 @@ public class AppUpdateTests_Startup
         Assert.Equal(AppPage.ServerSetup, transition.Model.CurrentPage);
     }
 
+    /// <summary>Prüft Update: bei <c>HealthCheckCompleted</c>, wenn erreichbar → löst AutoLogin aus.</summary>
     [Fact]
     public void Update_HealthCheckCompleted_Reachable_EmitsAutoLogin()
     {
@@ -124,6 +132,7 @@ public class AppUpdateTests_Startup
         Assert.Equal("http://nas/videoplayer/", autoLogin.ServerAddress);
     }
 
+    /// <summary>Prüft Update: bei <c>HealthCheckCompleted</c>, wenn erreichbar, ohne aktiven Server → wechselt zum Setup.</summary>
     [Fact]
     public void Update_HealthCheckCompleted_Reachable_WithoutActiveServer_GoesToSetup()
     {
@@ -139,6 +148,7 @@ public class AppUpdateTests_Startup
         Assert.Equal(AppPage.ServerSetup, navigate.Page);
     }
 
+    /// <summary>Prüft Update: bei <c>HealthCheckCompleted</c>, wenn nicht erreichbar → löst die Offline-Datenprüfung aus.</summary>
     [Fact]
     public void Update_HealthCheckCompleted_Unreachable_EmitsOfflineDataCheck()
     {

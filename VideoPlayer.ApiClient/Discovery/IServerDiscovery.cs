@@ -9,5 +9,7 @@ namespace VideoPlayer.ApiClient.Discovery;
 public interface IServerDiscovery
 {
     /// <summary>Sucht Server-Kandidaten; liefert eine (ggf. leere) Liste.</summary>
+    /// <param name="cancellationToken">Abbruchtoken.</param>
+    /// <returns>Gefundene Server-Kandidaten (ggf. leer).</returns>
     Task<IReadOnlyList<DiscoveredServer>> DiscoverAsync(CancellationToken cancellationToken = default);
 }

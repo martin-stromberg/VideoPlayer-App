@@ -11,6 +11,11 @@ namespace VideoWebPlayer.Maui.Services;
 public class ElementCacheService
 {
     private static ElementCacheService? _instance;
+
+    /// <summary>
+    /// Ruft die gemeinsame Singleton-Instanz des Cache-Dienstes ab.
+    /// </summary>
+    /// <value>Die Singleton-Instanz des <see cref="ElementCacheService"/>.</value>
     public static ElementCacheService Instance => _instance ??= new ElementCacheService();
 
     private readonly ClientDatabase _db = ClientDatabase.Instance;
@@ -18,6 +23,8 @@ public class ElementCacheService
     /// <summary>
     /// Returns all cached items for the given carousel, ordered by their stored position.
     /// </summary>
+    /// <param name="carouselName">Der Name des Carousels, dessen Einträge geladen werden.</param>
+    /// <returns>Liste der gecachten <see cref="CachedCarouselItem"/>-Einträge.</returns>
     public async Task<List<CachedCarouselItem>> GetCachedItemsAsync(string carouselName)
     {
         await _db.Lock.WaitAsync();
@@ -37,6 +44,9 @@ public class ElementCacheService
     /// <summary>
     /// Replaces all cached items for the given carousel with the supplied items.
     /// </summary>
+    /// <param name="carouselName">Der Name des Carousels, dessen Einträge ersetzt werden.</param>
+    /// <param name="items">Die zu speichernden Einträge.</param>
+    /// <returns>Ein Task, der das Speichern abschließt.</returns>
     public async Task SaveCachedItemsAsync(string carouselName, IEnumerable<MediaItemViewModel> items)
     {
         await _db.Lock.WaitAsync();

@@ -9,6 +9,7 @@ namespace VideoPlayer.Mvu;
 public sealed record MediaDetailsState
 {
     /// <summary>Ausgangszustand (kein Medium angefragt).</summary>
+    /// <value>Der leere Ausgangszustand der Detailseite.</value>
     public static MediaDetailsState Empty { get; } = new();
 
     /// <summary>Angefragter Medientyp (normalisiert, CLR-Konvention).</summary>

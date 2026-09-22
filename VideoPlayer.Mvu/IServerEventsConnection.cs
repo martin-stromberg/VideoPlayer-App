@@ -16,12 +16,16 @@ public interface IServerEventsConnection : IAsyncDisposable
     /// liefert das jeweils aktuelle Bearer-Token (wird vom Transport bei
     /// jeder (Neu-)Verbindung abgefragt).
     /// </summary>
+    /// <param name="hubAddress">Adresse des SignalR-Hubs.</param>
+    /// <param name="accessTokenProvider">Liefert das jeweils aktuelle Bearer-Token.</param>
+    /// <param name="cancellationToken">Bricht den Verbindungsaufbau ab.</param>
     Task ConnectAsync(
         Uri hubAddress,
         Func<Task<string?>> accessTokenProvider,
         CancellationToken cancellationToken = default);
 
     /// <summary>Trennt die Verbindung, falls sie besteht.</summary>
+    /// <param name="cancellationToken">Bricht das Trennen ab.</param>
     Task DisconnectAsync(CancellationToken cancellationToken = default);
 
     /// <summary>Server-Ereignis: Weiterschauen-Liste wurde aktualisiert.</summary>
@@ -41,6 +45,9 @@ public interface IServerEventsConnection : IAsyncDisposable
 }
 
 /// <summary>Argumente des Server-Ereignisses „neue Inhalte eingescannt".</summary>
+/// <param name="sourceId">Id der betroffenen Medienquelle.</param>
+/// <param name="count">Anzahl neu gefundener Videos.</param>
+/// <returns>Ereignisargumente des Scan-Ereignisses.</returns>
 public sealed class NewVideosScannedEventArgs(long sourceId, int count) : EventArgs
 {
     /// <summary>Id der betroffenen Medienquelle.</summary>

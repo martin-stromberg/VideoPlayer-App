@@ -3,6 +3,7 @@ using VideoPlayer.ApiClient.Models;
 
 namespace VideoWebPlayer.Maui.Tests;
 
+/// <summary>Tests für <c>MediaEntrySerialization</c>.</summary>
 public class MediaEntrySerializationTests
 {
     private static readonly JsonSerializerOptions JsonOptions = new()
@@ -10,6 +11,9 @@ public class MediaEntrySerializationTests
         PropertyNameCaseInsensitive = true
     };
 
+    /// <summary>Prüft MediaEntry: deserialisiert per Typdiscriminator.</summary>
+    /// <param name="discriminator">Der Diskriminator.</param>
+    /// <param name="expectedType">Der erwartete Typ.</param>
     [Theory]
     [InlineData("mediaEntry", typeof(MediaEntry))]
     [InlineData("movie", typeof(Movie))]
@@ -26,6 +30,7 @@ public class MediaEntrySerializationTests
         Assert.IsType(expectedType, entry);
     }
 
+    /// <summary>Prüft MediaEntry: serialisiert mit Typdiscriminator.</summary>
     [Fact]
     public void MediaEntry_SerializesWithTypeDiscriminator()
     {

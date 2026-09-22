@@ -13,6 +13,7 @@ public sealed record SourceBrowserState
     public const int PageSize = 20;
 
     /// <summary>Ausgangszustand (keine Quelle geöffnet).</summary>
+    /// <value>Der leere Ausgangszustand der Browsing-Seite.</value>
     public static SourceBrowserState Empty { get; } = new();
 
     /// <summary>Id der geöffneten Quelle; 0 = kein Browser aktiv.</summary>

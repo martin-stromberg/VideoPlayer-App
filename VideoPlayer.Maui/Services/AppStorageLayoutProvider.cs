@@ -27,6 +27,8 @@ public static class AppStorageLayoutProvider
     /// Erstellt das Ablage-Layout für das aktive Profil, legt die Verzeichnisse
     /// an und wendet den plattformseitigen Backup-Ausschluss an.
     /// </summary>
+    /// <param name="profile">Aktives Anwendungsprofil (steuert die Unterverzeichnis-Namen).</param>
+    /// <returns>Das initialisierte Ablage-Layout mit angelegten Verzeichnissen.</returns>
     public static AppStorageLayout CreateLayout(AppProfile profile)
     {
         ArgumentNullException.ThrowIfNull(profile);

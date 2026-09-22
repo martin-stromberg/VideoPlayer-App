@@ -13,6 +13,7 @@ namespace VideoPlayer.Maui.Controls;
 /// </summary>
 public sealed class CachedSourceIconImage : Image
 {
+    /// <value>Bindable Property für <see cref="PictureId"/> — Server-Bild-Id (<c>api/sourceicons/{id}</c>) des anzuzeigenden Quellen-Icons.</value>
     public static readonly BindableProperty PictureIdProperty = BindableProperty.Create(
         nameof(PictureId),
         typeof(long?),

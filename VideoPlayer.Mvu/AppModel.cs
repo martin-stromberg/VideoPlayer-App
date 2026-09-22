@@ -57,6 +57,7 @@ public sealed record AppModel
     /// Geladene App-Einstellungen (beim Start über <see cref="LoadSettingsEffect"/>
     /// befüllt; bis dahin Defaults).
     /// </summary>
+    /// <value>Die aktuellen App-Einstellungen.</value>
     public AppSettings Settings { get; init; } = new();
 
     /// <summary>Bekannte Server (backup-pflichtige Liste, zuletzt verwendet zuerst).</summary>

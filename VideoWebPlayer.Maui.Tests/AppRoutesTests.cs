@@ -2,8 +2,10 @@ using VideoPlayer.Mvu;
 
 namespace VideoWebPlayer.Maui.Tests;
 
+/// <summary>Tests für <c>AppRoutes</c>.</summary>
 public class AppRoutesTests
 {
+    /// <summary>Prüft MenuPages: enthält alle sechs Menüeinträge in definierter Reihenfolge.</summary>
     [Fact]
     public void MenuPages_ContainsAllSixMenuEntriesInOrder()
     {
@@ -12,6 +14,7 @@ public class AppRoutesTests
             AppRoutes.MenuPages);
     }
 
+    /// <summary>Prüft ToRoute: bildet alle Menüseiten rundtripfest auf Routen ab.</summary>
     [Fact]
     public void ToRoute_RoundTripsAllMenuPages()
     {
@@ -24,12 +27,16 @@ public class AppRoutesTests
         }
     }
 
+    /// <summary>Prüft ToRoute: für <c>Loading</c> existiert keine Route.</summary>
     [Fact]
     public void ToRoute_Loading_HasNoRoute()
     {
         Assert.Throws<ArgumentOutOfRangeException>(() => AppRoutes.ToRoute(AppPage.Loading));
     }
 
+    /// <summary>Prüft TryGetPage: löst Shell-Orte auf die zugehörigen Seiten auf.</summary>
+    /// <param name="location">Der Ort.</param>
+    /// <param name="expected">Der erwartete Wert.</param>
     [Theory]
     [InlineData("//home", AppPage.Home)]
     [InlineData("//sources/SourcesPage", AppPage.Sources)]
@@ -40,6 +47,8 @@ public class AppRoutesTests
         Assert.Equal(expected, page);
     }
 
+    /// <summary>Prüft TryGetPage: bei unbekanntem Ort → gibt false zurück.</summary>
+    /// <param name="location">Der Ort.</param>
     [Theory]
     [InlineData(null)]
     [InlineData("")]

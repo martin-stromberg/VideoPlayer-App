@@ -9,14 +9,23 @@ namespace VideoPlayer.Storage;
 /// </summary>
 public sealed class AppSecretsService
 {
+    /// <summary>Ablageschlüssel des Benutzernamens (normale Ablage).</summary>
     public const string UsernameKey = "Username";
+
+    /// <summary>Ablageschlüssel des Passworts (sichere Ablage).</summary>
     public const string PasswordKey = "Passkey";
+
+    /// <summary>Ablageschlüssel des Anmelde-Tokens (sichere Ablage).</summary>
     public const string AuthTokenKey = "AuthToken";
 
     private readonly ISettingsStore settings;
     private readonly ISecretStore secrets;
     private readonly AppProfile profile;
 
+    /// <summary>Erstellt den Dienst.</summary>
+    /// <param name="settings">Nicht-geheime Ablage (Benutzername, Legacy-Werte).</param>
+    /// <param name="secrets">Sichere Ablage (Passwort, Token).</param>
+    /// <param name="profile">Aktives Profil für die Schlüssel-Präfixe.</param>
     public AppSecretsService(ISettingsStore settings, ISecretStore secrets, AppProfile profile)
     {
         this.settings = settings ?? throw new ArgumentNullException(nameof(settings));
@@ -25,15 +34,18 @@ public sealed class AppSecretsService
     }
 
     /// <summary>Benutzername aus der normalen Ablage (kein Geheimnis).</summary>
+    /// <returns>Der gespeicherte Benutzername oder eine leere Zeichenfolge.</returns>
     public string GetUsername() => settings.GetString(profile.PrefixKey(UsernameKey), string.Empty);
 
     /// <summary>Passwort aus der sicheren Ablage (inkl. Legacy-Migration aus der normalen Ablage).</summary>
+    /// <returns>Das gespeicherte Passwort oder eine leere Zeichenfolge.</returns>
     public async Task<string> GetPasswordAsync()
     {
         return await GetMigratedSecretAsync(PasswordKey);
     }
 
     /// <summary>Prüft, ob Benutzername und Passwort vorhanden sind.</summary>
+    /// <returns><c>true</c>, wenn beide Werte nicht leer sind.</returns>
     public async Task<bool> HasCredentialsAsync()
     {
         return !string.IsNullOrWhiteSpace(GetUsername())
@@ -41,6 +53,8 @@ public sealed class AppSecretsService
     }
 
     /// <summary>Speichert Benutzername (normale Ablage) und Passwort (sichere Ablage).</summary>
+    /// <param name="username">Zu speichernder Benutzername.</param>
+    /// <param name="password">Zu speicherndes Passwort.</param>
     public async Task SetCredentialsAsync(string username, string password)
     {
         settings.Set(profile.PrefixKey(UsernameKey), username ?? string.Empty);
@@ -56,6 +70,7 @@ public sealed class AppSecretsService
     }
 
     /// <summary>Anmelde-Token aus der sicheren Ablage (inkl. Legacy-Migration).</summary>
+    /// <returns>Das gespeicherte Token oder <c>null</c>.</returns>
     public async Task<string?> GetAuthTokenAsync()
     {
         var token = await GetMigratedSecretAsync(AuthTokenKey);
@@ -63,6 +78,7 @@ public sealed class AppSecretsService
     }
 
     /// <summary>Speichert das Anmelde-Token sicher und entfernt etwaige Reste in der normalen Ablage.</summary>
+    /// <param name="token">Zu speicherndes Anmelde-Token.</param>
     public async Task SetAuthTokenAsync(string token)
     {
         await secrets.SetAsync(profile.PrefixKey(AuthTokenKey), token ?? string.Empty);
@@ -80,6 +96,8 @@ public sealed class AppSecretsService
     /// Liest ein Geheimnis aus der sicheren Ablage; liegt es nur als Legacy-Wert
     /// in der normalen Ablage vor, wird es migriert und dort entfernt.
     /// </summary>
+    /// <param name="key">Schlüssel ohne Profil-Präfix.</param>
+    /// <returns>Das Geheimnis oder eine leere Zeichenfolge.</returns>
     private async Task<string> GetMigratedSecretAsync(string key)
     {
         var prefixed = profile.PrefixKey(key);

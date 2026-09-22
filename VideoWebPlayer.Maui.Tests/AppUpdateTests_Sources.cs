@@ -23,6 +23,7 @@ public class AppUpdateTests_Sources
 
     // --- Quellenliste ---
 
+    /// <summary>Prüft SourcesPageOpened: bei <c>Connected</c> → startet das Laden.</summary>
     [Fact]
     public void SourcesPageOpened_Connected_StartsLoading()
     {
@@ -33,6 +34,7 @@ public class AppUpdateTests_Sources
         Assert.IsType<LoadSourcesEffect>(effect);
     }
 
+    /// <summary>Prüft SourcesPageOpened: bei Offline → kein Request und der Zustand wird zurückgesetzt.</summary>
     [Fact]
     public void SourcesPageOpened_Offline_NoRequestAndStateReset()
     {
@@ -55,6 +57,7 @@ public class AppUpdateTests_Sources
         Assert.Empty(transition.Model.SourcesOverview.Sources);
     }
 
+    /// <summary>Prüft SourcesPageOpened: bei <c>NotConnected</c> → kein Request.</summary>
     [Fact]
     public void SourcesPageOpened_NotConnected_NoRequest()
     {
@@ -66,6 +69,7 @@ public class AppUpdateTests_Sources
         Assert.Empty(transition.Effects);
     }
 
+    /// <summary>Prüft SourcesPageOpened: bei <c>AlreadyLoading</c> → kein zweiter Ladevorgang.</summary>
     [Fact]
     public void SourcesPageOpened_AlreadyLoading_NoSecondRun()
     {
@@ -79,6 +83,7 @@ public class AppUpdateTests_Sources
         Assert.Empty(transition.Effects);
     }
 
+    /// <summary>Prüft SourcesLoaded: bei <c>SetsList</c> → eine leere Liste ist unterscheidbar.</summary>
     [Fact]
     public void SourcesLoaded_SetsList_AndEmptyIsDistinguishable()
     {
@@ -96,6 +101,7 @@ public class AppUpdateTests_Sources
         Assert.True(empty.Model.SourcesOverview.ShowEmpty);
     }
 
+    /// <summary>Prüft SourcesLoaded: bei Fehler → setzt Fehlerzustand.</summary>
     [Fact]
     public void SourcesLoaded_Error_SetsErrorState()
     {
@@ -109,6 +115,7 @@ public class AppUpdateTests_Sources
 
     // --- Quellenwahl / Browser ---
 
+    /// <summary>Prüft SourceSelected: navigiert und startet das initiale Laden.</summary>
     [Fact]
     public void SourceSelected_NavigatesAndStartsInitialLoad()
     {
@@ -134,6 +141,7 @@ public class AppUpdateTests_Sources
         Assert.Null(items.SearchText);
     }
 
+    /// <summary>Prüft SourceBrowserOpened: bei gleicher Quelle → behält den Zustand.</summary>
     [Fact]
     public void SourceBrowserOpened_SameSource_KeepsState()
     {
@@ -148,6 +156,7 @@ public class AppUpdateTests_Sources
         Assert.Empty(transition.Effects);
     }
 
+    /// <summary>Prüft SourceBrowserOpened: bei <c>Restore</c> → lädt Genres und die erste Seite.</summary>
     [Fact]
     public void SourceBrowserOpened_Restore_LoadsGenresAndFirstPage()
     {
@@ -159,6 +168,7 @@ public class AppUpdateTests_Sources
         Assert.DoesNotContain(transition.Effects, e => e is NavigateToSourceOverviewEffect);
     }
 
+    /// <summary>Prüft SourceGenresLoaded: bei falscher Quelle → wird verworfen.</summary>
     [Fact]
     public void SourceGenresLoaded_WrongSource_IsDiscarded()
     {
@@ -176,6 +186,7 @@ public class AppUpdateTests_Sources
 
     // --- Filter / Suche ---
 
+    /// <summary>Prüft GenreSelected: bei <c>ReloadsFromFirstPage</c> → lädt mit Genrefilter neu.</summary>
     [Fact]
     public void GenreSelected_ReloadsFromFirstPage_WithGenreFilter()
     {
@@ -209,6 +220,7 @@ public class AppUpdateTests_Sources
         Assert.False(effect.Append);
     }
 
+    /// <summary>Prüft SearchSubmitted: bei <c>ReloadsFromFirstPage</c> → lädt mit dem Suchtext neu.</summary>
     [Fact]
     public void SearchSubmitted_ReloadsFromFirstPage_WithSearchText()
     {
@@ -225,6 +237,7 @@ public class AppUpdateTests_Sources
         Assert.Equal(0, effect.Page);
     }
 
+    /// <summary>Prüft SearchSubmitted: bei gleichem Text → lädt nicht neu.</summary>
     [Fact]
     public void SearchSubmitted_SameText_NoReload()
     {
@@ -241,6 +254,7 @@ public class AppUpdateTests_Sources
 
     // --- Nachladen ---
 
+    /// <summary>Prüft NextPageRequested: lädt die nächste Seite und hängt sie an.</summary>
     [Fact]
     public void NextPageRequested_LoadsAppendedPage()
     {
@@ -264,6 +278,7 @@ public class AppUpdateTests_Sources
         Assert.True(effect.Append);
     }
 
+    /// <summary>Prüft NextPageRequested: ohne weitere Seite oder bei Busy → wird ignoriert.</summary>
     [Fact]
     public void NextPageRequested_NoMoreOrBusy_IsIgnored()
     {
@@ -278,6 +293,7 @@ public class AppUpdateTests_Sources
         Assert.Empty(transition.Effects);
     }
 
+    /// <summary>Prüft ItemsLoaded: bei <c>Append</c> → hängt Einträge an und rückt die Seite vor.</summary>
     [Fact]
     public void ItemsLoaded_Append_ConcatenatesAndAdvancesPage()
     {
@@ -303,6 +319,7 @@ public class AppUpdateTests_Sources
         Assert.False(browser.IsLoadingMore);
     }
 
+    /// <summary>Prüft ItemsLoaded: bei <c>StaleAppend</c> → wird verworfen.</summary>
     [Fact]
     public void ItemsLoaded_StaleAppend_IsDiscarded()
     {
@@ -326,6 +343,7 @@ public class AppUpdateTests_Sources
         Assert.Same(model, transition.Model);
     }
 
+    /// <summary>Prüft ItemsLoaded: bei <c>AppendError</c> → behält vorhandene Einträge.</summary>
     [Fact]
     public void ItemsLoaded_AppendError_KeepsExistingItems()
     {
@@ -352,6 +370,7 @@ public class AppUpdateTests_Sources
         Assert.False(browser.HasError);
     }
 
+    /// <summary>Prüft Retry: nach leerem Fehler → lädt von Grund auf neu.</summary>
     [Fact]
     public void Retry_OnEmptyError_ReloadsFromScratch()
     {
@@ -372,6 +391,7 @@ public class AppUpdateTests_Sources
         Assert.IsType<LoadSourceItemsEffect>(Assert.Single(transition.Effects));
     }
 
+    /// <summary>Prüft Retry: mit Einträgen → wiederholt die ausstehende nächste Seite.</summary>
     [Fact]
     public void Retry_WithItems_RetriesPendingNextPage()
     {
@@ -395,6 +415,7 @@ public class AppUpdateTests_Sources
 
     // --- Auswahl → Details ---
 
+    /// <summary>Prüft MediaItemSelected: navigiert zur Detailseite.</summary>
     [Fact]
     public void MediaItemSelected_NavigatesToDetails()
     {

@@ -13,6 +13,9 @@ public static class ServerAddress
     /// Liefert <c>false</c> für leere oder nicht als http(s)-URI
     /// interpretierbare Eingaben.
     /// </summary>
+    /// <param name="input">Eingegebene oder gemeldete Serveradresse.</param>
+    /// <param name="normalized">Kanonische Form der Adresse; leer bei ungültiger Eingabe.</param>
+    /// <returns><c>true</c>, wenn die Eingabe zu einer gültigen http(s)-Adresse normalisiert werden konnte.</returns>
     public static bool TryNormalize(string? input, out string normalized)
     {
         normalized = string.Empty;
@@ -49,6 +52,9 @@ public static class ServerAddress
     }
 
     /// <summary>Normalisiert eine Serveradresse oder wirft bei ungültiger Eingabe.</summary>
+    /// <param name="input">Zu normalisierende Serveradresse.</param>
+    /// <returns>Die kanonische Form der Adresse.</returns>
+    /// <exception cref="ArgumentException">Die Eingabe ist keine gültige http(s)-Adresse.</exception>
     public static string Normalize(string input)
     {
         if (!TryNormalize(input, out var normalized))

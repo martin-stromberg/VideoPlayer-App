@@ -13,6 +13,8 @@ public sealed class PendingProgressSyncService
 {
     private readonly BackupDatabase database;
 
+    /// <summary>Erstellt den Dienst.</summary>
+    /// <param name="database">Backup-pflichtige Datenbank mit der Tabelle <c>pending_progress</c>.</param>
     public PendingProgressSyncService(BackupDatabase database)
     {
         this.database = database ?? throw new ArgumentNullException(nameof(database));
@@ -24,6 +26,10 @@ public sealed class PendingProgressSyncService
     /// (<c>VideoType</c>, <c>VideoId</c>) wird nur der jeweils neueste
     /// Stand vorgehalten — ältere Stände desselben Mediums sind überholt.
     /// </summary>
+    /// <param name="videoType">Medientyp des Videos (z. B. <c>movie</c>, <c>episode</c>).</param>
+    /// <param name="videoId">ID des Videos.</param>
+    /// <param name="position">Wiedergabeposition.</param>
+    /// <param name="duration">Gesamtdauer des Mediums.</param>
     public async Task EnqueueAsync(
         string videoType,
         int videoId,
@@ -54,6 +60,7 @@ public sealed class PendingProgressSyncService
     /// Liefert die ausstehenden Meldungen — eine pro Medium, geordnet nach
     /// Erfassungszeitpunkt (älteste zuerst).
     /// </summary>
+    /// <returns>Liste der ausstehenden Meldungen (ggf. leer).</returns>
     public async Task<IReadOnlyList<PendingProgressSyncEntry>> GetPendingAsync()
     {
         var entries = await database.Connection
@@ -64,6 +71,7 @@ public sealed class PendingProgressSyncService
     }
 
     /// <summary>Anzahl der wartenden Einträge (ein Eintrag pro Medium).</summary>
+    /// <returns>Anzahl der ausstehenden Meldungen.</returns>
     public async Task<int> CountAsync()
     {
         return await database.Connection.Table<PendingProgressSyncEntry>().CountAsync();
@@ -73,6 +81,8 @@ public sealed class PendingProgressSyncService
     /// Entfernt alle wartenden Einträge eines Mediums — nach erfolgreichem
     /// Nachsenden der neuesten Meldung sind ältere Stände überholt.
     /// </summary>
+    /// <param name="videoType">Medientyp des Videos.</param>
+    /// <param name="videoId">ID des Videos.</param>
     public async Task RemoveForMediaAsync(string videoType, int videoId)
     {
         await database.Connection

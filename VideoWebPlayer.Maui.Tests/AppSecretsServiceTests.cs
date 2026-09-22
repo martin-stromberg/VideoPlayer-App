@@ -3,6 +3,7 @@ using VideoWebPlayer.Maui.Tests.Stubs;
 
 namespace VideoWebPlayer.Maui.Tests;
 
+/// <summary>Tests für <c>AppSecretsService</c>.</summary>
 public class AppSecretsServiceTests
 {
     private static AppSecretsService CreateService(
@@ -11,6 +12,7 @@ public class AppSecretsServiceTests
         return new AppSecretsService(settings, secrets, AppProfile.Create(profile));
     }
 
+    /// <summary>Prüft Secrets: landen ausschließlich im SecretStore.</summary>
     [Fact]
     public async Task Secrets_GoToSecretStore_Only()
     {
@@ -28,6 +30,7 @@ public class AppSecretsServiceTests
         Assert.DoesNotContain(AppSecretsService.AuthTokenKey, settings.Keys);
     }
 
+    /// <summary>Prüft Username: wird im SettingsStore abgelegt.</summary>
     [Fact]
     public async Task Username_GoesToSettingsStore()
     {
@@ -41,6 +44,7 @@ public class AppSecretsServiceTests
         Assert.Equal("user", service.GetUsername());
     }
 
+    /// <summary>Prüft SetAuthToken: entfernt die Legacy-Preference.</summary>
     [Fact]
     public async Task SetAuthToken_RemovesLegacyPreference()
     {
@@ -55,6 +59,7 @@ public class AppSecretsServiceTests
         Assert.Equal("new-token", await service.GetAuthTokenAsync());
     }
 
+    /// <summary>Prüft GetAuthToken: migriert die Legacy-Preference.</summary>
     [Fact]
     public async Task GetAuthToken_MigratesLegacyPreference()
     {
@@ -70,6 +75,7 @@ public class AppSecretsServiceTests
         Assert.Equal("legacy-token", await secrets.GetAsync(AppSecretsService.AuthTokenKey));
     }
 
+    /// <summary>Prüft ClearCredentials: entfernt alle Zugangsdaten.</summary>
     [Fact]
     public async Task ClearCredentials_RemovesAll()
     {
@@ -87,6 +93,7 @@ public class AppSecretsServiceTests
         Assert.Empty(secrets.Keys);
     }
 
+    /// <summary>Prüft Secrets: sind pro Profil isoliert.</summary>
     [Fact]
     public async Task Secrets_AreProfileIsolated()
     {
@@ -109,6 +116,7 @@ public class AppSecretsServiceTests
         Assert.Contains($"second_{AppSecretsService.AuthTokenKey}", secrets.Keys);
     }
 
+    /// <summary>Prüft HasCredentials: erfordert Benutzername und Passwort.</summary>
     [Fact]
     public async Task HasCredentials_RequiresUsernameAndPassword()
     {

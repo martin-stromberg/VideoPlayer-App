@@ -5,8 +5,10 @@ using VideoWebPlayer.Maui.Tests.Stubs;
 
 namespace VideoWebPlayer.Maui.Tests;
 
+/// <summary>Tests der Retry-Policy des <c>VideoPlayerApiClient</c> (Wiederholungen, Delays, Abbruch).</summary>
 public class VideoPlayerApiClientTests_RetryPolicy
 {
+    /// <summary>Prüft ServerError: bei <c>RetriesUpToThreeTimes</c> → wiederholt mit exponentiellen Delays.</summary>
     [Fact]
     public async Task ServerError_RetriesUpToThreeTimes_WithExponentialDelays()
     {
@@ -27,6 +29,7 @@ public class VideoPlayerApiClientTests_RetryPolicy
             delays.Delays);
     }
 
+    /// <summary>Prüft ServerError: bei permanentem Fehler → wirft nach Erschöpfung der Retries.</summary>
     [Fact]
     public async Task ServerError_Permanent_ThrowsAfterExhaustion()
     {
@@ -45,6 +48,8 @@ public class VideoPlayerApiClientTests_RetryPolicy
         Assert.Equal(3, delays.Delays.Count);
     }
 
+    /// <summary>Prüft ClientError: wiederholt nicht.</summary>
+    /// <param name="statusCode">Der HTTP-Statuscode.</param>
     [Theory]
     [InlineData(HttpStatusCode.BadRequest)]
     [InlineData(HttpStatusCode.Forbidden)]
@@ -64,6 +69,8 @@ public class VideoPlayerApiClientTests_RetryPolicy
         Assert.Empty(delays.Delays);
     }
 
+    /// <summary>Prüft RetriableClientError: wiederholt.</summary>
+    /// <param name="statusCode">Der HTTP-Statuscode.</param>
     [Theory]
     [InlineData(HttpStatusCode.RequestTimeout)]
     [InlineData(HttpStatusCode.TooManyRequests)]
@@ -81,6 +88,7 @@ public class VideoPlayerApiClientTests_RetryPolicy
         Assert.Equal([TimeSpan.FromSeconds(1)], delays.Delays);
     }
 
+    /// <summary>Prüft TransportError: wiederholt.</summary>
     [Fact]
     public async Task TransportError_Retried()
     {
@@ -96,6 +104,7 @@ public class VideoPlayerApiClientTests_RetryPolicy
         Assert.Equal([TimeSpan.FromSeconds(1)], delays.Delays);
     }
 
+    /// <summary>Prüft TransportError: bei permanentem Fehler → wirft nach Erschöpfung der Retries.</summary>
     [Fact]
     public async Task TransportError_Permanent_ThrowsAfterExhaustion()
     {
@@ -113,6 +122,7 @@ public class VideoPlayerApiClientTests_RetryPolicy
         Assert.Equal(4, handler.Requests.Count);
     }
 
+    /// <summary>Prüft Timeout: wiederholt.</summary>
     [Fact]
     public async Task Timeout_Retried()
     {
@@ -127,6 +137,7 @@ public class VideoPlayerApiClientTests_RetryPolicy
         Assert.Equal(2, handler.Requests.Count);
     }
 
+    /// <summary>Prüft CallerCancellation: wiederholt nicht.</summary>
     [Fact]
     public async Task CallerCancellation_NotRetried()
     {

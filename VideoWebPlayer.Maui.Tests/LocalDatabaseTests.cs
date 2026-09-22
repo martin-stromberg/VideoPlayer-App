@@ -12,11 +12,13 @@ public class LocalDatabaseTests : IDisposable
 {
     private readonly string root;
 
+    /// <summary>Initialisiert eine neue Instanz der Testklasse <c>LocalDatabaseTests</c>.</summary>
     public LocalDatabaseTests()
     {
         root = Path.Combine(Path.GetTempPath(), "videoplayer-db-tests", Guid.NewGuid().ToString("N"));
     }
 
+    /// <inheritdoc/>
     public void Dispose()
     {
         SQLite.SQLiteAsyncConnection.ResetPool();
@@ -37,6 +39,7 @@ public class LocalDatabaseTests : IDisposable
         return layout;
     }
 
+    /// <summary>Prüft BackupDatabase: erstellt Tabellen.</summary>
     [Fact]
     public async Task BackupDatabase_CreatesTables()
     {
@@ -49,6 +52,7 @@ public class LocalDatabaseTests : IDisposable
         Assert.Empty(await db.Connection.Table<PendingProgressSyncEntry>().ToListAsync());
     }
 
+    /// <summary>Prüft BackupDatabase: Werte überstehen den Roundtrip.</summary>
     [Fact]
     public async Task BackupDatabase_RoundTrips()
     {
@@ -84,6 +88,7 @@ public class LocalDatabaseTests : IDisposable
         Assert.Equal(42, progress.VideoId);
     }
 
+    /// <summary>Prüft CacheDatabase: erstellt Tabellen und übersteht den Roundtrip.</summary>
     [Fact]
     public async Task CacheDatabase_CreatesTablesAndRoundTrips()
     {
@@ -120,6 +125,7 @@ public class LocalDatabaseTests : IDisposable
         Assert.Equal("videos/42.mp4", manifest.FilePath);
     }
 
+    /// <summary>Prüft CacheDatabase: bei <c>HasOfflineData</c> → false bei leerem Cache.</summary>
     [Fact]
     public async Task CacheDatabase_HasOfflineData_FalseWhenEmpty()
     {
@@ -129,6 +135,7 @@ public class LocalDatabaseTests : IDisposable
         Assert.False(await db.HasOfflineDataAsync());
     }
 
+    /// <summary>Prüft CacheDatabase: bei <c>HasOfflineData</c> → true mit gecachter Liste.</summary>
     [Fact]
     public async Task CacheDatabase_HasOfflineData_TrueWithCachedList()
     {
@@ -144,6 +151,7 @@ public class LocalDatabaseTests : IDisposable
         Assert.True(await db.HasOfflineDataAsync());
     }
 
+    /// <summary>Prüft CacheDatabase: bei <c>HasOfflineData</c> → true mit Downloadmanifest.</summary>
     [Fact]
     public async Task CacheDatabase_HasOfflineData_TrueWithDownloadManifest()
     {
@@ -162,6 +170,7 @@ public class LocalDatabaseTests : IDisposable
         Assert.True(await db.HasOfflineDataAsync());
     }
 
+    /// <summary>Prüft BackupDatabase: migriert DurationTicks auf einer vorhandenen Tabelle.</summary>
     [Fact]
     public async Task BackupDatabase_MigratesDurationTicksOntoExistingTable()
     {
@@ -193,6 +202,7 @@ public class LocalDatabaseTests : IDisposable
         await db.InitializeAsync();
     }
 
+    /// <summary>Prüft Databases: landen in den klassifizierten Verzeichnissen.</summary>
     [Fact]
     public async Task Databases_LandInClassifiedDirectories()
     {

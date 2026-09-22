@@ -3,8 +3,10 @@ using VideoPlayer.Storage;
 
 namespace VideoWebPlayer.Maui.Tests;
 
+/// <summary>Tests für <c>AppUpdate.Update</c> – Bereich Einstellungen.</summary>
 public class AppUpdateTests_Settings
 {
+    /// <summary>Prüft Update: beim Startup → löst Storage- und Einstellungseffekte aus.</summary>
     [Fact]
     public void Update_Startup_EmitsStorageAndSettingsEffects()
     {
@@ -17,6 +19,7 @@ public class AppUpdateTests_Settings
         Assert.Contains(transition.Effects, e => e is LoadServersEffect);
     }
 
+    /// <summary>Prüft Update: bei <c>LoadSettingsRequested</c> → löst den Lade-Effekt aus.</summary>
     [Fact]
     public void Update_LoadSettingsRequested_EmitsLoadEffect()
     {
@@ -26,6 +29,7 @@ public class AppUpdateTests_Settings
         Assert.IsType<LoadSettingsEffect>(effect);
     }
 
+    /// <summary>Prüft Update: bei <c>SettingsLoaded</c> → setzt die Model-Einstellungen.</summary>
     [Fact]
     public void Update_SettingsLoaded_SetsModelSettings()
     {
@@ -38,6 +42,7 @@ public class AppUpdateTests_Settings
         Assert.Empty(transition.Effects);
     }
 
+    /// <summary>Prüft Update: bei <c>SettingsLoaded</c> → normalisiert die Einstellungen.</summary>
     [Fact]
     public void Update_SettingsLoaded_Normalizes()
     {
@@ -48,6 +53,7 @@ public class AppUpdateTests_Settings
         Assert.Equal(500, transition.Model.Settings.DownloadQuotaGb);
     }
 
+    /// <summary>Prüft Update: bei <c>SaveSettings</c> → normalisiert und persistiert.</summary>
     [Fact]
     public void Update_SaveSettings_NormalizesAndPersists()
     {

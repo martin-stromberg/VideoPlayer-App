@@ -27,6 +27,7 @@ public class ServerDiscoveryServiceTests
         }
     }
 
+    /// <summary>Prüft DiscoverAsync: führt alle Probes gemeinsam aus.</summary>
     [Fact]
     public async Task DiscoverAsync_MergesAllProbes()
     {
@@ -43,6 +44,7 @@ public class ServerDiscoveryServiceTests
         Assert.Contains(found, s => s.Source == DiscoverySource.Udp);
     }
 
+    /// <summary>Prüft DiscoverAsync: dedupliziert per Adresse.</summary>
     [Fact]
     public async Task DiscoverAsync_DeduplicatesByAddress()
     {
@@ -60,6 +62,7 @@ public class ServerDiscoveryServiceTests
         Assert.Single(found);
     }
 
+    /// <summary>Prüft DiscoverAsync: bei <c>FailingProbe</c> → beeinflusst andere nicht.</summary>
     [Fact]
     public async Task DiscoverAsync_FailingProbe_DoesNotAffectOthers()
     {
@@ -75,6 +78,7 @@ public class ServerDiscoveryServiceTests
         Assert.Equal(DiscoverySource.Udp, server.Source);
     }
 
+    /// <summary>Prüft DiscoverAsync: ohne Ergebnisse → gibt eine leere Liste zurück.</summary>
     [Fact]
     public async Task DiscoverAsync_NoResults_ReturnsEmpty()
     {

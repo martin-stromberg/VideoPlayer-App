@@ -13,6 +13,8 @@ public sealed class BackupDatabase
 {
     private readonly Lazy<SQLiteAsyncConnection> connection;
 
+    /// <summary>Erstellt die Datenbank; die Verbindung wird erst bei Bedarf geöffnet.</summary>
+    /// <param name="layout">Ablagelayout mit dem Datenbankpfad.</param>
     public BackupDatabase(AppStorageLayout layout)
     {
         ArgumentNullException.ThrowIfNull(layout);
@@ -40,6 +42,9 @@ public sealed class BackupDatabase
     }
 
     /// <summary>Ergänzt eine fehlende Spalte in einer bestehenden Tabelle.</summary>
+    /// <param name="table">Name der Tabelle.</param>
+    /// <param name="column">Name der zu prüfenden Spalte.</param>
+    /// <param name="columnDefinition">SQL-Definition der Spalte für das <c>ALTER TABLE</c>.</param>
     private async Task EnsureColumnAsync(string table, string column, string columnDefinition)
     {
         var columns = await Connection.QueryAsync<TableInfoRow>($"PRAGMA table_info({table})");

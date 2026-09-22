@@ -23,6 +23,8 @@ public sealed class HomeListService
 
     private readonly CacheDatabase cache;
 
+    /// <summary>Erstellt den Dienst.</summary>
+    /// <param name="cache">Lokale Cache-Ablage mit den synchronisierten Listen.</param>
     public HomeListService(CacheDatabase cache)
     {
         this.cache = cache ?? throw new ArgumentNullException(nameof(cache));
@@ -33,6 +35,8 @@ public sealed class HomeListService
     /// beschädigte Einträge ergeben leere Teillisten — die Startseite bleibt
     /// damit in jedem Fall anzeigbar.
     /// </summary>
+    /// <param name="cancellationToken">Bricht das Lesen ab.</param>
+    /// <returns>Die drei Startseiten-Listen aus dem Cache.</returns>
     public async Task<HomeLists> LoadHomeListsAsync(CancellationToken cancellationToken = default)
     {
         var continueWatching = await ReadListAsync<ContinueWatchingEntry>(ServerSyncService.ContinueWatchingCacheKey);
@@ -168,6 +172,9 @@ public sealed class HomeListService
     /// der Detail-Navigation (Episoden/Staffeln öffnen die Serienansicht
     /// mit Vorwahl, wie im Altbestand).
     /// </summary>
+    /// <param name="media">Das Medium, aus dem der Serienkontext gelesen wird.</param>
+    /// <param name="ShowId">Tupel-Element des Ergebnisses: Id der Serie, falls auflösbar.</param>
+    /// <param name="SeasonId">Tupel-Element des Ergebnisses: Id der Staffel, falls auflösbar.</param>
     private static (long? ShowId, long? SeasonId, long? EpisodeId) MediaHints(MediaEntry media)
     {
         return media switch

@@ -5,6 +5,7 @@ namespace VideoWebPlayer.Maui.Tests;
 /// <summary>Konstanten und Antwort-Parsing des Server-Discovery-Protokolls.</summary>
 public class DiscoveryProtocolTests
 {
+    /// <summary>Prüft ProtocolConstants: entsprechen der Server-Spezifikation.</summary>
     [Fact]
     public void ProtocolConstants_MatchServerSpecification()
     {
@@ -14,6 +15,7 @@ public class DiscoveryProtocolTests
         Assert.Equal("_http._tcp.local.", DiscoveryProtocol.MdnsServiceType);
     }
 
+    /// <summary>Prüft TryParseResponse: bei gültigem Datagramm → extrahiert die Adresse.</summary>
     [Fact]
     public void TryParseResponse_ValidDatagram_ExtractsAddress()
     {
@@ -25,6 +27,8 @@ public class DiscoveryProtocolTests
         Assert.Equal("http://nas:8080/videoplayer", address);
     }
 
+    /// <summary>Prüft TryParseResponse: bei ungültigem Datagramm → gibt false zurück.</summary>
+    /// <param name="datagram">Das Datagramm.</param>
     [Theory]
     [InlineData(null)]
     [InlineData("")]

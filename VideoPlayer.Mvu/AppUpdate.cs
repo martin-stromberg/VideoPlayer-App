@@ -29,6 +29,14 @@ public static class AppUpdate
     /// <summary>Hinweistext der Anmeldemaske nach abgelaufener Sitzung.</summary>
     public const string SessionExpiredError = "Die Anmeldung ist abgelaufen. Bitte erneut anmelden.";
 
+    /// <summary>
+    /// Wendet eine Nachricht auf das übergebene Model an und liefert den
+    /// Übergang: das neue Model plus die daraus resultierenden Effekte.
+    /// Unbekannte Nachrichten lassen das Model unverändert.
+    /// </summary>
+    /// <param name="model">Aktuelles, unveränderliches App-Model.</param>
+    /// <param name="message">Die anzuwendende Nachricht.</param>
+    /// <returns>Neues Model samt auszuführender Effekte.</returns>
     public static AppTransition Update(AppModel model, AppMessage message)
     {
         ArgumentNullException.ThrowIfNull(model);
@@ -378,6 +386,8 @@ public static class AppUpdate
     /// nur von Workflow-Seiten aus angesteuert — bei einer Wiederverbindung
     /// zur Laufzeit bleibt der Anwender auf der aktuellen Menüseite.
     /// </summary>
+    /// <param name="model">Aktuelles App-Model.</param>
+    /// <returns>Übergang in den verbundenen Zustand samt Effekten.</returns>
     private static AppTransition EnterConnected(AppModel model)
     {
         var updated = model with
@@ -411,6 +421,8 @@ public static class AppUpdate
     }
 
     /// <summary>Seiten ohne Menüeintrag (Start-Ladeanzeige, Anmeldung, Servereinrichtung).</summary>
+    /// <param name="page">Die zu prüfende Seite.</param>
+    /// <returns><c>true</c>, wenn die Seite eine Workflow-Seite ist.</returns>
     private static bool IsWorkflowPage(AppPage page)
     {
         return page is AppPage.Loading or AppPage.Login or AppPage.ServerSetup;
@@ -709,6 +721,9 @@ public static class AppUpdate
     }
 
     /// <summary>Browser-Zustand für einen Filter-/Suchwechsel: Liste zurücksetzen, ab Seite 0 laden.</summary>
+    /// <param name="model">Aktuelles App-Model.</param>
+    /// <param name="updated">Browser-Zustand mit dem neuen Filter bzw. Suchtext.</param>
+    /// <returns>Übergang mit zurückgesetzter Liste und Lade-Effekt für die erste Seite.</returns>
     private static AppTransition ReloadBrowserItems(AppModel model, SourceBrowserState updated)
     {
         return new AppTransition(

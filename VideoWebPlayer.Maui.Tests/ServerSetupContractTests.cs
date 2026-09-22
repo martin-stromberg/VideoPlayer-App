@@ -15,6 +15,7 @@ public class ServerSetupContractTests
     private static string MauiFile(params string[] parts) =>
         File.ReadAllText(Path.Combine(new[] { Root, "VideoPlayer.Maui" }.Concat(parts).ToArray()));
 
+    /// <summary>Prüft ServerSetupPage: existiert mit manueller Eingabe und Discovery.</summary>
     [Fact]
     public void ServerSetupPage_ExistsWithManualEntryAndDiscovery()
     {
@@ -35,6 +36,7 @@ public class ServerSetupContractTests
         Assert.Contains("ErrorLabel", xaml, StringComparison.Ordinal);
     }
 
+    /// <summary>Prüft ServerSetupPage: die Steuerelemente haben AutomationIds.</summary>
     [Fact]
     public void ServerSetupPage_ControlsHaveAutomationIds()
     {
@@ -57,6 +59,7 @@ public class ServerSetupContractTests
         }
     }
 
+    /// <summary>Prüft ServerSetupPage: im Code-Behind werden MVU-Nachrichten dispatcht.</summary>
     [Fact]
     public void ServerSetupPage_CodeBehind_DispatchesMvuMessages()
     {
@@ -70,6 +73,7 @@ public class ServerSetupContractTests
         Assert.DoesNotContain("Guid", code, StringComparison.Ordinal);
     }
 
+    /// <summary>Prüft SettingsPage: enthält den Eintrag für den diskreten Serverwechsel.</summary>
     [Fact]
     public void SettingsPage_ContainsDiscreetServerSwitchEntry()
     {
@@ -79,6 +83,7 @@ public class ServerSetupContractTests
         Assert.Contains("ServerSwitchButton", xaml, StringComparison.Ordinal);
     }
 
+    /// <summary>Prüft AppShell: bei <c>RegistersServerSetupRoute</c> → registriert die Route ohne Flyout-Eintrag.</summary>
     [Fact]
     public void AppShell_RegistersServerSetupRoute_WithoutFlyoutItem()
     {
@@ -92,6 +97,7 @@ public class ServerSetupContractTests
         Assert.DoesNotContain("ServerSetupPage", xaml, StringComparison.Ordinal);
     }
 
+    /// <summary>Prüft MauiProgram: registriert die Servermanagement-Services.</summary>
     [Fact]
     public void MauiProgram_RegistersServerManagementServices()
     {
@@ -102,6 +108,7 @@ public class ServerSetupContractTests
         Assert.Contains("ServerSetupPage", program, StringComparison.Ordinal);
     }
 
+    /// <summary>Prüft EffectHandler: behandelt alle Server-Effekte.</summary>
     [Fact]
     public void EffectHandler_HandlesAllServerEffects()
     {
@@ -119,6 +126,7 @@ public class ServerSetupContractTests
         Assert.Contains("CheckHealthAsync", MauiFile("Services", "ServerHealthProbe.cs"), StringComparison.Ordinal);
     }
 
+    /// <summary>Prüft Discovery: verwendet das dokumentierte Protokoll.</summary>
     [Fact]
     public void Discovery_UsesDocumentedProtocol()
     {
@@ -134,6 +142,7 @@ public class ServerSetupContractTests
         Assert.Contains("Zeroconf", csproj, StringComparison.Ordinal);
     }
 
+    /// <summary>Prüft KnownServersService: speichert in der Backup-Datenbank.</summary>
     [Fact]
     public void KnownServersService_StoresInBackupDatabase()
     {

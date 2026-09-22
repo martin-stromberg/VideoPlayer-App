@@ -5,12 +5,19 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace VideoWebPlayer.Maui.Services;
 
+/// <summary>
+/// Dienst zum Aufbau und Prüfen der Verbindung zum VideoWebPlayer-Server.
+/// </summary>
 public class ConnectionService : IConnectionService
 {
+    /// <summary>
+    /// Initialisiert eine neue Instanz der <see cref="ConnectionService"/>-Klasse.
+    /// </summary>
     public ConnectionService()
     {
     }
 
+    /// <inheritdoc/>
     public async Task<bool> TryConnectAsync(string baseAddress, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(baseAddress))
@@ -56,6 +63,7 @@ public class ConnectionService : IConnectionService
 
     }
 
+    /// <inheritdoc/>
     public async Task<ConnectionState> StartConnectionWorkflowAsync(ViewModels.HomePageViewModel viewModel, IServiceProvider services, CancellationToken cancellationToken = default)
     {
         // Show connecting indicator

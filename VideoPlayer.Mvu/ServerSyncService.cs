@@ -7,6 +7,12 @@ using VideoPlayer.Storage.Entities;
 namespace VideoPlayer.Mvu;
 
 /// <summary>Ergebnis einer vollständigen Synchronisation.</summary>
+/// <param name="SentProgressReports">Anzahl erfolgreich nachgesendeter Fortschrittsmeldungen.</param>
+/// <param name="RemainingProgressReports">Anzahl weiterhin wartender Fortschrittsmeldungen.</param>
+/// <param name="MetadataSynced"><c>true</c>, wenn Quellen und „Neu im Programm" aktualisiert wurden.</param>
+/// <param name="ContinueWatchingSynced"><c>true</c>, wenn die Weiterschauen-Liste aktualisiert wurde.</param>
+/// <param name="FavoritesSynced"><c>true</c>, wenn die Favoriten-Kopie erneuert wurde.</param>
+/// <returns>Ergebnis-Datensatz der Synchronisation.</returns>
 public sealed record SyncResult(
     int SentProgressReports,
     int RemainingProgressReports,
@@ -36,6 +42,10 @@ public sealed class ServerSyncService
     private readonly PendingProgressSyncService pendingProgress;
     private readonly CacheDatabase cache;
 
+    /// <summary>Erstellt den Dienst.</summary>
+    /// <param name="authSession">Sitzungsdienst mit dem angemeldeten API-Client.</param>
+    /// <param name="pendingProgress">Persistente Warteschlange der Fortschrittsmeldungen.</param>
+    /// <param name="cache">Lokale Cache-Ablage für die Metadaten.</param>
     public ServerSyncService(
         AuthSessionService authSession,
         PendingProgressSyncService pendingProgress,
@@ -52,6 +62,8 @@ public sealed class ServerSyncService
     /// Weiterschauen-Liste den aktuellen Stand enthält), dann die
     /// Metadaten-Caches erneuert. Ohne angemeldeten Client ein No-Op.
     /// </summary>
+    /// <param name="cancellationToken">Bricht die Synchronisation ab.</param>
+    /// <returns>Das Ergebnis der Synchronisation.</returns>
     public async Task<SyncResult> SynchronizeAsync(CancellationToken cancellationToken = default)
     {
         if (authSession.Client is null)
@@ -78,6 +90,7 @@ public sealed class ServerSyncService
     /// Serverfehler brechen den Lauf ab (der Rest bleibt in der
     /// Warteschlange); permanente Clientfehler verwerfen den Eintrag.
     /// </summary>
+    /// <param name="cancellationToken">Bricht das Nachsenden ab.</param>
     /// <returns>Anzahl erfolgreich gesendeter Meldungen.</returns>
     public async Task<int> FlushPendingProgressAsync(CancellationToken cancellationToken = default)
     {
@@ -124,6 +137,8 @@ public sealed class ServerSyncService
     }
 
     /// <summary>Aktualisiert die gecachten Quellen und „Neu im Programm".</summary>
+    /// <param name="cancellationToken">Bricht die Aktualisierung ab.</param>
+    /// <returns><c>true</c> bei Erfolg; <c>false</c> ohne Client oder bei Fehler.</returns>
     public async Task<bool> SyncMetadataAsync(CancellationToken cancellationToken = default)
     {
         return await TrySyncAsync(async client =>
@@ -137,6 +152,8 @@ public sealed class ServerSyncService
     }
 
     /// <summary>Aktualisiert die gecachte Weiterschauen-Liste.</summary>
+    /// <param name="cancellationToken">Bricht die Aktualisierung ab.</param>
+    /// <returns><c>true</c> bei Erfolg; <c>false</c> ohne Client oder bei Fehler.</returns>
     public async Task<bool> SyncContinueWatchingAsync(CancellationToken cancellationToken = default)
     {
         return await TrySyncAsync(async client =>
@@ -147,6 +164,8 @@ public sealed class ServerSyncService
     }
 
     /// <summary>Ersetzt die lokale Kopie der serverseitigen Favoriten.</summary>
+    /// <param name="cancellationToken">Bricht die Aktualisierung ab.</param>
+    /// <returns><c>true</c> bei Erfolg; <c>false</c> ohne Client oder bei Fehler.</returns>
     public async Task<bool> SyncFavoritesAsync(CancellationToken cancellationToken = default)
     {
         return await TrySyncAsync(async client =>

@@ -9,14 +9,18 @@ namespace VideoPlayer.Storage.Entities;
 [Table("pending_progress")]
 public sealed class PendingProgressSyncEntry
 {
+    /// <summary>ID des Eintrags (Primärschlüssel, automatisch).</summary>
     [PrimaryKey, AutoIncrement]
     public int Id { get; set; }
 
+    /// <summary>ID des betroffenen Videos (indiziert).</summary>
     [Indexed]
     public int VideoId { get; set; }
 
+    /// <summary>Medientyp des Videos (z. B. <c>movie</c>, <c>episode</c>).</summary>
     public string VideoType { get; set; } = string.Empty;
 
+    /// <summary>Wiedergabeposition in Ticks.</summary>
     public long PositionTicks { get; set; }
 
     /// <summary>
@@ -26,5 +30,6 @@ public sealed class PendingProgressSyncEntry
     /// </summary>
     public long DurationTicks { get; set; }
 
+    /// <summary>Zeitpunkt der letzten Aktualisierung (UTC).</summary>
     public DateTime UpdatedAtUtc { get; set; }
 }

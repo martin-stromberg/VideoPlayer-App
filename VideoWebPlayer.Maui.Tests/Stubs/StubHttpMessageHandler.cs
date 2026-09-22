@@ -8,6 +8,12 @@ namespace VideoWebPlayer.Maui.Tests.Stubs;
 /// <summary>
 /// Aufgezeichneter HTTP-Request des simulierten Servers.
 /// </summary>
+/// <param name="Method">Die HTTP-Methode des Requests.</param>
+/// <param name="PathAndQuery">Pfad und Query-String des Requests.</param>
+/// <param name="Authorization">Der Authorization-Header, falls vorhanden.</param>
+/// <param name="ApiKey">Der API-Key-Header, falls vorhanden.</param>
+/// <param name="Body">Der Request-Body, falls vorhanden.</param>
+/// <returns>Ein aufgezeichneter Request mit den erfassten Daten.</returns>
 public sealed record RecordedRequest(
     HttpMethod Method,
     string PathAndQuery,
@@ -23,13 +29,20 @@ public sealed class StubHttpMessageHandler : HttpMessageHandler
 {
     private readonly Queue<Func<HttpRequestMessage, Task<HttpResponseMessage>>> responses = new();
 
+    /// <summary>Die in Reihenfolge aufgezeichneten Requests.</summary>
+    /// <value>Liste aller eingegangenen Requests.</value>
     public List<RecordedRequest> Requests { get; } = [];
 
+    /// <summary>Reiht eine vorgefertigte Antwort in die Queue ein.</summary>
+    /// <param name="response">Die zurückzugebende Antwort.</param>
     public void Enqueue(HttpResponseMessage response)
     {
         responses.Enqueue(_ => Task.FromResult(response));
     }
 
+    /// <summary>Reiht eine Antwort mit Statuscode und optionalem JSON-Body ein.</summary>
+    /// <param name="statusCode">Der HTTP-Statuscode der Antwort.</param>
+    /// <param name="jsonBody">Optionaler JSON-Body der Antwort.</param>
     public void Enqueue(HttpStatusCode statusCode, string? jsonBody = null)
     {
         var response = new HttpResponseMessage(statusCode);
@@ -40,21 +53,29 @@ public sealed class StubHttpMessageHandler : HttpMessageHandler
         Enqueue(response);
     }
 
+    /// <summary>Reiht eine Antwort ein, deren Body das serialisierte Objekt ist.</summary>
+    /// <param name="statusCode">Der HTTP-Statuscode der Antwort.</param>
+    /// <param name="payload">Das zu serialisierende Antwortobjekt.</param>
     public void EnqueueJson(HttpStatusCode statusCode, object payload)
     {
         Enqueue(statusCode, JsonSerializer.Serialize(payload));
     }
 
+    /// <summary>Reiht eine Ausnahme ein, die beim nächsten Request geworfen wird.</summary>
+    /// <param name="exception">Die zu werfende Ausnahme.</param>
     public void EnqueueException(Exception exception)
     {
         responses.Enqueue(_ => Task.FromException<HttpResponseMessage>(exception));
     }
 
+    /// <summary>Reiht ein Responder-Delegate ein, das die Antwort erzeugt.</summary>
+    /// <param name="responder">Das Responder-Delegate.</param>
     public void Enqueue(Func<HttpRequestMessage, HttpResponseMessage> responder)
     {
         responses.Enqueue(request => Task.FromResult(responder(request)));
     }
 
+    /// <inheritdoc/>
     protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
@@ -82,8 +103,14 @@ public sealed class StubHttpMessageHandler : HttpMessageHandler
 /// </summary>
 public sealed class RecordingDelays
 {
+    /// <summary>Die in Reihenfolge angeforderten Verzögerungen.</summary>
+    /// <value>Liste aller aufgezeichneten Warteintervalle.</value>
     public List<TimeSpan> Delays { get; } = [];
 
+    /// <summary>Zeichnet eine angeforderte Verzögerung auf, ohne zu warten.</summary>
+    /// <param name="delay">Das angeforderte Warteintervall.</param>
+    /// <param name="cancellationToken">Abbruchtoken.</param>
+    /// <returns>Ein sofort abgeschlossener Task.</returns>
     public Task Delay(TimeSpan delay, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
@@ -92,10 +119,17 @@ public sealed class RecordingDelays
     }
 }
 
+/// <summary>Testfabrik für den API-Client.</summary>
 public static class ApiClientTestFactory
 {
+    /// <summary>Die Basisadresse des simulierten Testservers.</summary>
+    /// <value>Basis-URI für alle Test-Clients.</value>
     public static Uri BaseAddress { get; } = new("http://testserver/");
 
+    /// <summary>Erstellt einen API-Client, der über den Stub-Handler kommuniziert.</summary>
+    /// <param name="handler">Der Stub-Handler mit den eingereihten Antworten.</param>
+    /// <param name="configure">Optionale Konfiguration der Client-Optionen.</param>
+    /// <returns>Ein konfigurierter <see cref="VideoPlayerApiClient"/>.</returns>
     public static VideoPlayerApiClient CreateClient(
         StubHttpMessageHandler handler,
         Action<VideoPlayerApiClientOptions>? configure = null)
@@ -105,6 +139,11 @@ public static class ApiClientTestFactory
         return new VideoPlayerApiClient(new HttpClient(handler) { BaseAddress = BaseAddress }, options);
     }
 
+    /// <summary>Erstellt einen API-Client, dessen Delays aufgezeichnet werden.</summary>
+    /// <param name="handler">Der Stub-Handler mit den eingereihten Antworten.</param>
+    /// <param name="delays">Der Delay-Recorder für angeforderte Warteintervalle.</param>
+    /// <param name="configure">Optionale Konfiguration der Client-Optionen.</param>
+    /// <returns>Ein konfigurierter <see cref="VideoPlayerApiClient"/>.</returns>
     public static VideoPlayerApiClient CreateClientWithDelays(
         StubHttpMessageHandler handler,
         RecordingDelays delays,

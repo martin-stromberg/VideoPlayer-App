@@ -3,10 +3,19 @@ using VideoWebPlayer.Maui.Services;
 
 namespace VideoWebPlayer.Maui;
 
+/// <summary>
+/// Einstellungsseite der App: hier werden u. a. die Aufbewahrungsdauer
+/// für Cache- und Download-Inhalte (in Tagen) konfiguriert.
+/// </summary>
 public partial class SettingsPage : ContentPage
 {
     private readonly ISettingsService _settings;
 
+    /// <summary>
+    /// Erstellt eine neue Instanz der <see cref="SettingsPage"/> und lädt die
+    /// aktuellen Einstellungswerte in die Eingabefelder.
+    /// </summary>
+    /// <param name="settings">Der Einstellungsdienst; bei <c>null</c> wird ein Standard-<see cref="Services.SettingsService"/> verwendet.</param>
     public SettingsPage(ISettingsService? settings)
     {
         InitializeComponent();

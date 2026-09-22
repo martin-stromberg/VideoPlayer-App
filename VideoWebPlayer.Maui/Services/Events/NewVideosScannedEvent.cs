@@ -5,7 +5,16 @@ namespace VideoWebPlayer.Maui.Services.Events;
 /// </summary>
 public class StatusChangedEvent : NotificationEvent
 {
+    /// <summary>
+    /// Gets the status message.
+    /// </summary>
+    /// <value>Die Meldung des Statuswechsels.</value>
     public string Message { get; }
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="StatusChangedEvent"/> class.
+    /// </summary>
+    /// <param name="message">Die Statusmeldung.</param>
     public StatusChangedEvent(string message)
     {
         Message = message;

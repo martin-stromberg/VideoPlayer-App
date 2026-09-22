@@ -6,8 +6,10 @@ using VideoWebPlayer.Maui.Tests.Stubs;
 
 namespace VideoWebPlayer.Maui.Tests;
 
+/// <summary>Tests der Authentifizierung des <c>VideoPlayerApiClient</c> (Login, Header, Health-Check).</summary>
 public class VideoPlayerApiClientTests_Authentication
 {
+    /// <summary>Prüft LoginAsync: postet Zugangsdaten und setzt Bearertoken.</summary>
     [Fact]
     public async Task LoginAsync_PostsCredentialsAndSetsBearerToken()
     {
@@ -31,6 +33,7 @@ public class VideoPlayerApiClientTests_Authentication
         Assert.Equal("Bearer jwt-token-1", handler.Requests[1].Authorization);
     }
 
+    /// <summary>Prüft AllRequests: enthalten den ClientGate-Header.</summary>
     [Fact]
     public async Task AllRequests_ContainClientGateHeader()
     {
@@ -45,6 +48,7 @@ public class VideoPlayerApiClientTests_Authentication
         Assert.All(handler.Requests, request => Assert.Equal("test-api-key", request.ApiKey));
     }
 
+    /// <summary>Prüft Constructor: ohne Baseadresse → wirft.</summary>
     [Fact]
     public void Constructor_WithoutBaseAddress_Throws()
     {
@@ -53,6 +57,7 @@ public class VideoPlayerApiClientTests_Authentication
         Assert.Throws<InvalidOperationException>(() => new VideoPlayerApiClient(new HttpClient(handler)));
     }
 
+    /// <summary>Prüft CheckHealthAsync: gibt true auf Erfolg zurück.</summary>
     [Fact]
     public async Task CheckHealthAsync_ReturnsTrueOnSuccess()
     {
@@ -64,6 +69,7 @@ public class VideoPlayerApiClientTests_Authentication
         Assert.Equal("/api/health", handler.Requests[0].PathAndQuery);
     }
 
+    /// <summary>Prüft CheckHealthAsync: gibt false auf Fehlschlag zurück.</summary>
     [Fact]
     public async Task CheckHealthAsync_ReturnsFalseOnFailure()
     {

@@ -13,6 +13,7 @@ namespace VideoPlayer.Maui.WinUI
             this.InitializeComponent();
         }
 
+        /// <inheritdoc/>
         protected override MauiApp CreateMauiApp() => MauiProgram.CreateMauiApp();
     }
 }

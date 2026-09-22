@@ -10,6 +10,7 @@ namespace VideoWebPlayer.Maui.Tests;
 /// </summary>
 public class AppUpdateTests_ServerManagement
 {
+    /// <summary>Prüft Update: bei <c>LoadServersRequested</c> → löst den Lade-Effekt aus.</summary>
     [Fact]
     public void Update_LoadServersRequested_EmitsLoadEffect()
     {
@@ -19,6 +20,7 @@ public class AppUpdateTests_ServerManagement
         Assert.IsType<LoadServersEffect>(effect);
     }
 
+    /// <summary>Prüft Update: bei <c>DiscoveryRequested</c> → startet Discovery.</summary>
     [Fact]
     public void Update_DiscoveryRequested_StartsDiscovery()
     {
@@ -29,6 +31,7 @@ public class AppUpdateTests_ServerManagement
         Assert.IsType<DiscoverServersEffect>(effect);
     }
 
+    /// <summary>Prüft Update: bei <c>DiscoveryRequested</c> während laufender Suche → wird ignoriert.</summary>
     [Fact]
     public void Update_DiscoveryRequested_WhileRunning_IsIgnored()
     {
@@ -40,6 +43,7 @@ public class AppUpdateTests_ServerManagement
         Assert.Empty(transition.Effects);
     }
 
+    /// <summary>Prüft Update: bei <c>DiscoveryCompleted</c> → übernimmt die gefundenen Kandidaten.</summary>
     [Fact]
     public void Update_DiscoveryCompleted_TakesOverCandidates()
     {
@@ -58,6 +62,8 @@ public class AppUpdateTests_ServerManagement
         Assert.Empty(transition.Effects);
     }
 
+    /// <summary>Prüft Update: bei <c>AddressSubmitted</c> mit ungültiger Adresse → setzt einen Fehler ohne Effekte.</summary>
+    /// <param name="input">Die Eingabe.</param>
     [Theory]
     [InlineData("")]
     [InlineData("   ")]
@@ -72,6 +78,7 @@ public class AppUpdateTests_ServerManagement
         Assert.Empty(transition.Effects);
     }
 
+    /// <summary>Prüft Update: bei <c>AddressSubmitted</c> mit gültiger Adresse → startet den Check mit normalisierter Adresse.</summary>
     [Fact]
     public void Update_AddressSubmitted_Valid_StartsCheckWithNormalizedAddress()
     {
@@ -86,6 +93,7 @@ public class AppUpdateTests_ServerManagement
         Assert.Equal("http://nas:8080/videoplayer/", check.Address);
     }
 
+    /// <summary>Prüft Update: bei Auswahl eines gefundenen Servers → startet den Check.</summary>
     [Fact]
     public void Update_DiscoveredServerSelected_StartsCheck()
     {
@@ -99,6 +107,7 @@ public class AppUpdateTests_ServerManagement
         Assert.True(transition.Model.IsServerCheckRunning);
     }
 
+    /// <summary>Prüft Update: bei <c>ServerSwitchRequested</c> → startet den Server-Check.</summary>
     [Fact]
     public void Update_ServerSwitchRequested_StartsCheck()
     {
@@ -111,6 +120,7 @@ public class AppUpdateTests_ServerManagement
         Assert.Equal("Altserver", check.DisplayName);
     }
 
+    /// <summary>Prüft Update: bei <c>ServerCheckCompleted</c> mit Fehlschlag → zeigt den Fehler und bleibt.</summary>
     [Fact]
     public void Update_ServerCheckCompleted_Failure_ShowsErrorAndStays()
     {
@@ -131,6 +141,7 @@ public class AppUpdateTests_ServerManagement
         Assert.Empty(transition.Effects);
     }
 
+    /// <summary>Prüft Update: bei <c>ServerCheckCompleted</c> mit Erfolg → persistiert und startet AutoLogin.</summary>
     [Fact]
     public void Update_ServerCheckCompleted_Success_PersistsAndStartsAutoLogin()
     {
@@ -171,6 +182,7 @@ public class AppUpdateTests_ServerManagement
         Assert.Equal("http://nas:8080/", autoLogin.ServerAddress);
     }
 
+    /// <summary>Prüft Update: bei <c>ServerCheckCompleted</c> mit Erfolg und vorhandenem Server → verschiebt ihn nach oben.</summary>
     [Fact]
     public void Update_ServerCheckCompleted_Success_ExistingServer_MovesToTop()
     {

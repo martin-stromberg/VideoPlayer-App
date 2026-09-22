@@ -6,8 +6,10 @@ using VideoWebPlayer.Maui.Tests.Stubs;
 
 namespace VideoWebPlayer.Maui.Tests;
 
+/// <summary>Tests der Token-Erneuerung des <c>VideoPlayerApiClient</c> bei HTTP 401.</summary>
 public class VideoPlayerApiClientTests_TokenRefresh
 {
+    /// <summary>Prüft Unauthorized: bei <c>RefreshesTokenOnce</c> → erneuert das Token und sendet erneut.</summary>
     [Fact]
     public async Task Unauthorized_RefreshesTokenOnce_AndResends()
     {
@@ -34,6 +36,7 @@ public class VideoPlayerApiClientTests_TokenRefresh
         Assert.Empty(delays.Delays);
     }
 
+    /// <summary>Prüft Unauthorized: bei <c>RefreshFails</c> → wirft.</summary>
     [Fact]
     public async Task Unauthorized_RefreshFails_Throws()
     {
@@ -50,6 +53,7 @@ public class VideoPlayerApiClientTests_TokenRefresh
         Assert.Single(handler.Requests);
     }
 
+    /// <summary>Prüft Unauthorized: bei <c>WithoutRefresher</c> → wirft.</summary>
     [Fact]
     public async Task Unauthorized_WithoutRefresher_Throws()
     {
@@ -63,6 +67,7 @@ public class VideoPlayerApiClientTests_TokenRefresh
         Assert.Single(handler.Requests);
     }
 
+    /// <summary>Prüft Unauthorized: bei <c>AfterSuccessfulRefresh</c> → wirft.</summary>
     [Fact]
     public async Task Unauthorized_AfterSuccessfulRefresh_Throws()
     {
@@ -86,6 +91,7 @@ public class VideoPlayerApiClientTests_TokenRefresh
         Assert.Equal(2, handler.Requests.Count);
     }
 
+    /// <summary>Prüft Login: überspringt Re-Authentifizierung.</summary>
     [Fact]
     public async Task Login_SkipsReauthentication()
     {

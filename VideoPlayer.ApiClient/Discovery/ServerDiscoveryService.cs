@@ -9,6 +9,8 @@ public sealed class ServerDiscoveryService
 {
     private readonly IReadOnlyList<IServerDiscovery> probes;
 
+    /// <summary>Erstellt den Dienst mit den auszuführenden Discovery-Wegen.</summary>
+    /// <param name="probes">Die Discovery-Wege (z. B. mDNS, UDP-Broadcast).</param>
     public ServerDiscoveryService(IEnumerable<IServerDiscovery> probes)
     {
         ArgumentNullException.ThrowIfNull(probes);
@@ -16,6 +18,7 @@ public sealed class ServerDiscoveryService
     }
 
     /// <summary>Standardzusammenstellung: mDNS + UDP-Broadcast.</summary>
+    /// <returns>Ein Dienst mit den Standard-Discovery-Wegen.</returns>
     public static ServerDiscoveryService CreateDefault()
     {
         return new ServerDiscoveryService(
@@ -25,6 +28,13 @@ public sealed class ServerDiscoveryService
         ]);
     }
 
+    /// <summary>
+    /// Führt alle Discovery-Wege parallel aus und liefert die nach Adresse
+    /// deduplizierte Trefferliste. Fehler eines einzelnen Wegs führen zu
+    /// einer leeren Teilliste.
+    /// </summary>
+    /// <param name="cancellationToken">Abbruchtoken.</param>
+    /// <returns>Deduplizierte Liste gefundener Server-Kandidaten (ggf. leer).</returns>
     public async Task<IReadOnlyList<DiscoveredServer>> DiscoverAsync(CancellationToken cancellationToken = default)
     {
         var results = await Task.WhenAll(

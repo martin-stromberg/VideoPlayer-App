@@ -13,6 +13,8 @@ public partial class HomePage : ContentPage
 {
     private readonly MvuHost mvuHost;
 
+    /// <summary>Initialisiert eine neue Instanz der <see cref="HomePage"/>-Klasse.</summary>
+    /// <param name="mvuHost">MVU-Host; dient als <see cref="BindableObject.BindingContext"/> und Dispatch-Ziel der Auswahl-Nachrichten.</param>
     public HomePage(MvuHost mvuHost)
     {
         InitializeComponent();

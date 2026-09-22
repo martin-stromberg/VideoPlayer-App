@@ -20,6 +20,7 @@ public class SourceBrowserServiceTests
     private readonly StubHttpMessageHandler handler = new();
     private readonly AuthSessionService authSession;
 
+    /// <summary>Initialisiert eine neue Instanz der Testklasse <c>SourceBrowserServiceTests</c>.</summary>
     public SourceBrowserServiceTests()
     {
         var secrets = new AppSecretsService(
@@ -39,6 +40,7 @@ public class SourceBrowserServiceTests
         handler.Requests.Clear();
     }
 
+    /// <summary>Prüft LoadSources: bei <c>MapsServerList</c> → bildet die Serverliste mit Icons ab.</summary>
     [Fact]
     public async Task LoadSources_MapsServerList_WithIcons()
     {
@@ -59,6 +61,7 @@ public class SourceBrowserServiceTests
         Assert.EndsWith("/api/Sources", Assert.Single(handler.Requests).PathAndQuery);
     }
 
+    /// <summary>Prüft LoadSources: ohne Client → wirft.</summary>
     [Fact]
     public async Task LoadSources_WithoutClient_Throws()
     {
@@ -66,6 +69,7 @@ public class SourceBrowserServiceTests
         Assert.Empty(handler.Requests);
     }
 
+    /// <summary>Prüft LoadGenres: bei <c>PrependsAllEntry</c> → stellt den Alle-Eintrag voran und bildet die Server-Genres ab.</summary>
     [Fact]
     public async Task LoadGenres_PrependsAllEntry_AndMapsServerGenres()
     {
@@ -92,6 +96,7 @@ public class SourceBrowserServiceTests
         Assert.EndsWith("/api/SourceGenres/1", Assert.Single(handler.Requests).PathAndQuery);
     }
 
+    /// <summary>Prüft LoadItems: bei erster Seite → fordert die Query an und bildet die Summaries ab.</summary>
     [Fact]
     public async Task LoadItems_FirstPage_MapsSummaries_AndRequestsQuery()
     {
@@ -119,6 +124,7 @@ public class SourceBrowserServiceTests
         Assert.Contains("genreId=4", request.PathAndQuery);
     }
 
+    /// <summary>Prüft LoadItems: bei voller Seite → meldet weitere Einträge.</summary>
     [Fact]
     public async Task LoadItems_FullPage_ReportsHasMore()
     {
@@ -139,6 +145,7 @@ public class SourceBrowserServiceTests
         Assert.False(partial.HasMore);
     }
 
+    /// <summary>Prüft LoadItems: bei <c>NoFilter</c> → lässt Search- und Genre-Parameter weg.</summary>
     [Fact]
     public async Task LoadItems_NoFilter_OmitsSearchAndGenreParameters()
     {
@@ -152,6 +159,9 @@ public class SourceBrowserServiceTests
         Assert.DoesNotContain("genreId=", request.PathAndQuery);
     }
 
+    /// <summary>Prüft MapSummaryType: bildet Legacytypen ab.</summary>
+    /// <param name="type">Der Typ.</param>
+    /// <param name="expected">Der erwartete Wert.</param>
     [Theory]
     [InlineData("Movie", "moviecollection")]
     [InlineData("moviecollection", "moviecollection")]

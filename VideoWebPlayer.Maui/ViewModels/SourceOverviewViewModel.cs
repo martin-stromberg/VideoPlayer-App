@@ -7,6 +7,9 @@ using VideoWebPlayer.Client.Models;
 
 namespace VideoWebPlayer.Maui.ViewModels;
 
+/// <summary>
+/// ViewModel für die Übersichtsseite einer Medienquelle mit Genre-Filter und paginierter Liste.
+/// </summary>
 public class SourceOverviewViewModel : INotifyPropertyChanged
 {
     private readonly VideoWebPlayerClient? _client;
@@ -17,12 +20,31 @@ public class SourceOverviewViewModel : INotifyPropertyChanged
     private const int PageSize = 20;
     private bool _hasMoreItems = true;
 
+    /// <summary>
+    /// Die ID der Medienquelle.
+    /// </summary>
     public long SourceId { get; }
+
+    /// <summary>
+    /// Der Anzeigename der Medienquelle.
+    /// </summary>
     public string SourceName { get; }
 
+    /// <summary>
+    /// Die verfügbaren Genres der Medienquelle (inkl. "Alle"-Eintrag).
+    /// </summary>
+    /// <value>Liste der Genres; initial leer.</value>
     public ObservableCollection<GenreViewModel> Genres { get; } = new();
+
+    /// <summary>
+    /// Die geladenen Medien-Elemente der aktuell ausgewählten Genre-Auswahl.
+    /// </summary>
+    /// <value>Liste der Elemente; initial leer.</value>
     public ObservableCollection<MediaItemViewModel> Items { get; } = new();
 
+    /// <summary>
+    /// Gibt an, ob gerade Daten (Genres oder Elemente) geladen werden.
+    /// </summary>
     public bool IsLoading
     {
         get => _isLoading;
@@ -36,6 +58,9 @@ public class SourceOverviewViewModel : INotifyPropertyChanged
         }
     }
 
+    /// <summary>
+    /// Gibt an, ob gerade eine weitere Seite von Elementen nachgeladen wird.
+    /// </summary>
     public bool IsLoadingMore
     {
         get => _isLoadingMore;
@@ -49,6 +74,9 @@ public class SourceOverviewViewModel : INotifyPropertyChanged
         }
     }
 
+    /// <summary>
+    /// Das aktuell ausgewählte Genre; ein Wechsel lädt die Elemente der Liste neu.
+    /// </summary>
     public GenreViewModel? SelectedGenre
     {
         get => _selectedGenre;
@@ -63,6 +91,11 @@ public class SourceOverviewViewModel : INotifyPropertyChanged
         }
     }
 
+    /// <summary>
+    /// Erstellt eine neue Instanz des <see cref="SourceOverviewViewModel"/>.
+    /// </summary>
+    /// <param name="sourceId">Die ID der Medienquelle.</param>
+    /// <param name="sourceName">Der Anzeigename der Medienquelle.</param>
     public SourceOverviewViewModel(long sourceId, string sourceName)
     {
         SourceId = sourceId;
@@ -71,6 +104,9 @@ public class SourceOverviewViewModel : INotifyPropertyChanged
         _client = App.ServiceProvider?.GetService<VideoWebPlayerClient>();
     }
 
+    /// <summary>
+    /// Lädt die Genres der Medienquelle vom Server und wählt anschließend "Alle" aus.
+    /// </summary>
     public async Task LoadGenresAsync()
     {
         if (_client == null)
@@ -148,6 +184,9 @@ public class SourceOverviewViewModel : INotifyPropertyChanged
         }
     }
 
+    /// <summary>
+    /// Lädt die nächste Seite von Elementen für das ausgewählte Genre nach.
+    /// </summary>
     public async Task LoadMoreItemsAsync()
     {
         if (!_hasMoreItems || IsLoadingMore || SelectedGenre == null)
@@ -280,19 +319,30 @@ public class SourceOverviewViewModel : INotifyPropertyChanged
         }
     }
 
+    /// <inheritdoc/>
     public event PropertyChangedEventHandler? PropertyChanged;
 
+    /// <summary>
+    /// Löst das <see cref="PropertyChanged"/>-Ereignis aus.
+    /// </summary>
+    /// <param name="propertyName">Der Name der geänderten Eigenschaft (wird automatisch ermittelt).</param>
     protected virtual void OnPropertyChanged([CallerMemberName] string? propertyName = null)
     {
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
     }
 }
 
+/// <summary>
+/// ViewModel für ein Genre einer Medienquelle.
+/// </summary>
 public class GenreViewModel : INotifyPropertyChanged
 {
     private long _id;
     private string _name = string.Empty;
 
+    /// <summary>
+    /// Die ID des Genres (0 steht für "Alle").
+    /// </summary>
     public long Id
     {
         get => _id;
@@ -306,6 +356,9 @@ public class GenreViewModel : INotifyPropertyChanged
         }
     }
 
+    /// <summary>
+    /// Der Anzeigename des Genres.
+    /// </summary>
     public string Name
     {
         get => _name;
@@ -319,8 +372,13 @@ public class GenreViewModel : INotifyPropertyChanged
         }
     }
 
+    /// <inheritdoc/>
     public event PropertyChangedEventHandler? PropertyChanged;
 
+    /// <summary>
+    /// Löst das <see cref="PropertyChanged"/>-Ereignis aus.
+    /// </summary>
+    /// <param name="propertyName">Der Name der geänderten Eigenschaft (wird automatisch ermittelt).</param>
     protected virtual void OnPropertyChanged([CallerMemberName] string? propertyName = null)
     {
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));

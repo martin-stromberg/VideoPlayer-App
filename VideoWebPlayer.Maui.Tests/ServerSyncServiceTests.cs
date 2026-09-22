@@ -27,6 +27,7 @@ public class ServerSyncServiceTests : IDisposable
     private readonly StubHttpMessageHandler handler = new();
     private readonly AuthSessionService authSession;
 
+    /// <summary>Initialisiert eine neue Instanz der Testklasse <c>ServerSyncServiceTests</c>.</summary>
     public ServerSyncServiceTests()
     {
         root = Path.Combine(Path.GetTempPath(), "videoplayer-sync-tests", Guid.NewGuid().ToString("N"));
@@ -50,6 +51,7 @@ public class ServerSyncServiceTests : IDisposable
             new RecordingDelays().Delay);
     }
 
+    /// <inheritdoc/>
     public void Dispose()
     {
         SQLite.SQLiteAsyncConnection.ResetPool();
@@ -90,6 +92,7 @@ public class ServerSyncServiceTests : IDisposable
 
     private ServerSyncService CreateService() => new(authSession, queue, cache);
 
+    /// <summary>Prüft SynchronizeAsync: sendet Ausstehendes und aktualisiert dann die Caches.</summary>
     [Fact]
     public async Task SynchronizeAsync_SendsPendingThenRefreshesCaches()
     {
@@ -134,6 +137,7 @@ public class ServerSyncServiceTests : IDisposable
         Assert.Equal(7, favorite.VideoId);
     }
 
+    /// <summary>Prüft SynchronizeAsync: ohne Client → ist ein No-Op.</summary>
     [Fact]
     public async Task SynchronizeAsync_WithoutClient_IsNoOp()
     {
@@ -147,6 +151,7 @@ public class ServerSyncServiceTests : IDisposable
         Assert.Empty(handler.Requests);
     }
 
+    /// <summary>Prüft FlushPendingProgress: bei Transportfehler → behält die verbleibenden Einträge.</summary>
     [Fact]
     public async Task FlushPendingProgress_TransportError_KeepsRemainingEntries()
     {
@@ -167,6 +172,7 @@ public class ServerSyncServiceTests : IDisposable
         Assert.Equal(2, await queue.CountAsync());
     }
 
+    /// <summary>Prüft FlushPendingProgress: bei permanentem Fehler → verwirft den Eintrag und setzt fort.</summary>
     [Fact]
     public async Task FlushPendingProgress_PermanentError_DiscardsEntryAndContinues()
     {
@@ -182,6 +188,7 @@ public class ServerSyncServiceTests : IDisposable
         Assert.Equal(0, await queue.CountAsync());
     }
 
+    /// <summary>Prüft SynchronizeAsync: bei partiellem Fehlschlag → meldet false, läuft aber weiter.</summary>
     [Fact]
     public async Task SynchronizeAsync_PartialFailure_ReportsFalseButKeepsGoing()
     {
@@ -202,6 +209,7 @@ public class ServerSyncServiceTests : IDisposable
         Assert.False(result.FavoritesSynced);
     }
 
+    /// <summary>Prüft SyncContinueWatching: aktualisiert nur den betreffenden Cache.</summary>
     [Fact]
     public async Task SyncContinueWatching_RefreshesOnlyThatCache()
     {

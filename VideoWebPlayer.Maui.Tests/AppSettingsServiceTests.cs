@@ -3,6 +3,7 @@ using VideoWebPlayer.Maui.Tests.Stubs;
 
 namespace VideoWebPlayer.Maui.Tests;
 
+/// <summary>Tests für <c>AppSettingsService</c>.</summary>
 public class AppSettingsServiceTests
 {
     private static AppSettingsService CreateService(InMemorySettingsStore store, string? profile = null)
@@ -10,6 +11,7 @@ public class AppSettingsServiceTests
         return new AppSettingsService(store, AppProfile.Create(profile));
     }
 
+    /// <summary>Prüft Load: bei leerem Store → gibt die Standardwerte zurück.</summary>
     [Fact]
     public void Load_WhenStoreEmpty_ReturnsDefaults()
     {
@@ -21,6 +23,7 @@ public class AppSettingsServiceTests
         Assert.Equal(5, settings.DownloadQuotaGb);
     }
 
+    /// <summary>Prüft Save: gespeicherte Werte überstehen ein erneutes Laden (Roundtrip).</summary>
     [Fact]
     public void Save_ThenLoad_RoundTrips()
     {
@@ -44,6 +47,7 @@ public class AppSettingsServiceTests
         Assert.Equal(settings, loaded);
     }
 
+    /// <summary>Prüft Load: begrenzt gespeicherte Werte außerhalb des gültigen Bereichs.</summary>
     [Fact]
     public void Load_ClampsOutOfRangeStoredValues()
     {
@@ -60,6 +64,7 @@ public class AppSettingsServiceTests
         Assert.Equal(30, loaded.WatchedEndWindowSeconds);
     }
 
+    /// <summary>Prüft Save: normalisiert die Werte vor dem Schreiben.</summary>
     [Fact]
     public void Save_NormalizesBeforeWriting()
     {
@@ -71,6 +76,7 @@ public class AppSettingsServiceTests
         Assert.Equal(500, store.GetInt(AppSettingsService.DownloadQuotaGbKey, -1));
     }
 
+    /// <summary>Prüft Profiles: Profile beeinflussen sich gegenseitig nicht.</summary>
     [Fact]
     public void Profiles_DoNotInterfere()
     {
@@ -89,6 +95,7 @@ public class AppSettingsServiceTests
         Assert.False(otherService.Load().AutoDownloadEnabled);
     }
 
+    /// <summary>Prüft UsesProfilePrefixedKeys: die Schlüssel sind profilpräfixiert.</summary>
     [Fact]
     public void UsesProfilePrefixedKeys()
     {
