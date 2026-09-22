@@ -9,7 +9,7 @@ Branch: `task/issue-9-cebc7d86f7084dc687e7f5bccf5f678a-neugestaltung-der-app`
 | 3 | Einstellungsverwaltung und lokale Datenhaltung mit Backup-Trennung | 2 | `task/issue-9-cebc7d86f7084dc687e7f5bccf5f678a-neugestaltung-der-app-schritt-3-einstellungen-datenhaltung` | Fertig |
 | 4 | Serververwaltung und Erststart-Einrichtung | 2, 3 | `task/issue-9-cebc7d86f7084dc687e7f5bccf5f678a-neugestaltung-der-app-schritt-4-serververwaltung-erststart` | Fertig |
 | 5 | Verbindungs-Workflow und Anmeldung | 4 | `task/issue-9-cebc7d86f7084dc687e7f5bccf5f678a-neugestaltung-der-app-schritt-5-verbindung-anmeldung` | Fertig |
-| 6 | Netzwerkstatus-Erkennung und Synchronisation | 5 | `task/issue-9-cebc7d86f7084dc687e7f5bccf5f678a-neugestaltung-der-app-schritt-6-netzwerk-sync` | In Arbeit |
+| 6 | Netzwerkstatus-Erkennung und Synchronisation | 5 | `task/issue-9-cebc7d86f7084dc687e7f5bccf5f678a-neugestaltung-der-app-schritt-6-netzwerk-sync` | Fertig |
 | 7 | Startseite mit gecachten Medienlisten | 6 | `task/issue-9-cebc7d86f7084dc687e7f5bccf5f678a-neugestaltung-der-app-schritt-7-startseite` | Offen |
 | 8 | Quellen-Browsing und Medien-Detailseiten | 5 | `task/issue-9-cebc7d86f7084dc687e7f5bccf5f678a-neugestaltung-der-app-schritt-8-quellen-details` | Offen |
 | 9 | Favoriten- und Profil-Seite | 5 | `task/issue-9-cebc7d86f7084dc687e7f5bccf5f678a-neugestaltung-der-app-schritt-9-favoriten-profil` | Offen |
