@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:mct="http://schemas.microsoft.com/dotnet/2022/maui/toolkit"
+             xmlns:mvu="clr-namespace:VideoPlayer.Mvu;assembly=VideoPlayer.Mvu"
+             x:Class="VideoPlayer.Maui.Pages.PlayerPage"
+             Title="Wiedergabe"
+             x:DataType="mvu:MvuHost">
+
+    <Grid BackgroundColor="Black">
+
+        <!-- Videofläche -->
+        <mct:MediaElement x:Name="VideoElement"
+                          ShouldAutoPlay="True"
+                          ShouldShowPlaybackControls="True"
+                          ShouldKeepScreenOn="True"
+                          MediaOpened="OnMediaOpened"
+                          MediaEnded="OnMediaEnded"
+                          MediaFailed="OnMediaFailed"
+                          StateChanged="OnMediaStateChanged" />
+
+        <!-- Lade-/Puffer-Anzeige (Quellauflösung oder Zwischenpufferung) -->
+        <ActivityIndicator x:Name="LoadingIndicator"
+                           IsRunning="{Binding Model.Player.IsResolving}"
+                           IsVisible="{Binding Model.Player.IsResolving}"
+                           Color="#FFB84D"
+                           HeightRequest="48"
+                           WidthRequest="48" />
+
+        <!-- Kopf-Overlay: Titel, „angesehen"-Hinweis, Mini-Player-Schalter -->
+        <VerticalStackLayout x:Name="OverlayChrome"
+                             Spacing="0">
+            <Border Padding="12"
+                    BackgroundColor="#80000000">
+                <Grid ColumnDefinitions="*,Auto,Auto"
+                      ColumnSpacing="8">
+                    <Label x:Name="TitleLabel"
+                           Grid.Column="0"
+                           FontSize="16"
+                           FontAttributes="Bold"
+                           TextColor="#FFDDAA"
+                           VerticalOptions="Center"
+                           LineBreakMode="TailTruncation" />
+                    <Label x:Name="WatchedBadge"
+                           Grid.Column="1"
+                           Text="Angesehen"
+                           FontSize="12"
+                           TextColor="#9CCC65"
+                           VerticalOptions="Center"
+                           IsVisible="False" />
+                    <Button x:Name="PipButton"
+                            Grid.Column="2"
+                            Text="Mini-Player"
+                            FontSize="12"
+                            HeightRequest="36"
+                            IsVisible="False"
+                            Clicked="OnPipClicked" />
+                </Grid>
+            </Border>
+        </VerticalStackLayout>
+
+        <!-- Fehlerhinweis (Quelle nicht verfügbar / Wiedergabefehler) -->
+        <Border x:Name="ErrorPanel"
+                VerticalOptions="End"
+                Margin="16"
+                Padding="12"
+                StrokeShape="RoundRectangle 8"
+                BackgroundColor="#80404040"
+                IsVisible="False">
+            <Label x:Name="ErrorLabel"
+                   FontSize="13"
+                   TextColor="#FF8A80" />
+        </Border>
+
+    </Grid>
+
+</ContentPage>

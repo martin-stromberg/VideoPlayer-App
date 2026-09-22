@@ -58,6 +58,16 @@ public class EnumCoverageTests
             Enum.GetValues<RecentEntryKind>().Select(value => value.ToString()));
     }
 
+    /// <summary>Prüft PlaybackSourceKind: alle Werte sind abgedeckt.</summary>
+    [Fact]
+    public void PlaybackSourceKind_AllValuesAreCovered()
+    {
+        // VideoPlayer.Mvu.PlaybackSourceKind — direkt referenziert.
+        Assert.Equal(
+            new[] { "ServerStream", "LocalFile" },
+            Enum.GetValues<VideoPlayer.Mvu.PlaybackSourceKind>().Select(value => value.ToString()));
+    }
+
     /// <summary>Prüft RecentEntryType: alle Werte sind abgedeckt.</summary>
     [Fact]
     public void RecentEntryType_AllValuesAreCovered()

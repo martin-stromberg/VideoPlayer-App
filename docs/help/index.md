@@ -12,6 +12,7 @@
 - [Startseite mit gecachten Medienlisten](startseite-medienlisten.md) — „Weiterschauen", „Favoriten" und „Neu im Programm" mit Cache-First-Laden, Poster-Ablage außerhalb des Backups, ereignisgesteuerter Aktualisierung und Detail-Navigation.
 - [Quellen-Browsing und Medien-Detailseiten](quellen-browsing-details.md) — Quellenliste mit Icons und Offline-Hinweis, Genre-Filter, Textsuche und seitenweises Nachladen sowie Detailseiten für Filme, Kollektionen, Serien mit Staffeln/Episoden und die Favoriten-Markierung.
 - [Favoriten- und Profil-Seite](favoriten-profil.md) — Favoritenliste des Server-Benutzers mit Poster/Titel/Medientyp, Entfernen mit Server als führendem System, Cache-only-Anzeige offline sowie Profilansicht mit Benutzer, lokalem Profil und Abmeldung.
+- [Wiedergabe, Picture-in-Picture und Fortschrittsverfolgung](wiedergabe-pip.md) — Wiedergabeseite mit MediaElement, Server-Stream und lokale Dateien, Fortsetzungsposition, Offline-Fortschrittswarteschlange, „angesehen"-Schwelle, Auto-Fortsetzung, Fehler-Rückfall sowie Mini-Player (Windows) und nativem PiP (iOS).
 
 ## Infrastruktur
 

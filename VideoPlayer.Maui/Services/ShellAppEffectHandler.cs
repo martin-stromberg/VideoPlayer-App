@@ -145,10 +145,94 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
             case LoadProfileInfoEffect:
                 await LoadProfileInfoAsync(cancellationToken);
                 break;
+            case NavigateToPlayerEffect:
+                await MainThread.InvokeOnMainThreadAsync(NavigateToPlayerAsync);
+                break;
+            case ResolvePlaybackSourceEffect resolve:
+                await ResolvePlaybackSourceAsync(resolve, cancellationToken);
+                break;
+            case ReportPlaybackProgressEffect report:
+                await ReportPlaybackProgressAsync(report, cancellationToken);
+                break;
+            case TogglePictureInPictureEffect:
+                await TogglePictureInPictureAsync();
+                break;
             case LogoutEffect:
                 await LogoutAsync();
                 break;
         }
+    }
+
+    private async Task NavigateToPlayerAsync()
+    {
+        if (Shell.Current is null)
+        {
+            return;
+        }
+
+        try
+        {
+            await Shell.Current.GoToAsync("player");
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[ShellAppEffectHandler] Player-Navigation fehlgeschlagen: {ex.Message}");
+        }
+    }
+
+    private async Task ResolvePlaybackSourceAsync(ResolvePlaybackSourceEffect resolve, CancellationToken cancellationToken)
+    {
+        PlaybackSource? source = null;
+        string? error = null;
+        try
+        {
+            source = await services.GetRequiredService<PlaybackSourceService>()
+                .ResolveAsync(resolve.MediaType, resolve.MediaId, cancellationToken);
+            if (source is null)
+            {
+                error = AppUpdate.PlaybackUnavailableError;
+            }
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[ShellAppEffectHandler] Quellauflösung fehlgeschlagen: {ex.Message}");
+            error = AppUpdate.PlaybackUnavailableError;
+        }
+
+        await DispatchMessageAsync(new PlaybackSourceResolvedMessage(
+            resolve.MediaType, resolve.MediaId, source, error));
+    }
+
+    private async Task ReportPlaybackProgressAsync(ReportPlaybackProgressEffect report, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await services.GetRequiredService<ProgressReportService>()
+                .ReportProgressAsync(
+                    report.MediaType, (int)report.MediaId,
+                    report.Position, report.Duration, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            // Ein Fehlschlag ist nicht fatal — der nächste Takt meldet erneut.
+            System.Diagnostics.Debug.WriteLine($"[ShellAppEffectHandler] Fortschrittsmeldung fehlgeschlagen: {ex.Message}");
+        }
+    }
+
+    private async Task TogglePictureInPictureAsync()
+    {
+        var isActive = false;
+        try
+        {
+            isActive = await MainThread.InvokeOnMainThreadAsync(
+                () => services.GetRequiredService<IPictureInPictureService>().ToggleAsync());
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[ShellAppEffectHandler] PiP-Umschaltung fehlgeschlagen: {ex.Message}");
+        }
+
+        await DispatchMessageAsync(new PictureInPictureChangedMessage(isActive));
     }
 
     private async Task StartNetworkMonitoringAsync()

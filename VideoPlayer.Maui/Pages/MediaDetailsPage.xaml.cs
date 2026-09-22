@@ -127,6 +127,11 @@ public partial class MediaDetailsPage : ContentPage
         FavoriteButton.Text = details.FavoriteStarText;
         FavoriteButton.IsEnabled = !state.IsFavoriteUpdating;
 
+        // „Abspielen" nur für direkt abspielbare Medientypen (Film,
+        // Episode) — Serien/Staffeln/Kollektionen spielen über ihre
+        // Episoden- bzw. Film-Einträge.
+        PlayButton.IsVisible = details.IsPlayable;
+
         UpdateSeasonSection(details);
         UpdateCollectionSection(details);
     }
@@ -227,5 +232,34 @@ public partial class MediaDetailsPage : ContentPage
     private void OnFavoriteClicked(object? sender, EventArgs e)
     {
         _ = mvuHost.DispatchAsync(new FavoriteToggleRequestedMessage());
+    }
+
+    private void OnPlayClicked(object? sender, EventArgs e)
+    {
+        var details = mvuHost.Model.MediaDetails.Details;
+        if (details is null || !details.IsPlayable)
+        {
+            return;
+        }
+
+        // Bei einer navigierten Episode ist der Episodentitel
+        // aussagekräftiger als der Serienname des Kopfbereichs.
+        _ = mvuHost.DispatchAsync(new PlayRequestedMessage(
+            details.MediaType, details.MediaId,
+            details.HighlightedEpisodeTitle ?? details.Title));
+    }
+
+    private void OnEpisodePlayClicked(object? sender, EventArgs e)
+    {
+        if ((sender as Element)?.BindingContext is not EpisodeItem episode)
+        {
+            return;
+        }
+
+        // „Abspielen" direkt aus der Episodenliste — der Serienkontext
+        // (Fortsetzungsliste) wird im Update aus den geladenen Details
+        // gebildet.
+        _ = mvuHost.DispatchAsync(new PlayRequestedMessage(
+            "tvshowepisode", episode.Id, episode.Title));
     }
 }
