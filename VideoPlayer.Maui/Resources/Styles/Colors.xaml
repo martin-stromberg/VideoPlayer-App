@@ -4,42 +4,40 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
     x:Class="VideoPlayer.Maui.Resources.Styles.Colors">
 
-    <!-- Note: For Android please see also Platforms\Android\Resources\values\colors.xml -->
+    <!-- Design-Tokens der Webanwendung (deployter Stand, dokumentiert in
+         docs/projects/.../web-design-recherche.md). Die App ist dunkel-only;
+         Schlüssel spiegeln die CSS-Variablen vp-*. -->
 
-    <Color x:Key="Primary">#512BD4</Color>
-    <Color x:Key="PrimaryDark">#ac99ea</Color>
-    <Color x:Key="PrimaryDarkText">#242424</Color>
-    <Color x:Key="Secondary">#DFD8F7</Color>
-    <Color x:Key="SecondaryDarkText">#9880e5</Color>
-    <Color x:Key="Tertiary">#2B0B98</Color>
+    <!-- Hintergründe -->
+    <Color x:Key="VpBg">#131313</Color>
+    <Color x:Key="VpBgDeep">#0e0e0e</Color>
 
-    <Color x:Key="White">White</Color>
-    <Color x:Key="Black">Black</Color>
-    <Color x:Key="Magenta">#D600AA</Color>
-    <Color x:Key="MidnightBlue">#190649</Color>
-    <Color x:Key="OffBlack">#1f1f1f</Color>
+    <!-- Flächen, abgestuft -->
+    <Color x:Key="VpSurfaceLow">#1c1b1b</Color>
+    <Color x:Key="VpSurface">#201f1f</Color>
+    <Color x:Key="VpSurfaceHigh">#2a2a2a</Color>
+    <Color x:Key="VpSurfaceBright">#393939</Color>
 
-    <Color x:Key="Gray100">#E1E1E1</Color>
-    <Color x:Key="Gray200">#C8C8C8</Color>
-    <Color x:Key="Gray300">#ACACAC</Color>
-    <Color x:Key="Gray400">#919191</Color>
-    <Color x:Key="Gray500">#6E6E6E</Color>
-    <Color x:Key="Gray600">#404040</Color>
-    <Color x:Key="Gray900">#212121</Color>
-    <Color x:Key="Gray950">#141414</Color>
+    <!-- Text -->
+    <Color x:Key="VpText">#e5e2e1</Color>
+    <Color x:Key="VpTextMuted">#bda9a6</Color>
+    <Color x:Key="VpTextSoft">#e9bcb6</Color>
 
-    <SolidColorBrush x:Key="PrimaryBrush" Color="{StaticResource Primary}"/>
-    <SolidColorBrush x:Key="SecondaryBrush" Color="{StaticResource Secondary}"/>
-    <SolidColorBrush x:Key="TertiaryBrush" Color="{StaticResource Tertiary}"/>
-    <SolidColorBrush x:Key="WhiteBrush" Color="{StaticResource White}"/>
-    <SolidColorBrush x:Key="BlackBrush" Color="{StaticResource Black}"/>
+    <!-- Rahmen (rgba(255,255,255,0.1) bzw. rgba(255,180,170,0.42) als ARGB) -->
+    <Color x:Key="VpBorder">#1AFFFFFF</Color>
+    <Color x:Key="VpBorderStrong">#6BFFB4AA</Color>
 
-    <SolidColorBrush x:Key="Gray100Brush" Color="{StaticResource Gray100}"/>
-    <SolidColorBrush x:Key="Gray200Brush" Color="{StaticResource Gray200}"/>
-    <SolidColorBrush x:Key="Gray300Brush" Color="{StaticResource Gray300}"/>
-    <SolidColorBrush x:Key="Gray400Brush" Color="{StaticResource Gray400}"/>
-    <SolidColorBrush x:Key="Gray500Brush" Color="{StaticResource Gray500}"/>
-    <SolidColorBrush x:Key="Gray600Brush" Color="{StaticResource Gray600}"/>
-    <SolidColorBrush x:Key="Gray900Brush" Color="{StaticResource Gray900}"/>
-    <SolidColorBrush x:Key="Gray950Brush" Color="{StaticResource Gray950}"/>
+    <!-- Akzente -->
+    <Color x:Key="VpPrimary">#e50914</Color>
+    <Color x:Key="VpPrimaryHover">#c0000c</Color>
+    <Color x:Key="VpPrimarySoft">#ffb4aa</Color>
+    <Color x:Key="VpSecondary">#00a8e8</Color>
+    <Color x:Key="VpSecondarySoft">#83cfff</Color>
+    <Color x:Key="VpDanger">#ffb4ab</Color>
+
+    <!-- App-eigene Hilfstokens: transluzente Abdunklung (Scrim/Badge,
+         Web-Muster rgba(0,0,0,.68)) und Karten-Schatten. -->
+    <Color x:Key="VpOverlay">#80000000</Color>
+    <Color x:Key="VpShadow">#000000</Color>
+    <SolidColorBrush x:Key="VpShadowBrush" Color="{StaticResource VpShadow}"/>
 </ResourceDictionary>

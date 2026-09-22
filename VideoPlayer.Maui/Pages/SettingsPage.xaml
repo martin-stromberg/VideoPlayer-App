@@ -12,7 +12,7 @@
             <Label x:Name="InvalidInputLabel"
                    AutomationId="InvalidInputLabel"
                    Text="Bitte eine gültige Zahl eingeben."
-                   TextColor="Red"
+                   TextColor="{StaticResource VpDanger}"
                    IsVisible="False" />
 
             <!-- Downloads -->

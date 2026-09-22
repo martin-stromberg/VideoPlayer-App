@@ -21,6 +21,11 @@ namespace VideoPlayer.Maui
             InitializeComponent();
             this.mvuHost = mvuHost;
             this.services = services;
+
+            // Die App ist dunkel-only wie die Webanwendung: alle Farben
+            // kommen aus den Vp*-Design-Tokens, ein System-Light-Theme darf
+            // keine Restwerte aktivieren.
+            UserAppTheme = AppTheme.Dark;
         }
 
         /// <inheritdoc/>

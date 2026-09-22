@@ -15,6 +15,7 @@
 - [Wiedergabe, Picture-in-Picture und Fortschrittsverfolgung](wiedergabe-pip.md) — Wiedergabeseite mit MediaElement, Server-Stream und lokale Dateien, Fortsetzungsposition, Offline-Fortschrittswarteschlange, „angesehen"-Schwelle, Auto-Fortsetzung, Fehler-Rückfall sowie Mini-Player (Windows) und nativem PiP (iOS).
 - [Download-Verwaltung und automatische Downloads](downloads.md) — Downloads-Seite mit Status/Fortschritt und Aktionen, parallele Transfers mit GB-Kontingent, WLAN-only, automatische Wiederaufnahme nach Neustart/Netzwerkverlust, Weiterschauen-Vorlauf und automatisches Löschen gesehener Episoden.
 - [Offlinebetrieb und Wiederherstellung](offline-wiederherstellung.md) — Offline-Startseite aus lokalen Downloads mit Platzhaltern fehlender Episoden, lokale Wiedergabe, Offline-Snapshots der Detailseiten, Re-Anmeldung nach Backup-Wiederherstellung, Neu-Synchronisation verworfener Caches und Wiederherstellung beschädigter Datenbanken.
+- [Erscheinungsbild](erscheinungsbild.md) — dunkles Design der Webanwendung: zentrale Design-Tokens (Farben, Abstufungen, Rahmen), Button-Radien (normal 4, Karten 8, Chips/Badges pill-förmig) und die Festlegung auf das dunkle Farbschema.
 
 ## Infrastruktur
 

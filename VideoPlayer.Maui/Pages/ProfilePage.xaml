@@ -12,17 +12,18 @@
             <ActivityIndicator x:Name="LoadingIndicator"
                                IsRunning="{Binding Model.Profile.IsLoading}"
                                IsVisible="{Binding Model.Profile.IsLoading}"
-                               Color="#FFB84D" />
+                               Color="{StaticResource VpPrimary}" />
 
             <!-- Offline-Hinweis: ohne Serververbindung stehen die
                  Profilinformationen nicht zur Verfügung. -->
             <Border x:Name="ProfileOfflineBanner"
                     Padding="12,8"
                     StrokeShape="RoundRectangle 8"
-                    BackgroundColor="#D9A029"
+                    Stroke="{StaticResource VpBorderStrong}"
+                    BackgroundColor="{StaticResource VpSurfaceHigh}"
                     IsVisible="False">
                 <Label Text="Offline-Modus – Profilinformationen stehen ohne Serververbindung nicht zur Verfügung."
-                       TextColor="Black"
+                       TextColor="{StaticResource VpText}"
                        FontAttributes="Bold" />
             </Border>
 
@@ -32,15 +33,15 @@
             <Border x:Name="UserInfoBorder"
                     Padding="16"
                     StrokeShape="RoundRectangle 8"
-                    BackgroundColor="#23232a">
+                    BackgroundColor="{StaticResource VpSurface}">
                 <Border.Shadow>
-                    <Shadow Brush="Black" Offset="0,2" Radius="4" Opacity="0.3" />
+                    <Shadow Brush="{StaticResource VpShadowBrush}" Offset="0,2" Radius="4" Opacity="0.3" />
                 </Border.Shadow>
                 <VerticalStackLayout Spacing="10">
                     <Label Text="Angemeldeter Benutzer"
                            FontSize="14"
                            FontAttributes="Bold"
-                           TextColor="#FFB84D" />
+                           TextColor="{StaticResource VpPrimarySoft}" />
                     <Grid ColumnDefinitions="Auto,*" ColumnSpacing="16" RowSpacing="4">
                         <Label Grid.Row="0" Grid.Column="0" Text="Benutzername" />
                         <Label Grid.Row="0" Grid.Column="1"
@@ -56,15 +57,15 @@
             <!-- Lokale Installation: aktives Profil und verbundener Server. -->
             <Border Padding="16"
                     StrokeShape="RoundRectangle 8"
-                    BackgroundColor="#23232a">
+                    BackgroundColor="{StaticResource VpSurface}">
                 <Border.Shadow>
-                    <Shadow Brush="Black" Offset="0,2" Radius="4" Opacity="0.3" />
+                    <Shadow Brush="{StaticResource VpShadowBrush}" Offset="0,2" Radius="4" Opacity="0.3" />
                 </Border.Shadow>
                 <VerticalStackLayout Spacing="10">
                     <Label Text="Lokale Installation"
                            FontSize="14"
                            FontAttributes="Bold"
-                           TextColor="#FFB84D" />
+                           TextColor="{StaticResource VpPrimarySoft}" />
                     <Grid ColumnDefinitions="Auto,*" ColumnSpacing="16" RowSpacing="4">
                         <Label Grid.Row="0" Grid.Column="0" Text="Profil" />
                         <Label Grid.Row="0" Grid.Column="1"

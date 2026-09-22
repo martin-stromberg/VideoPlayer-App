@@ -30,7 +30,7 @@
                     <DataTemplate x:DataType="storage:KnownServer">
                         <Grid RowDefinitions="Auto,Auto" Padding="0,4">
                             <Label Text="{Binding NameOrAddress}" FontAttributes="Bold" />
-                            <Label Grid.Row="1" Text="{Binding Address}" FontSize="12" TextColor="Gray" />
+                            <Label Grid.Row="1" Text="{Binding Address}" FontSize="12" TextColor="{StaticResource VpTextMuted}" />
                         </Grid>
                     </DataTemplate>
                 </CollectionView.ItemTemplate>
@@ -53,7 +53,7 @@
                     <DataTemplate x:DataType="discovery:DiscoveredServer">
                         <Grid RowDefinitions="Auto,Auto" Padding="0,4">
                             <Label Text="{Binding NameOrAddress}" FontAttributes="Bold" />
-                            <Label Grid.Row="1" Text="{Binding Address}" FontSize="12" TextColor="Gray" />
+                            <Label Grid.Row="1" Text="{Binding Address}" FontSize="12" TextColor="{StaticResource VpTextMuted}" />
                         </Grid>
                     </DataTemplate>
                 </CollectionView.ItemTemplate>
@@ -69,7 +69,7 @@
                     Text="Verbinden"
                     Clicked="OnConnectClicked" />
             <ActivityIndicator x:Name="CheckIndicator" IsRunning="false" IsVisible="false" />
-            <Label x:Name="ErrorLabel" AutomationId="ErrorLabel" TextColor="Red" IsVisible="false" />
+            <Label x:Name="ErrorLabel" AutomationId="ErrorLabel" TextColor="{StaticResource VpDanger}" IsVisible="false" />
 
         </VerticalStackLayout>
     </ScrollView>

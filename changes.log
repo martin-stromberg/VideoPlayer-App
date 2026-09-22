@@ -1,5 +1,12 @@
 # Änderungsprotokoll
 
+## 2026-09-22 — Design-Angleichung an die Webanwendung, Schritt 1: Design-Tokens
+
+- Die neue App (`VideoPlayer.Maui`) nutzt durchgehend das dunkle Erscheinungsbild der Webanwendung: `Resources/Styles/Colors.xaml` enthält jetzt die dokumentierten Web-Design-Tokens als zentrale `Vp*`-Ressourcen (Seitenhintergrund `#131313`/`#0e0e0e`, Flächen `#1c1b1b`–`#393939`, Textstufen, Rahmen, Primär-/Sekundär-/Fehlerfarben); die MAUI-Template-Palette ist entfernt.
+- `Resources/Styles/Styles.xaml` stellt alle globalen Styles auf die Tokens um — inklusive Shell/Flyout- und Navigations-Farbgebung, `CornerRadius` 4 für normale Buttons mit `PointerOver`-Hover und einem neuen pill-förmigen `IconButton`-Style (999) für runde Symbol-Schaltflächen; `App.xaml.cs` pinnt `UserAppTheme = AppTheme.Dark`.
+- Alle hartcodierten Hexfarben und Farbliterale in den Seiten, `AppShell.xaml`, `Controls/MediaCarousel.xaml` und `MediaDetailsPage.xaml.cs` wurden durch `StaticResource`-Verweise ersetzt; Genre-Chips und Badges sind pill-förmig, Karten behalten den Web-Radius 8. Reine Design-Umstellung ohne Verhaltensänderung.
+- Neue Contract-Tests (`DesignTokensContractTests`) pinnen die Token-Werte, die Radien-Vorgaben und verbieten verstreute Farbwerte in Seiten, Steuerelementen und Code-Behind.
+
 ## 2026-09-22 — Videowiedergabe mit Picture-in-Picture und Fortschrittsverfolgung (Neugestaltung, Schritt 10)
 
 - Neue Wiedergabeseite `PlayerPage` (Shell-Route `player`) auf Basis von `CommunityToolkit.Maui.MediaElement` 10.0.0: Server-Streams (`api/items/{typ}/{id}/stream` mit `access_token`-Parameter, Konvention des Altbestands) oder lokale Dateien aus dem Download-Manifest — die Quellenabstraktion (`PlaybackSource`/`PlaybackSourceKind`) ist für den Download-Ausbau in Schritt 11 vorbereitet.

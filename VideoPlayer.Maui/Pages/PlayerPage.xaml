@@ -7,7 +7,7 @@
              Title="Wiedergabe"
              x:DataType="mvu:MvuHost">
 
-    <Grid BackgroundColor="Black">
+    <Grid BackgroundColor="{StaticResource VpBgDeep}">
 
         <!-- Videofläche -->
         <mct:MediaElement x:Name="VideoElement"
@@ -23,7 +23,7 @@
         <ActivityIndicator x:Name="LoadingIndicator"
                            IsRunning="{Binding Model.Player.IsResolving}"
                            IsVisible="{Binding Model.Player.IsResolving}"
-                           Color="#FFB84D"
+                           Color="{StaticResource VpPrimary}"
                            HeightRequest="48"
                            WidthRequest="48" />
 
@@ -31,21 +31,21 @@
         <VerticalStackLayout x:Name="OverlayChrome"
                              Spacing="0">
             <Border Padding="12"
-                    BackgroundColor="#80000000">
+                    BackgroundColor="{StaticResource VpOverlay}">
                 <Grid ColumnDefinitions="*,Auto,Auto"
                       ColumnSpacing="8">
                     <Label x:Name="TitleLabel"
                            Grid.Column="0"
                            FontSize="16"
                            FontAttributes="Bold"
-                           TextColor="#FFDDAA"
+                           TextColor="{StaticResource VpPrimarySoft}"
                            VerticalOptions="Center"
                            LineBreakMode="TailTruncation" />
                     <Label x:Name="WatchedBadge"
                            Grid.Column="1"
                            Text="Angesehen"
                            FontSize="12"
-                           TextColor="#9CCC65"
+                           TextColor="{StaticResource VpSecondary}"
                            VerticalOptions="Center"
                            IsVisible="False" />
                     <Button x:Name="PipButton"
@@ -65,11 +65,11 @@
                 Margin="16"
                 Padding="12"
                 StrokeShape="RoundRectangle 8"
-                BackgroundColor="#80404040"
+                BackgroundColor="{StaticResource VpOverlay}"
                 IsVisible="False">
             <Label x:Name="ErrorLabel"
                    FontSize="13"
-                   TextColor="#FF8A80" />
+                   TextColor="{StaticResource VpDanger}" />
         </Border>
 
     </Grid>

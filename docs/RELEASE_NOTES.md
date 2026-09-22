@@ -6,6 +6,7 @@
 
 ## What's New
 
+- Web-style dark design (`VideoPlayer.Maui`): the new app now uses the web application's documented design tokens — deep black backgrounds, graded dark surfaces, the red primary color with hover state, pill-shaped chips/badges/round icon buttons and 4px button corners. All colors come from central `Vp*` style resources; behavior is unchanged.
 - New platform-neutral server API client (`VideoPlayer.ApiClient`): login, health check, sources, recently added items, continue watching (progress/hide/skip), favorites, media lookup and picture retrieval.
 - Fixed retry strategy for failed server responses (retries with 1 s/2 s/4 s delays) and one-time token renewal on “unauthorized”.
 - Client gate via `X-API-Key` header, configurable through environment variable `VIDEOWEBPLAYER_MAUI_API_TOKEN`, build property `VideoPlayerApiToken` or client options.
@@ -29,6 +30,7 @@
 
 ## Neuerungen
 
+- Dunkles Web-Design (`VideoPlayer.Maui`): Die neue App nutzt die dokumentierten Design-Tokens der Webanwendung — tiefschwarze Hintergründe, abgestufte dunkle Flächen, rote Primärfarbe mit Hover-Zustand, pill-förmige Chips/Badges/runde Symbol-Schaltflächen und 4px-Button-Ecken. Alle Farben kommen aus zentralen `Vp*`-Stilressourcen; die Bedienung ist unverändert.
 - Neuer plattformneutraler Server-API-Client (`VideoPlayer.ApiClient`): Anmeldung, Erreichbarkeitsprüfung, Quellen, „Neu im Programm", Weiterschauen (Fortschritt/Ausblenden/Überspringen), Favoriten, Mediennachschlagen und Bildabrufe.
 - Feste Wiederholungsstrategie bei fehlerhaften Serverantworten (Wiederholungen nach 1 s/2 s/4 s) und einmalige Token-Erneuerung bei „nicht autorisiert".
 - Client-Gate per `X-API-Key`-Header, konfigurierbar über die Umgebungsvariable `VIDEOWEBPLAYER_MAUI_API_TOKEN`, die Build-Eigenschaft `VideoPlayerApiToken` oder die Client-Optionen.
