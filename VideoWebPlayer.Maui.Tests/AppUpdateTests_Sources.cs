@@ -169,6 +169,62 @@ public class AppUpdateTests_Sources
         Assert.False(transition.Model.SourcesOverview.ShowEmpty);
     }
 
+    /// <summary>Prüft SourcesLoaded: bei Fehler mit Bestand → bleiben die bisherigen Einträge erhalten.</summary>
+    [Fact]
+    public void SourcesLoaded_Error_KeepsExistingSources()
+    {
+        // Der Effekt-Handler dispatcht im Fehlerfall eine leere Liste —
+        // ein transienter Ladefehlschlag (z. B. Neuversuch aus dem Menü)
+        // darf die bisherigen Menüeinträge nicht abräumen: das Menü
+        // zeigt die Retry-Zeile über den weiterhin antippbaren
+        // Einträgen.
+        var model = Connected() with
+        {
+            SourcesOverview = new SourcesOverviewState
+            {
+                Attempted = true,
+                IsLoading = true,
+                Sources = [Source(3, "Archiv"), Source(4, "Filme")]
+            }
+        };
+
+        var transition = AppUpdate.Update(
+            model,
+            new SourcesLoadedMessage([], "Die Quellen konnten nicht geladen werden."));
+
+        var overview = transition.Model.SourcesOverview;
+        Assert.True(overview.Attempted);
+        Assert.True(overview.HasError);
+        Assert.False(overview.IsLoading);
+        Assert.Equal(2, overview.Sources.Count);
+        Assert.Equal(3, overview.Sources[0].Id);
+        Assert.Equal(4, overview.Sources[1].Id);
+    }
+
+    /// <summary>Prüft SourcesLoaded: ohne Fehler ersetzt die Antwort den bisherigen Bestand.</summary>
+    [Fact]
+    public void SourcesLoaded_Success_ReplacesExistingSources()
+    {
+        var model = Connected() with
+        {
+            SourcesOverview = new SourcesOverviewState
+            {
+                Attempted = true,
+                IsLoading = true,
+                Sources = [Source(3, "Archiv")]
+            }
+        };
+
+        var transition = AppUpdate.Update(
+            model,
+            new SourcesLoadedMessage([Source(9, "Neu")], null));
+
+        var overview = transition.Model.SourcesOverview;
+        Assert.False(overview.HasError);
+        var retained = Assert.Single(overview.Sources);
+        Assert.Equal(9, retained.Id);
+    }
+
     // --- Manueller Neuversuch aus dem Menü (Fehler-Eintrag) ---
 
     /// <summary>Prüft SourcesReloadRequested: bei <c>Connected</c> → startet den Ladevorgang erneut und löscht den Fehler.</summary>

@@ -216,6 +216,32 @@ public class SourcesContractTests
         Assert.Contains("CachedListsChangedMessage", handler, StringComparison.Ordinal);
     }
 
+    /// <summary>Prüft EffectHandler: die Quellen-Navigation schiebt keine identische Seite, wenn die Quelle bereits oben liegt.</summary>
+    [Fact]
+    public void EffectHandler_SkipsPush_WhenSameSourceOverviewIsTopmost()
+    {
+        var handler = Read("VideoPlayer.Maui", "Services", "ShellAppEffectHandler.cs");
+
+        // Ein erneuter Tap auf die bereits geöffnete Quelle darf keine
+        // identische Seite auf den Stack legen: vor dem GoToAsync wird
+        // die oberste Shell-Route (CurrentState.Location) auf
+        // „sourceoverview" mit gleicher id geprüft.
+        var start = handler.IndexOf("private async Task NavigateToSourceOverviewAsync", StringComparison.Ordinal);
+        var end = handler.IndexOf("private async Task LoadSourcesAsync", StringComparison.Ordinal);
+        Assert.True(start > 0 && end > start);
+        var method = handler[start..end];
+
+        Assert.Contains("sourceoverview", method, StringComparison.Ordinal);
+        Assert.Contains("\"id\"", method, StringComparison.Ordinal);
+        // Die Dedup-Prüfung liest die oberste Shell-Route und steht vor
+        // dem Push — der Helper folgt der Methode, der Aufruf muss vor
+        // GoToAsync liegen.
+        Assert.Contains("CurrentState", method, StringComparison.Ordinal);
+        var guard = method.IndexOf("IsTopmostSourceOverview", StringComparison.Ordinal);
+        var push = method.IndexOf("GoToAsync", StringComparison.Ordinal);
+        Assert.True(guard > 0 && push > guard);
+    }
+
     /// <summary>Prüft MauiProgram: registriert die Step-8-Services und Seiten.</summary>
     [Fact]
     public void MauiProgram_RegistersStep8ServicesAndPages()

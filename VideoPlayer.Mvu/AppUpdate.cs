@@ -722,7 +722,13 @@ public static class AppUpdate
                 SourcesOverview = new SourcesOverviewState
                 {
                     Attempted = true,
-                    Sources = message.Sources,
+                    // Bei Fehlschlag bleibt der bisherige Bestand sichtbar —
+                    // der Effekt-Handler dispatcht im Fehlerfall eine leere
+                    // Liste; das Menü zeigt die Retry-Zeile über den
+                    // weiterhin antippbaren Einträgen statt sie abzuräumen.
+                    Sources = message.Error is null
+                        ? message.Sources
+                        : model.SourcesOverview.Sources,
                     Error = message.Error
                 }
             },

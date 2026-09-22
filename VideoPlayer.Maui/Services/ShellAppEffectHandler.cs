@@ -415,6 +415,16 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
 
         try
         {
+            if (IsTopmostSourceOverview(overview.SourceId))
+            {
+                // Die Übersicht dieser Quelle liegt bereits oben auf dem
+                // Stack — ein erneuter Push (Tap auf den gerade offenen
+                // Menüeintrag) würde eine identische Seite schieben; die
+                // Nachlade-Effekte der Auswahl laufen dennoch und
+                // frischen den Stand der geöffneten Seite auf.
+                return;
+            }
+
             var route = $"sourceoverview?id={overview.SourceId}" +
                 $"&name={Uri.EscapeDataString(overview.SourceName ?? string.Empty)}";
             await Shell.Current.GoToAsync(route);
@@ -423,6 +433,43 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
         {
             System.Diagnostics.Debug.WriteLine($"[ShellAppEffectHandler] Quellen-Navigation fehlgeschlagen: {ex.Message}");
         }
+    }
+
+    /// <summary>Prüft, ob die oberste Shell-Route bereits die Quellenübersicht der angegebenen Quelle ist.</summary>
+    /// <param name="sourceId">Die Quellen-Id des anzusteuernden Ziels.</param>
+    /// <returns><c>true</c>, wenn oben bereits „sourceoverview" mit derselben <c>id</c> liegt.</returns>
+    private static bool IsTopmostSourceOverview(long sourceId)
+    {
+        var location = Shell.Current?.CurrentState?.Location?.OriginalString;
+        if (string.IsNullOrEmpty(location))
+        {
+            return false;
+        }
+
+        // Die Location trägt den ganzen Stack (z. B.
+        // „//home/sourceoverview?id=5") — nur das letzte Pfadsegment
+        // entscheidet, welche Seite oben liegt.
+        var queryIndex = location.IndexOf('?', StringComparison.Ordinal);
+        var path = queryIndex >= 0 ? location[..queryIndex] : location;
+        var topmost = path.Split('/', StringSplitOptions.RemoveEmptyEntries).LastOrDefault();
+        if (!string.Equals(topmost, "sourceoverview", StringComparison.OrdinalIgnoreCase)
+            || queryIndex < 0)
+        {
+            return false;
+        }
+
+        foreach (var pair in location[(queryIndex + 1)..].Split('&', StringSplitOptions.RemoveEmptyEntries))
+        {
+            var parts = pair.Split('=', 2);
+            if (parts.Length == 2
+                && string.Equals(parts[0], "id", StringComparison.OrdinalIgnoreCase))
+            {
+                return long.TryParse(Uri.UnescapeDataString(parts[1]), out var id)
+                    && id == sourceId;
+            }
+        }
+
+        return false;
     }
 
     private async Task LoadSourcesAsync(CancellationToken cancellationToken)
