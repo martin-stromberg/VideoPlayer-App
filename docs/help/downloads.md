@@ -27,6 +27,9 @@ auch offline, weil der Bestand lokal im Download-Manifest liegt.
 - Je Eintrag: Titel, Medientyp (Film/Episode), Zustand („Wartend",
   „Läuft", „Fertig", „Abgebrochen", „Fehler"), Fortschrittsbalken
   mit Prozentangabe während des Laufs und verständliche Fehlertexte.
+- Der Fortschrittsbalken aktualisiert sich flüssig: bei jedem
+  Fortschritts-Tick wird nur der betroffene Eintrag aktualisiert —
+  die übrige Liste wird nicht neu aufgebaut (kein Flackern).
 - Über der Liste steht die Kontingent-Belegung („x von y GB belegt");
   ein Offline-Banner kündigt an, dass wartende Downloads mit der
   Verbindung fortgesetzt werden.

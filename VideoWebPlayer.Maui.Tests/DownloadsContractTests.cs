@@ -21,7 +21,11 @@ public class DownloadsContractTests
     {
         var xaml = Read("VideoPlayer.Maui", "Pages", "DownloadsPage.xaml");
 
-        Assert.Contains("{Binding Model.Downloads.Items}", xaml, StringComparison.Ordinal);
+        // Stabile ItemsSource (Code-Behind): kein Listen-Binding, das bei
+        // jedem Fortschritts-Tick eine neue Instanz setzt (Flackern).
+        Assert.Contains("x:Name=\"DownloadsCollection\"", xaml, StringComparison.Ordinal);
+        Assert.DoesNotContain("ItemsSource=\"{Binding", xaml, StringComparison.Ordinal);
+        Assert.Contains("x:DataType=\"mvu:DownloadItemViewModel\"", xaml, StringComparison.Ordinal);
         Assert.Contains("{Binding Title}", xaml, StringComparison.Ordinal);
         Assert.Contains("{Binding MediaTypeText}", xaml, StringComparison.Ordinal);
         Assert.Contains("{Binding StateText}", xaml, StringComparison.Ordinal);
@@ -64,6 +68,21 @@ public class DownloadsContractTests
         // Quota- und Offline-Anzeige werden aus dem Modell aktualisiert.
         Assert.Contains("model.Downloads.QuotaText", code, StringComparison.Ordinal);
         Assert.Contains("model.IsOffline", code, StringComparison.Ordinal);
+    }
+
+    /// <summary>Prüft DownloadsPage: granulare Listen-Aktualisierung ohne CollectionView-Reset (Anti-Flackern).</summary>
+    [Fact]
+    public void DownloadsPage_SyncsItems_WithoutItemsSourceReset()
+    {
+        var code = Read("VideoPlayer.Maui", "Pages", "DownloadsPage.xaml.cs");
+
+        // Stabile ObservableCollection, einmalig als ItemsSource gesetzt.
+        Assert.Contains("ObservableCollection<DownloadItemViewModel>", code, StringComparison.Ordinal);
+        Assert.Contains("ItemsSource = downloadItems", code, StringComparison.Ordinal);
+        // Granularer Abgleich pro Modelländerung (in-place statt Reset).
+        Assert.Contains("DownloadListSync.Sync(downloadItems, model.Downloads.Items)", code, StringComparison.Ordinal);
+        // Eintrags-Kontext ist das ViewModel; die Messages erhalten den Record.
+        Assert.Contains("is DownloadItemViewModel viewItem", code, StringComparison.Ordinal);
     }
 
     /// <summary>Prüft MediaDetailsPage: Download-Schalter für Film und je Episode.</summary>
