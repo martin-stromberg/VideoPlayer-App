@@ -9,6 +9,7 @@
 - [Serververwaltung und Erststart-Einrichtung](serververwaltung-erststart.md) — Erststart-Dialog, Netzwerk-Erkennung (mDNS/UDP), bekannte Server und „Server wechseln".
 - [Verbindung und Anmeldung](verbindung-anmeldung.md) — automatischer Verbindungsaufbau beim Start, Anmeldemaske, Offline-Modus, Token-Erneuerung und Verhalten nach einer Backup-Wiederherstellung.
 - [Netzwerkstatus und Synchronisation](netzwerk-synchronisation.md) — Online↔Offline-Erkennung zur Laufzeit, automatische Wiederverbindung, Echtzeit-Ereignisse des Servers (SignalR), persistente Fortschritts-Warteschlange und Hintergrund-Synchronisation.
+- [Startseite mit gecachten Medienlisten](startseite-medienlisten.md) — „Weiterschauen", „Favoriten" und „Neu im Programm" mit Cache-First-Laden, Poster-Ablage außerhalb des Backups, ereignisgesteuerter Aktualisierung und Detail-Navigation.
 
 ## Infrastruktur
 

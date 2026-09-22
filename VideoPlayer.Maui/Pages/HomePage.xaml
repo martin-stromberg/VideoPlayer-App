@@ -1,25 +1,53 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:controls="clr-namespace:VideoPlayer.Maui.Controls"
+             xmlns:mvu="clr-namespace:VideoPlayer.Mvu;assembly=VideoPlayer.Mvu"
              x:Class="VideoPlayer.Maui.Pages.HomePage"
-             Title="Startseite">
+             Title="Startseite"
+             x:DataType="mvu:MvuHost">
+    <ScrollView>
+        <VerticalStackLayout Padding="0,10,0,20" Spacing="24">
+            <!-- Hinweis bei fehlender Verbindung: die gecachten Inhalte
+                 bleiben trotzdem sichtbar. -->
+            <Border x:Name="OfflineBanner"
+                    Margin="20,0"
+                    Padding="12,8"
+                    StrokeShape="RoundRectangle 8"
+                    BackgroundColor="#D9A029"
+                    IsVisible="False">
+                <Label Text="Offline-Modus – zwischengespeicherte Inhalte werden angezeigt."
+                       TextColor="Black"
+                       FontAttributes="Bold" />
+            </Border>
 
-    <VerticalStackLayout Padding="20" Spacing="10">
-        <Label Text="Startseite" FontSize="24" FontAttributes="Bold" />
-        <Border x:Name="OfflineBanner"
-                AutomationId="OfflineBanner"
-                IsVisible="False"
-                BackgroundColor="#FFF3CD"
-                StrokeShape="RoundRectangle 6"
-                Padding="10">
-            <Label Text="Offline-Modus: Der Server ist nicht erreichbar. Es werden lokal gespeicherte Daten angezeigt. Über „Einstellungen → Serververwaltung“ kann ein anderer Server gewählt werden."
-                   TextColor="#664D03" />
-        </Border>
-        <Label Text="Diese Seite wird in einem späteren Entwicklungsschritt gefüllt." />
-        <Label x:Name="ServerStatusLabel"
-               AutomationId="ServerStatusLabel"
-               Text="{Binding Model.ServerHealthText}"
-               FontSize="12" />
-    </VerticalStackLayout>
+            <!-- Leerer Zustand: noch keine gecachten oder synchronisierten Inhalte. -->
+            <Label Text="Noch keine Inhalte vorhanden. Sobald ein Server verbunden ist, erscheinen hier deine Medien."
+                   Padding="20,0"
+                   IsVisible="False">
+                <Label.Triggers>
+                    <DataTrigger TargetType="Label"
+                                 Binding="{Binding Model.HasHomeContent}"
+                                 Value="False">
+                        <Setter Property="IsVisible" Value="True" />
+                    </DataTrigger>
+                </Label.Triggers>
+            </Label>
 
+            <controls:MediaCarousel Title="Weiterschauen"
+                                    Items="{Binding Model.ContinueWatching}"
+                                    ItemTapped="OnMediaItemTapped" />
+            <controls:MediaCarousel Title="Favoriten"
+                                    Items="{Binding Model.Favorites}"
+                                    ItemTapped="OnMediaItemTapped" />
+            <controls:MediaCarousel Title="Neu im Programm"
+                                    Items="{Binding Model.RecentEntries}"
+                                    ItemTapped="OnMediaItemTapped" />
+
+            <Label x:Name="ServerStatusLabel"
+                   Text="{Binding Model.ServerHealthText}"
+                   FontSize="12"
+                   Padding="20,0" />
+        </VerticalStackLayout>
+    </ScrollView>
 </ContentPage>

@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="VideoPlayer.Maui.Pages.MediaDetailsPage"
+             Title="Details">
+    <ScrollView>
+        <VerticalStackLayout Padding="20" Spacing="12">
+            <Label x:Name="MediaTitleLabel"
+                   FontSize="24"
+                   FontAttributes="Bold" />
+            <Label x:Name="MediaTypeLabel"
+                   FontSize="14"
+                   Opacity="0.7" />
+            <Label Text="Die Detailseite dieses Mediums wird in einem späteren Entwicklungsschritt ergänzt."
+                   FontSize="14" />
+        </VerticalStackLayout>
+    </ScrollView>
+</ContentPage>

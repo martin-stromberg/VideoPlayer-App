@@ -105,6 +105,12 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
             case SyncMetadataEffect:
                 await RunPartialSyncAsync(s => s.SyncMetadataAsync(cancellationToken));
                 break;
+            case LoadHomeListsEffect:
+                await LoadHomeListsAsync();
+                break;
+            case NavigateToMediaDetailsEffect details:
+                await MainThread.InvokeOnMainThreadAsync(() => NavigateToMediaDetailsAsync(details));
+                break;
         }
     }
 
@@ -175,6 +181,48 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
         catch (Exception ex)
         {
             System.Diagnostics.Debug.WriteLine($"[ShellAppEffectHandler] Teil-Synchronisation fehlgeschlagen: {ex.Message}");
+        }
+
+        // Alle Teil-Synchronisationen betreffen Startseiten-Listen — die
+        // Anzeige lädt danach den (ggf. unveränderten) Cache-Stand neu.
+        await DispatchMessageAsync(new CachedListsChangedMessage());
+    }
+
+    private async Task LoadHomeListsAsync()
+    {
+        HomeLists lists;
+        try
+        {
+            lists = await services.GetRequiredService<HomeListService>().LoadHomeListsAsync();
+        }
+        catch (Exception ex)
+        {
+            // Fehler beim Cache-Lesen → leere Listen, die Startseite bleibt
+            // anzeigbar.
+            System.Diagnostics.Debug.WriteLine($"[ShellAppEffectHandler] Startseiten-Listen laden fehlgeschlagen: {ex.Message}");
+            lists = HomeLists.Empty;
+        }
+
+        await DispatchMessageAsync(new HomeListsLoadedMessage(lists));
+    }
+
+    private async Task NavigateToMediaDetailsAsync(NavigateToMediaDetailsEffect details)
+    {
+        if (Shell.Current is null)
+        {
+            return;
+        }
+
+        try
+        {
+            var route = $"mediadetails?mediaType={Uri.EscapeDataString(details.MediaType)}" +
+                $"&id={details.MediaId}" +
+                $"&title={Uri.EscapeDataString(details.Title ?? string.Empty)}";
+            await Shell.Current.GoToAsync(route);
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[ShellAppEffectHandler] Detail-Navigation fehlgeschlagen: {ex.Message}");
         }
     }
 

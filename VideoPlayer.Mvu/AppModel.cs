@@ -86,6 +86,31 @@ public sealed record AppModel
     /// </summary>
     public string? ServerSetupError { get; init; }
 
+    /// <summary>
+    /// Startseiten-Liste „Weiterschauen" — Stand der lokalen Cache-Ablage
+    /// (Cache-First beim Start, aktualisiert nach Synchronisation und
+    /// Server-Ereignissen).
+    /// </summary>
+    public IReadOnlyList<HomeMediaItem> ContinueWatching { get; init; } = [];
+
+    /// <summary>Startseiten-Liste „Favoriten" (Stand der Cache-Ablage).</summary>
+    public IReadOnlyList<HomeMediaItem> Favorites { get; init; } = [];
+
+    /// <summary>Startseiten-Liste „Neu im Programm" (Stand der Cache-Ablage).</summary>
+    public IReadOnlyList<HomeMediaItem> RecentEntries { get; init; } = [];
+
+    /// <summary>Die Weiterschauen-Liste enthält Einträge.</summary>
+    public bool HasContinueWatching => ContinueWatching.Count > 0;
+
+    /// <summary>Die Favoriten-Liste enthält Einträge.</summary>
+    public bool HasFavorites => Favorites.Count > 0;
+
+    /// <summary>Die Neu-im-Programm-Liste enthält Einträge.</summary>
+    public bool HasRecentEntries => RecentEntries.Count > 0;
+
+    /// <summary>Mindestens eine Startseiten-Liste enthält Einträge.</summary>
+    public bool HasHomeContent => HasContinueWatching || HasFavorites || HasRecentEntries;
+
     /// <summary>Dem Anwender anzeigbarer Text zum Serverstatus.</summary>
     public string ServerHealthText => ServerHealth switch
     {

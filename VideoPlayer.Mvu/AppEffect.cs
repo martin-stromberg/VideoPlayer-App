@@ -89,3 +89,19 @@ public sealed record SyncFavoritesEffect : AppEffect;
 
 /// <summary>Quellen und „Neu im Programm" vom Server neu laden und cachen.</summary>
 public sealed record SyncMetadataEffect : AppEffect;
+
+/// <summary>
+/// Gecachte Startseiten-Listen aus der lokalen Ablage lesen
+/// (Ergebnis: <c>HomeListsLoadedMessage</c>). Läuft ohne Serverkontakt —
+/// Cache-First-Anzeige der Startseite.
+/// </summary>
+public sealed record LoadHomeListsEffect : AppEffect;
+
+/// <summary>
+/// Zur Detailseite eines Mediums navigieren (Shell-Route
+/// <c>mediadetails</c>, geschoben auf den Navigationsstack).
+/// </summary>
+public sealed record NavigateToMediaDetailsEffect(
+    string MediaType,
+    long MediaId,
+    string Title) : AppEffect;
