@@ -447,6 +447,136 @@ public class AppUpdateTests_Player
         Assert.DoesNotContain(transition.Effects, e => e is ResolvePlaybackSourceEffect);
     }
 
+    // --- Angesehen-Markierung in den geladenen Details (Schritt 7) ---
+
+    /// <summary>Prüft PlaybackEnded: die gesehene Episode wird in den geladenen Details markiert.</summary>
+    [Fact]
+    public void PlaybackEnded_MarksEpisodeWatchedInDetails()
+    {
+        var model = WithDetails(ShowDetails()) with
+        {
+            Player = PlayingState(
+                duration: TimeSpan.FromMinutes(45),
+                position: TimeSpan.FromMinutes(44))
+        };
+
+        var transition = AppUpdate.Update(model, new PlaybackEndedMessage());
+
+        var seasons = transition.Model.MediaDetails.Details!.Seasons;
+        var watched = seasons[0].Episodes[0];
+        Assert.NotNull(watched.WatchedAt);
+        Assert.True(watched.IsWatched);
+        // Alle übrigen Episoden bleiben ungesehen.
+        Assert.Null(seasons[0].Episodes[1].WatchedAt);
+        Assert.All(seasons[1].Episodes, e => Assert.Null(e.WatchedAt));
+    }
+
+    /// <summary>Prüft PlaybackEnded: die Markierung greift auch bei Auto-Fortsetzung auf die Folge-Episode.</summary>
+    [Fact]
+    public void PlaybackEnded_AutoResume_StillMarksFinishedEpisode()
+    {
+        var duration = TimeSpan.FromMinutes(45);
+        var model = WithDetails(ShowDetails()) with
+        {
+            Player = PlayingState(
+                duration: duration,
+                position: duration - TimeSpan.FromSeconds(5),
+                upcoming: [new PlayerEpisodeRef { MediaId = 32, Title = "Folge 2" }]),
+            Settings = new AppSettings { AutoResumeEnabled = true }
+        };
+
+        var transition = AppUpdate.Update(model, new PlaybackEndedMessage());
+
+        // Player läuft auf der nächsten Episode weiter …
+        Assert.Equal(32, transition.Model.Player.MediaId);
+        // … aber die beendete Episode trägt den Gesehen-Zeitpunkt.
+        var seasons = transition.Model.MediaDetails.Details!.Seasons;
+        Assert.True(seasons[0].Episodes[0].IsWatched);
+        Assert.False(seasons[0].Episodes[1].IsWatched);
+    }
+
+    /// <summary>Prüft PlaybackProgress: das Watched-Fenster markiert die Episode in den geladenen Details.</summary>
+    [Fact]
+    public void PlaybackProgress_WatchedWindow_MarksEpisodeWatchedInDetails()
+    {
+        var duration = TimeSpan.FromMinutes(45);
+        var model = WithDetails(ShowDetails()) with { Player = PlayingState() };
+
+        var transition = AppUpdate.Update(
+            model,
+            new PlaybackProgressMessage(
+                duration - TimeSpan.FromSeconds(300), duration, true, false));
+
+        Assert.True(transition.Model.Player.IsWatched);
+        var seasons = transition.Model.MediaDetails.Details!.Seasons;
+        Assert.True(seasons[0].Episodes[0].IsWatched);
+        Assert.False(seasons[0].Episodes[1].IsWatched);
+    }
+
+    /// <summary>Prüft PlaybackEnded: eine bereits gesehene Episode behält den Server-Zeitpunkt.</summary>
+    [Fact]
+    public void PlaybackEnded_AlreadyWatchedEpisode_KeepsServerTimestamp()
+    {
+        var watchedAt = new DateTime(2026, 9, 1, 20, 0, 0, DateTimeKind.Utc);
+        var details = ShowDetails();
+        details = details with
+        {
+            Seasons =
+            [
+                details.Seasons[0] with
+                {
+                    Episodes =
+                    [
+                        details.Seasons[0].Episodes[0] with { WatchedAt = watchedAt },
+                        details.Seasons[0].Episodes[1]
+                    ]
+                },
+                details.Seasons[1]
+            ]
+        };
+        var model = WithDetails(details) with
+        {
+            Player = PlayingState(
+                duration: TimeSpan.FromMinutes(45),
+                position: TimeSpan.FromMinutes(44))
+        };
+
+        var transition = AppUpdate.Update(model, new PlaybackEndedMessage());
+
+        Assert.Equal(watchedAt, transition.Model.MediaDetails.Details!.Seasons[0].Episodes[0].WatchedAt);
+    }
+
+    /// <summary>Prüft PlaybackEnded: Wiedergabe eines Films berührt die Episodenliste nicht.</summary>
+    [Fact]
+    public void PlaybackEnded_Movie_DoesNotTouchEpisodeList()
+    {
+        var model = WithDetails(ShowDetails()) with
+        {
+            Player = PlayingState() with { MediaType = "movie", MediaId = 42 }
+        };
+
+        var transition = AppUpdate.Update(model, new PlaybackEndedMessage());
+
+        Assert.All(
+            transition.Model.MediaDetails.Details!.Seasons.SelectMany(s => s.Episodes),
+            e => Assert.Null(e.WatchedAt));
+    }
+
+    /// <summary>Prüft PlaybackEnded: eine Episode außerhalb der geladenen Details lässt die Ansicht unverändert.</summary>
+    [Fact]
+    public void PlaybackEnded_UnknownEpisode_LeavesDetailsUnchanged()
+    {
+        var details = ShowDetails();
+        var model = WithDetails(details) with
+        {
+            Player = PlayingState(mediaId: 99)
+        };
+
+        var transition = AppUpdate.Update(model, new PlaybackEndedMessage());
+
+        Assert.Same(details, transition.Model.MediaDetails.Details);
+    }
+
     /// <summary>Prüft PlaybackFailed: Fehlermeldung + Rückfall auf die nächste Episode.</summary>
     [Fact]
     public void PlaybackFailed_ShowsErrorAndFallsBack()

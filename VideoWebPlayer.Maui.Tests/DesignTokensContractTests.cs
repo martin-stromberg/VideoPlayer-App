@@ -87,6 +87,18 @@ public class DesignTokensContractTests
         Assert.Contains("x:Key=\"VpShadowBrush\"", xaml, StringComparison.Ordinal);
     }
 
+    /// <summary>Prüft Colors.xaml: die Badge-Tokens des Angesehen-Symbols sind mit den Web-Werten abgebildet.</summary>
+    [Fact]
+    public void Colors_DefinesWatchedBadgeTokens()
+    {
+        var colors = LoadColorResources();
+
+        // Web .watched-indicator: rgba(0,0,0,.68) Grund,
+        // rgba(255,255,255,.28) Rand — als ARGB-Hex.
+        Assert.Equal("#AD000000", colors["VpBadgeBg"], ignoreCase: true);
+        Assert.Equal("#47FFFFFF", colors["VpBadgeBorder"], ignoreCase: true);
+    }
+
     /// <summary>Prüft Colors.xaml: die alte MAUI-Template-Palette ist vollständig entfernt.</summary>
     [Fact]
     public void Colors_ContainsNoTemplatePalette()

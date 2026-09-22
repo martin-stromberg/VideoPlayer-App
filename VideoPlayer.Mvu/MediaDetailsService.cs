@@ -467,6 +467,7 @@ public sealed class MediaDetailsService
                         Id = e.Id,
                         Number = e.Number,
                         Title = string.IsNullOrWhiteSpace(e.Title) ? $"Episode {e.Number}" : e.Title,
+                        WatchedAt = e.WatchedAt,
                         IsHighlighted = e.Id == highlightedEpisodeId,
                         HasLocalFile = completedIds.Contains(e.Id),
                         IsPlaceholder = !completedIds.Contains(e.Id)
@@ -623,6 +624,7 @@ public sealed class MediaDetailsService
                         Plot = e.Plot,
                         ReleaseYear = e.ReleaseDate?.Year,
                         PosterPictureId = e.GeneratedBackgroundPictureId ?? e.PosterPictureId,
+                        WatchedAt = e.WatchedAt,
                         IsHighlighted = e.Id == highlightedEpisodeId
                     })
                     .ToList()

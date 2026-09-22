@@ -41,6 +41,11 @@
     <Color x:Key="VpShadow">#000000</Color>
     <SolidColorBrush x:Key="VpShadowBrush" Color="{StaticResource VpShadow}"/>
 
+    <!-- Angesehen-Badge der Episodenlisten (Web .watched-indicator):
+         Grund rgba(0,0,0,.68) und feiner Rand rgba(255,255,255,.28). -->
+    <Color x:Key="VpBadgeBg">#AD000000</Color>
+    <Color x:Key="VpBadgeBorder">#47FFFFFF</Color>
+
     <!-- Hero-Kopfbereich der Startseite: transluzente Ableitungen der
          Tokens für die geschichteten Gradienten des Web-Heros
          (seitlicher Verlauf rgba(19,19,19,.98→.76→.18) über VpBg,

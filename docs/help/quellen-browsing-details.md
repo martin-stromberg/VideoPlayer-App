@@ -60,7 +60,7 @@ Startseiten-Listen).
 |-----------|-------------|
 | Film (`movie`) | Bild, Titel, Jahr, Genres, Handlung |
 | Filmkollektion (`moviecollection`) | Sammlungs-Metadaten + Raster der enthaltenen Filme; Tap öffnet die Film-Detailseite. Antwortet der Server 404 (Einzelfilm ohne Hülle), wird automatisch die Filmansicht geladen |
-| Serie (`tvshow`) | Serien-Metadaten, Staffel-Auswahl (`Picker`) und Episodenliste der gewählten Staffel mit Bild, „Nr. Titel" und Kurzbeschreibung |
+| Serie (`tvshow`) | Serien-Metadaten, Staffel-Auswahl (`Picker`) und Episodenliste der gewählten Staffel mit Bild, „Nr. Titel", Kurzbeschreibung und Angesehen-Badge gesehener Episoden |
 | Staffel (`tvshowseason`) | Serienansicht mit vorgewählter Staffel (Serie über den `show`-Hint aufgelöst — es existiert kein eigener Staffel-Endpunkt) |
 | Episode (`tvshowepisode`) | Serienansicht mit vorgewählter Staffel und markierter Episode; ist keine Serie auflösbar, werden die Basisdetails der Episode gezeigt |
 
@@ -85,6 +85,26 @@ Höhe folgt der Fensterbreite (mindestens 360, höchstens 620).
 - **Ohne Bild** (fehlende Grafik, Fehlschlag oder Offline) bleibt der
   Kopfbereich mit Gradienten und Texten stabil — kein Layoutbruch,
   kein Fehlerzustand.
+
+### Angesehen-Symbol in der Episodenliste
+
+In der Episodenliste der Serien-/Staffelansicht trägt jede als gesehen
+markierte Episode ein **rundes Angesehen-Badge** nach Web-Vorbild
+(`WatchedIndicator` / `.watched-indicator-episode -image-left`):
+
+- Dunkler transluzenter Kreis mit feinem hellem Rand und einem
+  **Augen-Symbol** in der weichen Primärfarbe, oben links über dem
+  Episoden-Still; Tooltip/Hinweis „Gesehen".
+- Grundlage ist der serverseitige Gesehen-Zeitpunkt
+  (`MediaEntry.WatchedAt` → `EpisodeItem.IsWatched`); Episoden ohne
+  Zeitpunkt zeigen **kein** Symbol.
+- Markiert der Player eine Episode der geöffneten Serie als gesehen
+  (Ende der Wiedergabe bzw. Watched-Endfenster), erscheint das Badge
+  in der Liste **ohne erneutes Laden** (`MarkEpisodeWatchedInDetails`
+  im Update-Zyklus); der exakte Server-Zeitpunkt folgt beim nächsten
+  Laden.
+- Der Offline-Snapshot übernimmt den Stand aus `CachedShowEpisode`
+  (alte Cache-Einträge ohne das Feld gelten als ungesehen).
 
 ## Favoriten
 

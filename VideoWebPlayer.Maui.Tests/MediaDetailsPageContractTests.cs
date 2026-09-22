@@ -134,6 +134,56 @@ public class MediaDetailsPageContractTests
         Assert.Contains("SelectedEpisodeId", update, StringComparison.Ordinal);
     }
 
+    /// <summary>Prüft MediaDetailsPage: blendet das Angesehen-Badge nur bei gesehenen Episoden ein.</summary>
+    [Fact]
+    public void MediaDetailsPage_EpisodeWatchedBadge_BindsIsWatched()
+    {
+        var xaml = Read("VideoPlayer.Maui", "Pages", "MediaDetailsPage.xaml");
+
+        // Das Badge gehört zum Episoden-Template (nach der Item-Auswahl
+        // der Episodenliste, vor dem Kollektions-Template).
+        var episodeTemplate = xaml.IndexOf("x:DataType=\"mvu:EpisodeItem\"", StringComparison.Ordinal);
+        var badgeIndex = xaml.IndexOf("AutomationId=\"WatchedIndicator\"", StringComparison.Ordinal);
+        var collectionTemplate = xaml.IndexOf("x:DataType=\"mvu:CollectionMovieItem\"", StringComparison.Ordinal);
+        Assert.True(episodeTemplate >= 0);
+        Assert.True(badgeIndex > episodeTemplate);
+        Assert.True(collectionTemplate > badgeIndex);
+        // Sichtbarkeit ausschließlich über den Gesehen-Zeitpunkt
+        // (IsWatched = WatchedAt.HasValue) — ungesehene Episoden ohne Badge.
+        Assert.Contains("IsVisible=\"{Binding IsWatched}\"", xaml, StringComparison.Ordinal);
+    }
+
+    /// <summary>Prüft MediaDetailsPage: bildet das Badge nach dem Web-Vorbild (rund, dunkel, Auge in Primärfarbe, oben links).</summary>
+    [Fact]
+    public void MediaDetailsPage_EpisodeWatchedBadge_FollowsWebDesign()
+    {
+        var xaml = Read("VideoPlayer.Maui", "Pages", "MediaDetailsPage.xaml");
+
+        // Pill-Form (Web: border-radius 999px), dunkler transluzenter
+        // Grund und feiner heller Rand über die Badge-Tokens.
+        Assert.Contains("CornerRadius=\"999\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("VpBadgeBg", xaml, StringComparison.Ordinal);
+        Assert.Contains("VpBadgeBorder", xaml, StringComparison.Ordinal);
+        // Position oben links über dem Poster (Web: -image-left).
+        var badgeIndex = xaml.IndexOf("AutomationId=\"WatchedIndicator\"", StringComparison.Ordinal);
+        var badgeSection = xaml.Substring(badgeIndex, xaml.IndexOf("</Border>", badgeIndex, StringComparison.Ordinal) - badgeIndex);
+        Assert.Contains("HorizontalOptions=\"Start\"", badgeSection, StringComparison.Ordinal);
+        Assert.Contains("VerticalOptions=\"Start\"", badgeSection, StringComparison.Ordinal);
+        // Auge in weicher Primärfarbe: Kontur-Pfad des Web-SVG.
+        Assert.Contains("VpPrimarySoft", badgeSection, StringComparison.Ordinal);
+        Assert.Contains("M2 12C4 7 8 4 12 4", badgeSection, StringComparison.Ordinal);
+    }
+
+    /// <summary>Prüft EpisodeItem: trägt den Gesehen-Zeitpunkt als Sichtbarkeitsquelle des Badges.</summary>
+    [Fact]
+    public void EpisodeItem_CarriesWatchedState()
+    {
+        var view = Read("VideoPlayer.Mvu", "MediaDetailsView.cs");
+
+        Assert.Contains("DateTime? WatchedAt", view, StringComparison.Ordinal);
+        Assert.Contains("WatchedAt.HasValue", view, StringComparison.Ordinal);
+    }
+
     /// <summary>Prüft VideoPlayerApiClient: ruft den Episoden-Still-Endpunkt über die gemeinsame Sende-Pipeline ab.</summary>
     [Fact]
     public void ApiClient_EpisodeStillEndpoint_UsesSendPipeline()

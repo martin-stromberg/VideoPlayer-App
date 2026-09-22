@@ -1714,14 +1714,17 @@ public static class AppUpdate
                 && updated.HasNextEpisode
                 && remaining <= TimeSpan.FromSeconds(model.Settings.AutoResumeRemainingSeconds))
             {
-                var transition = AdvanceToNextEpisode(model, updated, null);
+                var transition = AdvanceToNextEpisode(
+                    MarkEpisodeWatchedInDetails(model, updated), updated, null);
                 return new AppTransition(
                     transition.Model,
                     [.. effects, .. transition.Effects]);
             }
         }
 
-        return new AppTransition(model with { Player = updated }, effects);
+        return new AppTransition(
+            MarkEpisodeWatchedInDetails(model, updated) with { Player = updated },
+            effects);
     }
 
     private static AppTransition UpdatePlaybackEnded(AppModel model)
@@ -1762,13 +1765,68 @@ public static class AppUpdate
         // greift damit wie im Takt (Fenster ist stets > 0).
         if (model.Settings.AutoResumeEnabled && updated.HasNextEpisode)
         {
-            var transition = AdvanceToNextEpisode(model, updated, null);
+            var transition = AdvanceToNextEpisode(
+                MarkEpisodeWatchedInDetails(model, updated), updated, null);
             return new AppTransition(
                 transition.Model,
                 [.. effects, .. transition.Effects]);
         }
 
-        return new AppTransition(model with { Player = updated }, effects);
+        return new AppTransition(
+            MarkEpisodeWatchedInDetails(model, updated) with { Player = updated },
+            effects);
+    }
+
+    /// <summary>
+    /// Überträgt den „angesehen"-Stand des Players auf die geladene
+    /// Detailansicht: Die gespielte Episode erhält einen lokalen
+    /// Gesehen-Zeitpunkt (<see cref="EpisodeItem.WatchedAt"/>), damit die
+    /// Episodenliste ihr Angesehen-Badge ohne erneutes Laden zeigt.
+    /// Greift nur bei Episoden-Wiedergabe mit gesetztem
+    /// <see cref="PlayerState.IsWatched"/> und vorhandenem Serienkontext;
+    /// bereits markierte oder nicht enthaltene Episoden bleiben
+    /// unverändert.
+    /// </summary>
+    /// <param name="model">Aktuelles App-Model (Player-Stand wird separat gesetzt).</param>
+    /// <param name="player">Der aktualisierte Player-Zustand mit der gespielten Identität.</param>
+    /// <returns>Das ggf. aktualisierte Model; unverändert, wenn keine Markierung nötig ist.</returns>
+    private static AppModel MarkEpisodeWatchedInDetails(AppModel model, PlayerState player)
+    {
+        var details = model.MediaDetails.Details;
+        if (details is null
+            || !player.IsWatched
+            || MediaTypeNames.Normalize(player.MediaType) != "tvshowepisode"
+            || !details.HasSeasons)
+        {
+            return model;
+        }
+
+        var target = details.Seasons
+            .SelectMany(s => s.Episodes)
+            .FirstOrDefault(e => e.Id == player.MediaId);
+        if (target is null || target.WatchedAt is not null)
+        {
+            return model;
+        }
+
+        var seasons = details.Seasons
+            .Select(s => s with
+            {
+                Episodes = s.Episodes
+                    .Select(e => e.Id == player.MediaId
+                        ? e with { WatchedAt = DateTime.UtcNow }
+                        : e)
+                    .ToList()
+            })
+            .ToList();
+
+        return model with
+        {
+            MediaDetails = model.MediaDetails with
+            {
+                Details = details with { Seasons = seasons }
+            }
+        };
     }
 
     private static AppTransition UpdatePlaybackFailed(AppModel model)
