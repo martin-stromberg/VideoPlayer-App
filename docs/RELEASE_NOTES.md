@@ -6,6 +6,7 @@
 
 ## What's New
 
+- Player controls usable in full view (`VideoPlayer.Maui`): on the playback page the native transport controls (play/pause, seek, etc.) were unreachable because the app's header overlay invisibly covered the whole video area; the overlay now only occupies its visible top band and the title area passes input through, while the "Mini player" button stays usable.
 - Web-style dark design (`VideoPlayer.Maui`): the new app now uses the web application's documented design tokens — deep black backgrounds, graded dark surfaces, the red primary color with hover state, pill-shaped chips/badges/round icon buttons and 4px button corners. All colors come from central `Vp*` style resources; behavior is unchanged.
 - New platform-neutral server API client (`VideoPlayer.ApiClient`): login, health check, sources, recently added items, continue watching (progress/hide/skip), favorites, media lookup and picture retrieval.
 - Fixed retry strategy for failed server responses (retries with 1 s/2 s/4 s delays) and one-time token renewal on “unauthorized”.
@@ -31,6 +32,7 @@
 
 ## Neuerungen
 
+- Player-Steuerung in der Vollansicht bedienbar (`VideoPlayer.Maui`): Auf der Wiedergabeseite waren die nativen Transportsteuerungen (Play/Pause, Seek u. a.) nicht erreichbar, weil die Kopf-Überlagerung der App unsichtbar die gesamte Videofläche abdeckte; die Überlagerung belegt jetzt nur noch ihr sichtbares Kopfband und die Titelfläche lässt Eingaben durch, während der „Mini-Player"-Schalter nutzbar bleibt.
 - Dunkles Web-Design (`VideoPlayer.Maui`): Die neue App nutzt die dokumentierten Design-Tokens der Webanwendung — tiefschwarze Hintergründe, abgestufte dunkle Flächen, rote Primärfarbe mit Hover-Zustand, pill-förmige Chips/Badges/runde Symbol-Schaltflächen und 4px-Button-Ecken. Alle Farben kommen aus zentralen `Vp*`-Stilressourcen; die Bedienung ist unverändert.
 - Neuer plattformneutraler Server-API-Client (`VideoPlayer.ApiClient`): Anmeldung, Erreichbarkeitsprüfung, Quellen, „Neu im Programm", Weiterschauen (Fortschritt/Ausblenden/Überspringen), Favoriten, Mediennachschlagen und Bildabrufe.
 - Feste Wiederholungsstrategie bei fehlerhaften Serverantworten (Wiederholungen nach 1 s/2 s/4 s) und einmalige Token-Erneuerung bei „nicht autorisiert".

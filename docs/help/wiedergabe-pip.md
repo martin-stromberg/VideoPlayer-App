@@ -16,6 +16,18 @@ läuft vollständig über den MVU-Kreislauf.
   Abspielen-Schalter — dort wird über die enthaltenen Einträge
   gestartet.
 
+## Bedienung in der Vollansicht
+
+Die nativen Transportsteuerungen des `MediaElement`
+(`ShouldShowPlaybackControls` — Play/Pause, Positionsregler/Seek und
+die übrigen Transportfunktionen) sind in der normalen Vollansicht
+direkt bedienbar. Das App-Kopfband `OverlayChrome` (Titel,
+„Angesehen"-Hinweis, Mini-Player-Schalter) liegt nur am oberen Rand
+(`VerticalOptions="Start"`) und belegt die Videofläche nicht mehr
+vollständig; die Titelfläche ist zudem eingabedurchlässig
+(`InputTransparent`), sodass nur der Mini-Player-Schalter selbst
+Eingaben beansprucht.
+
 ## Quellen
 
 Die Quellauflösung (`PlaybackSourceService`) wählt automatisch:

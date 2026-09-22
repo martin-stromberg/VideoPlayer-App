@@ -1,5 +1,11 @@
 # Änderungsprotokoll
 
+## 2026-09-22 — Design-Angleichung an die Webanwendung, Schritt 3: Player-Steuerung in der Vollansicht
+
+- Die nativen Transportsteuerungen der Wiedergabeseite (`PlayerPage`, `MediaElement` mit `ShouldShowPlaybackControls`) sind in der Vollansicht wieder unmittelbar bedienbar: Das Kopf-Overlay `OverlayChrome` füllte als `VerticalStackLayout` ohne `VerticalOptions` (Default `Fill`) das gesamte Wiedergabe-Grid und fing alle Eingaben ab, obwohl nur das obere Kopfband sichtbaren Inhalt zeigte.
+- Korrektur rein deklarativ im XAML: `OverlayChrome` erhält `VerticalOptions="Start"` (Overlay schrumpft auf das Kopfband), das Kopfband-`Border` ist `InputTransparent="True"` (Titelfläche eingabedurchlässig), der `PipButton` bleibt per `InputTransparent="False"` klickbar. Mini-Player (Overlay dort per `IsVisible = !IsPictureInPicture` ausgeblendet) und Zurück-Navigation unverändert.
+- Neuer Contract-Test `PlayerContractTests.PlayerPage_OverlayChromeDoesNotCoverPlaybackSurface` pinnt die Korrektur (Negativprobe auf dem Ausgangsstand verifiziert).
+
 ## 2026-09-22 — Design-Angleichung an die Webanwendung, Schritt 1: Design-Tokens
 
 - Die neue App (`VideoPlayer.Maui`) nutzt durchgehend das dunkle Erscheinungsbild der Webanwendung: `Resources/Styles/Colors.xaml` enthält jetzt die dokumentierten Web-Design-Tokens als zentrale `Vp*`-Ressourcen (Seitenhintergrund `#131313`/`#0e0e0e`, Flächen `#1c1b1b`–`#393939`, Textstufen, Rahmen, Primär-/Sekundär-/Fehlerfarben); die MAUI-Template-Palette ist entfernt.
