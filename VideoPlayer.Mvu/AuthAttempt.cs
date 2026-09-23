@@ -15,6 +15,12 @@ public enum AuthAttemptStatus
     /// <summary>Der Server ist nicht erreichbar (Transportfehler/Zeitüberschreitung nach der Wiederholungsstrategie).</summary>
     ServerUnreachable,
 
+    /// <summary>
+    /// Das Client-Gate hat den Schlüssel abgelehnt (widerrufenes Geräte-Token) —
+    /// die Gate-Probe wurde als 401 beantwortet; kein Zugangsdaten-Problem.
+    /// </summary>
+    GateRejected,
+
     /// <summary>Sonstiger Fehler der Anmeldung.</summary>
     Failed
 }

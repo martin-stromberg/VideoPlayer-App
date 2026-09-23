@@ -25,6 +25,34 @@ Adressen oder nicht erreichbare Server erzeugen einen Inline-Hinweis —
 es wird nichts gespeichert. Nach erfolgreicher Einrichtung startet die App
 künftig direkt mit dem gespeicherten Server.
 
+## Gerät koppeln (Pairing)
+
+Ist der Server erreichbar, aber weder ein gepaartes Geräte-Token noch ein
+statischer Gate-Schlüssel vorhanden, blendet die Serverseite den Abschnitt
+„Gerät koppeln" ein:
+
+- Der Einmal-Code wird in der Verwaltung des Servers (Bereich „Geräte")
+  erzeugt und hier eingegeben (in der Regel 8 Zeichen, Großbuchstaben
+  und Ziffern ohne 0, O, 1, I und L; Kleinbuchstaben und Leerzeichen
+  werden normalisiert). „Koppeln" tauscht den Code über den
+  öffentlichen Endpunkt `POST api/pairing/exchange` gegen ein
+  verschlüsseltes Geräte-Token (ECDH P-256, AES-256-GCM). Die App meldet
+  dabei den Gerätenamen mit — er erscheint in der Geräteliste des
+  Servers und erleichtert ein späteres Widerrufen.
+- Fehler erscheinen inline: unvollständige oder falsch formatierte
+  Eingabe, ungültiger/abgelaufener/bereits verwendeter Code, zu viele
+  Versuche (vorübergehende Sperre), Server ohne Pairing-Endpunkt oder
+  Verbindungsfehler. Eine erneute Eingabe ist jederzeit möglich; es gibt
+  keinen automatischen Rückfall auf einen statischen Token.
+- Nach erfolgreicher Kopplung läuft die gewohnte automatische Anmeldung
+  an.
+
+Das Geräte-Token liegt in der sicheren Plattformablage
+(`AppSecretsService`), profil- und serveradress-spezifisch — es ist nicht
+Teil des Geräte-Backups. Verwirft der Server das Token (Gate-Ablehnung),
+wird es entfernt, einmalig der statische Schlüssel geprüft und danach die
+Pairing-Eingabe mit einem Hinweis erneut angezeigt.
+
 ## Server wechseln
 
 In den „Einstellungen" führt der Eintrag „Server wechseln" (Abschnitt
@@ -70,14 +98,27 @@ Fallback für API-Aufrufe, gilt aber nicht als „hinterlegter Server".
   (parallele Probes, Merge + Deduplizierung, Fehlerisolation).
 - `VideoPlayer.Mvu`: `AppPage.ServerSetup`, Model-Erweiterung
   (`KnownServers`, `ActiveServerAddress`, `DiscoveredServers`,
-  Lauf-/Fehlerflags), Messages/Effekte für Laden, Discovery, Prüfung und
-  Übernahme; der Start-Workflow lädt die Serververwaltung vor dem
-  Health-Check.
+  Lauf-/Fehlerflags, `IsPairingRequired`/`IsPairingRunning`/`PairingError`),
+  Messages/Effekte für Laden, Discovery, Prüfung, Übernahme und Pairing
+  (`PairingCodeSubmitted`, `PairingCompleted`, `DeviceTokenRevoked` /
+  `ExchangePairingCode`); `PairingCode` (Normalisierung/Validierung),
+  `DeviceTokenService` (Provider-Pflege, Gate-Probe per
+  `POST api/auth/login` — `api/health` ist serverseitig nicht
+  gate-geschützt —, Widerruf-Ereignis `DeviceTokenRejected`);
+  der Start-Workflow lädt die Serververwaltung vor dem Health-Check.
 - `VideoPlayer.Maui`: `Pages/ServerSetupPage` (Erststart als Window-Root,
-  „Server wechseln" als Shell-Route `serversetup` ohne Menüeintrag),
+  „Server wechseln" als Shell-Route `serversetup` ohne Menüeintrag,
+  Pairing-Abschnitt mit Code-Eingabe),
   `ServerAddressProvider` (zuletzt verbunden → Umgebungsvariable →
   IIS-Default), `ServerHealthProbe.CheckAsync(Uri)` für
-  Kandidatenadressen, `ShellAppEffectHandler`-Zweige.
+  Kandidatenadressen (mit adressspezifisch aufgelöstem Gate-Schlüssel,
+  niemals dem Geräte-Token eines anderen Servers),
+  `ShellAppEffectHandler`-Zweige.
+- `VideoPlayer.ApiClient`: `DevicePairingClient` (öffentlicher
+  Pairing-Endpunkt ohne Gate-/Bearer-Header und ohne Wiederholungen),
+  `ClientGate.DeviceTokenProvider`/`ResolveStatic` (Geräte-Token vor den
+  statischen Quellen), `HealthCheckResult` (unterscheidet
+  Gate-Ablehnung von Nichterreichbarkeit).
 
 ## Bekannte Einschränkung (serverseitig)
 

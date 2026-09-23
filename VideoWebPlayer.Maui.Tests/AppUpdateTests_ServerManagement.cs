@@ -132,7 +132,7 @@ public class AppUpdateTests_ServerManagement
 
         var transition = AppUpdate.Update(
             model,
-            new ServerCheckCompletedMessage("http://nas/", null, false));
+            new ServerCheckCompletedMessage("http://nas/", null, false, false));
 
         Assert.False(transition.Model.IsServerCheckRunning);
         Assert.Equal(AppUpdate.UnreachableServerError, transition.Model.ServerSetupError);
@@ -158,7 +158,7 @@ public class AppUpdateTests_ServerManagement
 
         var transition = AppUpdate.Update(
             model,
-            new ServerCheckCompletedMessage("http://nas:8080/", "NAS", true));
+            new ServerCheckCompletedMessage("http://nas:8080/", "NAS", true, false));
 
         Assert.True(transition.Model.IsServerCheckRunning);
         Assert.Null(transition.Model.ServerSetupError);
@@ -199,11 +199,92 @@ public class AppUpdateTests_ServerManagement
 
         var transition = AppUpdate.Update(
             model,
-            new ServerCheckCompletedMessage("http://alt/", "Alt", true));
+            new ServerCheckCompletedMessage("http://alt/", "Alt", true, false));
 
         // Kein Duplikat; der gewechselte Server steht vorn.
         Assert.Equal(2, transition.Model.KnownServers.Count);
         Assert.Equal("http://alt/", transition.Model.KnownServers[0].Address);
         Assert.Equal("http://neu/", transition.Model.KnownServers[1].Address);
+    }
+
+    /// <summary>
+    /// Prüft Update: bei <c>ServerCheckCompleted</c> mit Erfolg und
+    /// Pairing-Erforderlichkeit → Pairing-Eingabe statt AutoLogin.
+    /// </summary>
+    [Fact]
+    public void Update_ServerCheckCompleted_Success_PairingRequired_ShowsPairingInput()
+    {
+        // Erreichbarer, geprüfter Server ohne nutzbaren Gate-Schlüssel:
+        // der Server wird persistiert, aber statt der automatischen
+        // Anmeldung wird die Pairing-Eingabe der Einrichtungsseite sichtbar.
+        var model = new AppModel
+        {
+            CurrentPage = AppPage.ServerSetup,
+            IsServerCheckRunning = true
+        };
+
+        var transition = AppUpdate.Update(
+            model,
+            new ServerCheckCompletedMessage("http://nas/", "NAS", true, PairingRequired: true));
+
+        Assert.False(transition.Model.IsServerCheckRunning);
+        Assert.True(transition.Model.IsPairingRequired);
+        Assert.False(transition.Model.IsPairingRunning);
+        Assert.Null(transition.Model.PairingError);
+        Assert.Equal("http://nas/", transition.Model.ActiveServerAddress);
+        Assert.Equal(ServerHealthStatus.Reachable, transition.Model.ServerHealth);
+        Assert.Equal(ConnectionState.NeedsServerSetup, transition.Model.ConnectionState);
+        Assert.Equal(AppPage.ServerSetup, transition.Model.CurrentPage);
+        Assert.Equal("http://nas/", Assert.Single(transition.Model.KnownServers).Address);
+
+        // Persistiert wird der Server, eine automatische Anmeldung läuft nicht an.
+        var effect = Assert.IsType<PersistActiveServerEffect>(Assert.Single(transition.Effects));
+        Assert.Equal("http://nas/", effect.Address);
+        Assert.DoesNotContain(transition.Effects, e => e is AttemptAutoLoginEffect);
+    }
+
+    /// <summary>Prüft Update: bei <c>ServerCheckCompleted</c> mit Misserfolg → Pairing-Felder werden zurückgesetzt.</summary>
+    [Fact]
+    public void Update_ServerCheckCompleted_Failure_ResetsPairingFields()
+    {
+        var model = new AppModel
+        {
+            CurrentPage = AppPage.ServerSetup,
+            IsServerCheckRunning = true,
+            IsPairingRequired = true,
+            IsPairingRunning = true,
+            PairingError = AppUpdate.DeviceRevokedError
+        };
+
+        var transition = AppUpdate.Update(
+            model,
+            new ServerCheckCompletedMessage("http://nas/", null, false, PairingRequired: false));
+
+        Assert.False(transition.Model.IsPairingRequired);
+        Assert.False(transition.Model.IsPairingRunning);
+        Assert.Null(transition.Model.PairingError);
+        Assert.Equal(AppUpdate.UnreachableServerError, transition.Model.ServerSetupError);
+    }
+
+    /// <summary>Prüft Update: eine neue Adresseingabe setzt den Pairing-Kontext zurück.</summary>
+    [Fact]
+    public void Update_AddressSubmitted_ResetsPairingFields()
+    {
+        var model = new AppModel
+        {
+            CurrentPage = AppPage.ServerSetup,
+            IsPairingRequired = true,
+            IsPairingRunning = true,
+            PairingError = AppUpdate.InvalidPairingCodeError
+        };
+
+        var transition = AppUpdate.Update(model, new ServerAddressSubmittedMessage("http://nas"));
+
+        Assert.True(transition.Model.IsServerCheckRunning);
+        Assert.False(transition.Model.IsPairingRequired);
+        Assert.False(transition.Model.IsPairingRunning);
+        Assert.Null(transition.Model.PairingError);
+        var effect = Assert.IsType<CheckCandidateServerEffect>(Assert.Single(transition.Effects));
+        Assert.Equal("http://nas/", effect.Address);
     }
 }

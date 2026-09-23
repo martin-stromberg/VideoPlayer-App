@@ -68,6 +68,17 @@ public partial class ServerSetupPage : ContentPage
 
         ErrorLabel.Text = model.ServerSetupError;
         ErrorLabel.IsVisible = model.ServerSetupError is not null;
+
+        // Pairing-Abschnitt: nur sichtbar, wenn der Server ein
+        // Geräte-Pairing verlangt; Fehler laufen in einem eigenen
+        // Feld (getrennt von Adress-/Erreichbarkeitsfehlern).
+        PairingSection.IsVisible = model.IsPairingRequired;
+        PairingIndicator.IsRunning = model.IsPairingRunning;
+        PairingIndicator.IsVisible = model.IsPairingRunning;
+        PairButton.IsEnabled = !model.IsPairingRunning;
+        PairingCodeEntry.IsEnabled = !model.IsPairingRunning;
+        PairingErrorLabel.Text = model.PairingError;
+        PairingErrorLabel.IsVisible = model.PairingError is not null;
     }
 
     private void OnDiscoverClicked(object? sender, EventArgs e)
@@ -78,6 +89,11 @@ public partial class ServerSetupPage : ContentPage
     private void OnConnectClicked(object? sender, EventArgs e)
     {
         _ = mvuHost.DispatchAsync(new ServerAddressSubmittedMessage(AddressEntry.Text ?? string.Empty));
+    }
+
+    private void OnPairClicked(object? sender, EventArgs e)
+    {
+        _ = mvuHost.DispatchAsync(new PairingCodeSubmittedMessage(PairingCodeEntry.Text ?? string.Empty));
     }
 
     private void OnDiscoveredSelectionChanged(object? sender, SelectionChangedEventArgs e)

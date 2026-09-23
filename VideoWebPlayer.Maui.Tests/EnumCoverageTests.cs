@@ -68,6 +68,26 @@ public class EnumCoverageTests
             Enum.GetValues<VideoPlayer.Mvu.PlaybackSourceKind>().Select(value => value.ToString()));
     }
 
+    /// <summary>Prüft HealthCheckResult: alle Werte sind abgedeckt.</summary>
+    [Fact]
+    public void HealthCheckResult_AllValuesAreCovered()
+    {
+        // VideoPlayer.ApiClient.HealthCheckResult — direkt referenziert.
+        Assert.Equal(
+            new[] { "Reachable", "GateRejected", "Unreachable" },
+            Enum.GetValues<VideoPlayer.ApiClient.HealthCheckResult>().Select(value => value.ToString()));
+    }
+
+    /// <summary>Prüft PairingStatus: alle Werte sind abgedeckt.</summary>
+    [Fact]
+    public void PairingStatus_AllValuesAreCovered()
+    {
+        // VideoPlayer.Mvu.PairingStatus — direkt referenziert.
+        Assert.Equal(
+            new[] { "Succeeded", "InvalidCode", "RateLimited", "InvalidRequest", "NotSupported", "ServerUnreachable", "Failed" },
+            Enum.GetValues<VideoPlayer.Mvu.PairingStatus>().Select(value => value.ToString()));
+    }
+
     /// <summary>Prüft RecentEntryType: alle Werte sind abgedeckt.</summary>
     [Fact]
     public void RecentEntryType_AllValuesAreCovered()

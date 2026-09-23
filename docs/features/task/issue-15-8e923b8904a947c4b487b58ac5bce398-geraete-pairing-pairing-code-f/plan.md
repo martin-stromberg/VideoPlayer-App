@@ -362,3 +362,20 @@ Bestehende E2E-Tests: Keine vorhanden, folglich keine betroffen.
 ## Offene Punkte
 
 Keine.
+
+---
+
+## Nachtrag: Korrektur der Gate-Probe (Live-Verifikation 2026-09-23)
+
+Die Live-Verifikation gegen den IIS-Testserver (`live-verification.md`) hat gezeigt: `GET api/health` ist serverseitig **nicht** durch `ApiTokenCheck` geschützt und liefert auch mit ungültigem `X-API-Key` 200. Die ursprünglich geplante Probe von `IsGateRejectedAsync` auf `api/health` kann eine Gate-Ablehnung daher niemals feststellen.
+
+**Korrigierte Spezifikation für `DeviceTokenService.IsGateRejectedAsync`:** Die Probe sendet `POST api/auth/login` (einziger `MauiOnly`-gated Endpunkt) mit Body `{}` und nur dem `X-API-Key`-Header (aufgelöster Schlüssel inkl. Geräte-Token, kein Bearer). Auswertung:
+
+| Antwort | Bedeutung | Rückgabe |
+|---------|-----------|----------|
+| `401` mit `Content-Type: application/problem+json` | Gate-Ablehnung (`UnauthorizedResult` aus dem Action-Filter) | `true` |
+| `401` mit `Content-Type: text/plain` | Key akzeptiert, Credential-Prüfung schlug fehl (Action lief) | `false` |
+| `400` | Key akzeptiert, Model-Validation | `false` |
+| `429`, Transportfehler, sonstige | nicht entscheidbar | `false` |
+
+`LoginIpBlockService.RegisterFailure` wird nur im `PairingController` aufgerufen — die Probe erzeugt keine IP-Sperr-Fehlversuche. `HealthCheckResult.GateRejected` in `CheckHealthAsync`/`IServerHealthProbe` bleibt als Defense-in-depth für Server mit gated Health-Endpunkt bestehen, ist aber auf dem Referenzserver unerreichbar; der primäre Widerrufs-Detektor ist die korrigierte Login-Probe in den 401/403-Pfaden von `AuthSessionService`.

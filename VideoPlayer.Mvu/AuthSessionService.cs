@@ -18,13 +18,14 @@ public sealed class AuthSessionService
     private static readonly TimeSpan RequestTimeout = TimeSpan.FromSeconds(30);
 
     private readonly AppSecretsService secrets;
+    private readonly DeviceTokenService deviceTokens;
     private readonly Func<Uri, HttpClient> httpClientFactory;
     private readonly Func<TimeSpan, CancellationToken, Task>? delayAsync;
 
     /// <summary>Erstellt den Dienst mit der produktiven <see cref="HttpClient"/>-Erzeugung.</summary>
     /// <param name="secrets">Ablage der Zugangsdaten und Anmelde-Token.</param>
     public AuthSessionService(AppSecretsService secrets)
-        : this(secrets, null, null)
+        : this(secrets, new DeviceTokenService(secrets), null, null)
     {
     }
 
@@ -32,6 +33,8 @@ public sealed class AuthSessionService
     /// Erstellt den Dienst mit einer injizierbaren <see cref="HttpClient"/>-Fabrik
     /// und optionaler Warte-Implementierung für die Wiederholungsstrategie
     /// (für Tests; produktiv wird ein Client mit Basisadresse und Timeout erzeugt).
+    /// Der <see cref="DeviceTokenService"/> teilt die Fabrik für seine
+    /// Gate-Probe.
     /// </summary>
     /// <param name="secrets">Ablage der Zugangsdaten und Anmelde-Token.</param>
     /// <param name="httpClientFactory">Fabrik für <see cref="HttpClient"/> pro Serveradresse; <c>null</c> = produktive Erzeugung mit Timeout.</param>
@@ -40,8 +43,26 @@ public sealed class AuthSessionService
         AppSecretsService secrets,
         Func<Uri, HttpClient>? httpClientFactory,
         Func<TimeSpan, CancellationToken, Task>? delayAsync = null)
+        : this(secrets, new DeviceTokenService(secrets, httpClientFactory), httpClientFactory, delayAsync)
+    {
+    }
+
+    /// <summary>
+    /// Erstellt den Dienst mit Geräte-Token-Verwaltung sowie injizierbarer
+    /// <see cref="HttpClient"/>-Fabrik und Warte-Implementierung (Tests).
+    /// </summary>
+    /// <param name="secrets">Ablage der Zugangsdaten und Anmelde-Token.</param>
+    /// <param name="deviceTokens">Verwaltung der gepaarten Geräte-Tokens (Gate-Probe, Widerruf).</param>
+    /// <param name="httpClientFactory">Fabrik für <see cref="HttpClient"/> pro Serveradresse; <c>null</c> = produktive Erzeugung mit Timeout.</param>
+    /// <param name="delayAsync">Optionale Warte-Implementierung der Wiederholungsstrategie (Tests); <c>null</c> = <see cref="Task.Delay(TimeSpan, CancellationToken)"/>.</param>
+    public AuthSessionService(
+        AppSecretsService secrets,
+        DeviceTokenService deviceTokens,
+        Func<Uri, HttpClient>? httpClientFactory = null,
+        Func<TimeSpan, CancellationToken, Task>? delayAsync = null)
     {
         this.secrets = secrets ?? throw new ArgumentNullException(nameof(secrets));
+        this.deviceTokens = deviceTokens ?? throw new ArgumentNullException(nameof(deviceTokens));
         this.httpClientFactory = httpClientFactory ?? CreateHttpClient;
         this.delayAsync = delayAsync;
     }
@@ -181,10 +202,23 @@ public sealed class AuthSessionService
         }
         catch (ApiException ex) when (ex.StatusCode is HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden)
         {
+            // Das 401/403 kann vom Client-Gate (widerrufenes Geräte-Token)
+            // oder vom Anmelde-Token stammen — die Gate-Probe trennt beide
+            // Fälle. Bei einer Gate-Ablehnung entfällt der Zugangsdaten-
+            // Fallback: auch eine Anmeldung käme nicht am Gate vorbei.
+            if (await HandleGateRejectionAsync(serverAddress, cancellationToken))
+            {
+                return new AuthAttempt(AuthAttemptStatus.GateRejected);
+            }
+
             // Token endgültig abgelehnt → verwerfen und auf die
             // Zugangsdaten zurückfallen.
             await secrets.ClearAuthTokenAsync();
             return null;
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
         }
         catch (Exception ex) when (ex is ApiException or HttpRequestException or TaskCanceledException)
         {
@@ -213,7 +247,12 @@ public sealed class AuthSessionService
         }
         catch (ApiException ex) when (ex.StatusCode is HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden)
         {
-            return new AuthAttempt(AuthAttemptStatus.InvalidCredentials, username);
+            // Das 401/403 kann vom Client-Gate (widerrufenes Geräte-Token)
+            // oder von den Zugangsdaten stammen — die Gate-Probe trennt
+            // beide Fälle (Muster: SilentReloginAsync).
+            return await HandleGateRejectionAsync(serverAddress, cancellationToken)
+                ? new AuthAttempt(AuthAttemptStatus.GateRejected, username)
+                : new AuthAttempt(AuthAttemptStatus.InvalidCredentials, username);
         }
         catch (ApiException ex) when (ex.StatusCode is null)
         {
@@ -286,9 +325,21 @@ public sealed class AuthSessionService
         }
         catch (ApiException ex) when (ex.StatusCode is HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden)
         {
+            // Das 401/403 kann vom Client-Gate (widerrufenes Geräte-Token)
+            // oder von den Benutzer-Zugangsdaten stammen — die Gate-Probe
+            // mit nur dem Gate-Header trennt beide Fälle.
+            if (await HandleGateRejectionAsync(serverAddress, cancellationToken))
+            {
+                return null;
+            }
+
             await secrets.ClearAuthTokenAsync();
             OnSessionExpired();
             return null;
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
         }
         catch (Exception ex) when (ex is ApiException or HttpRequestException or TaskCanceledException)
         {
@@ -297,6 +348,46 @@ public sealed class AuthSessionService
             System.Diagnostics.Debug.WriteLine($"[AuthSessionService] Stille Neuanmeldung fehlgeschlagen: {ex.Message}");
             return null;
         }
+    }
+
+    /// <summary>
+    /// Klärt eine 401/403-Ablehnung per Gate-Probe
+    /// (<see cref="DeviceTokenService.IsGateRejectedAsync"/>): Lehnt das
+    /// Client-Gate den Schlüssel ab, wird das Geräte-Token der geprüften
+    /// Adresse verworfen. Provider-Rücksetzung und Widerrufs-Meldung
+    /// erfolgen nur, wenn der abgelehnte Server noch der aktuelle ist —
+    /// ein zwischenzeitlicher Serverwechsel darf weder das frisch
+    /// aktivierte Token des neuen Servers verwerfen noch die App
+    /// fälschlich in die Re-Pairing-Eingabe zwingen.
+    /// </summary>
+    /// <param name="serverAddress">Adresse des ablehnenden Servers.</param>
+    /// <param name="cancellationToken">Bricht die Probe ab.</param>
+    /// <returns><c>true</c>, wenn das Gate den Schlüssel abgelehnt hat.</returns>
+    private async Task<bool> HandleGateRejectionAsync(Uri serverAddress, CancellationToken cancellationToken)
+    {
+        var address = serverAddress.ToString();
+        if (!await deviceTokens.IsGateRejectedAsync(address, cancellationToken))
+        {
+            return false;
+        }
+
+        // Das abgelehnte Geräte-Token gehört zur geprüften Adresse — es
+        // wird gezielt gelöscht, auch wenn der Server nicht mehr aktiv ist.
+        try
+        {
+            await secrets.ClearDeviceTokenAsync(address);
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[AuthSessionService] Geräte-Token konnte nicht verworfen werden: {ex.Message}");
+        }
+
+        if (await deviceTokens.DiscardIfCurrentAsync(address))
+        {
+            deviceTokens.NotifyRejected();
+        }
+
+        return true;
     }
 
     private void OnSessionExpired()

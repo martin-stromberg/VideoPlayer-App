@@ -18,6 +18,13 @@ public sealed class AppSecretsService
     /// <summary>Ablageschlüssel des Anmelde-Tokens (sichere Ablage).</summary>
     public const string AuthTokenKey = "AuthToken";
 
+    /// <summary>
+    /// Basis-Schlüssel der Geräte-Tokens aus dem Pairing (sichere Ablage);
+    /// der effektive Schlüssel hängt zusätzlich von der normalisierten
+    /// Serveradresse ab.
+    /// </summary>
+    public const string DeviceTokenKey = "DeviceToken";
+
     private readonly ISettingsStore settings;
     private readonly ISecretStore secrets;
     private readonly AppProfile profile;
@@ -90,6 +97,55 @@ public sealed class AppSecretsService
     {
         settings.Remove(profile.PrefixKey(AuthTokenKey));
         await secrets.RemoveAsync(profile.PrefixKey(AuthTokenKey));
+    }
+
+    /// <summary>
+    /// Geräte-Token eines Servers aus der sicheren Ablage. Die Tokens sind
+    /// profil- und serveradress-spezifisch hinterlegt.
+    /// </summary>
+    /// <param name="serverAddress">Serveradresse (wird normalisiert).</param>
+    /// <returns>Das gespeicherte Geräte-Token oder <c>null</c>.</returns>
+    public async Task<string?> GetDeviceTokenAsync(string serverAddress)
+    {
+        var token = await secrets.GetAsync(DeviceTokenSecretKey(serverAddress));
+        return string.IsNullOrEmpty(token) ? null : token;
+    }
+
+    /// <summary>Prüft, ob für den Server ein Geräte-Token hinterlegt ist.</summary>
+    /// <param name="serverAddress">Serveradresse (wird normalisiert).</param>
+    /// <returns><c>true</c>, wenn ein Token in der sicheren Ablage liegt.</returns>
+    public async Task<bool> HasDeviceTokenAsync(string serverAddress)
+    {
+        return await GetDeviceTokenAsync(serverAddress) is not null;
+    }
+
+    /// <summary>Speichert ein Geräte-Token ausschließlich in der sicheren Ablage.</summary>
+    /// <param name="serverAddress">Serveradresse (wird normalisiert).</param>
+    /// <param name="token">Zu speicherndes Geräte-Token.</param>
+    public async Task SetDeviceTokenAsync(string serverAddress, string token)
+    {
+        await secrets.SetAsync(DeviceTokenSecretKey(serverAddress), token ?? string.Empty);
+    }
+
+    /// <summary>Entfernt das Geräte-Token eines Servers aus der sicheren Ablage.</summary>
+    /// <param name="serverAddress">Serveradresse (wird normalisiert).</param>
+    public async Task ClearDeviceTokenAsync(string serverAddress)
+    {
+        await secrets.RemoveAsync(DeviceTokenSecretKey(serverAddress));
+    }
+
+    /// <summary>
+    /// Effektiver Ablageschlüssel eines Geräte-Tokens: Profil-Präfix plus
+    /// normalisierte Serveradresse als Unterscheidungsmerkmal.
+    /// </summary>
+    /// <param name="serverAddress">Serveradresse (wird normalisiert).</param>
+    /// <returns>Der vollständige Ablageschlüssel.</returns>
+    private string DeviceTokenSecretKey(string serverAddress)
+    {
+        var normalized = ServerAddress.TryNormalize(serverAddress, out var value)
+            ? value
+            : serverAddress?.Trim() ?? string.Empty;
+        return profile.PrefixKey($"{DeviceTokenKey}:{normalized}");
     }
 
     /// <summary>

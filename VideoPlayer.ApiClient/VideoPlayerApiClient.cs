@@ -90,6 +90,20 @@ public class VideoPlayerApiClient
         httpClient.DefaultRequestHeaders.Authorization = null;
     }
 
+    /// <summary>
+    /// Ersetzt den Client-Gate-Schlüssel (<see cref="ClientGate.HeaderName"/>) für
+    /// Folgeanfragen — etwa nach einem erfolgreichen Geräte-Pairing oder dem
+    /// Rückfall auf einen statischen Schlüssel.
+    /// </summary>
+    /// <param name="apiKey">Der neue Gate-Schlüssel.</param>
+    /// <exception cref="ArgumentException"><paramref name="apiKey"/> ist leer.</exception>
+    public void SetApiKey(string apiKey)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(apiKey);
+        httpClient.DefaultRequestHeaders.Remove(ClientGate.HeaderName);
+        httpClient.DefaultRequestHeaders.Add(ClientGate.HeaderName, apiKey);
+    }
+
     #region Authentication
 
     /// <summary>
@@ -119,10 +133,14 @@ public class VideoPlayerApiClient
 
     #region Health
 
-    /// <summary>Prüft die Erreichbarkeit des Servers (<c>GET api/health</c>).</summary>
+    /// <summary>
+    /// Prüft die Erreichbarkeit des Servers (<c>GET api/health</c>) und
+    /// unterscheidet dabei eine Gate-Ablehnung (HTTP 401) von echter
+    /// Nichterreichbarkeit.
+    /// </summary>
     /// <param name="cancellationToken">Abbruchtoken.</param>
-    /// <returns><c>true</c>, wenn der Server mit einem Erfolgsstatus antwortet, sonst <c>false</c>.</returns>
-    public async Task<bool> CheckHealthAsync(CancellationToken cancellationToken = default)
+    /// <returns>Das Ergebnis der Erreichbarkeitsprüfung.</returns>
+    public async Task<HealthCheckResult> CheckHealthAsync(CancellationToken cancellationToken = default)
     {
         try
         {
@@ -131,11 +149,13 @@ public class VideoPlayerApiClient
                 () => new HttpRequestMessage(HttpMethod.Get, "api/health"),
                 allowReauth: true,
                 cancellationToken);
-            return response.IsSuccessStatusCode;
+            return response.IsSuccessStatusCode ? HealthCheckResult.Reachable : HealthCheckResult.Unreachable;
         }
-        catch (ApiException)
+        catch (ApiException ex)
         {
-            return false;
+            return ex.StatusCode == HttpStatusCode.Unauthorized
+                ? HealthCheckResult.GateRejected
+                : HealthCheckResult.Unreachable;
         }
     }
 

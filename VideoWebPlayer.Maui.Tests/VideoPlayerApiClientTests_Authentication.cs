@@ -57,26 +57,91 @@ public class VideoPlayerApiClientTests_Authentication
         Assert.Throws<InvalidOperationException>(() => new VideoPlayerApiClient(new HttpClient(handler)));
     }
 
-    /// <summary>Prüft CheckHealthAsync: gibt true auf Erfolg zurück.</summary>
+    /// <summary>Prüft CheckHealthAsync: meldet <c>Reachable</c> auf Erfolg.</summary>
     [Fact]
-    public async Task CheckHealthAsync_ReturnsTrueOnSuccess()
+    public async Task CheckHealthAsync_ReturnsReachableOnSuccess()
     {
         var handler = new StubHttpMessageHandler();
         handler.Enqueue(HttpStatusCode.OK);
         var client = ApiClientTestFactory.CreateClient(handler);
 
-        Assert.True(await client.CheckHealthAsync());
+        Assert.Equal(HealthCheckResult.Reachable, await client.CheckHealthAsync());
         Assert.Equal("/api/health", handler.Requests[0].PathAndQuery);
     }
 
-    /// <summary>Prüft CheckHealthAsync: gibt false auf Fehlschlag zurück.</summary>
-    [Fact]
-    public async Task CheckHealthAsync_ReturnsFalseOnFailure()
+    /// <summary>Prüft CheckHealthAsync: meldet <c>Unreachable</c> auf sonstigem Fehlschlag.</summary>
+    /// <param name="statusCode">Der simulierte HTTP-Statuscode.</param>
+    [Theory]
+    [InlineData(HttpStatusCode.NotFound)]
+    [InlineData(HttpStatusCode.InternalServerError)]
+    public async Task CheckHealthAsync_ReturnsUnreachableOnFailure(HttpStatusCode statusCode)
     {
         var handler = new StubHttpMessageHandler();
-        handler.Enqueue(HttpStatusCode.NotFound);
+        // 5xx ist wiederholbar — für alle Versuche Antworten einreihen.
+        for (var i = 0; i < 4; i++)
+        {
+            handler.Enqueue(statusCode);
+        }
+        var client = ApiClientTestFactory.CreateClient(handler, options =>
+            options.DelayAsync = (_, _) => Task.CompletedTask);
+
+        Assert.Equal(HealthCheckResult.Unreachable, await client.CheckHealthAsync());
+    }
+
+    /// <summary>Prüft CheckHealthAsync: meldet <c>Unreachable</c> bei Transportfehler.</summary>
+    [Fact]
+    public async Task CheckHealthAsync_ReturnsUnreachableOnTransportError()
+    {
+        var handler = new StubHttpMessageHandler();
+        // Transportfehler sind wiederholbar — für alle Versuche Ausnahmen einreihen.
+        for (var i = 0; i < 4; i++)
+        {
+            handler.EnqueueException(new HttpRequestException("Verbindung fehlgeschlagen"));
+        }
+        var client = ApiClientTestFactory.CreateClient(handler, options => options.DelayAsync = (_, _) => Task.CompletedTask);
+
+        Assert.Equal(HealthCheckResult.Unreachable, await client.CheckHealthAsync());
+    }
+
+    /// <summary>
+    /// Prüft CheckHealthAsync: ein 401 ohne Token-Erneuerung wird als
+    /// <c>GateRejected</c> gemeldet (Client-Gate lehnt den Schlüssel ab).
+    /// </summary>
+    [Fact]
+    public async Task CheckHealthAsync_ReturnsGateRejectedOnUnauthorized()
+    {
+        var handler = new StubHttpMessageHandler();
+        handler.Enqueue(HttpStatusCode.Unauthorized);
         var client = ApiClientTestFactory.CreateClient(handler);
 
-        Assert.False(await client.CheckHealthAsync());
+        Assert.Equal(HealthCheckResult.GateRejected, await client.CheckHealthAsync());
+    }
+
+    /// <summary>Prüft SetApiKey: ersetzt den Gate-Header für Folgeanfragen.</summary>
+    [Fact]
+    public async Task SetApiKey_UpdatesClientGateHeader()
+    {
+        var handler = new StubHttpMessageHandler();
+        handler.Enqueue(HttpStatusCode.OK);
+        var client = ApiClientTestFactory.CreateClient(handler);
+
+        client.SetApiKey("device-token-1");
+        await client.CheckHealthAsync();
+
+        Assert.Equal("device-token-1", handler.Requests[0].ApiKey);
+    }
+
+    /// <summary>Prüft SetApiKey: <c>null</c>/leerer Schlüssel → ArgumentException (kein heimliches Entfernen des Gate-Headers).</summary>
+    /// <param name="apiKey">Der abgelehnte Schlüssel.</param>
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("  ")]
+    public void SetApiKey_RejectsNullOrEmpty(string? apiKey)
+    {
+        var handler = new StubHttpMessageHandler();
+        var client = ApiClientTestFactory.CreateClient(handler);
+
+        Assert.ThrowsAny<ArgumentException>(() => client.SetApiKey(apiKey!));
     }
 }

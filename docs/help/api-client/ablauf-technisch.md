@@ -4,7 +4,7 @@
 
 ## Übersicht
 
-Alle öffentlichen Methoden von `VideoPlayerApiClient` laufen über die zentrale Sende-Pipeline `SendWithPolicyAsync`. Diese kapselt die feste Wiederholungsstrategie sowie die einmalige Token-Erneuerung bei `401 Unauthorized`.
+Alle öffentlichen Methoden von `VideoPlayerApiClient` laufen über die zentrale Sende-Pipeline `SendWithPolicyAsync`. Diese kapselt die feste Wiederholungsstrategie sowie die einmalige Token-Erneuerung bei `401 Unauthorized`. Ausnahme: `DevicePairingClient` (öffentlicher Pairing-Endpunkt) sendet direkt — ohne `X-API-Key`-/Bearer-Header, ohne Wiederholungen und ohne Token-Erneuerung.
 
 ## Ablauf
 
@@ -27,6 +27,17 @@ Beteiligte Komponenten:
 ### 3. Ergebnis
 
 Erfolgsantworten werden als DTO (`MediaEntry`-Hierarchie, `MediaSource`, `RecentEntry`, `ContinueWatchingEntry`, `FavoriteEntry`, `MediaItemSummary`, `GenreOption`, `SourceGenres`) bzw. `byte[]` (Bildabrufe) zurückgegeben; Fehler als `ApiException` mit `Endpoint`, `StatusCode` und `ResponseBody`.
+
+### 4. Pairing-Austausch (Sonderpfad außerhalb der Pipeline)
+
+`DevicePairingClient.ExchangeAsync` tauscht einen Einmal-Code gegen ein Geräte-Token — bewusst ohne `X-API-Key`-/Bearer-Header, ohne Wiederholungen und ohne `TokenRefresher` (429 muss sofort sichtbar sein, 401 darf keine Erneuerung auslösen):
+
+1. `PairingCrypto.CreateKeyPair()` erzeugt ein flüchtiges ECDH-Schlüsselpaar (nistP256); `PairingCrypto.ExportPublicKeyBase64` exportiert den öffentlichen Schlüssel als SPKI/DER-Base64.
+2. `POST api/pairing/exchange` geht als absolute Adresse gegen den Pairing-Server mit camelCase-Body `code`, `clientPublicKey`, `deviceName` (DTOs `PairingExchangeRequest`/`PairingExchangeResponse`).
+3. `PairingCrypto.DecryptToken` leitet aus dem `serverPublicKey` der Antwort per `DeriveKeyFromHmac` (SHA-256) den 32-Byte-Schlüssel ab und entschlüsselt `encryptedToken` per AES-256-GCM (`nonce(12) ‖ ciphertext ‖ tag(16)`).
+4. HTTP-Fehler werden als `ApiException` mit `StatusCode` (400/401/404/429) bzw. `null` bei Transportfehlern gemeldet; unentschlüsselbare Antworten werfen `CryptographicException`.
+
+Das entschlüsselte Token wird außerhalb dieser Bibliothek sicher hinterlegt und über `ClientGate.DeviceTokenProvider` bzw. `VideoPlayerApiClient.SetApiKey` als `X-API-Key` aktiviert.
 
 ## Fehlerbehandlung
 

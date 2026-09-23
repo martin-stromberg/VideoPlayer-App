@@ -27,8 +27,8 @@ public class MvuHostTests
         await host.DispatchAsync(new StartupRequestedMessage(), cancellationToken);
         // Hinterlegter Server → Health-Check → automatische Anmeldung → Startseite.
         await host.DispatchAsync(
-            new ServersLoadedMessage([], "http://nas/videoplayer/"), cancellationToken);
-        await host.DispatchAsync(new ServerHealthCheckCompletedMessage(IsReachable: true), cancellationToken);
+            new ServersLoadedMessage([], "http://nas/videoplayer/", PairingRequired: false), cancellationToken);
+        await host.DispatchAsync(new ServerHealthCheckCompletedMessage(IsReachable: true, PairingRequired: false), cancellationToken);
         Assert.Equal(AppPage.Loading, host.Model.CurrentPage);
         Assert.True(host.Model.IsStartupRunning);
         await host.DispatchAsync(

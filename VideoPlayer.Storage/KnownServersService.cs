@@ -6,7 +6,7 @@ namespace VideoPlayer.Storage;
 /// Verwaltet die Liste bekannter Server und den zuletzt verbundenen Server in
 /// der backup-pflichtigen <see cref="BackupDatabase"/> (Tabellen
 /// <c>known_servers</c> und <c>backup_state</c>). Enthält die einmalige
-/// Migration des bisherigen <c>ServerAddress</code>-Schlüssels aus der
+/// Migration des bisherigen <c>ServerAddress</c>-Schlüssels aus der
 /// <see cref="ISettingsStore"/>-Ablage (Schritt 3).
 /// </summary>
 public sealed class KnownServersService

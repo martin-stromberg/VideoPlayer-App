@@ -20,14 +20,25 @@
 
 ## Client-Gate-Schlüssel — Auflösungsreihenfolge (`ClientGate.Resolve()`)
 
-1. Umgebungsvariable `VIDEOWEBPLAYER_MAUI_API_TOKEN`
-2. Assembly-Metadata `VideoPlayer.ApiClient.ApiToken` — gesetzt über die MSBuild-Build-Eigenschaft `VideoPlayerApiToken`:
+1. Gepaartes Geräte-Token über `ClientGate.DeviceTokenProvider` (wird vom `DeviceTokenService` der App nach dem Pairing bzw. beim Serverwechsel gesetzt)
+2. Umgebungsvariable `VIDEOWEBPLAYER_MAUI_API_TOKEN`
+3. Assembly-Metadata `VideoPlayer.ApiClient.ApiToken` — gesetzt über die MSBuild-Build-Eigenschaft `VideoPlayerApiToken`:
    ```bash
    dotnet build VideoPlayer.ApiClient/VideoPlayer.ApiClient.csproj -p:VideoPlayerApiToken="<MAUI_CLIENT_API_TOKEN>"
    ```
-3. Platzhalter `<MAUI_CLIENT_API_TOKEN>`
+   Das Deployment-Skript `scripts/iOS-Deployment.ps1` reicht die Eigenschaft über den Parameter `-VideoPlayerApiToken` (Standard: Umgebungsvariable `VIDEOWEBPLAYER_MAUI_API_TOKEN`) in alle Build-/Publish-Response-Dateien durch und maskiert den Wert in der Konsolenanzeige (`-p:VideoPlayerApiToken=***`). Diese Einbettung ist die transitionale Zwischenlösung für Server ohne Pairing-Endpunkt und Alt-App-Versionen.
+4. Token-Datei `client-api-token.txt` im lokalen Anwendungsdatenverzeichnis (`%LocalAppData%/VideoPlayer`)
+5. Platzhalter `<MAUI_CLIENT_API_TOKEN>`
 
-Der Wert muss backendseitig zu `Jwt:ApiToken:Maui` passen. Der Schlüssel ist kein Ersatz für die Benutzeranmeldung; produktive Werte gehören nicht ins Repository.
+`ClientGate.ResolveStatic()` liefert nur die statischen Quellen 2–5 (ohne Geräte-Token) — die App nutzt sie zur Feststellung, ob ein Pairing erforderlich ist, und als Rückfall nach dem Verwerfen eines widerrufenen Geräte-Tokens.
+
+Der statische Wert muss backendseitig zu `Jwt:ApiToken:Maui` passen. Der Schlüssel ist kein Ersatz für die Benutzeranmeldung; produktive Werte gehören nicht ins Repository.
+
+## Geräte-Pairing
+
+Ohne nutzbaren Gate-Schlüssel (weder Geräte-Token noch statische Quelle) koppelt die App das Gerät über den öffentlichen Endpunkt `POST api/pairing/exchange`: Der Server erzeugt einen Einmal-Code (8 Zeichen, serverseitig über `Pairing:CodeLength`/`Pairing:CodeTtlMinutes` konfigurierbar), die App tauscht ihn per `DevicePairingClient` gegen ein verschlüsseltes Geräte-Token (ECDH P-256 + AES-256-GCM), hinterlegt es in der sicheren Ablage (`AppSecretsService`, profil- und serveradress-spezifisch) und nutzt es fortan als `X-API-Key`. Ein serverseitig widerrufenes Token wird verworfen und per Re-Pairing ersetzt.
+
+Ist ein statischer Schlüssel konfiguriert (Quellen 2–4), entfällt das Pairing — die App verbindet sich wie bisher. Schlägt dagegen der Pairing-Austausch an einem Server ohne Endpunkt fehl (HTTP 404), gibt es bewusst **keinen** automatischen Laufzeit-Fallback auf einen statischen Token: Der statische Schlüssel muss dann beim Publish/Start über die Quellen 2–4 bereitgestellt sein.
 
 ## Umgebungsvariablen
 
@@ -37,4 +48,4 @@ Der Wert muss backendseitig zu `Jwt:ApiToken:Maui` passen. Der Schlüssel ist ke
 
 ## Überprüfung
 
-`CheckHealthAsync()` liefert `true`, sobald Server erreichbar und Client-Gate-Schlüssel akzeptiert werden.
+`CheckHealthAsync()` liefert `HealthCheckResult.Reachable`, sobald Server erreichbar und Client-Gate-Schlüssel akzeptiert werden. `GateRejected` (HTTP 401) weist auf einen ungültigen bzw. widerrufenen Gate-Schlüssel hin — bei einem Geräte-Token ist eine erneute Kopplung erforderlich.

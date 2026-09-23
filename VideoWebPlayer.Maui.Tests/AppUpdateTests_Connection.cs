@@ -159,6 +159,56 @@ public class AppUpdateTests_Connection
         Assert.Equal(AppPage.Home, transition.Model.CurrentPage);
     }
 
+    /// <summary>
+    /// Prüft AutoLoginCompleted: bei Gate-Ablehnung (widerrufenes Geräte-Token)
+    /// → Re-Pairing-Eingabe statt Anmeldemaske — die Anmeldung käme nie am
+    /// Client-Gate vorbei (Sackgasse).
+    /// </summary>
+    [Fact]
+    public void AutoLoginCompleted_GateRejected_NavigatesToRePairing()
+    {
+        var transition = AppUpdate.Update(
+            StartupModel(),
+            new AutoLoginCompletedMessage(AuthAttemptStatus.GateRejected, "martin"));
+
+        Assert.False(transition.Model.IsStartupRunning);
+        Assert.True(transition.Model.IsPairingRequired);
+        Assert.Equal(AppUpdate.DeviceRevokedError, transition.Model.PairingError);
+        Assert.Equal(ServerHealthStatus.Reachable, transition.Model.ServerHealth);
+        Assert.Equal(ConnectionState.NeedsServerSetup, transition.Model.ConnectionState);
+        Assert.Equal(AppPage.ServerSetup, transition.Model.CurrentPage);
+        Assert.Equal(2, transition.Effects.Count);
+        Assert.IsType<DisconnectServerEventsEffect>(transition.Effects[0]);
+        var navigate = Assert.IsType<NavigateToPageEffect>(transition.Effects[1]);
+        Assert.Equal(AppPage.ServerSetup, navigate.Page);
+    }
+
+    /// <summary>
+    /// Prüft AutoLoginCompleted: ein verspätetes Gate-Ablehnungs-Ergebnis darf
+    /// den bereits gesetzten Re-Pairing-Zustand nicht auf die Anmeldemaske
+    /// übersteuern (DeviceTokenRevokedMessage wurde zuerst verarbeitet).
+    /// </summary>
+    [Fact]
+    public void AutoLoginCompleted_GateRejected_InRePairingState_IsIgnored()
+    {
+        var model = new AppModel
+        {
+            CurrentPage = AppPage.ServerSetup,
+            ConnectionState = ConnectionState.NeedsServerSetup,
+            ActiveServerAddress = Server,
+            ServerHealth = ServerHealthStatus.Reachable,
+            IsPairingRequired = true,
+            PairingError = AppUpdate.DeviceRevokedError
+        };
+
+        var transition = AppUpdate.Update(
+            model,
+            new AutoLoginCompletedMessage(AuthAttemptStatus.GateRejected, null));
+
+        Assert.Same(model, transition.Model);
+        Assert.Empty(transition.Effects);
+    }
+
     // ---- LoginSubmittedMessage / LoginCompletedMessage ----
 
     /// <summary>Prüft LoginSubmitted: bei leeren Feldern → zeigt einen Fehler ohne Effekt.</summary>
@@ -265,6 +315,32 @@ public class AppUpdateTests_Connection
         Assert.Equal(ConnectionState.NeedsLogin, transition.Model.ConnectionState);
         Assert.Equal(AppPage.Login, transition.Model.CurrentPage);
         Assert.Empty(transition.Effects);
+    }
+
+    /// <summary>
+    /// Prüft LoginCompleted: bei Gate-Ablehnung → Re-Pairing-Eingabe statt
+    /// Anmeldefehler (jede Anmeldung scheitert am Client-Gate).
+    /// </summary>
+    [Fact]
+    public void LoginCompleted_GateRejected_NavigatesToRePairing()
+    {
+        var model = new AppModel
+        {
+            CurrentPage = AppPage.Login,
+            IsLoginRunning = true,
+            ActiveServerAddress = Server
+        };
+
+        var transition = AppUpdate.Update(
+            model,
+            new LoginCompletedMessage(AuthAttemptStatus.GateRejected));
+
+        Assert.False(transition.Model.IsLoginRunning);
+        Assert.True(transition.Model.IsPairingRequired);
+        Assert.Equal(AppUpdate.DeviceRevokedError, transition.Model.PairingError);
+        Assert.Equal(ConnectionState.NeedsServerSetup, transition.Model.ConnectionState);
+        Assert.Equal(AppPage.ServerSetup, transition.Model.CurrentPage);
+        Assert.IsType<NavigateToPageEffect>(transition.Effects[^1]);
     }
 
     // ---- SessionExpiredMessage ----
@@ -430,7 +506,7 @@ public class AppUpdateTests_Connection
 
         var transition = AppUpdate.Update(
             model,
-            new ServerCheckCompletedMessage("http://neu/videoplayer/", "Neuer Server", true));
+            new ServerCheckCompletedMessage("http://neu/videoplayer/", "Neuer Server", true, false));
 
         Assert.True(transition.Model.IsServerCheckRunning);
         Assert.Equal(ConnectionState.Connecting, transition.Model.ConnectionState);
@@ -462,7 +538,7 @@ public class AppUpdateTests_Connection
 
         var transition = AppUpdate.Update(
             model,
-            new ServerCheckCompletedMessage("http://neu/videoplayer/", "Neuer Server", true));
+            new ServerCheckCompletedMessage("http://neu/videoplayer/", "Neuer Server", true, false));
 
         Assert.Same(SourcesOverviewState.Initial, transition.Model.SourcesOverview);
         Assert.Same(SourceBrowserState.Empty, transition.Model.SourceBrowser);

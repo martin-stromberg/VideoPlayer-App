@@ -14,7 +14,7 @@ var client = new VideoPlayerApiClient(
 
 ## Authentifizierung
 
-Zweistufig: Client-Gate per `X-API-Key`-Header (auf jeder Anfrage) plus Bearer-Token nach `LoginAsync` bzw. `SetAccessToken`. Bei 401 erfolgt eine einmalige Erneuerung über `VideoPlayerApiClientOptions.TokenRefresher`.
+Zweistufig: Client-Gate per `X-API-Key`-Header (auf jeder Anfrage) plus Bearer-Token nach `LoginAsync` bzw. `SetAccessToken`. Bei 401 erfolgt eine einmalige Erneuerung über `VideoPlayerApiClientOptions.TokenRefresher`. Als Gate-Schlüssel dient vorrangig ein gepaartes Geräte-Token (`ClientGate.DeviceTokenProvider`, gesetzt nach dem Pairing), sonst die statischen Quellen (`ClientGate.ResolveStatic()`); `SetApiKey` ersetzt den Schlüssel eines bestehenden Clients zur Laufzeit (z. B. direkt nach einem Pairing).
 
 ## Rate Limiting / Wiederholungen
 
@@ -32,7 +32,21 @@ Der Server kann `429 Too Many Requests` liefern; der Client wiederholt dann wie 
 
 ### `CheckHealthAsync()` / `GET api/health`
 
-**Rückgabe:** `bool` — `true` bei Erfolgsantwort, sonst `false`.
+**Rückgabe:** `HealthCheckResult` — `Reachable` bei Erfolgsantwort, `GateRejected` bei HTTP 401 (das Client-Gate lehnt den Schlüssel ab, z. B. ein widerrufenes Geräte-Token), `Unreachable` bei sonstigem Fehlschlag oder Nichterreichbarkeit.
+
+### `SetApiKey(apiKey)`
+
+**Beschreibung:** Ersetzt den `X-API-Key`-Header des Clients für Folgeanfragen — etwa nach einem erfolgreichen Geräte-Pairing oder dem Rückfall auf einen statischen Schlüssel.
+
+**Fehler:** `ArgumentException` bei leerem Schlüssel.
+
+### `DevicePairingClient.ExchangeAsync(baseAddress, code, deviceName)` / `POST api/pairing/exchange`
+
+**Beschreibung:** Öffentlicher Pairing-Endpunkt — tauscht einen serverseitig erzeugten Einmal-Code (8 Zeichen, Alphabet `ABCDEFGHJKMNPQRSTUVWXYZ23456789`, TTL serverseitig ca. 5 Minuten) gegen ein gerätegebundenes Token. Der Client erzeugt ein flüchtiges ECDH-P-256-Schlüsselpaar, sendet den öffentlichen Schlüssel (SPKI/DER, Base64) als `clientPublicKey` samt `code` und optionalem `deviceName` und entschlüsselt `encryptedToken` aus der Antwort (`nonce(12) ‖ ciphertext ‖ tag(16)`, AES-256-GCM, Schlüssel per SHA-256-HMAC-ECDH abgeleitet). Der Aufruf sendet bewusst **keinen** `X-API-Key`- und **keinen** Bearer-Header und läuft ohne Wiederholungen.
+
+**Rückgabe:** `string` — das entschlüsselte Geräte-Token (anschließend als `X-API-Key` zu verwenden und sicher zu hinterlegen).
+
+**Fehler:** `ApiException` mit `StatusCode` 400 (ungültige Anfrage), 401 (Code ungültig/abgelaufen/verbraucht), 404 (Server ohne Pairing-Endpunkt), 429 (Ratenlimit/IP-Sperre), `null` (Transportfehler); `CryptographicException` bei ungültiger/nicht entschlüsselbarer Antwort.
 
 ### `GetSourcesAsync()` / `GET api/Sources` · `GetSourceAsync(id)` / `GET api/Sources/{id}` · `GetSourceGenresAsync(id)` / `GET api/SourceGenres/{id}`
 

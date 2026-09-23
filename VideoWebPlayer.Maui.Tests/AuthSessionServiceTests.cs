@@ -1,5 +1,6 @@
 #pragma warning disable xUnit1051 // Kurzlebige Unit-Tests: TestContext-CancellationToken nicht erforderlich
 using System.Net;
+using System.Text;
 using VideoPlayer.ApiClient;
 using VideoPlayer.ApiClient.Models;
 using VideoPlayer.Mvu;
@@ -12,8 +13,10 @@ namespace VideoWebPlayer.Maui.Tests;
 /// Tests des Anmelde-Dienstes (Schritt 5): automatische und manuelle
 /// Anmeldung mit Ergebnis-Mapping sowie stille Neuanmeldung (TokenRefresher)
 /// inklusive <c>SessionExpired</c>-Ereignis bei fehlenden oder abgelehnten
-/// Zugangsdaten.
+/// Zugangsdaten. Die Collection serialisiert die Klasse gegen andere
+/// Nutzer des statischen <c>ClientGate.DeviceTokenProvider</c>.
 /// </summary>
+[Collection("ClientGate")]
 public class AuthSessionServiceTests
 {
     private static readonly Uri Server = new("http://testserver/videoplayer/");
@@ -38,6 +41,18 @@ public class AuthSessionServiceTests
 
     private static void EnqueueLoginOk(StubHttpMessageHandler handler, string token = "jwt-token") =>
         handler.EnqueueJson(HttpStatusCode.OK, new { token, expires = "2030-01-01T00:00:00Z" });
+
+    /// <summary>
+    /// Reiht eine Gate-Ablehnung der Probe ein: 401 mit
+    /// ProblemDetails-Body (<c>application/problem+json</c>) — das
+    /// UnauthorizedResult des Action-Filters am gated Login-Endpunkt.
+    /// </summary>
+    private static void EnqueueGateProbeRejected(StubHttpMessageHandler handler) =>
+        handler.Enqueue(new HttpResponseMessage(HttpStatusCode.Unauthorized)
+        {
+            Content = new StringContent(
+                "{\"title\":\"Unauthorized\"}", Encoding.UTF8, "application/problem+json"),
+        });
 
     /// <summary>Prüft TryStoredLogin: ohne Zugangsdaten → gibt MissingCredentials zurück.</summary>
     [Fact]
@@ -149,7 +164,15 @@ public class AuthSessionServiceTests
         Assert.Equal(AuthAttemptStatus.MissingCredentials, attempt.Status);
         Assert.Null(service.Client);
         Assert.Null(await secrets.GetAuthTokenAsync());
-        Assert.Single(handler.Requests);
+        // [0] api/favorites (Token abgelehnt), [1] Gate-Probe
+        // POST api/auth/login — sie trennt eine Gate-Ablehnung von einem
+        // abgelaufenen Token.
+        Assert.Equal(2, handler.Requests.Count);
+        Assert.EndsWith("/api/favorites", handler.Requests[0].PathAndQuery);
+        Assert.Equal(HttpMethod.Post, handler.Requests[1].Method);
+        Assert.EndsWith("/api/auth/login", handler.Requests[1].PathAndQuery);
+        Assert.Equal("{}", handler.Requests[1].Body);
+        Assert.Null(handler.Requests[1].Authorization);
     }
 
     /// <summary>Prüft TryStoredLogin: gespeicherter Token, Server nicht erreichbar → ServerUnreachable (Offline-Fallback).</summary>
@@ -369,5 +392,313 @@ public class AuthSessionServiceTests
         await Assert.ThrowsAsync<ApiException>(() => service.Client!.GetSourcesAsync());
 
         Assert.Equal(0, expired);
+    }
+
+    /// <summary>
+    /// Erstellt den Dienst samt geteilter <see cref="DeviceTokenService"/>-
+    /// Instanz (beide nutzen dieselbe Stub-Handler-Fabrik).
+    /// </summary>
+    /// <param name="handler">Der Stub-Handler mit den eingereihten Antworten.</param>
+    /// <param name="secrets">Die Ablage der Zugangsdaten.</param>
+    /// <param name="deviceTokens">Die Geräte-Token-Verwaltung.</param>
+    /// <returns>Der konfigurierte Dienst.</returns>
+    private static AuthSessionService CreateServiceWithDeviceTokens(
+        StubHttpMessageHandler handler,
+        out AppSecretsService secrets,
+        out DeviceTokenService deviceTokens)
+    {
+        secrets = new AppSecretsService(
+            new InMemorySettingsStore(), new InMemorySecretStore(), AppProfile.Create(null));
+        HttpClient Factory(Uri uri) => new(handler, disposeHandler: false) { BaseAddress = uri };
+        deviceTokens = new DeviceTokenService(secrets, Factory);
+        return new AuthSessionService(secrets, deviceTokens, Factory, new RecordingDelays().Delay);
+    }
+
+    /// <summary>
+    /// Prüft TokenRefresh: lehnt das Gate den Schlüssel ab (Probe-401), wird das
+    /// Geräte-Token verworfen und <c>DeviceTokenRejected</c> ausgelöst — nicht
+    /// <c>SessionExpired</c> (die Zugangsdaten sind nicht das Problem).
+    /// </summary>
+    [Fact]
+    public async Task TokenRefresh_GateRejected_RaisesDeviceTokenRejected_NotSessionExpired()
+    {
+        var handler = new StubHttpMessageHandler();
+        var service = CreateServiceWithDeviceTokens(handler, out var secrets, out var deviceTokens);
+        try
+        {
+            await secrets.SetCredentialsAsync("martin", "pw");
+            await deviceTokens.SetPairedTokenAsync(Server.ToString(), "dev-token");
+            EnqueueLoginOk(handler);
+            await service.TryStoredLoginAsync(Server);
+            var expired = 0;
+            var rejected = 0;
+            service.SessionExpired += (_, _) => expired++;
+            deviceTokens.DeviceTokenRejected += (_, _) => rejected++;
+
+            handler.Enqueue(HttpStatusCode.Unauthorized); // Folgeanfrage
+            handler.Enqueue(HttpStatusCode.Unauthorized); // stille Neuanmeldung abgelehnt
+            EnqueueGateProbeRejected(handler);            // Gate-Probe → Gate lehnt ab
+            await Assert.ThrowsAsync<ApiException>(() => service.Client!.GetSourcesAsync());
+
+            Assert.Equal(1, rejected);
+            Assert.Equal(0, expired);
+            // Das Geräte-Token wurde verworfen (Re-Pairing folgt über den
+            // MVU-Rand); das Anmelde-Token bleibt unberührt.
+            Assert.False(await secrets.HasDeviceTokenAsync(Server.ToString()));
+            Assert.NotNull(await secrets.GetAuthTokenAsync());
+            // [0] Initial-Login, [1] 401-Folgeanfrage, [2] stille
+            // Neuanmeldung, [3] Gate-Probe POST api/auth/login.
+            Assert.Equal(4, handler.Requests.Count);
+            Assert.Equal(HttpMethod.Post, handler.Requests[3].Method);
+            Assert.EndsWith("/api/auth/login", handler.Requests[3].PathAndQuery);
+            Assert.Equal("{}", handler.Requests[3].Body);
+            Assert.Null(handler.Requests[3].Authorization);
+        }
+        finally
+        {
+            ClientGate.DeviceTokenProvider = null;
+        }
+    }
+
+    /// <summary>
+    /// Prüft TokenRefresh: akzeptiert die Gate-Probe den Schlüssel (400
+    /// Model-Validation nach passiertem Gate), ist die 401-Ablehnung der
+    /// Neuanmeldung ein Zugangsdaten-Problem → <c>SessionExpired</c> wie
+    /// bisher.
+    /// </summary>
+    [Fact]
+    public async Task TokenRefresh_GateProbeAccepted_RaisesSessionExpired()
+    {
+        var handler = new StubHttpMessageHandler();
+        var service = CreateServiceWithDeviceTokens(handler, out var secrets, out var deviceTokens);
+        try
+        {
+            await secrets.SetCredentialsAsync("martin", "alt-pw");
+            await deviceTokens.SetPairedTokenAsync(Server.ToString(), "dev-token");
+            EnqueueLoginOk(handler);
+            await service.TryStoredLoginAsync(Server);
+            var expired = 0;
+            var rejected = 0;
+            service.SessionExpired += (_, _) => expired++;
+            deviceTokens.DeviceTokenRejected += (_, _) => rejected++;
+
+            handler.Enqueue(HttpStatusCode.Unauthorized); // Folgeanfrage
+            handler.Enqueue(HttpStatusCode.Unauthorized); // stille Neuanmeldung abgelehnt
+            handler.Enqueue(HttpStatusCode.BadRequest);   // Gate-Probe → Gate akzeptiert (Model-Validation)
+            await Assert.ThrowsAsync<ApiException>(() => service.Client!.GetSourcesAsync());
+
+            Assert.Equal(0, rejected);
+            Assert.Equal(1, expired);
+            Assert.Null(await secrets.GetAuthTokenAsync());
+        }
+        finally
+        {
+            ClientGate.DeviceTokenProvider = null;
+        }
+    }
+
+    /// <summary>
+    /// Prüft TryStoredLogin: lehnt das Gate den Schlüssel beim
+    /// Zugangsdaten-Login ab (widerrufenes Geräte-Token, kein gespeicherter
+    /// Anmelde-Token), liefert der Versuch <c>GateRejected</c> — nicht
+    /// <c>InvalidCredentials</c> (die Anmeldemaske wäre eine Sackgasse).
+    /// </summary>
+    [Fact]
+    public async Task TryStoredLogin_GateRejectedLogin_ReturnsGateRejected()
+    {
+        var handler = new StubHttpMessageHandler();
+        var service = CreateServiceWithDeviceTokens(handler, out var secrets, out var deviceTokens);
+        try
+        {
+            await secrets.SetCredentialsAsync("martin", "pw");
+            await deviceTokens.SetPairedTokenAsync(Server.ToString(), "dev-token");
+            var rejected = 0;
+            deviceTokens.DeviceTokenRejected += (_, _) => rejected++;
+
+            handler.Enqueue(HttpStatusCode.Unauthorized); // api/auth/login → Gate-401
+            EnqueueGateProbeRejected(handler);            // Gate-Probe → 401 problem+json
+
+            var attempt = await service.TryStoredLoginAsync(Server);
+
+            Assert.Equal(AuthAttemptStatus.GateRejected, attempt.Status);
+            Assert.Equal(1, rejected);
+            // Das Geräte-Token wurde verworfen; das Anmelde-Token bleibt
+            // unberührt (es ist nicht das Problem).
+            Assert.False(await secrets.HasDeviceTokenAsync(Server.ToString()));
+            Assert.Equal(2, handler.Requests.Count);
+            Assert.EndsWith("/api/auth/login", handler.Requests[0].PathAndQuery);
+            // Die Probe geht an denselben gated Endpunkt — leerer Body,
+            // nur der Gate-Header, kein Bearer.
+            Assert.Equal(HttpMethod.Post, handler.Requests[1].Method);
+            Assert.EndsWith("/api/auth/login", handler.Requests[1].PathAndQuery);
+            Assert.Equal("{}", handler.Requests[1].Body);
+            Assert.Null(handler.Requests[1].Authorization);
+            Assert.Null(service.Client);
+        }
+        finally
+        {
+            ClientGate.DeviceTokenProvider = null;
+        }
+    }
+
+    /// <summary>
+    /// Prüft TryStoredLogin: wird der gespeicherte Anmelde-Token hinter einem
+    /// widerrufenen Geräte-Token abgelehnt (401-Kaskade über die stille
+    /// Neuanmeldung), liefert der Versuch <c>GateRejected</c> statt
+    /// <c>InvalidCredentials</c>.
+    /// </summary>
+    [Fact]
+    public async Task TryStoredLogin_StoredTokenGateRejected_ReturnsGateRejected()
+    {
+        var handler = new StubHttpMessageHandler();
+        var service = CreateServiceWithDeviceTokens(handler, out var secrets, out var deviceTokens);
+        try
+        {
+            await secrets.SetCredentialsAsync("martin", "pw");
+            await secrets.SetAuthTokenAsync("jwt-alt");
+            await deviceTokens.SetPairedTokenAsync(Server.ToString(), "dev-token");
+            var expired = 0;
+            var rejected = 0;
+            service.SessionExpired += (_, _) => expired++;
+            deviceTokens.DeviceTokenRejected += (_, _) => rejected++;
+
+            handler.Enqueue(HttpStatusCode.Unauthorized); // api/favorites → Gate-401
+            handler.Enqueue(HttpStatusCode.Unauthorized); // stille Neuanmeldung abgelehnt
+            EnqueueGateProbeRejected(handler);            // Gate-Probe → 401 problem+json
+            EnqueueGateProbeRejected(handler);            // Gate-Probe im Token-Catch → 401 problem+json
+
+            var attempt = await service.TryStoredLoginAsync(Server);
+
+            Assert.Equal(AuthAttemptStatus.GateRejected, attempt.Status);
+            Assert.True(rejected >= 1);
+            Assert.Equal(0, expired);
+            Assert.False(await secrets.HasDeviceTokenAsync(Server.ToString()));
+            // [0] api/favorites, [1] stille Neuanmeldung,
+            // [2]+[3] Gate-Probes POST api/auth/login.
+            Assert.Equal(4, handler.Requests.Count);
+            Assert.EndsWith("/api/favorites", handler.Requests[0].PathAndQuery);
+            Assert.EndsWith("/api/auth/login", handler.Requests[1].PathAndQuery);
+            Assert.EndsWith("/api/auth/login", handler.Requests[2].PathAndQuery);
+            Assert.Equal("{}", handler.Requests[2].Body);
+            Assert.EndsWith("/api/auth/login", handler.Requests[3].PathAndQuery);
+            Assert.Equal("{}", handler.Requests[3].Body);
+        }
+        finally
+        {
+            ClientGate.DeviceTokenProvider = null;
+        }
+    }
+
+    /// <summary>
+    /// Prüft TryStoredLogin: akzeptiert die Gate-Probe den Schlüssel (400
+    /// Model-Validation nach passiertem Gate), ist die 401-Ablehnung ein
+    /// Zugangsdaten-Problem → <c>InvalidCredentials</c> wie bisher, ohne
+    /// Widerrufs-Meldung.
+    /// </summary>
+    [Fact]
+    public async Task TryStoredLogin_GateProbeAccepted_ReturnsInvalidCredentials()
+    {
+        var handler = new StubHttpMessageHandler();
+        var service = CreateServiceWithDeviceTokens(handler, out var secrets, out var deviceTokens);
+        try
+        {
+            await secrets.SetCredentialsAsync("martin", "falsch");
+            await deviceTokens.SetPairedTokenAsync(Server.ToString(), "dev-token");
+            var rejected = 0;
+            deviceTokens.DeviceTokenRejected += (_, _) => rejected++;
+
+            handler.Enqueue(HttpStatusCode.Unauthorized); // api/auth/login abgelehnt
+            handler.Enqueue(HttpStatusCode.BadRequest);   // Gate-Probe → Gate akzeptiert (Model-Validation)
+
+            var attempt = await service.TryStoredLoginAsync(Server);
+
+            Assert.Equal(AuthAttemptStatus.InvalidCredentials, attempt.Status);
+            Assert.Equal(0, rejected);
+            // Das Geräte-Token wurde nicht verworfen — das Gate akzeptiert es.
+            Assert.True(await secrets.HasDeviceTokenAsync(Server.ToString()));
+            Assert.Null(service.Client);
+        }
+        finally
+        {
+            ClientGate.DeviceTokenProvider = null;
+        }
+    }
+
+    /// <summary>
+    /// Prüft LoginAsync: lehnt das Gate den Schlüssel bei der manuellen
+    /// Anmeldung ab, liefert der Versuch <c>GateRejected</c> — der Aufrufer
+    /// steuert auf die Re-Pairing-Eingabe statt einen Anmeldefehler zu zeigen.
+    /// </summary>
+    [Fact]
+    public async Task LoginAsync_GateRejected_ReturnsGateRejected()
+    {
+        var handler = new StubHttpMessageHandler();
+        var service = CreateServiceWithDeviceTokens(handler, out var secrets, out var deviceTokens);
+        try
+        {
+            await deviceTokens.SetPairedTokenAsync(Server.ToString(), "dev-token");
+            var rejected = 0;
+            deviceTokens.DeviceTokenRejected += (_, _) => rejected++;
+
+            handler.Enqueue(HttpStatusCode.Unauthorized); // api/auth/login → Gate-401
+            EnqueueGateProbeRejected(handler);            // Gate-Probe → 401 problem+json
+
+            var attempt = await service.LoginAsync(Server, "martin", "pw");
+
+            Assert.Equal(AuthAttemptStatus.GateRejected, attempt.Status);
+            Assert.Equal(1, rejected);
+            Assert.False(await secrets.HasDeviceTokenAsync(Server.ToString()));
+            Assert.Equal("martin", attempt.Username);
+        }
+        finally
+        {
+            ClientGate.DeviceTokenProvider = null;
+        }
+    }
+
+    /// <summary>
+    /// Prüft LoginAsync: lehnt das Gate den Schlüssel eines Servers ab, der
+    /// zwischenzeitlich nicht mehr der aktive ist, wird nur dessen
+    /// Geräte-Token gezielt gelöscht — Provider und Token des aktiven
+    /// Servers bleiben unberührt und es wird kein Widerruf gemeldet (keine
+    /// Re-Pairing-Eingabe für den falschen Server).
+    /// </summary>
+    [Fact]
+    public async Task LoginAsync_GateRejected_ForNonCurrentServer_KeepsActiveTokenAndStaysSilent()
+    {
+        var handler = new StubHttpMessageHandler();
+        var service = CreateServiceWithDeviceTokens(handler, out var secrets, out var deviceTokens);
+        try
+        {
+            var otherServer = new Uri("http://otherserver/videoplayer/");
+            await secrets.SetDeviceTokenAsync(otherServer.ToString(), "dev-token-other");
+            // Aktiver Server: der ambiente Provider bedient "dev-token".
+            await deviceTokens.SetPairedTokenAsync(Server.ToString(), "dev-token");
+            var rejected = 0;
+            deviceTokens.DeviceTokenRejected += (_, _) => rejected++;
+
+            handler.Enqueue(HttpStatusCode.Unauthorized); // api/auth/login → Gate-401
+            EnqueueGateProbeRejected(handler);            // Gate-Probe → 401 problem+json
+
+            var attempt = await service.LoginAsync(otherServer, "martin", "pw");
+
+            Assert.Equal(AuthAttemptStatus.GateRejected, attempt.Status);
+            Assert.Equal(2, handler.Requests.Count);
+            // Die Probe sendet den adressspezifischen Schlüssel — nicht den
+            // ambienten des aktiven Servers.
+            Assert.Equal("dev-token-other", handler.Requests[1].ApiKey);
+            // Das abgelehnte Token der geprüften Adresse wurde gelöscht …
+            Assert.False(await secrets.HasDeviceTokenAsync(otherServer.ToString()));
+            // … aber Provider und Token des aktiven Servers blieben
+            // unberührt …
+            Assert.Equal("dev-token", await secrets.GetDeviceTokenAsync(Server.ToString()));
+            Assert.Equal("dev-token", ClientGate.Resolve());
+            // … und der Widerruf wurde nicht gemeldet.
+            Assert.Equal(0, rejected);
+        }
+        finally
+        {
+            ClientGate.DeviceTokenProvider = null;
+        }
     }
 }

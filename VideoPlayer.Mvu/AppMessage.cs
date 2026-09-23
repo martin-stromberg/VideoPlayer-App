@@ -11,8 +11,9 @@ public sealed record StartupRequestedMessage : AppMessage;
 
 /// <summary>Ergebnis der Server-Erreichbarkeitsprüfung.</summary>
 /// <param name="IsReachable"><c>true</c>, wenn der Server erreichbar ist.</param>
+/// <param name="PairingRequired"><c>true</c>, wenn der Server ein Geräte-Pairing verlangt (kein nutzbarer Gate-Schlüssel).</param>
 /// <returns>Nachricht mit dem Prüfergebnis.</returns>
-public sealed record ServerHealthCheckCompletedMessage(bool IsReachable) : AppMessage;
+public sealed record ServerHealthCheckCompletedMessage(bool IsReachable, bool PairingRequired) : AppMessage;
 
 /// <summary>Programmatische Navigation zu einer Menüseite anfordern.</summary>
 /// <param name="Page">Zielseite der Navigation.</param>
@@ -46,10 +47,12 @@ public sealed record LoadServersRequestedMessage : AppMessage;
 /// </summary>
 /// <param name="Servers">Bekannte Server (zuletzt verwendet zuerst).</param>
 /// <param name="ActiveAddress">Adresse des aktiven Servers; <c>null</c> = kein Server hinterlegt.</param>
+/// <param name="PairingRequired"><c>true</c>, wenn der aktive Server ein Geräte-Pairing verlangt (kein nutzbarer Gate-Schlüssel).</param>
 /// <returns>Nachricht mit dem geladenen Serverbestand.</returns>
 public sealed record ServersLoadedMessage(
     IReadOnlyList<KnownServer> Servers,
-    string? ActiveAddress) : AppMessage;
+    string? ActiveAddress,
+    bool PairingRequired) : AppMessage;
 
 /// <summary>Automatische Netzwerk-Erkennung (mDNS + UDP) starten.</summary>
 public sealed record ServerDiscoveryRequestedMessage : AppMessage;
@@ -81,11 +84,30 @@ public sealed record ServerSwitchRequestedMessage(string Address, string? Displa
 /// <param name="Address">Die geprüfte Serveradresse.</param>
 /// <param name="DisplayName">Anzeigename des Kandidaten; <c>null</c>, wenn unbekannt.</param>
 /// <param name="Success"><c>true</c>, wenn der Server erreichbar ist.</param>
+/// <param name="PairingRequired"><c>true</c>, wenn der Server ein Geräte-Pairing verlangt (kein nutzbarer Gate-Schlüssel).</param>
 /// <returns>Nachricht mit dem Prüfergebnis.</returns>
 public sealed record ServerCheckCompletedMessage(
     string Address,
     string? DisplayName,
-    bool Success) : AppMessage;
+    bool Success,
+    bool PairingRequired) : AppMessage;
+
+/// <summary>Der Benutzer hat einen Einmal-Pairing-Code eingegeben.</summary>
+/// <param name="Code">Die Roheingabe (wird vor dem Austausch normalisiert/geprüft).</param>
+/// <returns>Nachricht für die Code-Eingabe.</returns>
+public sealed record PairingCodeSubmittedMessage(string Code) : AppMessage;
+
+/// <summary>Ergebnis des Pairing-Austauschs (<c>api/pairing/exchange</c>).</summary>
+/// <param name="Status">Ergebnisstatus des Pairings.</param>
+/// <returns>Nachricht mit dem Pairing-Ergebnis.</returns>
+public sealed record PairingCompletedMessage(PairingStatus Status) : AppMessage;
+
+/// <summary>
+/// Der Server hat das bereitgestellte Geräte-Token endgültig abgelehnt —
+/// das Token wurde verworfen; die App wechselt in die Re-Pairing-Eingabe
+/// (<c>NeedsServerSetup</c> mit aktivem Pairing-Abschnitt).
+/// </summary>
+public sealed record DeviceTokenRevokedMessage : AppMessage;
 
 /// <summary>
 /// Ergebnis der automatischen Anmeldung mit gespeicherten Zugangsdaten.

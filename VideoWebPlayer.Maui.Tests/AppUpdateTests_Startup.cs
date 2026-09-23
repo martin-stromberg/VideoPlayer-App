@@ -51,7 +51,7 @@ public class AppUpdateTests_Startup
 
         var transition = AppUpdate.Update(
             model,
-            new ServersLoadedMessage(servers, "http://nas/videoplayer/"));
+            new ServersLoadedMessage(servers, "http://nas/videoplayer/", PairingRequired: false));
 
         Assert.Equal("http://nas/videoplayer/", transition.Model.ActiveServerAddress);
         Assert.Single(transition.Model.KnownServers);
@@ -71,7 +71,7 @@ public class AppUpdateTests_Startup
 
         var transition = AppUpdate.Update(
             model,
-            new ServersLoadedMessage([], "http://nas/videoplayer/"));
+            new ServersLoadedMessage([], "http://nas/videoplayer/", PairingRequired: false));
 
         Assert.Equal("http://nas/videoplayer/", transition.Model.ActiveServerAddress);
         Assert.Empty(transition.Effects);
@@ -85,7 +85,7 @@ public class AppUpdateTests_Startup
         // Erststart ohne hinterlegten Server → Einrichtungsdialog.
         var model = new AppModel { IsStartupRunning = true, ServerHealth = ServerHealthStatus.Checking };
 
-        var transition = AppUpdate.Update(model, new ServersLoadedMessage([], null));
+        var transition = AppUpdate.Update(model, new ServersLoadedMessage([], null, PairingRequired: false));
 
         Assert.Null(transition.Model.ActiveServerAddress);
         Assert.False(transition.Model.IsStartupRunning);
@@ -102,7 +102,7 @@ public class AppUpdateTests_Startup
     {
         var model = new AppModel { CurrentPage = AppPage.ServerSetup };
 
-        var transition = AppUpdate.Update(model, new ServersLoadedMessage([], null));
+        var transition = AppUpdate.Update(model, new ServersLoadedMessage([], null, PairingRequired: false));
 
         Assert.Empty(transition.Effects);
         Assert.Equal(AppPage.ServerSetup, transition.Model.CurrentPage);
@@ -121,7 +121,7 @@ public class AppUpdateTests_Startup
             ActiveServerAddress = "http://nas/videoplayer/"
         };
 
-        var transition = AppUpdate.Update(model, new ServerHealthCheckCompletedMessage(true));
+        var transition = AppUpdate.Update(model, new ServerHealthCheckCompletedMessage(true, PairingRequired: false));
 
         Assert.True(transition.Model.IsStartupRunning);
         Assert.Equal(ServerHealthStatus.Reachable, transition.Model.ServerHealth);
@@ -139,7 +139,7 @@ public class AppUpdateTests_Startup
         // Defensiver Pfad: Health-Check ohne hinterlegten Server → Einrichtung.
         var model = new AppModel { IsStartupRunning = true, ServerHealth = ServerHealthStatus.Checking };
 
-        var transition = AppUpdate.Update(model, new ServerHealthCheckCompletedMessage(true));
+        var transition = AppUpdate.Update(model, new ServerHealthCheckCompletedMessage(true, PairingRequired: false));
 
         Assert.False(transition.Model.IsStartupRunning);
         Assert.Equal(AppPage.ServerSetup, transition.Model.CurrentPage);
@@ -161,11 +161,110 @@ public class AppUpdateTests_Startup
             ActiveServerAddress = "http://nas/videoplayer/"
         };
 
-        var transition = AppUpdate.Update(model, new ServerHealthCheckCompletedMessage(false));
+        var transition = AppUpdate.Update(model, new ServerHealthCheckCompletedMessage(false, PairingRequired: false));
 
         Assert.True(transition.Model.IsStartupRunning);
         Assert.Equal(ServerHealthStatus.Unreachable, transition.Model.ServerHealth);
         Assert.Equal(AppPage.Loading, transition.Model.CurrentPage);
         Assert.IsType<CheckOfflineDataEffect>(Assert.Single(transition.Effects));
+    }
+
+    /// <summary>Prüft Update: bei <c>ServersLoaded</c> → übernimmt die Pairing-Erforderlichkeit ins Model.</summary>
+    [Fact]
+    public void Update_ServersLoaded_SetsPairingFlags()
+    {
+        // Die Pairing-Erforderlichkeit wird am App-Rand (kein Geräte-Token,
+        // keine statische Gate-Quelle) ermittelt und über die Nachricht
+        // übernommen; ein angezeigter Pairing-Fehler bleibt unberührt.
+        var model = new AppModel { CurrentPage = AppPage.ServerSetup, PairingError = "alt" };
+
+        var transition = AppUpdate.Update(
+            model,
+            new ServersLoadedMessage([], "http://nas/videoplayer/", PairingRequired: true));
+
+        Assert.True(transition.Model.IsPairingRequired);
+        Assert.Equal("alt", transition.Model.PairingError);
+    }
+
+    /// <summary>Prüft Update: bei <c>HealthCheckCompleted</c> erreichbar mit Pairing → Einrichtungsseite statt AutoLogin.</summary>
+    [Fact]
+    public void Update_HealthCheckCompleted_Reachable_PairingRequired_GoesToSetup()
+    {
+        // Erreichbar, aber ohne nutzbaren Gate-Schlüssel → Pairing-Eingabe
+        // auf der Einrichtungsseite; die automatische Anmeldung läuft nicht an.
+        var model = new AppModel
+        {
+            IsStartupRunning = true,
+            ServerHealth = ServerHealthStatus.Checking,
+            ActiveServerAddress = "http://nas/videoplayer/"
+        };
+
+        var transition = AppUpdate.Update(
+            model,
+            new ServerHealthCheckCompletedMessage(true, PairingRequired: true));
+
+        Assert.False(transition.Model.IsStartupRunning);
+        Assert.True(transition.Model.IsPairingRequired);
+        Assert.Null(transition.Model.PairingError);
+        Assert.Equal(ServerHealthStatus.Reachable, transition.Model.ServerHealth);
+        Assert.Equal(ConnectionState.NeedsServerSetup, transition.Model.ConnectionState);
+        Assert.Equal(AppPage.ServerSetup, transition.Model.CurrentPage);
+        var navigate = Assert.IsType<NavigateToPageEffect>(Assert.Single(transition.Effects));
+        Assert.Equal(AppPage.ServerSetup, navigate.Page);
+        Assert.DoesNotContain(transition.Effects, e => e is AttemptAutoLoginEffect);
+    }
+
+    /// <summary>Prüft Update: bei <c>HealthCheckCompleted</c> unerreichbar → Pairing-Felder werden zurückgesetzt.</summary>
+    [Fact]
+    public void Update_HealthCheckCompleted_Unreachable_ResetsPairingFields()
+    {
+        var model = new AppModel
+        {
+            IsStartupRunning = true,
+            ServerHealth = ServerHealthStatus.Checking,
+            ActiveServerAddress = "http://nas/videoplayer/",
+            IsPairingRequired = true,
+            IsPairingRunning = true,
+            PairingError = AppUpdate.InvalidPairingCodeError
+        };
+
+        var transition = AppUpdate.Update(
+            model,
+            new ServerHealthCheckCompletedMessage(false, PairingRequired: false));
+
+        Assert.False(transition.Model.IsPairingRequired);
+        Assert.False(transition.Model.IsPairingRunning);
+        Assert.Null(transition.Model.PairingError);
+        Assert.IsType<CheckOfflineDataEffect>(Assert.Single(transition.Effects));
+    }
+
+    /// <summary>
+    /// Prüft Update: widerrufenes Geräte-Token während des Starts →
+    /// Pairing-Eingabe mit Hinweis statt Offline-Pfad.
+    /// </summary>
+    [Fact]
+    public void Update_DeviceTokenRevoked_DuringStartup_ShowsPairingInputWithError()
+    {
+        // Das Gate lehnt das hinterlegte Geräte-Token beim Start-Health-Check
+        // ab: die App darf nicht in den Offline-Pfad laufen, sondern fordert
+        // die Re-Pairing-Eingabe auf der Einrichtungsseite an.
+        var model = new AppModel
+        {
+            IsStartupRunning = true,
+            ServerHealth = ServerHealthStatus.Checking,
+            ActiveServerAddress = "http://nas/videoplayer/"
+        };
+
+        var transition = AppUpdate.Update(model, new DeviceTokenRevokedMessage());
+
+        Assert.False(transition.Model.IsStartupRunning);
+        Assert.True(transition.Model.IsPairingRequired);
+        Assert.Equal(AppUpdate.DeviceRevokedError, transition.Model.PairingError);
+        Assert.Equal(ServerHealthStatus.Reachable, transition.Model.ServerHealth);
+        Assert.Equal(ConnectionState.NeedsServerSetup, transition.Model.ConnectionState);
+        Assert.Equal(AppPage.ServerSetup, transition.Model.CurrentPage);
+        Assert.Contains(transition.Effects, e => e is DisconnectServerEventsEffect);
+        Assert.Contains(transition.Effects, e => e is NavigateToPageEffect { Page: AppPage.ServerSetup });
+        Assert.DoesNotContain(transition.Effects, e => e is CheckOfflineDataEffect);
     }
 }
