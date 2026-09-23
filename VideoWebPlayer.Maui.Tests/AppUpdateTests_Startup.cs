@@ -186,6 +186,55 @@ public class AppUpdateTests_Startup
         Assert.Equal("alt", transition.Model.PairingError);
     }
 
+    /// <summary>
+    /// Prüft Update: bei <c>ServersLoaded</c> im aktiven Re-Pairing-Zustand
+    /// bleibt die Pairing-Erforderlichkeit bestehen — die erneute Ermittlung
+    /// am App-Rand würde einen vorhandenen, aber vom Gate abgelehnten
+    /// statischen Schlüssel wieder als ausreichend werten.
+    /// </summary>
+    [Fact]
+    public void Update_ServersLoaded_InRePairingState_KeepsPairingRequired()
+    {
+        // Re-Pairing-Zustand nach Gate-Ablehnung (DeviceTokenRevoked):
+        // Einrichtungsseite mit sichtbarer Pairing-Eingabe und Fehlermeldung.
+        var model = new AppModel
+        {
+            CurrentPage = AppPage.ServerSetup,
+            ConnectionState = ConnectionState.NeedsServerSetup,
+            IsPairingRequired = true,
+            PairingError = AppUpdate.DeviceRevokedError
+        };
+
+        var transition = AppUpdate.Update(
+            model,
+            new ServersLoadedMessage([], "http://nas/videoplayer/", PairingRequired: false));
+
+        Assert.True(transition.Model.IsPairingRequired);
+        Assert.Equal(AppUpdate.DeviceRevokedError, transition.Model.PairingError);
+    }
+
+    /// <summary>
+    /// Prüft Update: bei <c>ServersLoaded</c> außerhalb des Re-Pairing-
+    /// Zustands übernimmt das Model die neu ermittelte Erforderlichkeit —
+    /// ein aktiver Server ohne Bedarf blendet den Pairing-Abschnitt aus.
+    /// </summary>
+    [Fact]
+    public void Update_ServersLoaded_WhileConnected_AppliesPairingFlag()
+    {
+        var model = new AppModel
+        {
+            CurrentPage = AppPage.ServerSetup,
+            ConnectionState = ConnectionState.Connected,
+            IsPairingRequired = true
+        };
+
+        var transition = AppUpdate.Update(
+            model,
+            new ServersLoadedMessage([], "http://nas/videoplayer/", PairingRequired: false));
+
+        Assert.False(transition.Model.IsPairingRequired);
+    }
+
     /// <summary>Prüft Update: bei <c>HealthCheckCompleted</c> erreichbar mit Pairing → Einrichtungsseite statt AutoLogin.</summary>
     [Fact]
     public void Update_HealthCheckCompleted_Reachable_PairingRequired_GoesToSetup()

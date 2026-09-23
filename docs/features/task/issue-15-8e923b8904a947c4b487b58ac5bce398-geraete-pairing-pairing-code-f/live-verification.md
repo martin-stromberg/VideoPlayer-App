@@ -28,3 +28,25 @@ Server: `http://localhost:83` (IIS-Site "VideoPlayer", staging mit Issue-228-Fea
 ## Abdeckung Task 42 (manueller Gerätetest)
 
 Der kryptografische und API-vertragliche Teil des Pairing-Flows ist hiermit **gegen den realen Server verifiziert** (Punkte 2–6 oben). Nicht verifizierbar in dieser Umgebung bleiben die gerätespezifischen Anteile: `SecureStorage`-Persistenz, `DeviceInfo`-Gerätename und die UI-Bedienung auf echten Zielen (iOS/Android/Windows-App).
+
+## E2E-Lauf in der echten Windows-App (Nachtrag, gleiches Datum)
+
+`VideoPlayer.Maui.exe` (Debug, `net10.0-windows`, unverpackt) wurde real gestartet und per UI-Automation (`AutomationId`s, `ValuePattern`/`InvokePattern`) durch den kompletten Flow geführt. Screenshots dokumentieren jeden Schritt.
+
+| # | Schritt | Ergebnis |
+|---|---------|----------|
+| 8 | App-Start mit aktivem Server `http://localhost:83/` | Health-Check → erreichbar → Auto-Login ohne gespeicherte Zugangsdaten → **Anmeldemaske** mit `ReloginRequiredNotice` |
+| 9 | Anmeldung `devin@example.com` — aufgelöster Gate-Schlüssel ist der **ungültige** statische Token (Token-Datei `client-api-token.txt` / `VIDEOWEBPLAYER_MAUI_API_TOKEN`, am Gate mit `401 problem+json` abgelehnt) | Gate-Ablehnung erkannt (`IsGateRejectedAsync` via `POST api/auth/login` + `{}`) → `DeviceTokenRevoked` → **Serverseite mit Pairing-Abschnitt** und Meldung „Der Geräte-Zugang wurde vom Server abgelehnt. Bitte das Gerät erneut koppeln." |
+| 10 | Pairing-Code `ABCD2345` (per DB-Insert auf dem Server erzeugt, Alphabet-konform) eingegeben → „Koppeln" | Exchange erfolgreich → Geräte-Token entschlüsselt und im **SecureStorage** abgelegt → `PairedDevices`-Eintrag „**DESKTOP-CM8OBSG**" (realer `DeviceInfo.Name`), Code serverseitig `ConsumedAtUtc`-gesetzt → Auto-Login → Anmeldemaske |
+| 11 | Erneute Anmeldung mit Zugangsdaten | **Startseite** mit „Neu im Programm" (reale Medienposter), „Server: erreichbar" — Geräte-Token am Gate akzeptiert |
+| 12 | Negativfall UI-Validierung: Codes `SHOWME42`/`PAIR2479` (enthalten `O`/`I`) | Lokale Formatprüfung greift: „Der Code ist nicht vollständig oder enthält ungültige Zeichen — …" — kein Serverkontakt |
+
+### Dabei gefundener und behobener Fehler
+
+**`UpdateServersLoaded` setzte `IsPairingRequired` zurück:** Nach der Gate-Ablehnung (Schritt 9) zeigte die Serverseite zunächst den Pairing-Abschnitt — `OnAppearing` dispatcht jedoch `LoadServersRequestedMessage`, dessen `IsPairingRequiredAsync` den *vorhandenen, aber abgelehnten* statischen Schlüssel wieder als ausreichend wertete (`ResolveStatic() != Platzhalter` → `false`) und den Abschnitt samt Fehlermeldung ausblendete. Reproduziert per Screenshot (Serverseite ohne Pairing-Abschnitt nach der Anmeldung).
+
+Fix in `AppUpdate.UpdateServersLoaded`: `IsPairingRequired` bleibt gesetzt, solange das Model im Re-Pairing-Zustand ist (`NeedsServerSetup && IsPairingRequired`); die nachgeladene Ermittlung darf es nur noch *setzen*, nicht mehr zurücknehmen. Regressionstests: `Update_ServersLoaded_InRePairingState_KeepsPairingRequired`, `Update_ServersLoaded_WhileConnected_AppliesPairingFlag`.
+
+### Restabdeckung
+
+Damit ist der komplette Pairing- und Re-Pairing-Flow **auf einem realen Windows-Ziel** verifiziert — inklusive `SecureStorage` (Credential Store), `DeviceInfo`-Gerätename und UI-Bedienung. Offen bleiben nur die plattformspezifischen Backends auf iOS (Keychain) und Android (Keystore); der Codepfad ist derselbe (`SecureStorage`-Abstraktion).

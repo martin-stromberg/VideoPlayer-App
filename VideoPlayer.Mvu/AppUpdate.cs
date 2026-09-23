@@ -207,7 +207,14 @@ public static class AppUpdate
             // Die Pairing-Erforderlichkeit wird am App-Rand ermittelt und
             // über die Nachricht übernommen; ein angezeigter Pairing-Fehler
             // (z. B. DeviceRevokedError) bleibt beim Nachladen bestehen.
+            // Ein aktiver Re-Pairing-Zustand (Gate-Ablehnung → Einrichtungs-
+            // seite) darf dabei nicht verloren gehen: die erneute Ermittlung
+            // würde einen vorhandenen, aber vom Gate abgelehnten statischen
+            // Schlüssel wieder als ausreichend werten und die Pairing-
+            // Eingabe mitsamt der Fehlermeldung ausblenden.
             IsPairingRequired = message.PairingRequired
+                || (model.IsPairingRequired
+                    && model.ConnectionState == ConnectionState.NeedsServerSetup)
         };
 
         if (message.ActiveAddress is not null)
