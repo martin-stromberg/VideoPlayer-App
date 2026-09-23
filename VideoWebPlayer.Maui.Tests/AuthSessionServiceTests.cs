@@ -415,6 +415,16 @@ public class AuthSessionServiceTests
     }
 
     /// <summary>
+    /// Test-Vorrichtung: hinterlegt ein Geräte-Token für den Testserver und
+    /// aktiviert ihn als aktuellen Server-Kontext.
+    /// </summary>
+    private static async Task PairDeviceAsync(DeviceTokenService deviceTokens, AppSecretsService secrets)
+    {
+        await secrets.SetDeviceTokenAsync(Server.ToString(), "dev-token");
+        await deviceTokens.LoadForServerAsync(Server.ToString());
+    }
+
+    /// <summary>
     /// Prüft TokenRefresh: lehnt das Gate den Schlüssel ab (Probe-401), wird das
     /// Geräte-Token verworfen und <c>DeviceTokenRejected</c> ausgelöst — nicht
     /// <c>SessionExpired</c> (die Zugangsdaten sind nicht das Problem).
@@ -427,7 +437,7 @@ public class AuthSessionServiceTests
         try
         {
             await secrets.SetCredentialsAsync("martin", "pw");
-            await deviceTokens.SetPairedTokenAsync(Server.ToString(), "dev-token");
+            await PairDeviceAsync(deviceTokens, secrets);
             EnqueueLoginOk(handler);
             await service.TryStoredLoginAsync(Server);
             var expired = 0;
@@ -474,7 +484,7 @@ public class AuthSessionServiceTests
         try
         {
             await secrets.SetCredentialsAsync("martin", "alt-pw");
-            await deviceTokens.SetPairedTokenAsync(Server.ToString(), "dev-token");
+            await PairDeviceAsync(deviceTokens, secrets);
             EnqueueLoginOk(handler);
             await service.TryStoredLoginAsync(Server);
             var expired = 0;
@@ -511,7 +521,7 @@ public class AuthSessionServiceTests
         try
         {
             await secrets.SetCredentialsAsync("martin", "pw");
-            await deviceTokens.SetPairedTokenAsync(Server.ToString(), "dev-token");
+            await PairDeviceAsync(deviceTokens, secrets);
             var rejected = 0;
             deviceTokens.DeviceTokenRejected += (_, _) => rejected++;
 
@@ -556,7 +566,7 @@ public class AuthSessionServiceTests
         {
             await secrets.SetCredentialsAsync("martin", "pw");
             await secrets.SetAuthTokenAsync("jwt-alt");
-            await deviceTokens.SetPairedTokenAsync(Server.ToString(), "dev-token");
+            await PairDeviceAsync(deviceTokens, secrets);
             var expired = 0;
             var rejected = 0;
             service.SessionExpired += (_, _) => expired++;
@@ -603,7 +613,7 @@ public class AuthSessionServiceTests
         try
         {
             await secrets.SetCredentialsAsync("martin", "falsch");
-            await deviceTokens.SetPairedTokenAsync(Server.ToString(), "dev-token");
+            await PairDeviceAsync(deviceTokens, secrets);
             var rejected = 0;
             deviceTokens.DeviceTokenRejected += (_, _) => rejected++;
 
@@ -636,7 +646,7 @@ public class AuthSessionServiceTests
         var service = CreateServiceWithDeviceTokens(handler, out var secrets, out var deviceTokens);
         try
         {
-            await deviceTokens.SetPairedTokenAsync(Server.ToString(), "dev-token");
+            await PairDeviceAsync(deviceTokens, secrets);
             var rejected = 0;
             deviceTokens.DeviceTokenRejected += (_, _) => rejected++;
 
@@ -673,7 +683,7 @@ public class AuthSessionServiceTests
             var otherServer = new Uri("http://otherserver/videoplayer/");
             await secrets.SetDeviceTokenAsync(otherServer.ToString(), "dev-token-other");
             // Aktiver Server: der ambiente Provider bedient "dev-token".
-            await deviceTokens.SetPairedTokenAsync(Server.ToString(), "dev-token");
+            await PairDeviceAsync(deviceTokens, secrets);
             var rejected = 0;
             deviceTokens.DeviceTokenRejected += (_, _) => rejected++;
 

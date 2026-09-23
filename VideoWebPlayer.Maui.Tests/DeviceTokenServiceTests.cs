@@ -37,6 +37,18 @@ public class DeviceTokenServiceTests : IDisposable
     /// <summary>Setzt den globalen Provider-Zustand nach dem Test zurück.</summary>
     public void Dispose() => ClientGate.DeviceTokenProvider = null;
 
+    /// <summary>
+    /// Test-Vorrichtung: hinterlegt ein Geräte-Token und aktiviert die
+    /// Adresse als aktuellen Server-Kontext (wie ein abgeschlossenes
+    /// Pairing mit anschließendem Serverwechsel).
+    /// </summary>
+    private static async Task PairAsync(
+        DeviceTokenService service, AppSecretsService secrets, string serverAddress, string token)
+    {
+        await secrets.SetDeviceTokenAsync(serverAddress, token);
+        await service.LoadForServerAsync(serverAddress);
+    }
+
     /// <summary>Prüft LoadForServerAsync: ein hinterlegtes Token wird über den Provider bereitgestellt.</summary>
     [Fact]
     public async Task LoadForServer_SetsClientGateProvider()
@@ -77,25 +89,12 @@ public class DeviceTokenServiceTests : IDisposable
         Assert.Equal(ClientGate.ResolveStatic(), ClientGate.Resolve());
     }
 
-    /// <summary>Prüft SetPairedTokenAsync: persistiert das Token und aktiviert es im Provider.</summary>
-    [Fact]
-    public async Task SetPairedToken_StoresAndActivatesToken()
-    {
-        var (service, secrets) = CreateService();
-
-        await service.SetPairedTokenAsync(Server, "dev-token-2");
-
-        Assert.Equal("dev-token-2", await secrets.GetDeviceTokenAsync(Server));
-        Assert.Equal(Server, service.CurrentServerAddress);
-        Assert.Equal("dev-token-2", ClientGate.Resolve());
-    }
-
     /// <summary>Prüft DiscardCurrentAsync: entfernt das Token und setzt den Provider zurück.</summary>
     [Fact]
     public async Task DiscardCurrent_ResetsProviderAndClearsStore()
     {
         var (service, secrets) = CreateService();
-        await service.SetPairedTokenAsync(Server, "dev-token-3");
+        await PairAsync(service, secrets, Server, "dev-token-3");
 
         await service.DiscardCurrentAsync();
 
@@ -109,7 +108,7 @@ public class DeviceTokenServiceTests : IDisposable
     public async Task DiscardIfCurrent_OnlyDiscardsMatchingServer()
     {
         var (service, secrets) = CreateService();
-        await service.SetPairedTokenAsync(Server, "dev-token-4");
+        await PairAsync(service, secrets, Server, "dev-token-4");
 
         // Fremde Adresse → no-op.
         Assert.False(await service.DiscardIfCurrentAsync("http://anderer/"));
@@ -149,7 +148,7 @@ public class DeviceTokenServiceTests : IDisposable
     public async Task SetPairedTokenIfCurrent_StaleServer_StoresOnlyWithoutActivating()
     {
         var (service, secrets) = CreateService();
-        await service.SetPairedTokenAsync(OtherServer, "dev-token-other");
+        await PairAsync(service, secrets, OtherServer, "dev-token-other");
 
         // Verspätetes Pairing-Ergebnis des alten Servers.
         Assert.False(await service.SetPairedTokenIfCurrentAsync(Server, "dev-token-old"));
@@ -203,7 +202,7 @@ public class DeviceTokenServiceTests : IDisposable
         var (service, secrets) = CreateService(handler);
         await secrets.SetDeviceTokenAsync(OtherServer, "dev-token-other");
         // Der ambiente Provider bedient den aktiven Server.
-        await service.SetPairedTokenAsync(Server, "dev-token-active");
+        await PairAsync(service, secrets, Server, "dev-token-active");
         handler.Enqueue(GateRejection());
 
         Assert.True(await service.IsGateRejectedAsync(OtherServer));
@@ -221,8 +220,8 @@ public class DeviceTokenServiceTests : IDisposable
     public async Task IsGateRejected_WithoutStoredToken_UsesStaticResolution()
     {
         var handler = new StubHttpMessageHandler();
-        var (service, _) = CreateService(handler);
-        await service.SetPairedTokenAsync(Server, "dev-token-active");
+        var (service, secrets) = CreateService(handler);
+        await PairAsync(service, secrets, Server, "dev-token-active");
         handler.Enqueue(GateRejection());
 
         Assert.True(await service.IsGateRejectedAsync(OtherServer));
@@ -329,12 +328,12 @@ public class DeviceTokenServiceTests : IDisposable
     [Fact]
     public async Task NotifyRejected_RaisesDeviceTokenRejected()
     {
-        var (service, _) = CreateService();
+        var (service, secrets) = CreateService();
         var rejected = 0;
         service.DeviceTokenRejected += (_, _) => rejected++;
 
         // Verwerfen allein löst das Ereignis nicht aus — erst NotifyRejected.
-        await service.SetPairedTokenAsync(Server, "dev-token-5");
+        await PairAsync(service, secrets, Server, "dev-token-5");
         await service.DiscardCurrentAsync();
         Assert.Equal(0, rejected);
 

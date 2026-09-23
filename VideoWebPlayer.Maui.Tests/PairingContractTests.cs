@@ -27,9 +27,9 @@ public class PairingContractTests
         Assert.Contains("PairingIndicator", xaml, StringComparison.Ordinal);
         Assert.Contains("PairingErrorLabel", xaml, StringComparison.Ordinal);
         // Die Code-Länge ist serverseitig konfigurierbar (Pairing:CodeLength)
-        // — das Feld darf keine feste Stellenzahl erzwingen.
-        Assert.Contains("MaxLength=\"32\"", xaml, StringComparison.Ordinal);
-        Assert.DoesNotContain("MaxLength=\"8\"", xaml, StringComparison.Ordinal);
+        // — das Feld darf keine Längenbegrenzung setzen, die längere
+        // Codes still abschneiden würde.
+        Assert.DoesNotContain("MaxLength=", xaml, StringComparison.Ordinal);
         // Rechtschreibprüfung/Wortvorschläge dürfen die Code-Eingabe nicht
         // unbemerkt verändern.
         Assert.Contains("IsSpellCheckEnabled=\"False\"", xaml, StringComparison.Ordinal);

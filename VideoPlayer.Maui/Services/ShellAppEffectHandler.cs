@@ -1074,9 +1074,24 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
             if (result == HealthCheckResult.GateRejected)
             {
                 // Das Gate hat geantwortet — der Server ist erreichbar.
-                // Das verworfene Token nur entfernen, wenn es zu diesem
-                // Server gehört (die Ablehnung eines fremden Tokens sagt
-                // nichts über seine Gültigkeit am eigenen Server aus).
+                // Die Probe löst den Gate-Schlüssel adressspezifisch auf:
+                // ein 401 beweist die Ungültigkeit des *hinterlegten*
+                // Geräte-Tokens dieses Kandidaten — es wird gezielt
+                // gelöscht, auch wenn der Server nicht aktiv ist (Muster:
+                // AuthSessionService.HandleGateRejectionAsync). Sonst
+                // würde IsPairingRequiredAsync fälschlich „kein Pairing
+                // nötig" melden und ein aussichtsloser Auto-Login starten.
+                try
+                {
+                    await secrets.ClearDeviceTokenAsync(address);
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"[ShellAppEffectHandler] Geräte-Token des Kandidaten konnte nicht verworfen werden: {ex.Message}");
+                }
+
+                // Provider-Rücksetzung nur, wenn der Kandidat der
+                // aktuell bediente Server ist.
                 await deviceTokens.DiscardIfCurrentAsync(address);
             }
 

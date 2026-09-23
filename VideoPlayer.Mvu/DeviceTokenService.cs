@@ -90,31 +90,6 @@ public sealed class DeviceTokenService
     }
 
     /// <summary>
-    /// Persistiert ein frisch gepaartes Geräte-Token sicher und aktiviert es
-    /// im <see cref="ClientGate.DeviceTokenProvider"/>.
-    /// </summary>
-    /// <param name="serverAddress">Serveradresse des Pairings.</param>
-    /// <param name="token">Das entschlüsselte Geräte-Token.</param>
-    /// <param name="cancellationToken">Abbruchtoken.</param>
-    public async Task SetPairedTokenAsync(string serverAddress, string token, CancellationToken cancellationToken = default)
-    {
-        ArgumentException.ThrowIfNullOrWhiteSpace(serverAddress);
-        ArgumentException.ThrowIfNullOrWhiteSpace(token);
-
-        await providerLock.WaitAsync();
-        try
-        {
-            await secrets.SetDeviceTokenAsync(serverAddress, token);
-            CurrentServerAddress = serverAddress;
-            ApplyProvider(token);
-        }
-        finally
-        {
-            providerLock.Release();
-        }
-    }
-
-    /// <summary>
     /// Persistiert ein frisch gepaartes Geräte-Token und aktiviert es im
     /// <see cref="ClientGate.DeviceTokenProvider"/> nur, wenn
     /// <paramref name="serverAddress"/> noch der aktuell bediente Server
@@ -193,6 +168,10 @@ public sealed class DeviceTokenService
     /// <summary>
     /// Verwirft das Geräte-Token nur, wenn <paramref name="serverAddress"/> der
     /// aktuell bediente Server ist (z. B. Gate-Ablehnung eines Kandidaten).
+    /// Vergleich und Provider-Rücksetzung laufen atomar unter
+    /// <see cref="providerLock"/> — ein dazwischengeschobener Serverwechsel
+    /// (<see cref="LoadForServerAsync"/>) kann so nicht das frisch
+    /// aktivierte Token des neuen Servers verwerfen.
     /// </summary>
     /// <param name="serverAddress">Die abgelehnte Serveradresse.</param>
     /// <returns>
@@ -201,12 +180,37 @@ public sealed class DeviceTokenService
     /// </returns>
     public async Task<bool> DiscardIfCurrentAsync(string serverAddress)
     {
-        if (CurrentServerAddress is null || !SameServer(CurrentServerAddress, serverAddress))
+        ArgumentException.ThrowIfNullOrWhiteSpace(serverAddress);
+
+        string? discarded;
+        await providerLock.WaitAsync();
+        try
         {
-            return false;
+            if (CurrentServerAddress is null || !SameServer(CurrentServerAddress, serverAddress))
+            {
+                return false;
+            }
+
+            discarded = CurrentServerAddress;
+            CurrentServerAddress = null;
+            ApplyProvider(null);
+        }
+        finally
+        {
+            providerLock.Release();
         }
 
-        await DiscardCurrentAsync();
+        // Store-Löschung erst nach dem Release — die Secure-Storage-I/O
+        // soll die Provider-Serialisierung nicht aufhalten.
+        try
+        {
+            await secrets.ClearDeviceTokenAsync(discarded);
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[DeviceTokenService] Geräte-Token konnte nicht verworfen werden: {ex.Message}");
+        }
+
         return true;
     }
 

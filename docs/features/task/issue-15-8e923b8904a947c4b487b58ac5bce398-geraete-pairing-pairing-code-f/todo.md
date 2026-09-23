@@ -1,4 +1,4 @@
-# Aufgabenliste - Anforderungsbearbeitung
+﻿# Aufgabenliste - Anforderungsbearbeitung
 
 Branch: `task/issue-15-8e923b8904a947c4b487b58ac5bce398-geraete-pairing-pairing-code-f`
 
@@ -25,4 +25,4 @@ Branch: `task/issue-15-8e923b8904a947c4b487b58ac5bce398-geraete-pairing-pairing-
 | [x] | 12c | Release Notes aktualisieren (Unteragent) | `docs/RELEASE_NOTES.md` |
 | [ ] | 13 | Nacharbeiten abschließen (offene Punkte aus `continue.md`) | `continue-done.md` |
 | [ ] | - | Feature-Verzeichnis löschen | - |
-| [ ] | - | Commit durchführen | - |
+| [x] | - | Commit durchführen | - |
