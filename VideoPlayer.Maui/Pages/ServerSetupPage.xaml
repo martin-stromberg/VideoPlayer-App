@@ -86,6 +86,28 @@
                     Clicked="OnConnectClicked" />
             <ActivityIndicator x:Name="CheckIndicator" IsRunning="false" IsVisible="false" />
             <Label x:Name="ErrorLabel" AutomationId="ErrorLabel" TextColor="{StaticResource VpDanger}" IsVisible="false" />
+
+            <!-- Gerät koppeln: sichtbar, wenn der erreichbare Server ein
+                 Geräte-Pairing verlangt (kein nutzbarer Gate-Schlüssel). -->
+            <VerticalStackLayout x:Name="PairingSection" IsVisible="false" Spacing="8">
+                <Label Text="Gerät koppeln" FontAttributes="Bold" />
+                <Label Text="Den Einmal-Code erstellst du in der Verwaltung deines Servers (Bereich „Geräte“). Gib ihn hier vollständig ein." />
+                <!-- Kein MaxLength: die Codelänge ist serverseitig
+                     konfigurierbar (Pairing:CodeLength) — ein hartes Limit
+                     würde längere Codes still abschneiden. -->
+                <Entry x:Name="PairingCodeEntry"
+                       AutomationId="PairingCodeEntry"
+                       Placeholder="Pairing-Code"
+                       Keyboard="Text"
+                       IsSpellCheckEnabled="False"
+                       IsTextPredictionEnabled="False" />
+                <Button x:Name="PairButton"
+                        AutomationId="PairButton"
+                        Text="Koppeln"
+                        Clicked="OnPairClicked" />
+                <ActivityIndicator x:Name="PairingIndicator" IsRunning="false" IsVisible="false" />
+                <Label x:Name="PairingErrorLabel" AutomationId="PairingErrorLabel" TextColor="{StaticResource VpDanger}" IsVisible="false" />
+            </VerticalStackLayout>
         </VerticalStackLayout>
     </Grid>
 </ContentPage>

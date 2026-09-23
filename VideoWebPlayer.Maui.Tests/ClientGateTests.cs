@@ -3,6 +3,7 @@ using VideoPlayer.ApiClient;
 namespace VideoWebPlayer.Maui.Tests;
 
 /// <summary>Tests für <c>ClientGate</c>.</summary>
+[Collection("ClientGate")]
 public class ClientGateTests
 {
     /// <summary>Prüft Resolve: bevorzugt Umgebungsvariable.</summary>
@@ -81,5 +82,72 @@ public class ClientGateTests
         var resolved = ClientGate.Resolve(environmentValue, metadataValue, fileValue);
 
         Assert.Equal(expected, resolved);
+    }
+
+    /// <summary>Prüft Resolve: das gepaarte Geräte-Token schlägt alle statischen Quellen.</summary>
+    [Fact]
+    public void Resolve_PrefersDeviceTokenOverEnvironment()
+    {
+        var resolved = ClientGate.Resolve(" device-token ", "env-key", "metadata-key", "file-key");
+
+        Assert.Equal("device-token", resolved);
+    }
+
+    /// <summary>
+    /// Prüft Resolve: ein leerer oder platzhalterartiger Geräte-Token wird
+    /// übersprungen — die statische Quellenkette greift.
+    /// </summary>
+    /// <param name="deviceToken">Der vom Provider gelieferte Wert.</param>
+    /// <param name="expected">Der erwartete aufgelöste Schlüssel.</param>
+    [Theory]
+    [InlineData(null, "env-key")]
+    [InlineData("", "env-key")]
+    [InlineData("   ", "env-key")]
+    [InlineData(ClientGate.ApiTokenPlaceholder, "env-key")]
+    public void Resolve_FallsBack_WhenDeviceTokenProviderReturnsPlaceholderOrNull(
+        string? deviceToken,
+        string expected)
+    {
+        var resolved = ClientGate.Resolve(deviceToken, "env-key", "metadata-key", "file-key");
+
+        Assert.Equal(expected, resolved);
+    }
+
+    /// <summary>Prüft Resolve: das öffentliche Resolve wertet den DeviceTokenProvider zuerst aus.</summary>
+    [Fact]
+    public void Resolve_PublicOverload_ConsultsDeviceTokenProvider()
+    {
+        try
+        {
+            ClientGate.DeviceTokenProvider = () => "provider-token";
+
+            Assert.Equal("provider-token", ClientGate.Resolve());
+        }
+        finally
+        {
+            ClientGate.DeviceTokenProvider = null;
+        }
+    }
+
+    /// <summary>Prüft ResolveStatic: ignoriert den DeviceTokenProvider (nur statische Quellen).</summary>
+    [Fact]
+    public void ResolveStatic_IgnoresDeviceTokenProvider()
+    {
+        try
+        {
+            ClientGate.DeviceTokenProvider = () => "provider-token";
+
+            // Der Provider-Wert darf in der statischen Auflösung nie auftauchen.
+            Assert.NotEqual("provider-token", ClientGate.ResolveStatic());
+
+            // Ohne Provider liefern beide Auflösungen denselben statischen Wert
+            // (Umgebungsvariable/Metadata/Datei der aktuellen Maschine).
+            ClientGate.DeviceTokenProvider = null;
+            Assert.Equal(ClientGate.Resolve(), ClientGate.ResolveStatic());
+        }
+        finally
+        {
+            ClientGate.DeviceTokenProvider = null;
+        }
     }
 }

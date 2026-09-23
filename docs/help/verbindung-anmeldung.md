@@ -20,6 +20,12 @@ Nach dem Start erscheint eine Ladeanzeige mit Statustext
   danach Startseite.
 - **Server erreichbar, Zugangsdaten fehlen oder werden abgelehnt:**
   Anmeldemaske (siehe unten).
+- **Server erreichbar, Geräte-Pairing erforderlich:** der Server verlangt
+  ein gerätegebundenes Token und es ist weder eines hinterlegt noch ein
+  statischer Gate-Schlüssel konfiguriert — die Einrichtungsseite zeigt die
+  Pairing-Eingabe (Einmal-Code aus der Server-Oberfläche), siehe
+  [Serververwaltung](serververwaltung-erststart.md). Nach erfolgreicher
+  Kopplung läuft die automatische Anmeldung an.
 - **Kein Server hinterlegt:** der Einrichtungsdialog aus
   [Schritt 4](serververwaltung-erststart.md) erscheint.
 - **Server nicht erreichbar:** mit lokalen Offline-Daten startet die App
@@ -58,6 +64,13 @@ im Normalbetrieb.
   Nur wenn die gespeicherten Zugangsdaten fehlen oder vom Server
   abgelehnt werden, erscheint die Anmeldemaske mit dem Hinweis „Die
   Anmeldung ist abgelaufen."
+- Lehnt das Client-Gate den bereitgestellten Schlüssel ab (HTTP 401 am
+  Gate), unterscheidet die App per Probe, ob das Geräte-Token widerrufen
+  wurde oder die Zugangsdaten abgelehnt sind: Ein widerrufenes
+  Geräte-Token wird verworfen, einmalig der statische Schlüssel
+  nachgeprüft — bleibt die Ablehnung bestehen, erscheint die
+  Pairing-Eingabe mit dem Hinweis „Der Geräte-Zugang wurde vom Server
+  abgelehnt. Bitte das Gerät erneut koppeln."
 
 ## Nach einer Backup-Wiederherstellung
 
@@ -74,6 +87,12 @@ Benutzernamen — eine erneute Passworteingabe genügt.
 |---------|----------|
 | „Der Server ist nicht erreichbar" | Server-Adresse und Netzwerk prüfen; auf der Serverseite „Server im Netzwerk suchen" oder die Adresse manuell korrigieren |
 | „Anmeldung fehlgeschlagen. Bitte Benutzername und Passwort prüfen." | Zugangsdaten der VideoPlayer-Serverinstallation verwenden (Web-UI-Zugang) |
+| „Der Code ist nicht vollständig oder enthält ungültige Zeichen" | Code vollständig eingeben — er besteht aus Großbuchstaben und Ziffern ohne die leicht verwechselbaren Zeichen 0, O, 1, I und L |
+| „Der Pairing-Code ist ungültig, abgelaufen oder bereits verwendet." | Neuen Einmal-Code in der Server-Verwaltung (Bereich „Geräte") erzeugen und erneut eingeben |
+| „Zu viele Pairing-Versuche." | Vorübergehende Sperre abwarten, dann mit einem neuen Code erneut versuchen |
+| „Der Server unterstützt kein Geräte-Pairing" | Serverinstallation aktualisieren oder die Person kontaktieren, die den Server eingerichtet hat — es gibt keinen automatischen Rückfall auf einen statischen Schlüssel |
+| „Das Geräte-Pairing ist fehlgeschlagen." | Vorgang mit einem neuen Einmal-Code erneut versuchen; bei anhaltendem Fehler Server-Adresse und Netzwerk prüfen |
+| „Der Geräte-Zugang wurde vom Server abgelehnt." | Gerät erneut koppeln — das widerrufene Geräte-Token wurde verworfen |
 | App bleibt im Offline-Modus | Server erreichbar machen oder über „Einstellungen → Serververwaltung" einen anderen Server wählen |
 | Anmeldemaske nach Backup-Wiederherstellung | Passwort erneut eingeben — Geheimnisse werden aus Sicherheitsgründen nicht gesichert |
 
@@ -84,7 +103,12 @@ Benutzernamen — eine erneute Passworteingabe genügt.
   Verzweigungen in `AppUpdate`; `AuthSessionService` (Anmeldung über
   `VideoPlayerApiClient.LoginAsync`, Persistenz via `AppSecretsService`,
   `TokenRefresher`-Verdrahtung für die stille Neuanmeldung,
-  `SessionExpired`-Ereignis); neue Messages/Effekte
+  `SessionExpired`-Ereignis); `DeviceTokenService` (Geräte-Token-Provider
+  für `ClientGate`, Gate-Probe `IsGateRejectedAsync` per
+  `POST api/auth/login`, `DeviceTokenRejected`-Ereignis) — eine
+  Gate-Ablehnung (Status `AuthAttemptStatus.GateRejected`) führt über
+  `DeviceTokenRevokedMessage` in die Pairing-Eingabe statt in den
+  `SessionExpired`-Pfad; neue Messages/Effekte
   (`AutoLoginCompleted`, `LoginSubmitted`, `LoginCompleted`,
   `OfflineDataCheckCompleted`, `SessionExpired` /
   `AttemptAutoLogin`, `AttemptLogin`, `CheckOfflineData`).

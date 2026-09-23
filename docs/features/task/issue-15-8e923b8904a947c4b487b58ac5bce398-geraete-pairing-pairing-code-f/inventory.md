@@ -1,0 +1,25 @@
+# Bestandsaufnahme: Geräte-Pairing per Einmal-Code und gerätegebundenes Token
+
+Analysiert wurde der bestehende Projektcode der .NET-MAUI-App (`VideoPlayer.ApiClient`, `VideoPlayer.Storage`, `VideoPlayer.Mvu`, `VideoPlayer.Maui`, geteiltes `VideoWebPlayer.Client`, Testprojekt `VideoWebPlayer.Maui.Tests`) bezogen auf die Anforderung „Geräte-Pairing per Einmal-Code" (`requirement.md`): `POST api/pairing/exchange` mit flüchtigem ECDH (nistP256) + AES-256-GCM-Geräte-Token, Ablage im `SecureStorage`, neue `ClientGate.Resolve()`-Priorität, Re-Pairing bei 401, Pairing-UI in der `ServerSetupPage`, `deviceName` an den Server.
+
+## Zusammenfassung
+
+- **Client-Gate existiert, aber nur mit statischen Quellen:** `ClientGate.Resolve()` (`VideoPlayer.ApiClient/ClientGate.cs`) löst synchron über Umgebungsvariable → Assembly-Metadata (`-p:VideoPlayerApiToken`) → Token-Datei → Platzhalter auf. Eine Geräte-Token-/SecureStorage-Quelle existiert noch nicht; `Resolve()` ist `static` und synchron, die geforderte Quelle (`ISecretStore`, asynchron) muss über einen injizierbaren Provider/Delegate angebunden werden.
+- **API-Client ohne Pairing-Endpunkt:** `VideoPlayerApiClient` setzt den `X-API-Key`-Header einmalig im Konstruktor über `DefaultRequestHeaders` — es gibt weder eine Methode zum Pairing-Austausch noch eine Möglichkeit, den Gate-Header nachträglich zu aktualisieren oder für einen einzelnen Request wegzulassen. Zu beachten: Die Wiederholungsstrategie (`SendWithPolicyAsync`) wiederholt **429** (bis zu 3×) und versucht bei **401** einmalig den `TokenRefresher` — beides kollidiert konzeptionell mit den Pairing-Fehlercodes (429 = IP-Sperre, 401 = Code ungültig bzw. Geräte-Token widerrufen).
+- **Keine Pairing-DTOs im Repo:** `VideoWebPlayer.Client/Models/` enthält keine `PairingExchange*`-Dateien (sie liegen laut Anforderung im Server-Repo). In diesem Repo existieren noch keine Request-/Response-Modelle und keine ECDH/AES-GCM-Krypto-Komponente; `System.Security.Cryptography` wird bislang nur in `ClientGate` für Diagnose-Hashes verwendet.
+- **Sichere Ablage ist vorhanden und verdrahtet:** `ISecretStore` (`VideoPlayer.Storage`) + `SecureStorageSecretStore` (`VideoPlayer.Maui`, Adapter auf `SecureStorage.Default`, per DI registriert) sowie `AppSecretsService` mit den Schlüsseln `Username`/`Passkey`/`AuthToken` (profil-präfixiert). Ein Ablageschlüssel für ein Geräte-Token fehlt noch.
+- **MVU-Verbindungs-Workflow als Anker vorhanden:** `ConnectionState.NeedsServerSetup` + `AppPage.ServerSetup` steuern die Einrichtungsseite; der Übergang `ServerCheckCompletedMessage` (Erfolg) → `PersistActiveServerEffect` + `AttemptAutoLoginEffect` ist die Stelle, an der die Pairing-Eingabe eingeklinkt werden muss. Es gibt noch keine Pairing-Nachrichten/-Effekte/-Modelfelder (`IsPairingRunning`, `PairingError` o. ä.) und keinen Mechanismus, der einen Gate-401 vom Benutzer-JWT-401 unterscheidet (`SessionExpiredMessage` → `NeedsLogin` deckt nur letzteren ab).
+- **ServerSetupPage ohne Pairing-Feld:** Die Seite bietet bekannte/gefundene Server, manuelle Adresseingabe (`AddressEntry`/`ConnectButton`) und `ErrorLabel` (`ServerSetupError`) — kein Code-Eingabefeld. UI-Verdrahtung ist über Quelltext-Contract-Tests abgesichert.
+- **Deployment-Skript bettet den Token derzeit nicht ein:** `scripts/iOS-Deployment.ps1` übergibt **kein** `-p:VideoPlayerApiToken` — die in der Anforderung genannte Nutzbarkeit ist so noch nicht gegeben. Die MSBuild-Eigenschaft existiert in `VideoPlayer.ApiClient.csproj` (Default: Platzhalter `<MAUI_CLIENT_API_TOKEN>`, eingebettet als `AssemblyMetadata`-Attribut).
+- **Legacy-Altbestand:** Das alte Projekt `VideoWebPlayer.Maui` nutzt einen eigenen Gate-Mechanismus (`MauiClientConfiguration`, Metadaten-Key `VideoWebPlayer.Maui.ApiToken`) — getrennt von `ClientGate`, von der Anforderung nicht direkt betroffen.
+
+Test-Ausgangszustand: `dotnet test VideoWebPlayer.Maui.Tests/VideoWebPlayer.Maui.Tests.csproj --configuration Release` am 2026-09-23 auf Commit `87f5faf5` — **743/743 Tests erfolgreich, 0 Fehlschläge, 0 übersprungen** (Exit-Code 0). Keine bekannten Testfehler; Details und Nachweis unter [Tests](inventory/tests.md).
+
+## Details
+
+- [Datenmodell](inventory/models.md) — `AppModel`, `KnownServer`, `AuthToken`/`LoginRequest`, fehlende `PairingExchange*`-DTOs
+- [Logik](inventory/logic.md) — `ClientGate`, `VideoPlayerApiClient`, `AppSecretsService`, `KnownServersService`, `AuthSessionService`, `AppUpdate`, `ShellAppEffectHandler`, `ServerHealthProbe`, `SecureStorageSecretStore`, `ServerSetupPage`, `MauiProgram` u. a.
+- [Enums](inventory/enums.md) — `ConnectionState`, `AuthAttemptStatus`, `ServerHealthStatus`, `AppPage`
+- [Interfaces](inventory/interfaces.md) — `ISecretStore`, `ISettingsStore`, `IAppEffectHandler`, `IServerHealthProbe`, `IServerAddressProvider`
+- [Build und Deployment](inventory/build-deployment.md) — `VideoPlayerApiToken`-MSBuild-Eigenschaft, `scripts/iOS-Deployment.ps1`, Legacy-`MauiClientConfiguration`
+- [Tests](inventory/tests.md) — Test-Ausgangszustand (Nachweis), bestehende Testklassen und Hilfsmethoden

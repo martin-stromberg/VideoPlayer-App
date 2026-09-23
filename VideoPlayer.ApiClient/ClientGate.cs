@@ -7,7 +7,8 @@ namespace VideoPlayer.ApiClient;
 
 /// <summary>
 /// Löst den API-Schlüssel für das serverseitige Client-Gate auf und stellt den
-/// zugehörigen Header-Namen bereit. Quellen in Reihenfolge: Umgebungsvariable,
+/// zugehörigen Header-Namen bereit. Quellen in Reihenfolge: gepaartes
+/// Geräte-Token (<see cref="DeviceTokenProvider"/>), Umgebungsvariable,
 /// Assembly-Metadata (Build-Eigenschaft), Token-Datei im lokalen
 /// Anwendungsdatenverzeichnis, Platzhalter. Werte, die dem Platzhalter
 /// entsprechen, gelten als nicht konfiguriert und werden übersprungen.
@@ -49,26 +50,56 @@ public static class ClientGate
         Path.Combine(TokenFileDirectory, ApiTokenFileName);
 
     /// <summary>
-    /// Löst den API-Schlüssel auf: Umgebungsvariable vor Assembly-Metadata
-    /// vor Token-Datei vor Platzhalter.
+    /// Liefert das gepaarte Geräte-Token des aktiven Servers, sofern eines
+    /// gesetzt ist. Der Delegate wird von <c>Resolve()</c> vor allen
+    /// statischen Quellen ausgewertet; <c>null</c> oder ein leerer/platzhalter-
+    /// artiger Rückgabewert fällt auf die statische Auflösung zurück.
+    /// </summary>
+    public static Func<string?>? DeviceTokenProvider { get; set; }
+
+    /// <summary>
+    /// Löst den API-Schlüssel auf: Geräte-Token vor Umgebungsvariable vor
+    /// Assembly-Metadata vor Token-Datei vor Platzhalter.
     /// </summary>
     /// <returns>Der aufgelöste API-Schlüssel bzw. der Platzhalter.</returns>
     public static string Resolve()
+    {
+        var deviceToken = DeviceTokenProvider?.Invoke();
+        var environmentValue = Environment.GetEnvironmentVariable(ApiTokenEnvironmentVariable);
+        var metadataValue = ReadMetadataValue();
+        var fileValue = ReadTokenFile();
+        var resolved = Resolve(deviceToken, environmentValue, metadataValue, fileValue);
+        WriteDiagnostic(deviceToken, environmentValue, metadataValue, fileValue, resolved);
+        return resolved;
+    }
+
+    /// <summary>
+    /// Löst nur die statischen Quellen auf (Umgebungsvariable, Assembly-Metadata,
+    /// Token-Datei, Platzhalter) — ohne <see cref="DeviceTokenProvider"/>.
+    /// Dient als Fallback nach dem Verwerfen eines Geräte-Tokens und zur
+    /// Prüfung, ob ein statischer Schlüssel konfiguriert ist.
+    /// </summary>
+    /// <returns>Der statisch aufgelöste API-Schlüssel bzw. der Platzhalter.</returns>
+    public static string ResolveStatic()
     {
         var environmentValue = Environment.GetEnvironmentVariable(ApiTokenEnvironmentVariable);
         var metadataValue = ReadMetadataValue();
         var fileValue = ReadTokenFile();
         var resolved = Resolve(environmentValue, metadataValue, fileValue);
-        WriteDiagnostic(environmentValue, metadataValue, fileValue, resolved);
+        WriteDiagnostic(null, environmentValue, metadataValue, fileValue, resolved);
         return resolved;
     }
 
     internal static string Resolve(string? environmentValue, string? metadataValue)
-        => Resolve(environmentValue, metadataValue, null);
+        => Resolve(null, environmentValue, metadataValue, null);
 
     internal static string Resolve(string? environmentValue, string? metadataValue, string? fileValue)
+        => Resolve(null, environmentValue, metadataValue, fileValue);
+
+    internal static string Resolve(string? deviceToken, string? environmentValue, string? metadataValue, string? fileValue)
     {
-        return FirstConfigured(environmentValue)
+        return FirstConfigured(deviceToken)
+            ?? FirstConfigured(environmentValue)
             ?? FirstConfigured(metadataValue)
             ?? FirstConfigured(fileValue)
             ?? ApiTokenPlaceholder;
@@ -110,6 +141,7 @@ public static class ClientGate
 
     [Conditional("DEBUG")]
     private static void WriteDiagnostic(
+        string? deviceToken,
         string? environmentValue,
         string? metadataValue,
         string? fileValue,
@@ -120,7 +152,7 @@ public static class ClientGate
             var line = string.Create(
                 System.Globalization.CultureInfo.InvariantCulture,
                 $"{DateTime.UtcNow:O} pid={Environment.ProcessId} exe={Environment.ProcessPath} " +
-                $"env={Describe(environmentValue)} meta={Describe(metadataValue)} " +
+                $"device={Describe(deviceToken)} env={Describe(environmentValue)} meta={Describe(metadataValue)} " +
                 $"file={Describe(fileValue)} resolved={Describe(resolved)}{Environment.NewLine}");
             File.AppendAllText(
                 Path.Combine(Path.GetTempPath(), "videoplayer-clientgate.log"),

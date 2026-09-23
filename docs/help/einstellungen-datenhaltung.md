@@ -69,11 +69,14 @@ Die App trennt ihre Daten in drei Bereiche:
 
 ## Geheimnisse
 
-Passwörter und Anmelde-Token werden ausschließlich in der sicheren
-Plattformablage (`SecureStorage`: iOS-Keychain, Windows-Credential-Ablage)
-gespeichert. Sie gelangen weder in die normale Einstellungsablage noch ins
-Cloud-Backup. Nach einer Wiederherstellung auf einem neuen Gerät ist daher
-eine erneute Anmeldung erforderlich.
+Passwörter, Anmelde-Token und gepaarte Geräte-Token (aus der
+Geräte-Kopplung per Einmal-Code, siehe
+[Serververwaltung](serververwaltung-erststart.md)) werden ausschließlich
+in der sicheren Plattformablage (`SecureStorage`: iOS-Keychain,
+Windows-Credential-Ablage) gespeichert. Sie gelangen weder in die
+normale Einstellungsablage noch ins Cloud-Backup. Nach einer
+Wiederherstellung auf einem neuen Gerät ist daher eine erneute Anmeldung
+erforderlich; das Gerät wird zudem erneut gekoppelt.
 
 ## Profile
 

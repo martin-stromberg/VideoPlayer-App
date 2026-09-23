@@ -49,6 +49,16 @@ public sealed record CheckCandidateServerEffect(string Address, string? DisplayN
 public sealed record PersistActiveServerEffect(string Address, string? DisplayName) : AppEffect;
 
 /// <summary>
+/// Pairing-Austausch ausführen: den eingegebenen Einmal-Code gegen ein
+/// Geräte-Token tauschen (<c>api/pairing/exchange</c>; Ergebnis:
+/// <c>PairingCompletedMessage</c>).
+/// </summary>
+/// <param name="ServerAddress">Adresse des Pairing-Servers.</param>
+/// <param name="Code">Der normalisierte Einmal-Code.</param>
+/// <returns>Effekt-Datensatz für den Pairing-Austausch.</returns>
+public sealed record ExchangePairingCodeEffect(string ServerAddress, string Code) : AppEffect;
+
+/// <summary>
 /// Automatische Anmeldung mit den gespeicherten Zugangsdaten ausführen
 /// (Ergebnis: <c>AutoLoginCompletedMessage</c>).
 /// </summary>

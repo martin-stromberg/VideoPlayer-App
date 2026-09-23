@@ -32,6 +32,24 @@ public static class AppUpdate
     /// <summary>Hinweistext der Anmeldemaske nach abgelaufener Sitzung.</summary>
     public const string SessionExpiredError = "Die Anmeldung ist abgelaufen. Bitte erneut anmelden.";
 
+    /// <summary>Fehlertext der Pairing-Eingabe bei ungültigem/abgelaufenem/bereits verwendetem Einmal-Code (HTTP 401).</summary>
+    public const string InvalidPairingCodeError = "Der Pairing-Code ist ungültig, abgelaufen oder bereits verwendet. Bitte den Code prüfen.";
+
+    /// <summary>Hinweistext der Pairing-Eingabe bei fehlendem oder falsch formatiertem Code (lokale Formatprüfung).</summary>
+    public const string PairingCodeFormatError = "Der Code ist nicht vollständig oder enthält ungültige Zeichen — er besteht aus Großbuchstaben und Ziffern, ohne 0, O, 1, I und L.";
+
+    /// <summary>Fehlertext der Pairing-Eingabe bei serverseitiger Versuchssperre (HTTP 429).</summary>
+    public const string PairingRateLimitedError = "Zu viele Pairing-Versuche. Bitte später erneut versuchen.";
+
+    /// <summary>Fehlertext der Pairing-Eingabe bei Servern ohne Pairing-Endpunkt (HTTP 404).</summary>
+    public const string PairingNotSupportedError = "Der Server unterstützt kein Geräte-Pairing — bitte den Server aktualisieren oder dich an die Person wenden, die den Server eingerichtet hat.";
+
+    /// <summary>Fehlertext der Pairing-Eingabe bei sonstigen Pairing-Fehlern.</summary>
+    public const string PairingFailedError = "Das Geräte-Pairing ist fehlgeschlagen. Bitte erneut versuchen.";
+
+    /// <summary>Fehlertext der Pairing-Eingabe, nachdem der Server das Geräte-Token verworfen hat.</summary>
+    public const string DeviceRevokedError = "Der Geräte-Zugang wurde vom Server abgelehnt. Bitte das Gerät erneut koppeln.";
+
     /// <summary>Fehlertext der Wiedergabeseite bei nicht verfügbarer/abspielbarer Quelle.</summary>
     public const string PlaybackUnavailableError = "Das Video kann nicht abgespielt werden.";
 
@@ -65,6 +83,9 @@ public static class AppUpdate
             DiscoveredServerSelectedMessage selected => UpdateServerCandidateSelected(model, selected.Address, selected.DisplayName),
             ServerSwitchRequestedMessage switchTo => UpdateServerCandidateSelected(model, switchTo.Address, switchTo.DisplayName),
             ServerCheckCompletedMessage check => UpdateServerCheckCompleted(model, check),
+            PairingCodeSubmittedMessage submitted => UpdatePairingCodeSubmitted(model, submitted),
+            PairingCompletedMessage completed => UpdatePairingCompleted(model, completed),
+            DeviceTokenRevokedMessage => UpdateDeviceTokenRevoked(model),
             AutoLoginCompletedMessage autoLogin => UpdateAutoLoginCompleted(model, autoLogin),
             LoginSubmittedMessage submitted => UpdateLoginSubmitted(model, submitted),
             LoginCompletedMessage completed => UpdateLoginCompleted(model, completed),
@@ -182,7 +203,18 @@ public static class AppUpdate
         var updated = model with
         {
             KnownServers = message.Servers,
-            ActiveServerAddress = message.ActiveAddress
+            ActiveServerAddress = message.ActiveAddress,
+            // Die Pairing-Erforderlichkeit wird am App-Rand ermittelt und
+            // über die Nachricht übernommen; ein angezeigter Pairing-Fehler
+            // (z. B. DeviceRevokedError) bleibt beim Nachladen bestehen.
+            // Ein aktiver Re-Pairing-Zustand (Gate-Ablehnung → Einrichtungs-
+            // seite) darf dabei nicht verloren gehen: die erneute Ermittlung
+            // würde einen vorhandenen, aber vom Gate abgelehnten statischen
+            // Schlüssel wieder als ausreichend werten und die Pairing-
+            // Eingabe mitsamt der Fehlermeldung ausblenden.
+            IsPairingRequired = message.PairingRequired
+                || (model.IsPairingRequired
+                    && model.ConnectionState == ConnectionState.NeedsServerSetup)
         };
 
         if (message.ActiveAddress is not null)
@@ -259,8 +291,18 @@ public static class AppUpdate
 
     private static AppTransition BeginServerCheck(AppModel model, string normalizedAddress, string? displayName)
     {
+        // Eine neue Serverprüfung ersetzt den Pairing-Kontext — ein alter
+        // Pairing-Fehler oder ein hängendes IsPairingRequired darf nicht
+        // über den nächsten Check hinweg sichtbar bleiben.
         return new AppTransition(
-            model with { IsServerCheckRunning = true, ServerSetupError = null },
+            model with
+            {
+                IsServerCheckRunning = true,
+                ServerSetupError = null,
+                IsPairingRequired = false,
+                IsPairingRunning = false,
+                PairingError = null
+            },
             [new CheckCandidateServerEffect(normalizedAddress, displayName)]);
     }
 
@@ -272,7 +314,10 @@ public static class AppUpdate
                 model with
                 {
                     IsServerCheckRunning = false,
-                    ServerSetupError = UnreachableServerError
+                    ServerSetupError = UnreachableServerError,
+                    IsPairingRequired = false,
+                    IsPairingRunning = false,
+                    PairingError = null
                 },
                 []);
         }
@@ -290,6 +335,35 @@ public static class AppUpdate
             .ToList();
         known.Insert(0, server);
 
+        if (message.PairingRequired)
+        {
+            // Der Server ist erreichbar und geprüft, verlangt aber ein
+            // Geräte-Pairing (kein Geräte-Token und kein statischer
+            // Gate-Schlüssel): die Pairing-Eingabe der Einrichtungsseite
+            // wird sichtbar — ohne automatische Anmeldung. Der geprüfte
+            // Server wird dennoch persistiert.
+            var updated = model with
+            {
+                IsServerCheckRunning = false,
+                ServerSetupError = null,
+                ActiveServerAddress = normalized,
+                KnownServers = known,
+                ServerHealth = ServerHealthStatus.Reachable,
+                IsPairingRequired = true,
+                IsPairingRunning = false,
+                PairingError = null,
+                ConnectionState = ConnectionState.NeedsServerSetup,
+                CurrentPage = AppPage.ServerSetup
+            };
+            var effects = new List<AppEffect> { new PersistActiveServerEffect(normalized, message.DisplayName) };
+            if (model.CurrentPage != AppPage.ServerSetup)
+            {
+                effects.Add(new NavigateToPageEffect(AppPage.ServerSetup));
+            }
+
+            return new AppTransition(updated, effects);
+        }
+
         // Der Server wird übernommen; die (automatische) Anmeldung am neuen
         // Server entscheidet über das Navigationsziel — „Home" wird nur aus
         // Connected/Offline erreicht. IsServerCheckRunning bleibt bis zum
@@ -305,6 +379,9 @@ public static class AppUpdate
                 KnownServers = known,
                 ServerHealth = ServerHealthStatus.Reachable,
                 ConnectionState = ConnectionState.Connecting,
+                IsPairingRequired = false,
+                IsPairingRunning = false,
+                PairingError = null,
                 SourcesOverview = SourcesOverviewState.Initial,
                 SourceBrowser = SourceBrowserState.Empty,
                 // Auch das servergenerierte Hero-Bild gehört zum
@@ -325,16 +402,45 @@ public static class AppUpdate
                 return GoToServerSetup(model, ServerHealthStatus.Unknown);
             }
 
+            if (message.PairingRequired)
+            {
+                // Erreichbar, aber ohne nutzbaren Gate-Schlüssel →
+                // Pairing-Eingabe auf der Einrichtungsseite.
+                var updated = model with
+                {
+                    IsStartupRunning = false,
+                    ServerHealth = ServerHealthStatus.Reachable,
+                    IsPairingRequired = true,
+                    PairingError = null,
+                    ConnectionState = ConnectionState.NeedsServerSetup,
+                    CurrentPage = AppPage.ServerSetup
+                };
+                return model.CurrentPage == AppPage.ServerSetup
+                    ? new AppTransition(updated, [])
+                    : new AppTransition(updated, [new NavigateToPageEffect(AppPage.ServerSetup)]);
+            }
+
             // Erreichbar → automatische Anmeldung mit gespeicherten Zugangsdaten.
             return new AppTransition(
-                model with { ServerHealth = ServerHealthStatus.Reachable },
+                model with
+                {
+                    ServerHealth = ServerHealthStatus.Reachable,
+                    IsPairingRequired = false,
+                    PairingError = null
+                },
                 [new AttemptAutoLoginEffect(model.ActiveServerAddress)]);
         }
 
         // Nicht erreichbar → Offline-Daten-Bestand entscheidet zwischen
         // Offline-Zustand und Serverauswahl.
         return new AppTransition(
-            model with { ServerHealth = ServerHealthStatus.Unreachable },
+            model with
+            {
+                ServerHealth = ServerHealthStatus.Unreachable,
+                IsPairingRequired = false,
+                IsPairingRunning = false,
+                PairingError = null
+            },
             [new CheckOfflineDataEffect()]);
     }
 
@@ -370,11 +476,134 @@ public static class AppUpdate
             : new AppTransition(withSetup, [new NavigateToPageEffect(AppPage.ServerSetup)]);
     }
 
+    private static AppTransition UpdatePairingCodeSubmitted(AppModel model, PairingCodeSubmittedMessage message)
+    {
+        if (model.IsPairingRunning)
+        {
+            // Doppel-Submit bei laufendem Austausch ignorieren — ein zweiter
+            // ExchangePairingCodeEffect würde die Seiteneffekte des ersten
+            // (Provider-Aktivierung, API-Client-Schlüssel) überholen.
+            return AppTransition.Unchanged(model);
+        }
+
+        if (!PairingCode.TryNormalize(message.Code, out var code))
+        {
+            // Lokale Formatprüfung: kein Server-Kontakt — die Eingabe ist
+            // unvollständig oder falsch formatiert (nicht „abgelaufen").
+            return new AppTransition(
+                model with { PairingError = PairingCodeFormatError },
+                []);
+        }
+
+        if (model.ActiveServerAddress is null)
+        {
+            // Defensiv: Pairing ohne aktiven Server → Einrichtung.
+            return GoToServerSetup(model, model.ServerHealth);
+        }
+
+        return new AppTransition(
+            model with { IsPairingRunning = true, PairingError = null },
+            [new ExchangePairingCodeEffect(model.ActiveServerAddress, code)]);
+    }
+
+    private static AppTransition UpdatePairingCompleted(AppModel model, PairingCompletedMessage message)
+    {
+        if (!model.IsPairingRunning)
+        {
+            // Verspätetes Ergebnis nach Serverwechsel/neuem Check —
+            // der Pairing-Kontext wurde bereits ersetzt.
+            return AppTransition.Unchanged(model);
+        }
+
+        if (message.Status == PairingStatus.Succeeded)
+        {
+            var updated = model with
+            {
+                IsPairingRunning = false,
+                IsPairingRequired = false,
+                PairingError = null,
+                ConnectionState = ConnectionState.Connecting
+            };
+            return model.ActiveServerAddress is null
+                ? new AppTransition(updated, [])
+                : new AppTransition(updated, [new AttemptAutoLoginEffect(model.ActiveServerAddress)]);
+        }
+
+        // Fehler bleiben inline auf der Pairing-Eingabe — der Benutzer
+        // kann den Code korrigiert erneut senden. Es gibt bewusst keinen
+        // Fallback auf einen statischen Token (auch nicht bei einem
+        // Server ohne Pairing-Endpunkt).
+        return new AppTransition(
+            model with
+            {
+                IsPairingRunning = false,
+                PairingError = PairingErrorFor(message.Status)
+            },
+            []);
+    }
+
+    private static string PairingErrorFor(PairingStatus status) => status switch
+    {
+        PairingStatus.InvalidCode => InvalidPairingCodeError,
+        PairingStatus.RateLimited => PairingRateLimitedError,
+        PairingStatus.NotSupported => PairingNotSupportedError,
+        PairingStatus.ServerUnreachable => LoginUnreachableError,
+        _ => PairingFailedError
+    };
+
+    private static AppTransition UpdateDeviceTokenRevoked(AppModel model)
+    {
+        if (model.ConnectionState == ConnectionState.NeedsServerSetup && model.IsPairingRequired)
+        {
+            // Bereits im Re-Pairing-Zustand — Doppelauslösung ignorieren.
+            return AppTransition.Unchanged(model);
+        }
+
+        var updated = model with
+        {
+            IsStartupRunning = false,
+            IsServerCheckRunning = false,
+            IsPairingRunning = false,
+            IsLoginRunning = false,
+            IsPairingRequired = true,
+            // Das Gate hat geantwortet — der Server ist erreichbar.
+            ServerHealth = ServerHealthStatus.Reachable,
+            ServerSetupError = null,
+            PairingError = DeviceRevokedError,
+            ConnectionState = ConnectionState.NeedsServerSetup,
+            CurrentPage = AppPage.ServerSetup,
+            // Quellen- und Browsing-Zustand gehören zur abgelehnten
+            // Sitzung — sie dürfen nicht sichtbar bleiben (Muster
+            // UpdateSessionExpired).
+            SourcesOverview = SourcesOverviewState.Initial,
+            SourceBrowser = SourceBrowserState.Empty,
+            HomeHero = HomeHeroState.Empty
+        };
+        var effects = new List<AppEffect> { new DisconnectServerEventsEffect() };
+        if (model.CurrentPage != AppPage.ServerSetup)
+        {
+            effects.Add(new NavigateToPageEffect(AppPage.ServerSetup));
+        }
+
+        return new AppTransition(updated, effects);
+    }
+
     private static AppTransition UpdateAutoLoginCompleted(AppModel model, AutoLoginCompletedMessage message)
     {
         if (message.Status == AuthAttemptStatus.Succeeded)
         {
             return EnterConnected(model with { LoginUsername = message.Username ?? model.LoginUsername });
+        }
+
+        if (message.Status == AuthAttemptStatus.GateRejected)
+        {
+            // Das Client-Gate hat den Schlüssel abgelehnt (widerrufenes
+            // Geräte-Token). Die Ablehnung wurde am Rand bereits als
+            // DeviceTokenRevokedMessage gemeldet — das verspätete
+            // Auto-Login-Ergebnis darf den Re-Pairing-Zustand nicht auf
+            // die Anmeldemaske übersteuern (dort scheitert jede Anmeldung
+            // am Gate). Der Übergang ist idempotent zum Widerrufs-Übergang.
+            return UpdateDeviceTokenRevoked(model);
         }
 
         // Fehlende oder fehlgeschlagene Zugangsdaten → Anmeldemaske.
@@ -421,6 +650,13 @@ public static class AppUpdate
         if (message.Status == AuthAttemptStatus.Succeeded)
         {
             return EnterConnected(model);
+        }
+
+        if (message.Status == AuthAttemptStatus.GateRejected)
+        {
+            // Gate-Ablehnung bei manueller Anmeldung (widerrufenes
+            // Geräte-Token) → Re-Pairing-Eingabe statt Anmeldefehler.
+            return UpdateDeviceTokenRevoked(model);
         }
 
         return new AppTransition(

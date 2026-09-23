@@ -237,7 +237,7 @@ public class AppUpdateTests_Offline
 
         var health = AppUpdate.Update(
             reconnect.Model,
-            new ServerHealthCheckCompletedMessage(true));
+            new ServerHealthCheckCompletedMessage(true, false));
         Assert.Contains(health.Effects, e => e is AttemptAutoLoginEffect);
 
         var connected = AppUpdate.Update(

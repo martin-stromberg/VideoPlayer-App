@@ -32,6 +32,13 @@ namespace VideoPlayer.Maui
             // führt Navigation und Server-Erreichbarkeitsprüfung am App-Rand aus.
             builder.Services.AddSingleton<IServerAddressProvider, ServerAddressProvider>();
             builder.Services.AddSingleton<IServerHealthProbe, ServerHealthProbe>();
+            // Geräte-Pairing: öffentlicher Austausch-Client (ohne Gate-/
+            // Bearer-Header und ohne Wiederholungen) plus Verwaltung der
+            // gepaarten Tokens (sichere Ablage, Gate-Provider).
+            builder.Services.AddSingleton<VideoPlayer.ApiClient.DevicePairingClient>(
+                _ => new VideoPlayer.ApiClient.DevicePairingClient(
+                    new HttpClient { Timeout = VideoPlayer.ApiClient.DevicePairingClient.RequestTimeout }));
+            builder.Services.AddSingleton<DeviceTokenService>();
             builder.Services.AddSingleton<AuthSessionService>();
             builder.Services.AddSingleton<IAppEffectHandler, ShellAppEffectHandler>();
             builder.Services.AddSingleton<MvuHost>();

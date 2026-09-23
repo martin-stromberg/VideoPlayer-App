@@ -42,6 +42,12 @@ public class AppRoutesTests
     [Theory]
     [InlineData("//home", AppPage.Home)]
     [InlineData("//settings?x=1", AppPage.Settings)]
+    // Geschobene Routen hängen am Ort des darunterliegenden Menüeintrags —
+    // das tiefste Segment bestimmt die angezeigte Seite.
+    [InlineData("//settings/serversetup", AppPage.ServerSetup)]
+    [InlineData("//home/serversetup", AppPage.ServerSetup)]
+    [InlineData("//settings/login", AppPage.Login)]
+    [InlineData("//favorites/FavoritesPage", AppPage.Favorites)]
     public void TryGetPage_ResolvesShellLocations(string location, AppPage expected)
     {
         Assert.True(AppRoutes.TryGetPage(location, out var page));

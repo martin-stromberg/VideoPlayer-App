@@ -34,6 +34,8 @@
         VIDEOPLAYER_IOS_API_KEY_PATH    -> Pfad zum App Store Connect API Key (.p8, ausserhalb des Repo)
         VIDEOPLAYER_IOS_API_KEY_ID      -> Key-ID aus App Store Connect
         VIDEOPLAYER_IOS_API_ISSUER_ID   -> Issuer-ID aus App Store Connect
+        VIDEOWEBPLAYER_MAUI_API_TOKEN   -> statischer Client-Gate-Schluessel (Build-Eigenschaft VideoPlayerApiToken;
+                                         Geraete ohne Pairing-Endpunkt/Alt-Clients). In der Anzeige maskiert.
 #>
 
 param(
@@ -70,6 +72,8 @@ param(
     [switch]$Console,
     [switch]$NoBumpBuildNumber,
     [string]$LogDir = "logs",
+    [Parameter(HelpMessage = "Statischer Client-Gate-Schluessel (MSBuild-Eigenschaft VideoPlayerApiToken); wird in der Anzeige maskiert.")]
+    [string]$VideoPlayerApiToken = $env:VIDEOWEBPLAYER_MAUI_API_TOKEN,
 
     [switch]$NoPrompt
 )
@@ -695,7 +699,7 @@ function Add-MaskedDisplay {
         [string]$Value
     )
     if (-not $Value) { return }
-    if ($Name -eq "ServerPassword") {
+    if ($Name -eq "ServerPassword" -or $Name -eq "VideoPlayerApiToken") {
         $List.Add("-p:$Name=***")
     }
     else {
@@ -718,6 +722,7 @@ function Invoke-Build {
 
     $rspLines = New-Object System.Collections.Generic.List[string]
     Add-PropertyLine -List $rspLines -Name "RuntimeIdentifier" -Value $rid
+    Add-PropertyLine -List $rspLines -Name "VideoPlayerApiToken" -Value $VideoPlayerApiToken
 
     if ($isWindows) {
         Add-PropertyLine -List $rspLines -Name "ServerAddress" -Value $ServerAddress
@@ -729,6 +734,7 @@ function Invoke-Build {
 
     $displayLines = New-Object System.Collections.Generic.List[string]
     Add-PropertyLine -List $displayLines -Name "RuntimeIdentifier" -Value $rid
+    Add-MaskedDisplay -List $displayLines -Name "VideoPlayerApiToken" -Value $VideoPlayerApiToken
     if ($isWindows) {
         Add-PropertyLine -List $displayLines -Name "ServerAddress" -Value $ServerAddress
         Add-PropertyLine -List $displayLines -Name "ServerUser" -Value $ServerUser
@@ -875,6 +881,7 @@ function Invoke-Run {
 
     $rspLines = New-Object System.Collections.Generic.List[string]
     Add-PropertyLine -List $rspLines -Name "RuntimeIdentifier" -Value $rid
+    Add-PropertyLine -List $rspLines -Name "VideoPlayerApiToken" -Value $VideoPlayerApiToken
 
     if ($isWindows) {
         Add-PropertyLine -List $rspLines -Name "ServerAddress" -Value $ServerAddress
@@ -886,6 +893,7 @@ function Invoke-Run {
 
     $displayLines = New-Object System.Collections.Generic.List[string]
     Add-PropertyLine -List $displayLines -Name "RuntimeIdentifier" -Value $rid
+    Add-MaskedDisplay -List $displayLines -Name "VideoPlayerApiToken" -Value $VideoPlayerApiToken
     if ($isWindows) {
         Add-PropertyLine -List $displayLines -Name "ServerAddress" -Value $ServerAddress
         Add-PropertyLine -List $displayLines -Name "ServerUser" -Value $ServerUser
@@ -965,6 +973,7 @@ function Invoke-DeviceViaSsh {
 
     $rspLines = New-Object System.Collections.Generic.List[string]
     Add-PropertyLine -List $rspLines -Name "RuntimeIdentifier" -Value $rid
+    Add-PropertyLine -List $rspLines -Name "VideoPlayerApiToken" -Value $VideoPlayerApiToken
     Add-PropertyLine -List $rspLines -Name "ServerAddress" -Value $ServerAddress
     Add-PropertyLine -List $rspLines -Name "ServerUser" -Value $ServerUser
     Add-PropertyLine -List $rspLines -Name "TcpPort" -Value $TcpPort

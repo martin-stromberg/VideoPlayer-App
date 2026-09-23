@@ -6,8 +6,8 @@
 
 - [Neues App-Grundgerüst](app-grundgeruest.md) — Startvorgang, Seitenmenü und Platzhalterseiten der neu aufgebauten App.
 - [Einstellungen und lokale Datenhaltung](einstellungen-datenhaltung.md) — Einstellungsseite, Backup-Trennung der Ablageorte, Geheimnisse und Profile.
-- [Serververwaltung und Erststart-Einrichtung](serververwaltung-erststart.md) — Erststart-Dialog, Netzwerk-Erkennung (mDNS/UDP), bekannte Server und „Server wechseln".
-- [Verbindung und Anmeldung](verbindung-anmeldung.md) — automatischer Verbindungsaufbau beim Start, Anmeldemaske, Offline-Modus, Token-Erneuerung und Verhalten nach einer Backup-Wiederherstellung.
+- [Serververwaltung und Erststart-Einrichtung](serververwaltung-erststart.md) — Erststart-Dialog, Netzwerk-Erkennung (mDNS/UDP), bekannte Server, „Server wechseln" und Geräte-Kopplung per Einmal-Code (Pairing).
+- [Verbindung und Anmeldung](verbindung-anmeldung.md) — automatischer Verbindungsaufbau beim Start, Anmeldemaske, Offline-Modus, Token-Erneuerung, Re-Pairing bei widerrufenem Geräte-Token und Verhalten nach einer Backup-Wiederherstellung.
 - [Netzwerkstatus und Synchronisation](netzwerk-synchronisation.md) — Online↔Offline-Erkennung zur Laufzeit, automatische Wiederverbindung, Echtzeit-Ereignisse des Servers (SignalR), persistente Fortschritts-Warteschlange und Hintergrund-Synchronisation.
 - [Startseite mit gecachten Medienlisten](startseite-medienlisten.md) — „Weiterschauen", „Favoriten" und „Neu im Programm" mit Cache-First-Laden, Poster-Ablage außerhalb des Backups, ereignisgesteuerter Aktualisierung und Detail-Navigation sowie der Hero-Kopfbereich mit servergeneriertem Bild (ausblendbar über die Einstellung „Kopfbereich anzeigen").
 - [Quellen-Browsing und Medien-Detailseiten](quellen-browsing-details.md) — Quellen als dynamische Menüeinträge mit Icons, Genre-Filter, Textsuche und seitenweises Nachladen sowie Detailseiten für Filme, Kollektionen, Serien mit Staffeln/Episoden, der vollbreite Kopfbereich mit Hintergrundgrafik nach Web-Vorbild, das Angesehen-Badge in der Episodenliste und die Favoriten-Markierung.
@@ -19,5 +19,5 @@
 
 ## Infrastruktur
 
-- [Server-API-Client](api-client/index.md) — Plattformneutraler Zugriff auf die öffentliche VideoPlayer-Server-API mit Wiederholungsstrategie und Token-Erneuerung.
+- [Server-API-Client](api-client/index.md) — Plattformneutraler Zugriff auf die öffentliche VideoPlayer-Server-API mit Wiederholungsstrategie, Token-Erneuerung und Geräte-Pairing-Endpunkt.
 - [Staging-Branch](staging-branch.md) — Branching- und Release-Prozess.

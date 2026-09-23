@@ -1,3 +1,5 @@
+using System.Net;
+using VideoPlayer.ApiClient;
 using VideoPlayer.ApiClient.Discovery;
 using VideoPlayer.Mvu;
 using VideoPlayer.Storage;
@@ -8,14 +10,18 @@ namespace VideoPlayer.Maui.Services;
 /// Führt MVU-Effekte aus: Navigation über die Shell, Server-Erreichbarkeits-
 /// prüfung über <see cref="IServerHealthProbe"/>, Ablage-Initialisierung und
 /// Einstellungs-Persistenz über <see cref="VideoPlayer.Storage"/>, die
-/// Serververwaltung (Laden, Discovery, Kandidaten-Prüfung, Speichern) sowie
-/// den Anmelde-Workflow über <see cref="AuthSessionService"/>.
+/// Serververwaltung (Laden, Discovery, Kandidaten-Prüfung, Speichern), das
+/// Geräte-Pairing über <see cref="DevicePairingClient"/>/<see cref="DeviceTokenService"/>
+/// sowie den Anmelde-Workflow über <see cref="AuthSessionService"/>.
 /// </summary>
 public sealed class ShellAppEffectHandler : IAppEffectHandler
 {
     private readonly IServiceProvider services;
     private readonly IServerHealthProbe healthProbe;
     private readonly AuthSessionService authSession;
+    private readonly DevicePairingClient pairing;
+    private readonly DeviceTokenService deviceTokens;
+    private readonly AppSecretsService secrets;
     private readonly INetworkStatusMonitor networkMonitor;
     private readonly ServerEventsService serverEvents;
     private readonly DownloadService downloads;
@@ -25,6 +31,9 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
     /// <param name="services">Dienstanbieter zum Auflösen der am Effekt beteiligten Dienste (inkl. <see cref="MvuHost"/>).</param>
     /// <param name="healthProbe">Erreichbarkeitsprüfung für den Server.</param>
     /// <param name="authSession">Sitzungsdienst für den Anmelde-Workflow.</param>
+    /// <param name="pairing">Öffentlicher Pairing-Endpunkt-Client (ohne Gate-/Bearer-Header).</param>
+    /// <param name="deviceTokens">Verwaltung der gepaarten Geräte-Tokens (Provider, Widerruf, Gate-Probe).</param>
+    /// <param name="secrets">Sichere Ablage (Geräte-Tokens je Server).</param>
     /// <param name="networkMonitor">Netzwerkstatus-Erkennung; meldet Wechsel in den MVU-Zyklus.</param>
     /// <param name="serverEvents">Server-Ereignisverbindung; meldet Ereignisse und Trennung in den MVU-Zyklus.</param>
     /// <param name="downloads">Download-Verwaltung; meldet Zustands-/Fortschrittsänderungen in den MVU-Zyklus.</param>
@@ -33,6 +42,9 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
         IServiceProvider services,
         IServerHealthProbe healthProbe,
         AuthSessionService authSession,
+        DevicePairingClient pairing,
+        DeviceTokenService deviceTokens,
+        AppSecretsService secrets,
         INetworkStatusMonitor networkMonitor,
         ServerEventsService serverEvents,
         DownloadService downloads,
@@ -41,6 +53,9 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
         this.services = services;
         this.healthProbe = healthProbe;
         this.authSession = authSession;
+        this.pairing = pairing;
+        this.deviceTokens = deviceTokens;
+        this.secrets = secrets;
         this.networkMonitor = networkMonitor;
         this.serverEvents = serverEvents;
         this.downloads = downloads;
@@ -49,6 +64,10 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
         // Endgültig abgelehnte stille Neuanmeldung (401 ohne gültige
         // Zugangsdaten) → die App wechselt in den Anmeldezustand.
         this.authSession.SessionExpired += OnSessionExpired;
+
+        // Serverseitig verworfenes Geräte-Token (Gate-Ablehnung) →
+        // die App wechselt in die Re-Pairing-Eingabe.
+        this.deviceTokens.DeviceTokenRejected += OnDeviceTokenRejected;
 
         // Netzwerkwechsel und Server-Ereignisse laufen auf beliebigen
         // Threads — die Messages gehen über den MainThread in den
@@ -95,6 +114,9 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
                 break;
             case PersistActiveServerEffect persist:
                 await PersistActiveServerAsync(persist.Address, persist.DisplayName);
+                break;
+            case ExchangePairingCodeEffect exchange:
+                await ExchangePairingCodeAsync(exchange.ServerAddress, exchange.Code, cancellationToken);
                 break;
             case AttemptAutoLoginEffect autoLogin:
                 await AttemptAutoLoginAsync(autoLogin.ServerAddress, cancellationToken);
@@ -1012,9 +1034,15 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
             System.Diagnostics.Debug.WriteLine($"[ShellAppEffectHandler] Serververwaltung laden fehlgeschlagen: {ex.Message}");
         }
 
+        // Geräte-Token des aktiven Servers laden und den Gate-Provider
+        // auf dessen Server-Kontext einstellen; ohne Token fällt die
+        // Auflösung auf die statischen Quellen zurück.
+        await deviceTokens.LoadForServerAsync(activeAddress, cancellationToken);
+        var pairingRequired = await IsPairingRequiredAsync(activeAddress);
+
         var host = services.GetRequiredService<MvuHost>();
         await MainThread.InvokeOnMainThreadAsync(
-            () => host.DispatchAsync(new ServersLoadedMessage(servers, activeAddress)));
+            () => host.DispatchAsync(new ServersLoadedMessage(servers, activeAddress, pairingRequired)));
     }
 
     private async Task DiscoverServersAsync(CancellationToken cancellationToken)
@@ -1039,9 +1067,39 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
     private async Task CheckCandidateServerAsync(string address, string? displayName, CancellationToken cancellationToken)
     {
         var success = false;
+        var pairingRequired = false;
         try
         {
-            success = await healthProbe.CheckAsync(new Uri(address), cancellationToken);
+            var result = await healthProbe.CheckAsync(new Uri(address), cancellationToken);
+            if (result == HealthCheckResult.GateRejected)
+            {
+                // Das Gate hat geantwortet — der Server ist erreichbar.
+                // Die Probe löst den Gate-Schlüssel adressspezifisch auf:
+                // ein 401 beweist die Ungültigkeit des *hinterlegten*
+                // Geräte-Tokens dieses Kandidaten — es wird gezielt
+                // gelöscht, auch wenn der Server nicht aktiv ist (Muster:
+                // AuthSessionService.HandleGateRejectionAsync). Sonst
+                // würde IsPairingRequiredAsync fälschlich „kein Pairing
+                // nötig" melden und ein aussichtsloser Auto-Login starten.
+                try
+                {
+                    await secrets.ClearDeviceTokenAsync(address);
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"[ShellAppEffectHandler] Geräte-Token des Kandidaten konnte nicht verworfen werden: {ex.Message}");
+                }
+
+                // Provider-Rücksetzung nur, wenn der Kandidat der
+                // aktuell bediente Server ist.
+                await deviceTokens.DiscardIfCurrentAsync(address);
+            }
+
+            success = result != HealthCheckResult.Unreachable;
+            if (success)
+            {
+                pairingRequired = await IsPairingRequiredAsync(address);
+            }
         }
         catch (Exception ex)
         {
@@ -1050,7 +1108,7 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
 
         var host = services.GetRequiredService<MvuHost>();
         await MainThread.InvokeOnMainThreadAsync(
-            () => host.DispatchAsync(new ServerCheckCompletedMessage(address, displayName, success)));
+            () => host.DispatchAsync(new ServerCheckCompletedMessage(address, displayName, success, pairingRequired)));
     }
 
     private async Task PersistActiveServerAsync(string address, string? displayName)
@@ -1064,27 +1122,196 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
         {
             System.Diagnostics.Debug.WriteLine($"[ShellAppEffectHandler] Server speichern fehlgeschlagen: {ex.Message}");
         }
+
+        // Provider auf das Geräte-Token des neuen Servers umstellen, bevor
+        // der nachfolgende Auto-Login-Effekt läuft (Effekte laufen
+        // sequenziell).
+        await deviceTokens.LoadForServerAsync(address);
     }
 
     private async Task RunHealthCheckAsync(CancellationToken cancellationToken)
     {
         // Jeder Fehler der Prüfung führt zu „nicht erreichbar" — die App darf
         // nicht auf der Ladeanzeige hängen bleiben.
-        bool reachable;
+        var result = HealthCheckResult.Unreachable;
         try
         {
-            reachable = await healthProbe.CheckAsync(cancellationToken);
+            result = await healthProbe.CheckAsync(cancellationToken);
         }
         catch (Exception ex)
         {
             System.Diagnostics.Debug.WriteLine($"[ShellAppEffectHandler] Erreichbarkeitsprüfung fehlgeschlagen: {ex.Message}");
-            reachable = false;
         }
+
+        if (result == HealthCheckResult.GateRejected)
+        {
+            // Das bereitgestellte Geräte-Token wurde verworfen — zuerst
+            // entfernen und auf die statische Auflösung zurückfallen,
+            // dann einmalig erneut prüfen: ein funktionierender
+            // statischer Schlüssel wird sonst vom veralteten Token
+            // verdeckt (nahtlose Migration).
+            await deviceTokens.DiscardCurrentAsync();
+            try
+            {
+                result = await healthProbe.CheckAsync(cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[ShellAppEffectHandler] Erreichbarkeits-Nachprüfung fehlgeschlagen: {ex.Message}");
+                result = HealthCheckResult.Unreachable;
+            }
+
+            if (result == HealthCheckResult.GateRejected)
+            {
+                // Es gibt keinen nutzbaren Schlüssel — Re-Pairing
+                // einfordern (Ereignis → DeviceTokenRevokedMessage).
+                deviceTokens.NotifyRejected();
+                return;
+            }
+        }
+
+        var pairingRequired = result == HealthCheckResult.Reachable
+            && await IsPairingRequiredAsync(services.GetRequiredService<MvuHost>().Model.ActiveServerAddress);
 
         var host = services.GetRequiredService<MvuHost>();
         await MainThread.InvokeOnMainThreadAsync(
-            () => host.DispatchAsync(new ServerHealthCheckCompletedMessage(reachable)));
+            () => host.DispatchAsync(new ServerHealthCheckCompletedMessage(
+                result == HealthCheckResult.Reachable, pairingRequired)));
     }
+
+    /// <summary>
+    /// Ermittelt, ob für den Server ein Geräte-Pairing erforderlich ist:
+    /// kein hinterlegtes Geräte-Token UND keine statische Gate-Quelle
+    /// konfiguriert (<see cref="ClientGate.ResolveStatic"/> liefert den
+    /// Platzhalter).
+    /// </summary>
+    /// <param name="serverAddress">Die zu prüfende Serveradresse.</param>
+    /// <returns><c>true</c>, wenn ein Pairing eingefordert werden muss.</returns>
+    private async Task<bool> IsPairingRequiredAsync(string? serverAddress)
+    {
+        if (string.IsNullOrWhiteSpace(serverAddress))
+        {
+            return false;
+        }
+
+        try
+        {
+            if (await secrets.HasDeviceTokenAsync(serverAddress))
+            {
+                return false;
+            }
+
+            return ClientGate.ResolveStatic() == ClientGate.ApiTokenPlaceholder;
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[ShellAppEffectHandler] Pairing-Erforderlichkeit fehlgeschlagen: {ex.Message}");
+            return false;
+        }
+    }
+
+    private async Task ExchangePairingCodeAsync(string serverAddress, string code, CancellationToken cancellationToken)
+    {
+        PairingStatus status;
+        try
+        {
+            var token = await pairing.ExchangeAsync(
+                new Uri(serverAddress), code, GetDeviceName(), cancellationToken);
+
+            // Provider-/Client-Aktivierung nur, wenn der Pairing-Kontext
+            // noch aktuell ist — dieselbe Bedingung wie der Stale-Guard in
+            // UpdatePairingCompleted (IsPairingRunning + aktiver Server):
+            // ein zwischenzeitlich gestarteter Servercheck (ConnectButton/
+            // Serverliste bleiben aktiv) hat den Provider über
+            // PersistActiveServerAsync → LoadForServerAsync bereits auf den
+            // neuen Server umgestellt — ein verspätetes Ergebnis des alten
+            // Servers darf ihn nicht zurücküberschreiben (der Stale-Guard
+            // verwirft nur die Nachricht, nicht die Seiteneffekte).
+            var model = services.GetRequiredService<MvuHost>().Model;
+            var pairingCurrent = model.IsPairingRunning
+                && ServerAddress.TryNormalize(model.ActiveServerAddress, out var activeAddress)
+                && ServerAddress.TryNormalize(serverAddress, out var pairedAddress)
+                && string.Equals(activeAddress, pairedAddress, StringComparison.OrdinalIgnoreCase);
+            if (pairingCurrent)
+            {
+                // Atomarer Stale-Guard: persistiert + aktiviert das Token
+                // nur, wenn die Adresse noch der aktuell bediente Server
+                // ist (unter Lock geprüft — ein paralleler Serverwechsel
+                // über LoadForServerAsync kann nicht dazwischenfunken);
+                // andernfalls bleibt das Token nur unter seiner Adresse
+                // hinterlegt. Bei Aktivierung erhält der gehaltene
+                // API-Client den Schlüssel direkt.
+                var activated = await deviceTokens.SetPairedTokenIfCurrentAsync(
+                    serverAddress, token, cancellationToken);
+                if (activated)
+                {
+                    authSession.Client?.SetApiKey(token);
+                }
+            }
+            else
+            {
+                // Veralteter Kontext: das gültige Token bleibt unter seiner
+                // eigenen Serveradresse hinterlegt (ein späteres Pairing zu
+                // diesem Server entfällt), ohne den aktiven Provider oder
+                // den gehaltenen API-Client anzufassen.
+                await secrets.SetDeviceTokenAsync(serverAddress, token);
+            }
+
+            status = PairingStatus.Succeeded;
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (ApiException ex)
+        {
+            status = ex.StatusCode switch
+            {
+                HttpStatusCode.Unauthorized => PairingStatus.InvalidCode,
+                HttpStatusCode.TooManyRequests => PairingStatus.RateLimited,
+                HttpStatusCode.BadRequest => PairingStatus.InvalidRequest,
+                HttpStatusCode.NotFound => PairingStatus.NotSupported,
+                null => PairingStatus.ServerUnreachable,
+                _ => PairingStatus.Failed
+            };
+            System.Diagnostics.Debug.WriteLine($"[ShellAppEffectHandler] Pairing-Austausch fehlgeschlagen: {ex.Message}");
+        }
+        catch (Exception ex)
+        {
+            // Ungültige/nicht entschlüsselbare Antwort oder sonstiger
+            // Fehler → allgemeiner Pairing-Fehler.
+            System.Diagnostics.Debug.WriteLine($"[ShellAppEffectHandler] Pairing-Austausch fehlgeschlagen: {ex.Message}");
+            status = PairingStatus.Failed;
+        }
+
+        await DispatchMessageAsync(new PairingCompletedMessage(status));
+    }
+
+    /// <summary>
+    /// Anzeigename des Geräts für das Pairing (<see cref="DeviceInfo.Name"/>,
+    /// Fallback Hersteller + Modell; <c>null</c>, wenn nichts ermittelbar —
+    /// der Server nutzt dann seinen Fallback). Auf 200 Zeichen gekürzt.
+    /// </summary>
+    /// <returns>Der Gerätename oder <c>null</c>.</returns>
+    private static string? GetDeviceName()
+    {
+        var name = DeviceInfo.Name;
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            name = $"{DeviceInfo.Manufacturer} {DeviceInfo.Model}".Trim();
+        }
+
+        var trimmed = name.Trim();
+        if (trimmed.Length == 0)
+        {
+            return null;
+        }
+
+        return trimmed.Length > 200 ? trimmed[..200] : trimmed;
+    }
+
+    private void OnDeviceTokenRejected(object? sender, EventArgs e) =>
+        _ = DispatchMessageAsync(new DeviceTokenRevokedMessage());
 
     private async Task NavigateAsync(AppPage page)
     {

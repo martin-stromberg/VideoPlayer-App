@@ -11,7 +11,7 @@ Der Server-API-Client stellt der App einen einheitlichen Zugriff auf den VideoPl
 - Nach der Anmeldung mit Benutzername und Passwort verwendet der Client das vom Server ausgestellte Anmelde-Token automatisch für alle Folgeanfragen.
 - Läuft das Token ab (Server meldet „nicht autorisiert"), wird die Anmeldung einmalig im Hintergrund erneuert und die Anfrage wiederholt — der Anwender merkt davon nichts.
 - Bei vorübergehenden Serverproblemen (Serverfehler, Zeitüberschreitung, zu viele Anfragen) wiederholt der Client die Anfrage automatisch mit wachsenden Wartezeiten. Eindeutige Fehler (z. B. „nicht gefunden") werden dagegen sofort gemeldet.
-- Jede Anfrage weist die App gegenüber dem Server über einen API-Schlüssel aus (Client-Gate).
+- Jede Anfrage weist die App gegenüber dem Server über einen API-Schlüssel aus (Client-Gate). Dieser stammt in der Regel aus einer einmaligen Geräte-Kopplung: Die App tauscht einen in der Server-Verwaltung erzeugten Einmal-Code verschlüsselt gegen ein gerätegebundenes Token, das sicher auf dem Gerät hinterlegt wird und sich serverseitig pro Gerät widerrufen lässt.
 
 ## Beispiele
 
@@ -21,5 +21,5 @@ Der Server-API-Client stellt der App einen einheitlichen Zugriff auf den VideoPl
 
 ## Einschränkungen
 
-- Der Client benötigt eine konfigurierte Server-Basisadresse und einen gültigen API-Schlüssel (Client-Gate).
+- Der Client benötigt eine konfigurierte Server-Basisadresse und einen gültigen API-Schlüssel (Client-Gate) — üblicherweise das beim Geräte-Pairing ausgehandelte Geräte-Token, alternativ ein konfigurierter statischer Schlüssel.
 - Er deckt nur die öffentliche Server-API ab; administrative Endpunkte (z. B. Quellenverwaltung, Metadaten-Schreiben) sind nicht Teil des Clients.

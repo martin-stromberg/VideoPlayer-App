@@ -128,4 +128,95 @@ public class AppSecretsServiceTests
         await service.SetCredentialsAsync("user", "pw");
         Assert.True(await service.HasCredentialsAsync());
     }
+
+    /// <summary>Prüft Geräte-Token: landen ausschließlich im SecretStore (nie in den Einstellungen).</summary>
+    [Fact]
+    public async Task DeviceToken_GoesToSecretStore_Only()
+    {
+        var settings = new InMemorySettingsStore();
+        var secrets = new InMemorySecretStore();
+        var service = CreateService(settings, secrets);
+
+        await service.SetDeviceTokenAsync("http://nas/videoplayer/", "dev-token");
+
+        var key = Assert.Single(secrets.Keys);
+        Assert.Contains(AppSecretsService.DeviceTokenKey, key);
+        Assert.Empty(settings.Keys);
+        Assert.Equal("dev-token", await service.GetDeviceTokenAsync("http://nas/videoplayer/"));
+        Assert.True(await service.HasDeviceTokenAsync("http://nas/videoplayer/"));
+    }
+
+    /// <summary>Prüft Geräte-Token: sind pro Serveradresse isoliert.</summary>
+    [Fact]
+    public async Task SetDeviceToken_IsolatedPerServer()
+    {
+        var settings = new InMemorySettingsStore();
+        var secrets = new InMemorySecretStore();
+        var service = CreateService(settings, secrets);
+
+        await service.SetDeviceTokenAsync("http://nas/", "token-nas");
+        await service.SetDeviceTokenAsync("http://cloud/", "token-cloud");
+
+        Assert.Equal("token-nas", await service.GetDeviceTokenAsync("http://nas/"));
+        Assert.Equal("token-cloud", await service.GetDeviceTokenAsync("http://cloud/"));
+        Assert.Equal(2, secrets.Keys.Count);
+    }
+
+    /// <summary>Prüft Geräte-Token: sind pro Profil isoliert.</summary>
+    [Fact]
+    public async Task DeviceToken_IsProfileIsolated()
+    {
+        var settings = new InMemorySettingsStore();
+        var secrets = new InMemorySecretStore();
+        var defaultService = CreateService(settings, secrets);
+        var otherService = CreateService(settings, secrets, "second");
+
+        await defaultService.SetDeviceTokenAsync("http://nas/", "token-default");
+        await otherService.SetDeviceTokenAsync("http://nas/", "token-second");
+
+        Assert.Equal("token-default", await defaultService.GetDeviceTokenAsync("http://nas/"));
+        Assert.Equal("token-second", await otherService.GetDeviceTokenAsync("http://nas/"));
+    }
+
+    /// <summary>Prüft Geräte-Token: die Serveradresse wird für den Ablageschlüssel normalisiert.</summary>
+    [Fact]
+    public async Task DeviceToken_NormalizesServerAddress()
+    {
+        var settings = new InMemorySettingsStore();
+        var secrets = new InMemorySecretStore();
+        var service = CreateService(settings, secrets);
+
+        await service.SetDeviceTokenAsync("NAS.local/video", "dev-token");
+
+        // Kanonische Form liefert denselben Schlüssel.
+        Assert.Equal("dev-token", await service.GetDeviceTokenAsync("http://nas.local/video/"));
+        Assert.Equal("dev-token", await service.GetDeviceTokenAsync("HTTP://NAS.LOCAL/video"));
+    }
+
+    /// <summary>Prüft ClearDeviceToken: entfernt nur das Token des angegebenen Servers.</summary>
+    [Fact]
+    public async Task ClearDeviceToken_RemovesOnlyThatServer()
+    {
+        var settings = new InMemorySettingsStore();
+        var secrets = new InMemorySecretStore();
+        var service = CreateService(settings, secrets);
+        await service.SetDeviceTokenAsync("http://nas/", "token-nas");
+        await service.SetDeviceTokenAsync("http://cloud/", "token-cloud");
+
+        await service.ClearDeviceTokenAsync("http://nas/");
+
+        Assert.Null(await service.GetDeviceTokenAsync("http://nas/"));
+        Assert.False(await service.HasDeviceTokenAsync("http://nas/"));
+        Assert.Equal("token-cloud", await service.GetDeviceTokenAsync("http://cloud/"));
+    }
+
+    /// <summary>Prüft GetDeviceToken: ohne Eintrag → null.</summary>
+    [Fact]
+    public async Task GetDeviceToken_WithoutEntry_ReturnsNull()
+    {
+        var service = CreateService(new InMemorySettingsStore(), new InMemorySecretStore());
+
+        Assert.Null(await service.GetDeviceTokenAsync("http://nas/"));
+        Assert.False(await service.HasDeviceTokenAsync("http://nas/"));
+    }
 }

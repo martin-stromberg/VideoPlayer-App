@@ -88,6 +88,22 @@ public sealed record AppModel
     public string? ServerSetupError { get; init; }
 
     /// <summary>
+    /// Der Server verlangt ein Geräte-Pairing: er ist erreichbar, aber weder
+    /// ein Geräte-Token noch ein statischer Client-Gate-Schlüssel ist
+    /// verfügbar — die Pairing-Eingabe der Einrichtungsseite wird sichtbar.
+    /// </summary>
+    public bool IsPairingRequired { get; init; }
+
+    /// <summary>Der Pairing-Austausch (<c>api/pairing/exchange</c>) läuft.</summary>
+    public bool IsPairingRunning { get; init; }
+
+    /// <summary>
+    /// Inline-Fehlertext der Pairing-Eingabe (ungültiger Code, Sperrung,
+    /// widerrufener Geräte-Zugang); <c>null</c> = kein Fehler.
+    /// </summary>
+    public string? PairingError { get; init; }
+
+    /// <summary>
     /// Startseiten-Liste „Weiterschauen" — Stand der lokalen Cache-Ablage
     /// (Cache-First beim Start, aktualisiert nach Synchronisation und
     /// Server-Ereignissen).
