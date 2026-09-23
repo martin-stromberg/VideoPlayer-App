@@ -18,3 +18,18 @@ Datum: Nach vierter Implementierungsrunde (Befunde aus `review-code.3.md` und `r
 ## Fehlgeschlagene Tests
 
 Keine.
+
+# Testergebnisse - Nacharbeiten (Bugfixes aus der E2E-Verifikation)
+
+Datum: 2026-09-23 (nach den Live-E2E-Läufen in der Windows-App)
+
+## Ausführung
+
+- Befehl: `dotnet test VideoWebPlayer.Maui.Tests` (Debug)
+- Ergebnis: **879/879 bestanden, 0 Fehler, 0 übersprungen**
+
+## Bewertung
+
+- Nach dem `UpdateServersLoaded`-Fix (Re-Pairing-Sichtbarkeit): 875/875.
+- Nach dem `AppRoutes.TryGetPage`-Fix (geschobene Routen): **879/879** — vier neue `InlineData`-Fälle in `AppRoutesTests.TryGetPage_ResolvesShellLocations` (`//settings/serversetup`, `//home/serversetup`, `//settings/login`, `//favorites/FavoritesPage`).
+- Keine neuen Fehlschläge gegenüber der Ausgangsbasis.

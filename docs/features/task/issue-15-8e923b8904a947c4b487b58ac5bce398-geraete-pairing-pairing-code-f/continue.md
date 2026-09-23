@@ -9,7 +9,7 @@ und müssen manuell oder in einem erneuten Lauf bearbeitet werden.
 
 ## Offene Planelemente
 
-- [ ] Tasks-Datei Nr. 42 - Manueller Pairing-Lauf auf echtem Zielgerät — **auf Windows vollständig durchgespielt** (siehe `live-verification.md`, E2E-Nachtrag): echte `VideoPlayer.Maui.exe` per UI-Automation durch Start → Gate-Ablehnung → Pairing-Abschnitt → Code-Eingabe → Pairing (SecureStorage-Ablage, `DeviceInfo`-Name „DESKTOP-CM8OBSG" serverseitig registriert) → Anmeldung → Startseite. Offen bleiben nur die plattformspezifischen Secure-Storage-Backends auf **iOS (Keychain) und Android (Keystore)** — dort ist der Codepfad identisch (`SecureStorage`-Abstraktion), aber nicht ausgeführt worden.
+- [ ] Tasks-Datei Nr. 42 - Manueller Pairing-Lauf auf echtem Zielgerät — **auf Windows vollständig durchgespielt** (siehe `live-verification.md`, E2E-Nachtrag): echte `VideoPlayer.Maui.exe` per UI-Automation durch Start → Gate-Ablehnung → Pairing-Abschnitt → Code-Eingabe → Pairing (SecureStorage-Ablage, `DeviceInfo`-Name „DESKTOP-CM8OBSG" serverseitig registriert) → Anmeldung → Startseite; anschließend auch der Serverwechsel-Pfad (Einstellungen → „Server wechseln" → bekannten Server wählen → Auto-Login mit Geräte-Token → Startseite) live verifiziert — inklusive zweier gefundener und behobener Fehler (`UpdateServersLoaded`-Pairing-Reset, `AppRoutes.TryGetPage`-Auflösung geschobener Routen). Offen bleiben nur die plattformspezifischen Secure-Storage-Backends auf **iOS (Keychain) und Android (Keystore)** — dort ist der Codepfad identisch (`SecureStorage`-Abstraktion), aber nicht ausgeführt worden.
 
 ## Code-Review-Befunde
 

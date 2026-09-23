@@ -50,3 +50,20 @@ Fix in `AppUpdate.UpdateServersLoaded`: `IsPairingRequired` bleibt gesetzt, sola
 ### Restabdeckung
 
 Damit ist der komplette Pairing- und Re-Pairing-Flow **auf einem realen Windows-Ziel** verifiziert — inklusive `SecureStorage` (Credential Store), `DeviceInfo`-Gerätename und UI-Bedienung. Offen bleiben nur die plattformspezifischen Backends auf iOS (Keychain) und Android (Keystore); der Codepfad ist derselbe (`SecureStorage`-Abstraktion).
+
+## Serverwechsel-Lauf (Nachtrag, gleiches Datum)
+
+Szenario: App auf der Startseite (gepaartes Gerät, aktiver Server `http://localhost:83/`) → Einstellungen → „Server wechseln" → Auswahl des bereits bekannten Servers aus der Liste.
+
+| # | Schritt | Ergebnis |
+|---|---------|----------|
+| 13 | Bekannten Server `http://localhost:83/` per Koordinatenklick ausgewählt | `SelectionChanged` → `ServerSwitchRequestedMessage` → Kandidatenprüfung (`GET /api/health` im IIS-Log 18:01:16) → Auto-Login mit gepaartem Geräte-Token (JWT noch gültig, kein neuer Login-Request nötig) → `EnterConnected` |
+| 14 | Nach dem Auto-Login | **Startseite** mit Hero-Bild, „Weiterschauen", „Neu im Programm" — IIS-Log zeigt `favorites`, `Sources`, `items/recent`, `continue-watching`, `hero-background` |
+
+### Dabei gefundener und behobener Fehler
+
+**`AppRoutes.TryGetPage` löste geschobene Routen falsch auf (erste Reproduktion: „nichts passiert").** Beim Öffnen der Serververwaltung aus den Einstellungen wird die Route `serversetup` auf den Stack geschoben — der Shell-Ort lautet `//settings/serversetup`. `TryGetPage` lieferte das *erste* passende Segment (`settings`) → `NavigatedMessage(Settings)` setzte `CurrentPage=Settings`. Beim erfolgreichen Auto-Login nach dem Serverwechsel prüfte `EnterConnected` `IsWorkflowPage(CurrentPage)` → `false` → **kein `NavigateToPageEffect(Home)`**: die App lud alle Daten, blieb aber auf der Serverseite stehen. Derselbe Fehler betraf die Route `login` (Sitzungsablauf → erfolgreiche Anmeldung ohne Rückkehr).
+
+Fix in `AppRoutes.cs`: `TryGetPage` wertet jetzt das **tiefste** bekannte Pfadsegment aus; neue Tabelle `PushedRoutes` bildet `serversetup`/`login` auf `AppPage.ServerSetup`/`AppPage.Login` ab. Regressionstests in `AppRoutesTests` (`//settings/serversetup` → ServerSetup, `//settings/login` → Login u. a.).
+
+Zweite Reproduktion nach dem Fix: Klick auf den bekannten Server → Health-Check → Auto-Login → **Startseite** (Screenshot verifiziert).
