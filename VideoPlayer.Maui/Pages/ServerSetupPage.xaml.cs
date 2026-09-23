@@ -52,8 +52,10 @@ public partial class ServerSetupPage : ContentPage
 
         KnownServersView.ItemsSource = model.KnownServers;
         KnownServersHeader.IsVisible = model.KnownServers.Count > 0;
+        KnownServersView.IsVisible = model.KnownServers.Count > 0;
 
         DiscoveredServersView.ItemsSource = model.DiscoveredServers;
+        DiscoveredServersView.IsVisible = model.DiscoveredServers.Count > 0;
         DiscoveryIndicator.IsRunning = model.IsDiscoveryRunning;
         DiscoveryIndicator.IsVisible = model.IsDiscoveryRunning;
         DiscoverButton.IsEnabled = !model.IsDiscoveryRunning;

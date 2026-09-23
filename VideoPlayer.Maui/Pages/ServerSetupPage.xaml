@@ -5,24 +5,34 @@
              xmlns:discovery="clr-namespace:VideoPlayer.ApiClient.Discovery;assembly=VideoPlayer.ApiClient"
              x:Class="VideoPlayer.Maui.Pages.ServerSetupPage"
              Title="Server">
-    <ScrollView>
-        <VerticalStackLayout Padding="24" Spacing="12">
+    <Grid RowDefinitions="Auto,*,Auto"
+          Padding="24"
+          RowSpacing="12">
 
+        <!-- Kopfbereich: Titel, Hinweis, aktiver Server -->
+        <VerticalStackLayout Spacing="8">
             <Label Text="VideoPlayer-Server"
                    FontSize="24"
                    FontAttributes="Bold" />
             <Label Text="Die App verbindet sich mit einem VideoPlayer-Server im eigenen Netzwerk." />
-
             <VerticalStackLayout x:Name="ActiveServerSection" IsVisible="false" Spacing="4">
                 <Label Text="Aktiver Server" FontAttributes="Bold" />
                 <Label x:Name="ActiveServerLabel" AutomationId="ActiveServerLabel" />
             </VerticalStackLayout>
+        </VerticalStackLayout>
+
+        <!-- Listenbereich: bekannte und gefundene Server scrollen intern,
+             damit Kopf und Eingabeformular immer sichtbar bleiben. -->
+        <Grid Grid.Row="1"
+              RowDefinitions="Auto,*,Auto,*"
+              RowSpacing="8">
 
             <Label x:Name="KnownServersHeader"
                    Text="Bekannte Server"
                    FontAttributes="Bold"
                    IsVisible="false" />
             <CollectionView x:Name="KnownServersView"
+                            Grid.Row="1"
                             AutomationId="KnownServersView"
                             SelectionMode="Single"
                             SelectionChanged="OnKnownSelectionChanged">
@@ -36,16 +46,19 @@
                 </CollectionView.ItemTemplate>
             </CollectionView>
 
-            <Button x:Name="DiscoverButton"
-                    AutomationId="DiscoverButton"
-                    Text="Server im Netzwerk suchen"
-                    Clicked="OnDiscoverClicked" />
-            <ActivityIndicator x:Name="DiscoveryIndicator" IsRunning="false" IsVisible="false" />
-            <Label x:Name="DiscoveryEmptyLabel"
-                   AutomationId="DiscoveryEmptyLabel"
-                   Text="Kein Server gefunden. Bitte die Adresse manuell eingeben."
-                   IsVisible="false" />
+            <VerticalStackLayout Grid.Row="2" Spacing="8">
+                <Button x:Name="DiscoverButton"
+                        AutomationId="DiscoverButton"
+                        Text="Server im Netzwerk suchen"
+                        Clicked="OnDiscoverClicked" />
+                <ActivityIndicator x:Name="DiscoveryIndicator" IsRunning="false" IsVisible="false" />
+                <Label x:Name="DiscoveryEmptyLabel"
+                       AutomationId="DiscoveryEmptyLabel"
+                       Text="Kein Server gefunden. Bitte die Adresse manuell eingeben."
+                       IsVisible="false" />
+            </VerticalStackLayout>
             <CollectionView x:Name="DiscoveredServersView"
+                            Grid.Row="3"
                             AutomationId="DiscoveredServersView"
                             SelectionMode="Single"
                             SelectionChanged="OnDiscoveredSelectionChanged">
@@ -58,7 +71,10 @@
                     </DataTemplate>
                 </CollectionView.ItemTemplate>
             </CollectionView>
+        </Grid>
 
+        <!-- Fußbereich: manuelle Eingabe bleibt ohne Scrollen erreichbar -->
+        <VerticalStackLayout Grid.Row="2" Spacing="8">
             <Label Text="Adresse manuell eingeben" FontAttributes="Bold" />
             <Entry x:Name="AddressEntry"
                    AutomationId="AddressEntry"
@@ -70,7 +86,6 @@
                     Clicked="OnConnectClicked" />
             <ActivityIndicator x:Name="CheckIndicator" IsRunning="false" IsVisible="false" />
             <Label x:Name="ErrorLabel" AutomationId="ErrorLabel" TextColor="{StaticResource VpDanger}" IsVisible="false" />
-
         </VerticalStackLayout>
-    </ScrollView>
+    </Grid>
 </ContentPage>
