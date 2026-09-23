@@ -13,11 +13,11 @@
     <WarningsAsErrors>CS1591</WarningsAsErrors>
     <MauiXamlInflator>SourceGen</MauiXamlInflator>
     <!-- Display name -->
-    <ApplicationTitle>VideoPlayer</ApplicationTitle>
+    <ApplicationTitle>Heimkino</ApplicationTitle>
     <!-- App Identifier -->
-    <ApplicationId>de.martinstromberg.videoplayer</ApplicationId>
+    <ApplicationId>de.martinstromberg.videos</ApplicationId>
     <!-- Versions -->
-    <ApplicationDisplayVersion>1.0</ApplicationDisplayVersion>
+    <ApplicationDisplayVersion>0.1</ApplicationDisplayVersion>
     <ApplicationVersion>1</ApplicationVersion>
     <!-- Unpackaged Windows-App (siehe https://aka.ms/MauiTemplateUnpackaged) -->
     <WindowsPackageType>None</WindowsPackageType>
