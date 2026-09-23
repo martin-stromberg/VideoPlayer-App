@@ -1,0 +1,51 @@
+# Plan-Gegenprüfung
+
+## Ergebnis
+
+**Status:** Plan lückenhaft
+
+## Abgleich Akzeptanzkriterien
+
+| Akzeptanzkriterium | Umsetzung im Plan | Testnachweis im Plan | Status |
+|--------------------|-------------------|----------------------|--------|
+| AC 1: `ServerSetupPage` mit Pairing-Code-Eingabefeld; Flow "Server verbinden → Code eingeben → gekoppelt" | Schritt 13 (XAML-Abschnitt `PairingCodeEntry`/`PairButton`/`PairingIndicator`/`PairingErrorLabel`, `OnPairClicked`, Sichtbarkeit an `IsPairingRequired`); Programmablauf "Erst-Pairing" vollständig beschrieben | `AppUpdateTests_Pairing` (Submitted/Completed-Übergänge) + `ServerSetupContractTests` (AutomationIds, Dispatches) | Abgedeckt |
+| AC 2: `POST api/pairing/exchange` mit flüchtigem ECDH-Paar, Token-Entschlüsselung | Schritte 1–3: eigene DTOs (camelCase via `JsonPropertyName`), `PairingCrypto` (nistP256, SPKI/DER-Base64, `DeriveKeyFromHmac` SHA256, AES-256-GCM `nonce(12)‖ct‖tag(16)`), `DevicePairingClient` mit eigenem `HttpClient` ohne Gate-/Bearer-Header und ohne Retry/Reauth (umgeht bewusst `SendWithPolicyAsync`, sodass 429/401-Vertrag greift) | `DevicePairingClientTests` (Header-Freiheit, camelCase-Payload, Fehler-Mapping 400/401/404/429, 429 ohne Wiederholung), `PairingCryptoTests` (Roundtrip, Nonce/Tag-Layout, falscher Key) | Abgedeckt |
+| AC 3: Geräte-Token in `SecureStorage`, nicht in Preferences | Schritt 5: `AppSecretsService.DeviceTokenKey` server-bezogen (`profile.PrefixKey(DeviceTokenKey + ":" + Adresse)`), ausschließlich `ISecretStore` | `AppSecretsServiceTests`: `GetDeviceToken_GoesToSecretStore_Only`, `SetDeviceToken_IsolatedPerServer` | Abgedeckt |
+| AC 4: `ClientGate.Resolve()`-Priorität Geräte-Token > Env > Metadata > Datei > Platzhalter | Schritt 4: statischer `DeviceTokenProvider`-Delegate mit höchster Priorität, `ResolveStatic()` für `PairingRequired`-Ermittlung/Fallback, interne `Resolve`-Überladung für Tests | `ClientGateTests`: `Resolve_PrefersDeviceTokenOverEnvironment`, `Resolve_FallsBack_WhenDeviceTokenProviderReturnsPlaceholderOrNull`, `ResolveStatic_IgnoresDeviceTokenProvider` | Abgedeckt |
+| AC 5: Re-Pairing bei 401 wegen widerrufenem/abgelaufenem Geräte-Token → Pairing-Eingabe mit Fehlertext | Schritte 7, 11, 12: Gate-Probe `IsGateRejectedAsync` (Request nur mit `X-API-Key` auf `api/health`), `DeviceTokenRejected`-Ereignis → `DeviceTokenRevokedMessage` → `NeedsServerSetup`/`ServerSetup` + `DeviceRevokedError` | `DeviceTokenServiceTests` (`IsGateRejected_*`), `AuthSessionServiceTests` (Gate-Rejected statt `SessionExpired`), `Update_DeviceTokenRevoked_NavigatesToSetupWithError` | Lücke — nur der Laufzeit-Pfad über `SilentReloginAsync` ist abgedeckt; beim App-Start/Health-Check mit bereits widerrufenem Token wird der Gate-401 von `CheckHealthAsync` auf "unerreichbar" abgebildet (Offline/`NeedsServerSetup` ohne Fehlertext, `IsPairingRequired` bleibt `false`, Token wird nie verworfen → Sackgasse, siehe unten) |
+| AC 6: `deviceName` im Request | Schritt 12 / Programmablauf: `DeviceInfo.Name`, Fallback `Manufacturer`+`Model`, Trim 200, am App-Rand | `ExchangeAsync_SendsCamelCasePayload` (enthält `deviceName`) | Abgedeckt |
+| AC 7: Tests Auflösereihenfolge, Pairing-Message-Flow, Negativfälle | Abschnitt "Tests" deckt alle drei Blöcke ab (ClientGate-Tests, `AppUpdateTests_Pairing`, Theory für `InvalidCode`/`RateLimited`/`InvalidRequest`/`ServerUnreachable`/`Failed`/`NotSupported`) | siehe Testtabelle | Abgedeckt (Test für `SetApiKey` fehlt, siehe unten) |
+| AC 8: Zwischenlösung dokumentiert (`-p:VideoPlayerApiToken`, `iOS-Deployment.ps1`) | Schritt 15 (Skript-Parameter `-VideoPlayerApiToken`, `Add-PropertyLine`, `Add-MaskedDisplay` — Bestandsaufnahme bestätigt, dass das Durchreichen derzeit fehlt) + Schritt 17 (Dokumentation der Publish-/Legacy-Zwischenlösung) | `ServerSetupContractTests`: Quelltext-Vertrag "Skript enthält `VideoPlayerApiToken`" | Abgedeckt |
+
+## Fehlende oder unvollständige Testanforderungen
+
+- [ ] Kein Test für `VideoPlayerApiClient.SetApiKey(string)`: Die Anforderung verlangt explizit, dass der `X-API-Key`-Header nach (Re-)Pairing an bereits erzeugten Clients aktualisierbar ist (`AuthSessionService.Client`); die Methode ist geplant (Schritt 8), aber ohne Testnachweis in der Testtabelle.
+- [ ] Liste der betroffenen bestehenden Tests unvollständig: `ServerCheckCompletedMessage`-Konstruktionen existieren auch in `AppUpdateTests_Connection` (`ServerCheckCompleted_Success_EmitsPersistAndAutoLogin`, `._ResetsSourcesOverviewAndBrowser`, Zeilen ~433/~465) — die Tabelle nennt für die Signaturänderung (`PairingRequired`-Feld) nur `AppUpdateTests_ServerManagement`.
+- [ ] Kein Test für den Start-/Health-Check-Pfad mit widerrufenem Geräte-Token (Konsequenz der Umsetzungslücke zu AC 5): Es fehlt ein Update-/Service-Test, der den Übergang "Health-Check schlägt wegen Gate-401 fehl → Re-Pairing statt Offline/Unerreichbar" absichert, sobald die Umsetzungslücke geschlossen ist.
+
+## E2E-Abdeckung
+
+| Benutzerfluss / Akzeptanzkriterium | Geplanter E2E-Test | Status |
+|------------------------------------|--------------------|--------|
+| Server verbinden → Code eingeben → gekoppelt → Anmeldung (AC 1, 2) | Kein automatisierter E2E-Test; Nachweis über `AppUpdateTests_Pairing` (vollständiger Zustandsautomat) + `ServerSetupContractTests` (UI-Verdrahtung) + manueller Lauf gegen Testserver | Nicht erforderlich mit Begründung: Repo hat keinerlei UI-/E2E-Infrastruktur (Testprojekt referenziert keine MAUI-Projekte), AC 7 der Anforderung definiert den Testnachweis selbst über ClientGate-/MVU-/Negativtests; Plan begründet den Verzicht nachvollziehbar und sieht manuelle Verifikation vor |
+| Ungültiger/abgelaufener Code → Inline-Fehler, erneute Eingabe (AC 7) | `AppUpdateTests_Pairing` (Theory) + `DevicePairingClientTests` | Nicht erforderlich mit Begründung (wie oben) |
+| 429 IP-Sperre → Hinweis, kein automatisches Wiederholen (AC 7) | `DevicePairingClientTests` (1 Request bei 429) + `AppUpdateTests_Pairing` | Nicht erforderlich mit Begründung (wie oben) |
+| Widerrufenes Geräte-Token → Re-Pairing-Flow mit Fehlertext (AC 5) | `AppUpdateTests_Connection`/`AppUpdateTests_Pairing` + `DeviceTokenServiceTests` + `AuthSessionServiceTests` | Lücke (Laufzeit-Pfad abgedeckt, Start-Pfad nicht — siehe Umsetzungslücke) |
+| Token-Persistenz in `SecureStorage` (AC 3) | `AppSecretsServiceTests` mit `InMemorySecretStore` | Nicht erforderlich mit Begründung (Ablageort über `ISecretStore`-Fake nachweisbar; echter SecureStorage nur manuell prüfbar) |
+| Server ohne Pairing-Endpunkt → `PairingNotSupportedError`, kein Fallback (AC 8, Anwender-Entscheidung) | `AppUpdateTests_Pairing` (`NotSupported` ohne `AttemptAutoLoginEffect`) | Nicht erforderlich mit Begründung (wie oben) |
+| Echter Gerätefluss (SecureStorage, `DeviceInfo`) | Manuell über `scripts/iOS-Deployment.ps1` + Testserver | Manueller Nachweis geplant — im Testprotokoll zu dokumentieren |
+
+Bewertung: Der Verzicht auf automatisierte E2E-Tests ist gegen die Anforderung vertretbar — AC 7 benennt den geforderten Testnachweis selbst (Auflösereihenfolge, MVU-Message-Flow, Negativfälle), und die etablierte Repo-Konvention (MVU-Update-Tests + Quelltext-Contract-Tests) deckt Zustandslogik und UI-Verdrahtung ab. Es bleibt ein Restrisiko für rein laufzeitseitige Verdrahtung (`SecureStorage`, `DeviceInfo`, DI), das nur durch den geplanten manuellen Nachweis mitgetragen wird.
+
+## Fehlende oder unvollständige Planbestandteile
+
+- [ ] **Re-Pairing beim App-Start / im Health-Check-Pfad mit bereits widerrufenem Geräte-Token (AC 5 teilweise unabgedeckt):** `ServerHealthProbe` erzeugt `VideoPlayerApiClient` ohne `TokenRefresher`, und `CheckHealthAsync` bildet jede `ApiException` — also auch den Gate-401 — auf `false` ("unerreichbar") ab. Folge: `UpdateHealthCheckCompleted` geht in `CheckOfflineDataEffect` → Offline bzw. `NeedsServerSetup` **ohne** `DeviceRevokedError`. Da das widerrufene Token noch im Store liegt, gilt `PairingRequired = false` → die Pairing-Eingabe ist unsichtbar, jeder erneute Servercheck scheitert als "unerreichbar", das Token wird nie verworfen — Sackgasse bis zur Neuinstallation. Der Plan benennt das Unterscheidungsproblem als Risiko, enthält aber keinen Schritt, der diesen Fall löst (z. B. Gate-Probe auch im `RunHealthCheckAsync`/`CheckCandidateServerAsync`-Pfad, oder Verwerfen des Tokens + `IsPairingRequired = true` bei Health-Check-401).
+- [ ] **Reset-Semantik der Pairing-Felder nicht spezifiziert:** Ob `BeginServerCheck` (erneute Adresseingabe/Serverwechsel aus der Pairing-Eingabe heraus) `PairingError` und `IsPairingRequired` zurücksetzt, ist im Plan nicht beschrieben — ein alter `PairingError` kann sonst über den nächsten Check hinweg stehen bleiben.
+
+## Hinweise
+
+- Die Anwender-Entscheidung "kein Fallback auf den statischen Token bei 404/`NotSupported`" ist konsistent umgesetzt (`PairingNotSupportedError`, kein `AttemptAutoLoginEffect`) und durch die `PairingRequired`-Logik verlustfrei (im `NotSupported`-Fall existiert ohnehin keine nutzbare statische Quelle). Alle offenen Fragen der Anforderung sind im Plan durch geklärte Entscheidungen geschlossen.
+- Der verbindliche Server-Vertrag (Endpunkt, camelCase-Felder, `DeriveKeyFromHmac`/SHA256, `nonce(12)‖ciphertext‖tag(16)`, Fehlercodes 400/401/429, öffentlicher Endpunkt ohne Gate-Header) wird durch `DevicePairingClient` + `PairingCrypto` samt Tests vollständig abgedeckt; die bewusste Umgehung von `SendWithPolicyAsync` (429-Retry, 401-Reauth) ist korrekt begründet.
+- Die kritische Reihenfolge "Provider muss vor dem ersten Request nach Serverwahl gesetzt sein" (`LoadServersAsync`/`PersistActiveServerAsync`) ist als Risiko benannt; in der Umsetzung sicherstellen, dass `PersistActiveServerAsync` vor dem `AttemptAutoLoginEffect`/`CheckServerHealthEffect` wirkt.
+- `PairingCode.TryNormalize` hardcodiert Länge 8 — korrekt gegen den Vertrag (Default-TTL/Länge), aber bei abweichender Server-Konfiguration (`Pairing:CodeLength` min. 4) würden kürzere Codes clientseitig verworfen, bevor der Server sie prüfen kann; akzeptabel, ggf. in der Nachplanung als Hinweis dokumentieren.
+- Manueller Verifikationslauf (echtes Gerät/Simulator gegen Testserver mit Admin-erzeugtem Code) ist als einziger Nachweis für `SecureStorage`/`DeviceInfo` einzuplanen und im Abschluss-Testprotokoll zu dokumentieren.
