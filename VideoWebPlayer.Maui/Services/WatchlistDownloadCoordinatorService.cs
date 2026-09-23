@@ -5,6 +5,10 @@ using VideoWebPlayer.Maui.Services.Events;
 
 namespace VideoWebPlayer.Maui.Services;
 
+/// <summary>
+/// Koordiniert automatische Downloads der Watchlist ("Weiterschauen"-Liste).
+/// Reagiert auf ContinueWatchingUpdated-Ereignisse und reiht fehlende Videos in die Download-Queue ein.
+/// </summary>
 public class WatchlistDownloadCoordinatorService
 {
     private readonly VideoWebPlayerClient _client;
@@ -14,6 +18,12 @@ public class WatchlistDownloadCoordinatorService
 
     private readonly Action<ContinueWatchingUpdatedEvent> _handler;
 
+    /// <summary>
+    /// Initialisiert eine neue Instanz der <see cref="WatchlistDownloadCoordinatorService"/>-Klasse
+    /// und abonniert das <see cref="ContinueWatchingUpdatedEvent"/>.
+    /// </summary>
+    /// <param name="client">Der API-Client zum Abrufen der Weiterschauen-Liste.</param>
+    /// <param name="subscriber">Der Event-Subscriber für Benachrichtigungs-Ereignisse.</param>
     public WatchlistDownloadCoordinatorService(VideoWebPlayerClient client, ISubscribeNotificationEvent subscriber)
     {
         _client = client;
@@ -23,6 +33,10 @@ public class WatchlistDownloadCoordinatorService
         _subscriber.Subscribe<ContinueWatchingUpdatedEvent>(_handler);
     }
 
+    /// <summary>
+    /// Führt eine sofortige Synchronisation der Watchlist beim App-Start aus (ohne Throttle).
+    /// </summary>
+    /// <returns>Ein Task, der die Synchronisation abschließt.</returns>
     public Task RunOnStartupAsync()
         => SyncAsync(force: true);
 

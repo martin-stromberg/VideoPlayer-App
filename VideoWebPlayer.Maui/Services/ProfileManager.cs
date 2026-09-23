@@ -9,8 +9,16 @@ public class ProfileManager
     private static ProfileManager? _instance;
     private string _currentProfile = "default";
 
+    /// <summary>
+    /// Ruft die gemeinsame Singleton-Instanz des Profil-Managers ab.
+    /// </summary>
+    /// <value>Die Singleton-Instanz des <see cref="ProfileManager"/>.</value>
     public static ProfileManager Instance => _instance ??= new ProfileManager();
 
+    /// <summary>
+    /// Ruft den Namen des aktuell aktiven Profils ab oder legt ihn fest.
+    /// </summary>
+    /// <value>Der Profilname (kleingeschrieben); bei leerem Wert wird "default" verwendet.</value>
     public string CurrentProfile
     {
         get => _currentProfile;
@@ -23,6 +31,10 @@ public class ProfileManager
         }
     }
 
+    /// <summary>
+    /// Liefert den Dateinamen der SQLite-Datenbank für das aktuelle Profil.
+    /// </summary>
+    /// <returns>Der profilabhängige Datenbank-Dateiname.</returns>
     public string GetDatabaseFileName()
     {
         return CurrentProfile == "default"
@@ -30,6 +42,10 @@ public class ProfileManager
             : $"downloads_{CurrentProfile}.db3";
     }
 
+    /// <summary>
+    /// Liefert das Präfix für Preferences-Schlüssel des aktuellen Profils.
+    /// </summary>
+    /// <returns>Das Schlüsselpräfix des Profils (leer für "default").</returns>
     public string GetPreferencesPrefix()
     {
         return CurrentProfile == "default"
@@ -37,6 +53,10 @@ public class ProfileManager
             : $"{CurrentProfile}_";
     }
 
+    /// <summary>
+    /// Initialisiert eine neue Instanz der <see cref="ProfileManager"/>-Klasse
+    /// und lädt das Profil ggf. aus der Umgebungsvariable VIDEOWEBPLAYER_PROFILE.
+    /// </summary>
     public ProfileManager()
     {
         // Versuche das Profil aus Umgebungsvariable zu laden

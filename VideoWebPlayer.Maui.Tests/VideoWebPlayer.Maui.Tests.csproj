@@ -3,6 +3,8 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <WarningsAsErrors>CS1591</WarningsAsErrors>
     <IsPackable>false</IsPackable>
     <PackageLicenseFile>LICENSE</PackageLicenseFile>
     <Copyright>Copyright (c) Martin Stromberg</Copyright>
@@ -24,6 +26,9 @@
     <Using Include="Xunit" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\VideoPlayer.ApiClient\VideoPlayer.ApiClient.csproj" />
+    <ProjectReference Include="..\VideoPlayer.Mvu\VideoPlayer.Mvu.csproj" />
+    <ProjectReference Include="..\VideoPlayer.Storage\VideoPlayer.Storage.csproj" />
     <ProjectReference Include="..\VideoWebPlayer.Client\VideoWebPlayer.Client.csproj" />
   </ItemGroup>
   <ItemGroup>

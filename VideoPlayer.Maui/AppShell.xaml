@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<Shell
+    x:Class="VideoPlayer.Maui.AppShell"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:pages="clr-namespace:VideoPlayer.Maui.Pages"
+    Title="VideoPlayer"
+    FlyoutBehavior="Flyout">
+
+    <Shell.Resources>
+        <!-- Sektionstitel der dynamischen Quellengruppe: kleiner,
+             kräftig und abgesetzt formatiert — die Zeile wirkt als
+             Überschrift, nicht als deaktivierter Menüeintrag. -->
+        <DataTemplate x:Key="SourceSectionTemplate">
+            <Label Text="{Binding Text}"
+                   FontSize="12"
+                   FontAttributes="Bold"
+                   Margin="0,12,0,0"
+                   Padding="16,4"
+                   TextColor="{StaticResource VpTextMuted}" />
+        </DataTemplate>
+        <!-- Fehlgeschlagener Quellen-Lauf: klickbarer Neuversuch-Eintrag,
+             im Fehler-Stil der übrigen App gehalten (rot, wie die
+             ErrorLabel der Seiten) und damit klar von normalen
+             Menüeinträgen unterscheidbar. -->
+        <DataTemplate x:Key="SourceErrorTemplate">
+            <Label Text="{Binding Text}"
+                   FontAttributes="Bold"
+                   Padding="16,10"
+                   TextColor="{StaticResource VpDanger}" />
+        </DataTemplate>
+        <!-- Nicht-klickbare Statuszeile der Quellengruppe
+             (Laden / keine Freigabe): dezent gehalten wie der
+             Sektionstitel, in normaler Eintragsgröße. -->
+        <DataTemplate x:Key="SourceInfoTemplate">
+            <Label Text="{Binding Text}"
+                   FontAttributes="Italic"
+                   Padding="16,10"
+                   TextColor="{StaticResource VpTextMuted}" />
+        </DataTemplate>
+    </Shell.Resources>
+
+    <FlyoutItem Title="Startseite" Route="home">
+        <ShellContent Title="Startseite" ContentTemplate="{DataTemplate pages:HomePage}" />
+    </FlyoutItem>
+    <FlyoutItem Title="Favoriten" Route="favorites">
+        <ShellContent Title="Favoriten" ContentTemplate="{DataTemplate pages:FavoritesPage}" />
+    </FlyoutItem>
+    <FlyoutItem Title="Downloads" Route="downloads">
+        <ShellContent Title="Downloads" ContentTemplate="{DataTemplate pages:DownloadsPage}" />
+    </FlyoutItem>
+    <FlyoutItem Title="Profil" Route="profile">
+        <ShellContent Title="Profil" ContentTemplate="{DataTemplate pages:ProfilePage}" />
+    </FlyoutItem>
+    <FlyoutItem Title="Einstellungen" Route="settings">
+        <ShellContent Title="Einstellungen" ContentTemplate="{DataTemplate pages:SettingsPage}" />
+    </FlyoutItem>
+
+</Shell>

@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="VideoPlayer.Maui.Pages.SettingsPage"
+             Title="Einstellungen">
+
+    <ScrollView>
+        <VerticalStackLayout Padding="20" Spacing="12">
+
+            <Label Text="Einstellungen" FontSize="24" FontAttributes="Bold" />
+
+            <Label x:Name="InvalidInputLabel"
+                   AutomationId="InvalidInputLabel"
+                   Text="Bitte eine gültige Zahl eingeben."
+                   TextColor="{StaticResource VpDanger}"
+                   IsVisible="False" />
+
+            <!-- Darstellung -->
+            <Label Text="Darstellung" FontAttributes="Bold" FontSize="16" />
+
+            <HorizontalStackLayout Spacing="10">
+                <Switch x:Name="HomeHeroSwitch"
+                        AutomationId="HomeHeroSwitch"
+                        VerticalOptions="Center" />
+                <Label Text="Kopfbereich anzeigen" VerticalOptions="Center" />
+            </HorizontalStackLayout>
+
+            <!-- Downloads -->
+            <Label Text="Downloads" FontAttributes="Bold" FontSize="16" />
+
+            <HorizontalStackLayout Spacing="10">
+                <Switch x:Name="AutoDownloadSwitch"
+                        AutomationId="AutoDownloadSwitch"
+                        VerticalOptions="Center" />
+                <Label Text="Automatische Downloads" VerticalOptions="Center" />
+            </HorizontalStackLayout>
+
+            <Label Text="Anzahl vorzuladender Episoden" />
+            <Entry x:Name="PreloadEpisodeCountEntry"
+                   AutomationId="PreloadEpisodeCountEntry"
+                   Keyboard="Numeric"
+                   Placeholder="1 – 10" />
+
+            <HorizontalStackLayout Spacing="10">
+                <Switch x:Name="WifiOnlySwitch"
+                        AutomationId="WifiOnlySwitch"
+                        VerticalOptions="Center" />
+                <Label Text="Downloads nur im WLAN" VerticalOptions="Center" />
+            </HorizontalStackLayout>
+
+            <Label Text="Speicherplatzkontingent für Downloads (GB)" />
+            <Entry x:Name="DownloadQuotaGbEntry"
+                   AutomationId="DownloadQuotaGbEntry"
+                   Keyboard="Numeric"
+                   Placeholder="Standard: 5" />
+
+            <HorizontalStackLayout Spacing="10">
+                <Switch x:Name="AutoDeleteWatchedSwitch"
+                        AutomationId="AutoDeleteWatchedSwitch"
+                        VerticalOptions="Center" />
+                <Label Text="Gesehene Episoden automatisch löschen" VerticalOptions="Center" />
+            </HorizontalStackLayout>
+
+            <!-- Wiedergabe -->
+            <Label Text="Wiedergabe" FontAttributes="Bold" FontSize="16" />
+
+            <HorizontalStackLayout Spacing="10">
+                <Switch x:Name="AutoResumeSwitch"
+                        AutomationId="AutoResumeSwitch"
+                        VerticalOptions="Center" />
+                <Label Text="Auto-Fortsetzung" VerticalOptions="Center" />
+            </HorizontalStackLayout>
+
+            <Label Text="Zeitfenster Auto-Fortsetzung (Sekunden Restlaufzeit)" />
+            <Entry x:Name="AutoResumeRemainingEntry"
+                   AutomationId="AutoResumeRemainingEntry"
+                   Keyboard="Numeric"
+                   Placeholder="30 – 3600" />
+
+            <Label Text="Als angesehen ab … Sekunden vor Ende" />
+            <Entry x:Name="WatchedEndWindowEntry"
+                   AutomationId="WatchedEndWindowEntry"
+                   Keyboard="Numeric"
+                   Placeholder="30 – 3600" />
+
+            <!-- Server -->
+            <Label Text="Server" FontAttributes="Bold" FontSize="16" />
+
+            <Button x:Name="ServerSwitchButton"
+                    AutomationId="ServerSwitchButton"
+                    Text="Server wechseln"
+                    Clicked="OnServerSwitchClicked" />
+
+        </VerticalStackLayout>
+    </ScrollView>
+
+</ContentPage>

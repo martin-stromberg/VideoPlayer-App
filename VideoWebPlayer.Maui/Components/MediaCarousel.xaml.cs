@@ -5,12 +5,27 @@ using CommunityToolkit.Maui.Core;
 
 namespace VideoWebPlayer.Maui.Components;
 
+/// <summary>
+/// Horizontales Media-Carousel, das eine Liste von Medien-Einträgen anzeigt
+/// und bei Auswahl zu den entsprechenden Detailseiten navigiert.
+/// </summary>
 public partial class MediaCarousel : ContentView
 {
     // Default item size (can be adjusted based on device)
+    /// <summary>
+    /// Breite eines einzelnen Carousel-Items in device-independent Units.
+    /// </summary>
     public double ItemWidth { get; set; } = 140;
+
+    /// <summary>
+    /// Höhe eines einzelnen Carousel-Items in device-independent Units.
+    /// </summary>
     public double ItemHeight { get; set; } = 210;
 
+    /// <summary>
+    /// Erstellt eine neue Instanz des <see cref="MediaCarousel"/> und passt
+    /// die Standard-Itemgrößen an die Bildschirmgröße an.
+    /// </summary>
     public MediaCarousel()
     {
         InitializeComponent();

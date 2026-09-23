@@ -1,0 +1,123 @@
+using CommunityToolkit.Maui;
+using Microsoft.Extensions.Logging;
+using VideoPlayer.Maui.Services;
+using VideoPlayer.Mvu;
+using VideoPlayer.Storage;
+
+namespace VideoPlayer.Maui
+{
+    /// <summary>
+    /// Einstiegspunkt der MAUI-App: baut die <see cref="MauiApp"/> mit
+    /// Dependency-Injection-Registrierungen für MVU-Host, Effekt-Handler,
+    /// lokale Ablage, Serververwaltung, Synchronisation und alle Seiten.
+    /// </summary>
+    public static class MauiProgram
+    {
+        /// <summary>
+        /// Erstellt und konfiguriert die <see cref="MauiApp"/> der Anwendung
+        /// (Dienste, Seiten, Schriftarten, Debug-Logging).
+        /// </summary>
+        /// <returns>Die konfigurierte <see cref="MauiApp"/>-Instanz.</returns>
+        public static MauiApp CreateMauiApp()
+        {
+            var builder = MauiApp.CreateBuilder();
+            builder.UseMauiApp<App>();
+
+            // Videowiedergabe (MediaElement) — registriert die plattform-
+            // spezifischen Player (iOS: AVPlayerViewController mit nativem
+            // PiP; Windows: MediaPlayerElement).
+            builder.UseMauiCommunityToolkitMediaElement(true);
+
+            // MVU-Zyklus: Host hält das unveränderliche App-Model, der Effekt-Handler
+            // führt Navigation und Server-Erreichbarkeitsprüfung am App-Rand aus.
+            builder.Services.AddSingleton<IServerAddressProvider, ServerAddressProvider>();
+            builder.Services.AddSingleton<IServerHealthProbe, ServerHealthProbe>();
+            builder.Services.AddSingleton<AuthSessionService>();
+            builder.Services.AddSingleton<IAppEffectHandler, ShellAppEffectHandler>();
+            builder.Services.AddSingleton<MvuHost>();
+
+            // Lokale Datenhaltung: Profil-Isolation, normale und sichere Ablage,
+            // Einstellungs-/Geheimnisdienste und getrennte Datenbanken.
+            builder.Services.AddSingleton(_ => AppProfile.FromEnvironment());
+            builder.Services.AddSingleton<ISettingsStore>(_ => new PreferencesSettingsStore(Preferences.Default));
+            builder.Services.AddSingleton<ISecretStore>(_ => new SecureStorageSecretStore(SecureStorage.Default));
+            builder.Services.AddSingleton<AppSettingsService>();
+            builder.Services.AddSingleton<AppSecretsService>();
+            builder.Services.AddSingleton(sp =>
+                AppStorageLayoutProvider.CreateLayout(sp.GetRequiredService<AppProfile>()));
+            builder.Services.AddSingleton<BackupDatabase>();
+            builder.Services.AddSingleton<CacheDatabase>();
+
+            // Serververwaltung und Netzwerk-Erkennung (mDNS + UDP-Broadcast).
+            builder.Services.AddSingleton<KnownServersService>();
+            builder.Services.AddSingleton<VideoPlayer.ApiClient.Discovery.ServerDiscoveryService>(
+                _ => VideoPlayer.ApiClient.Discovery.ServerDiscoveryService.CreateDefault());
+
+            // Netzwerkstatus, Ereignisverbindung (SignalR) und Synchronisation.
+            builder.Services.AddSingleton<INetworkStatusMonitor, ConnectivityNetworkStatusMonitor>();
+            builder.Services.AddSingleton<Func<IServerEventsConnection>>(
+                _ => () => new SignalRServerEventsConnection());
+            builder.Services.AddSingleton<ServerEventsService>();
+            builder.Services.AddSingleton<PendingProgressSyncService>();
+            builder.Services.AddSingleton<ProgressReportService>();
+            builder.Services.AddSingleton<ServerSyncService>();
+
+            // Startseiten-Listen aus der Cache-Ablage (Cache-First) und
+            // Vorschaubilder (api/pictures/{id}) mit lokaler Ablage im
+            // nicht backup-pflichtigen Previews-Verzeichnis.
+            builder.Services.AddSingleton<HomeListService>();
+            builder.Services.AddSingleton<OfflineContinueWatchingService>();
+            builder.Services.AddSingleton<PosterImageService>();
+
+            // Quellen-Browsing, Medien-Details und Favoriten-Umschaltung
+            // (plattformneutrale Dienste auf dem angemeldeten API-Client).
+            builder.Services.AddSingleton<SourceBrowserService>();
+            builder.Services.AddSingleton<MediaDetailsService>();
+            builder.Services.AddSingleton<FavoritesService>();
+            // Profil-Seite: Benutzerinfo aus Token-Claims/gespeicherter
+            // Anmelde-Kennung plus aktives lokales Profil.
+            builder.Services.AddSingleton<ProfileInfoService>();
+
+            // Wiedergabe: Quellauflösung (Stream/lokale Datei) und
+            // Picture-in-Picture (Windows: kompaktes Overlay des
+            // App-Fensters; iOS: nativer PiP der Transportsteuerung).
+            builder.Services.AddSingleton<PlaybackSourceService>();
+            builder.Services.AddSingleton<IPictureInPictureService, PictureInPictureService>();
+
+            // Download-Verwaltung: persistente Aufträge im Download-
+            // Manifest, parallele Transfers mit Quota/WLAN-Bedingung —
+            // die Downloads-Seite speist sich über ItemChanged/ItemRemoved.
+            // AutoDownloadService: Vorlauf der Weiterschauen-Episoden.
+            builder.Services.AddSingleton<DownloadService>();
+            builder.Services.AddSingleton<AutoDownloadService>();
+
+            builder.Services.AddSingleton<AppShell>();
+            builder.Services.AddTransient<Pages.LoadingPage>();
+            builder.Services.AddTransient<Pages.HomePage>();
+            builder.Services.AddTransient<Pages.FavoritesPage>();
+            builder.Services.AddTransient<Pages.DownloadsPage>();
+            builder.Services.AddTransient<Pages.ProfilePage>();
+            builder.Services.AddTransient<Pages.SettingsPage>();
+            builder.Services.AddTransient<Pages.ServerSetupPage>();
+            builder.Services.AddTransient<Pages.LoginPage>();
+            // Detailseite (Shell-Route „mediadetails") und
+            // Quellen-Browsing-Seite (Shell-Route „sourceoverview").
+            builder.Services.AddTransient<Pages.MediaDetailsPage>();
+            builder.Services.AddTransient<Pages.SourceOverviewPage>();
+            // Wiedergabeseite (Shell-Route „player").
+            builder.Services.AddTransient<Pages.PlayerPage>();
+
+            builder.ConfigureFonts(fonts =>
+            {
+                fonts.AddFont("OpenSans-Regular.ttf", "OpenSansRegular");
+                fonts.AddFont("OpenSans-Semibold.ttf", "OpenSansSemibold");
+            });
+
+#if DEBUG
+            builder.Logging.AddDebug();
+#endif
+
+            return builder.Build();
+        }
+    }
+}

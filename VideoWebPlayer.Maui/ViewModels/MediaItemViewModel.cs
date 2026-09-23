@@ -6,6 +6,9 @@ using VideoWebPlayer.Maui.Models;
 
 namespace VideoWebPlayer.Maui.ViewModels;
 
+/// <summary>
+/// ViewModel für ein Medien-Element (Film, Serie, Episode oder Download), das in Listen und Karussells angezeigt wird.
+/// </summary>
 public class MediaItemViewModel : INotifyPropertyChanged
 {
     private string? _title;
@@ -17,6 +20,9 @@ public class MediaItemViewModel : INotifyPropertyChanged
     private long? _seasonId;
     private long? _episodeId;
 
+    /// <summary>
+    /// Der Anzeigetitel des Elements.
+    /// </summary>
     public string? Title
     {
         get => _title;
@@ -30,6 +36,9 @@ public class MediaItemViewModel : INotifyPropertyChanged
         }
     }
 
+    /// <summary>
+    /// Die URL des Poster-Bildes (relativ zur API oder absolut).
+    /// </summary>
     public string? ImageUrl
     {
         get => _imageUrl;
@@ -43,9 +52,14 @@ public class MediaItemViewModel : INotifyPropertyChanged
         }
     }
 
-    // Optional: store the original poster picture id so callers can request images via API client
+    /// <summary>
+    /// Optional: die ursprüngliche Poster-Bild-ID, damit Aufrufer Bilder über den API-Client anfordern können.
+    /// </summary>
     public long? PosterPictureId { get; set; }
 
+    /// <summary>
+    /// Die geladene Bildquelle für das Poster des Elements.
+    /// </summary>
     public ImageSource? ImageSource
     {
         get => _imageSource;
@@ -59,6 +73,9 @@ public class MediaItemViewModel : INotifyPropertyChanged
         }
     }
 
+    /// <summary>
+    /// Die aus dem Poster-Bild extrahierte Hintergrundfarbe des Elements.
+    /// </summary>
     public Color BackgroundColor
     {
         get => _backgroundColor;
@@ -72,6 +89,9 @@ public class MediaItemViewModel : INotifyPropertyChanged
         }
     }
 
+    /// <summary>
+    /// Die ID des zugehörigen Eintrags (z. B. Collection-, Show- oder Video-ID).
+    /// </summary>
     public long? EntryId
     {
         get => _entryId;
@@ -85,6 +105,9 @@ public class MediaItemViewModel : INotifyPropertyChanged
         }
     }
 
+    /// <summary>
+    /// Der Medientyp des Elements (z. B. "collection", "show", "movie" oder "episode").
+    /// </summary>
     public string? MediaType
     {
         get => _mediaType;
@@ -98,6 +121,9 @@ public class MediaItemViewModel : INotifyPropertyChanged
         }
     }
 
+    /// <summary>
+    /// Die ID der Staffel, sofern das Element zu einer Staffel gehört.
+    /// </summary>
     public long? SeasonId
     {
         get => _seasonId;
@@ -111,6 +137,9 @@ public class MediaItemViewModel : INotifyPropertyChanged
         }
     }
 
+    /// <summary>
+    /// Die ID der Episode, sofern das Element eine Episode ist.
+    /// </summary>
     public long? EpisodeId
     {
         get => _episodeId;
@@ -129,8 +158,14 @@ public class MediaItemViewModel : INotifyPropertyChanged
     /// </summary>
     public bool IsFromCache { get; set; }
 
+    /// <summary>
+    /// Befehl zum Löschen des Downloads dieses Elements (mit Bestätigungsdialog).
+    /// </summary>
     public ICommand DeleteDownloadCommand { get; }
 
+    /// <summary>
+    /// Erstellt eine neue Instanz des <see cref="MediaItemViewModel"/>.
+    /// </summary>
     public MediaItemViewModel()
     {
         DeleteDownloadCommand = new Command(async () => await OnDeleteDownloadAsync());
@@ -166,8 +201,13 @@ public class MediaItemViewModel : INotifyPropertyChanged
         }
     }
 
+    /// <inheritdoc/>
     public event PropertyChangedEventHandler? PropertyChanged;
 
+    /// <summary>
+    /// Löst das <see cref="PropertyChanged"/>-Ereignis aus.
+    /// </summary>
+    /// <param name="propertyName">Der Name der geänderten Eigenschaft (wird automatisch ermittelt).</param>
     protected virtual void OnPropertyChanged([CallerMemberName] string? propertyName = null)
     {
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));

@@ -10,6 +10,9 @@ using VideoWebPlayer.Maui.Services;
 
 namespace VideoWebPlayer.Maui.ViewModels;
 
+/// <summary>
+/// ViewModel für die Detailseite einer TV-Show mit Staffeln, Episoden, Banner und Favoritenstatus.
+/// </summary>
 public class TVShowDetailsViewModel : INotifyPropertyChanged, IMediaBannerViewModel
 {
     private readonly VideoWebPlayerClient? _client;
@@ -32,8 +35,14 @@ public class TVShowDetailsViewModel : INotifyPropertyChanged, IMediaBannerViewMo
     private bool _isSelectedSeasonFavorite;
     private bool _isSelectionFavorite;
 
+    /// <summary>
+    /// Die ID der TV-Show.
+    /// </summary>
     public long TVShowId { get; }
 
+    /// <summary>
+    /// Der Index der aktuell ausgewählten Staffel in <see cref="Seasons"/> (-1 = keine Auswahl).
+    /// </summary>
     public int SelectedSeasonIndex
     {
         get => _selectedSeasonIndex;
@@ -70,6 +79,9 @@ public class TVShowDetailsViewModel : INotifyPropertyChanged, IMediaBannerViewMo
         }
     }
 
+    /// <summary>
+    /// Der Index der aktuell ausgewählten Episode in <see cref="Episodes"/> (-1 = keine Auswahl).
+    /// </summary>
     public int SelectedEpisodeIndex
     {
         get => _selectedEpisodeIndex;
@@ -92,6 +104,9 @@ public class TVShowDetailsViewModel : INotifyPropertyChanged, IMediaBannerViewMo
         }
     }
 
+    /// <summary>
+    /// Die aktuell ausgewählte Episode oder <c>null</c>, wenn keine gültige Auswahl vorliegt.
+    /// </summary>
     public TVShowEpisodeViewModel? SelectedEpisode
     {
         get => _selectedEpisodeIndex >= 0 && _selectedEpisodeIndex < Episodes.Count
@@ -99,6 +114,9 @@ public class TVShowDetailsViewModel : INotifyPropertyChanged, IMediaBannerViewMo
             : null;
     }
 
+    /// <summary>
+    /// Der Anzeigename der ausgewählten Episode (inkl. Episodennummer, falls vorhanden).
+    /// </summary>
     public string? SelectedEpisodeName
     {
         get => _selectedEpisodeName;
@@ -112,6 +130,9 @@ public class TVShowDetailsViewModel : INotifyPropertyChanged, IMediaBannerViewMo
         }
     }
 
+    /// <summary>
+    /// Der Titel der TV-Show.
+    /// </summary>
     public string? Title
     {
         get => _title;
@@ -125,6 +146,9 @@ public class TVShowDetailsViewModel : INotifyPropertyChanged, IMediaBannerViewMo
         }
     }
 
+    /// <summary>
+    /// Die Handlungsbeschreibung der Show bzw. der ausgewählten Episode.
+    /// </summary>
     public string? Plot
     {
         get => _plot;
@@ -138,6 +162,9 @@ public class TVShowDetailsViewModel : INotifyPropertyChanged, IMediaBannerViewMo
         }
     }
 
+    /// <summary>
+    /// Die Genre-Namen der TV-Show als Text.
+    /// </summary>
     public string? GenreNames
     {
         get => _genreNames;
@@ -151,6 +178,9 @@ public class TVShowDetailsViewModel : INotifyPropertyChanged, IMediaBannerViewMo
         }
     }
 
+    /// <summary>
+    /// Das Erscheinungsjahr der TV-Show.
+    /// </summary>
     public string? ReleaseYear
     {
         get => _releaseYear;
@@ -164,6 +194,9 @@ public class TVShowDetailsViewModel : INotifyPropertyChanged, IMediaBannerViewMo
         }
     }
 
+    /// <summary>
+    /// Die Bildquelle des aktuell angezeigten Banners (Show-, Staffel- oder Episoden-Banner).
+    /// </summary>
     public ImageSource? DisplayBannerSource
     {
         get => _displayBannerSource;
@@ -177,6 +210,9 @@ public class TVShowDetailsViewModel : INotifyPropertyChanged, IMediaBannerViewMo
         }
     }
 
+    /// <summary>
+    /// Die aus dem Banner-Bild extrahierte Hintergrundfarbe.
+    /// </summary>
     public Color DisplayBannerBackgroundColor
     {
         get => _displayBannerBackgroundColor;
@@ -190,6 +226,9 @@ public class TVShowDetailsViewModel : INotifyPropertyChanged, IMediaBannerViewMo
         }
     }
 
+    /// <summary>
+    /// Gibt an, ob die Daten der TV-Show gerade geladen werden.
+    /// </summary>
     public bool IsLoading
     {
         get => _isLoading;
@@ -203,12 +242,22 @@ public class TVShowDetailsViewModel : INotifyPropertyChanged, IMediaBannerViewMo
         }
     }
 
+    /// <summary>
+    /// Die Staffeln der TV-Show.
+    /// </summary>
+    /// <value>Liste der Staffeln; initial leer.</value>
     public ObservableCollection<DtoTVShowSeason> Seasons { get; } = new();
 
+    /// <summary>
+    /// Die aktuell ausgewählte Staffel oder <c>null</c>, wenn keine gültige Auswahl vorliegt.
+    /// </summary>
     public DtoTVShowSeason? SelectedSeason => SelectedSeasonIndex >= 0 && SelectedSeasonIndex < Seasons.Count
         ? Seasons[SelectedSeasonIndex]
         : null;
 
+    /// <summary>
+    /// Gibt an, ob die TV-Show als Favorit markiert ist.
+    /// </summary>
     public bool IsShowFavorite
     {
         get => _isShowFavorite;
@@ -224,8 +273,14 @@ public class TVShowDetailsViewModel : INotifyPropertyChanged, IMediaBannerViewMo
         }
     }
 
+    /// <summary>
+    /// Das Stern-Symbol für den Favoritenstatus der Show (gefüllt = Favorit, leer = kein Favorit).
+    /// </summary>
     public string ShowFavoriteStarText => IsShowFavorite ? "★" : "☆";
 
+    /// <summary>
+    /// Gibt an, ob die aktuelle Auswahl (Episode, Staffel oder Show) als Favorit markiert ist.
+    /// </summary>
     public bool IsSelectionFavorite
     {
         get => _isSelectionFavorite;
@@ -240,8 +295,14 @@ public class TVShowDetailsViewModel : INotifyPropertyChanged, IMediaBannerViewMo
         }
     }
 
+    /// <summary>
+    /// Das Stern-Symbol für den Favoritenstatus der aktuellen Auswahl (gefüllt = Favorit, leer = kein Favorit).
+    /// </summary>
     public string SelectionFavoriteStarText => IsSelectionFavorite ? "★" : "☆";
 
+    /// <summary>
+    /// Gibt an, ob die aktuell ausgewählte Staffel als Favorit markiert ist.
+    /// </summary>
     public bool IsSelectedSeasonFavorite
     {
         get => _isSelectedSeasonFavorite;
@@ -257,6 +318,9 @@ public class TVShowDetailsViewModel : INotifyPropertyChanged, IMediaBannerViewMo
         }
     }
 
+    /// <summary>
+    /// Das Stern-Symbol für den Favoritenstatus der ausgewählten Staffel (gefüllt = Favorit, leer = kein Favorit).
+    /// </summary>
     public string SelectedSeasonFavoriteStarText => IsSelectedSeasonFavorite ? "★" : "☆";
 
     private enum FavoriteTarget
@@ -304,12 +368,19 @@ public class TVShowDetailsViewModel : INotifyPropertyChanged, IMediaBannerViewMo
         };
     }
 
+    /// <summary>
+    /// Die Episoden der aktuell ausgewählten Staffel (aus dem Cache oder neu erstellt).
+    /// </summary>
     public ObservableCollection<TVShowEpisodeViewModel> Episodes =>
         SelectedSeason != null ? GetEpisodesForSeason(SelectedSeason) : new();
 
     private readonly Dictionary<long, ObservableCollection<TVShowEpisodeViewModel>> _episodeCache = new();
     private HashSet<long> _downloadedEpisodeIds = new();
 
+    /// <summary>
+    /// Erstellt eine neue Instanz des <see cref="TVShowDetailsViewModel"/>.
+    /// </summary>
+    /// <param name="tvShowId">Die ID der anzuzeigenden TV-Show.</param>
     public TVShowDetailsViewModel(long tvShowId)
     {
         TVShowId = tvShowId;
@@ -317,6 +388,11 @@ public class TVShowDetailsViewModel : INotifyPropertyChanged, IMediaBannerViewMo
         _client = App.ServiceProvider?.GetService<VideoWebPlayerClient>();
     }
 
+    /// <summary>
+    /// Lädt die Daten der TV-Show (Details, Banner, Staffeln, Episoden) vom Server.
+    /// </summary>
+    /// <param name="initialSeasonId">Optionale ID einer Staffel, die nach dem Laden ausgewählt werden soll.</param>
+    /// <param name="initialEpisodeId">Optionale ID einer Episode, die nach dem Laden ausgewählt werden soll.</param>
     public async Task LoadDataAsync(long? initialSeasonId = null, long? initialEpisodeId = null)
     {
         if (_client == null)
@@ -425,6 +501,9 @@ public class TVShowDetailsViewModel : INotifyPropertyChanged, IMediaBannerViewMo
         IsSelectedSeasonFavorite = SelectedSeason?.IsFavorite ?? false;
     }
 
+    /// <summary>
+    /// Schaltet den Favoritenstatus der gesamten TV-Show auf dem Server um.
+    /// </summary>
     public async Task ToggleShowFavoriteAsync()
     {
         if (_client == null)
@@ -443,6 +522,9 @@ public class TVShowDetailsViewModel : INotifyPropertyChanged, IMediaBannerViewMo
         }
     }
 
+    /// <summary>
+    /// Schaltet den Favoritenstatus der aktuellen Auswahl um (Episode, Staffel oder Show – je nach Kontext).
+    /// </summary>
     public async Task ToggleSelectionFavoriteAsync()
     {
         var target = GetSelectionFavoriteTarget();
@@ -468,6 +550,9 @@ public class TVShowDetailsViewModel : INotifyPropertyChanged, IMediaBannerViewMo
         }
     }
 
+    /// <summary>
+    /// Schaltet den Favoritenstatus der aktuell ausgewählten Staffel auf dem Server um.
+    /// </summary>
     public async Task ToggleSelectedSeasonFavoriteAsync()
     {
         if (_client == null || SelectedSeason == null)
@@ -487,6 +572,10 @@ public class TVShowDetailsViewModel : INotifyPropertyChanged, IMediaBannerViewMo
         }
     }
 
+    /// <summary>
+    /// Schaltet den Favoritenstatus der angegebenen Episode auf dem Server um.
+    /// </summary>
+    /// <param name="episode">Die Episode, deren Favoritenstatus umgeschaltet werden soll.</param>
     public async Task ToggleEpisodeFavoriteAsync(TVShowEpisodeViewModel episode)
     {
         if (_client == null)
@@ -505,6 +594,9 @@ public class TVShowDetailsViewModel : INotifyPropertyChanged, IMediaBannerViewMo
         }
     }
 
+    /// <summary>
+    /// Aktualisiert den Download-Status aller gecachten Episoden anhand der lokalen Download-Datenbank.
+    /// </summary>
     public async Task RefreshDownloadStatusAsync()
     {
         try
@@ -532,6 +624,11 @@ public class TVShowDetailsViewModel : INotifyPropertyChanged, IMediaBannerViewMo
         }
     }
 
+    /// <summary>
+    /// Sucht eine Episode anhand ihrer ID im Episoden-Cache bzw. in der aktuellen Staffel.
+    /// </summary>
+    /// <param name="episodeId">Die ID der gesuchten Episode.</param>
+    /// <returns>Das gefundene <see cref="TVShowEpisodeViewModel"/> oder <c>null</c>.</returns>
     public TVShowEpisodeViewModel? FindEpisode(long episodeId)
     {
         foreach (var list in _episodeCache.Values)
@@ -782,8 +879,10 @@ public class TVShowDetailsViewModel : INotifyPropertyChanged, IMediaBannerViewMo
         }
     }
 
+    /// <inheritdoc/>
     public bool ShouldShowPlayButton => true;
 
+    /// <inheritdoc/>
     public async Task<(long VideoId, string VideoType, string Title)?> GetVideoInfoForPlaybackAsync()
     {
         // Spiele ausgewählte Episode oder erste Episode
@@ -795,8 +894,13 @@ public class TVShowDetailsViewModel : INotifyPropertyChanged, IMediaBannerViewMo
         return (episode.EpisodeId, Models.MediaTypes.Episode, episode.Title ?? "Unknown Episode");
     }
 
+    /// <inheritdoc/>
     public event PropertyChangedEventHandler? PropertyChanged;
 
+    /// <summary>
+    /// Löst das <see cref="PropertyChanged"/>-Ereignis aus.
+    /// </summary>
+    /// <param name="propertyName">Der Name der geänderten Eigenschaft (wird automatisch ermittelt).</param>
     protected virtual void OnPropertyChanged([CallerMemberName] string? propertyName = null)
     {
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));

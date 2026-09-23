@@ -7,8 +7,17 @@ using VideoWebPlayer.Maui.Services.Events;
 
 namespace VideoWebPlayer.Maui
 {
+    /// <summary>
+    /// Einstiegspunkt zum Erstellen und Konfigurieren der MAUI-Anwendung
+    /// (DI-Registrierungen, Fonts, Logging).
+    /// </summary>
     public static class MauiProgram
     {
+        /// <summary>
+        /// Erstellt und konfiguriert die <see cref="MauiApp"/> inklusive aller
+        /// Services, Pages und Fonts.
+        /// </summary>
+        /// <returns>Die fertig konfigurierte <see cref="MauiApp"/>-Instanz.</returns>
         public static MauiApp CreateMauiApp()
         {
             var builder = MauiApp.CreateBuilder();

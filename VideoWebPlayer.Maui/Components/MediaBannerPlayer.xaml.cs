@@ -5,6 +5,10 @@ using System.ComponentModel;
 
 namespace VideoWebPlayer.Maui.Components;
 
+/// <summary>
+/// ContentView, der ein Banner-Bild mit Play-Button anzeigt und bei Bedarf die
+/// Video-Wiedergabe direkt im Banner-Bereich startet (inkl. Positions-Tracking).
+/// </summary>
 public partial class MediaBannerPlayer : ContentView
 {
     private VideoRequest? _currentVideoRequest;
@@ -13,6 +17,9 @@ public partial class MediaBannerPlayer : ContentView
     private double _lastReportedPositionSeconds = -1;
     private double _lastReportedDurationSeconds = -1;
 
+    /// <summary>
+    /// Erstellt eine neue Instanz des <see cref="MediaBannerPlayer"/>.
+    /// </summary>
     public MediaBannerPlayer()
     {
         // InitializeComponent() wird von ContentView nicht automatisch generiert
@@ -29,6 +36,7 @@ public partial class MediaBannerPlayer : ContentView
         }
     }
 
+    /// <inheritdoc/>
     protected override void OnBindingContextChanged()
     {
         base.OnBindingContextChanged();
@@ -330,6 +338,7 @@ public partial class MediaBannerPlayer : ContentView
         }
     }
 
+    /// <inheritdoc/>
     protected override void OnHandlerChanged()
     {
         base.OnHandlerChanged();
@@ -357,6 +366,7 @@ public interface IMediaBannerViewModel
     /// <summary>
     /// Gibt die Video-Informationen für die Wiedergabe zurück
     /// </summary>
+    /// <returns>Ein Tupel mit Video-ID, Video-Typ und Titel; <c>null</c>, wenn keine Wiedergabe möglich ist.</returns>
     Task<(long VideoId, string VideoType, string Title)?> GetVideoInfoForPlaybackAsync();
 
     /// <summary>

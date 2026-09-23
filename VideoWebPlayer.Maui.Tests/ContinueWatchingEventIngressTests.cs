@@ -3,8 +3,10 @@ using VideoWebPlayer.Client.Models;
 
 namespace VideoWebPlayer.Maui.Tests;
 
+/// <summary>Tests für <c>ContinueWatchingEventIngress</c>.</summary>
 public class ContinueWatchingEventIngressTests
 {
+    /// <summary>Prüft ContinueWatchingDto: übersteht den JSON-Vertrag im Roundtrip.</summary>
     [Fact]
     public void ContinueWatchingDto_RoundTripsThroughJsonContract()
     {
@@ -32,6 +34,7 @@ public class ContinueWatchingEventIngressTests
         Assert.Equal(22, roundTrip.PosterPictureId);
     }
 
+    /// <summary>Prüft MutationResult: verwendet stabile Status- und Nachrichtenfelder.</summary>
     [Fact]
     public void MutationResult_UsesStableStatusAndMessageFields()
     {

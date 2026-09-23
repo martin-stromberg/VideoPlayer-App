@@ -10,11 +10,16 @@ public class AuthorizedImageHttpClientHandler : HttpClientHandler
 {
     private readonly string _bearerToken;
 
+    /// <summary>
+    /// Initialisiert eine neue Instanz der <see cref="AuthorizedImageHttpClientHandler"/>-Klasse.
+    /// </summary>
+    /// <param name="bearerToken">Das Bearer-Token, das an Bild-Requests angehängt wird.</param>
     public AuthorizedImageHttpClientHandler(string bearerToken)
     {
         _bearerToken = bearerToken;
     }
 
+    /// <inheritdoc/>
     protected override async Task<HttpResponseMessage> SendAsync(
         HttpRequestMessage request,
         CancellationToken cancellationToken)

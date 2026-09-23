@@ -10,6 +10,9 @@ using VideoWebPlayer.Maui.Services;
 
 namespace VideoWebPlayer.Maui.ViewModels;
 
+/// <summary>
+/// ViewModel für die Startseite mit den Karussells "Weiterschauen", "Favoriten", "Neu im Programm" und Downloads.
+/// </summary>
 public class HomePageViewModel : INotifyPropertyChanged
 {
     private readonly VideoWebPlayerClient? _client;
@@ -17,12 +20,35 @@ public class HomePageViewModel : INotifyPropertyChanged
     private bool _isLoaded = false;
     private bool _isOfflineMode = false;
 
+    /// <summary>
+    /// Karussell für die "Weiterschauen"-Liste.
+    /// </summary>
     public MediaCarouselViewModel ContinueWatching { get; }
+
+    /// <summary>
+    /// Karussell für die Favoriten.
+    /// </summary>
     public MediaCarouselViewModel Favorites { get; }
+
+    /// <summary>
+    /// Karussell für die zuletzt hinzugefügten Einträge.
+    /// </summary>
     public MediaCarouselViewModel RecentEntries { get; }
+
+    /// <summary>
+    /// Karussell für die heruntergeladenen Videos.
+    /// </summary>
     public MediaCarouselViewModel Downloads { get; }
+
+    /// <summary>
+    /// Die verfügbaren Medienquellen.
+    /// </summary>
+    /// <value>Liste der Quellen; initial leer.</value>
     public ObservableCollection<MediaSourceViewModel> Sources { get; } = new();
 
+    /// <summary>
+    /// Gibt an, ob gerade Daten geladen werden.
+    /// </summary>
     public bool IsLoading
     {
         get => _isLoading;
@@ -36,6 +62,9 @@ public class HomePageViewModel : INotifyPropertyChanged
         }
     }
 
+    /// <summary>
+    /// Gibt an, ob sich die App im Offline-Modus befindet (kein Server erreichbar).
+    /// </summary>
     public bool IsOfflineMode
     {
         get => _isOfflineMode;
@@ -50,8 +79,14 @@ public class HomePageViewModel : INotifyPropertyChanged
         }
     }
 
+    /// <summary>
+    /// Gibt an, ob die App online ist (Negation von <see cref="IsOfflineMode"/>).
+    /// </summary>
     public bool IsOnline => !IsOfflineMode;
 
+    /// <summary>
+    /// Erstellt eine neue Instanz des <see cref="HomePageViewModel"/> und initialisiert die Karussells.
+    /// </summary>
     public HomePageViewModel()
     {
         ContinueWatching = new MediaCarouselViewModel { Title = "Weiterschauen", Kind = CarouselKind.ContinueWatching };
@@ -120,6 +155,10 @@ public class HomePageViewModel : INotifyPropertyChanged
         }
     }
 
+    /// <summary>
+    /// Lädt die Daten der Startseite: Downloads immer, Karussells und Quellen nur beim ersten Aufruf.
+    /// Zeigt zunächst gecachte Einträge an und aktualisiert sie anschließend mit Live-Daten.
+    /// </summary>
     public async Task LoadDataAsync()
     {
         System.Diagnostics.Debug.WriteLine("LoadDataAsync started");
@@ -177,34 +216,54 @@ public class HomePageViewModel : INotifyPropertyChanged
         }
     }
 
+    /// <summary>
+    /// Lädt nur das Downloads-Karussell neu, ohne die gesamte Seite zu aktualisieren.
+    /// </summary>
     public async Task RefreshDownloadsAsync()
     {
         // Lade nur Downloads neu, ohne die ganze Seite zu reloaden
         await LoadDownloadsAsync();
     }
 
+    /// <summary>
+    /// Erzwingt ein vollständiges Neuladen der Startseiten-Daten.
+    /// </summary>
     public async Task RefreshDataAsync()
     {
         _isLoaded = false;
         await LoadDataAsync();
     }
 
+    /// <summary>
+    /// Lädt nur das Favoriten-Karussell neu.
+    /// </summary>
     public async Task RefreshFavoritesAsync()
     {
         Favorites.BeginUpdate();
         await LoadFavoritesAsync();
     }
 
+    /// <summary>
+    /// Markiert die Daten als veraltet, sodass sie beim nächsten Aufruf von <see cref="LoadDataAsync"/> neu geladen werden.
+    /// </summary>
     public void RefreshData()
     {
         _isLoaded = false;
     }
 
+    /// <summary>
+    /// Setzt den Offline-Modus der Startseite.
+    /// </summary>
+    /// <param name="isOffline"><c>true</c>, wenn kein Server erreichbar ist; sonst <c>false</c>.</param>
     public void SetOfflineMode(bool isOffline)
     {
         IsOfflineMode = isOffline;
     }
 
+    /// <summary>
+    /// Versucht, die Verbindung zum Server wiederherzustellen, und lädt bei Erfolg die Daten neu.
+    /// </summary>
+    /// <returns><c>true</c>, wenn die Verbindung hergestellt werden konnte; sonst <c>false</c>.</returns>
     public async Task<bool> TryReconnectAsync()
     {
         if (_client == null)
@@ -417,6 +476,13 @@ public class HomePageViewModel : INotifyPropertyChanged
     /// <summary>
 	/// Erstellt ein MediaItemViewModel mit den gegebenen Parametern.
 	/// </summary>
+	/// <param name="title">Der Anzeigetitel des Elements.</param>
+	/// <param name="imageUrl">Die URL des Poster-Bildes.</param>
+	/// <param name="entryId">Die ID des zugehörigen Eintrags.</param>
+	/// <param name="mediaType">Der Medientyp des Elements (z. B. "collection", "show" oder "episode").</param>
+	/// <param name="seasonId">Optionale ID der Staffel, sofern das Element zu einer Staffel gehört.</param>
+	/// <param name="episodeId">Optionale ID der Episode, sofern das Element eine Episode ist.</param>
+	/// <returns>Ein neu erstelltes <see cref="MediaItemViewModel"/>.</returns>
 	private MediaItemViewModel CreateMediaItemViewModel(string title, string? imageUrl, long entryId, string? mediaType, long? seasonId = null, long? episodeId = null)
     {
         return new MediaItemViewModel
@@ -595,6 +661,14 @@ public class HomePageViewModel : INotifyPropertyChanged
     /// Bestimmt das Navigationsziel und den MediaType für einen Entry.
     /// Für Episoden und Seasons wird zur Show navigiert, für Movies zur Collection.
     /// </summary>
+    /// <param name="targetId">Rückgabewert: die ID des Navigationsziels (Show-, Collection- oder Movie-ID).</param>
+    /// <param name="mediaType">Rückgabewert: der Medientyp ("show", "collection" oder "movie").</param>
+    /// <param name="posterUrl">Rückgabewert: die URL des Poster-Bildes.</param>
+    /// <param name="title">Rückgabewert: der Anzeigetitel des Eintrags.</param>
+    /// <param name="seasonId">Rückgabewert: die ID der Staffel, sofern zutreffend.</param>
+    /// <param name="entry">Der Server-Eintrag (z. B. Show, Collection, Season, Episode oder Movie).</param>
+    /// <param name="pictureId">Die Bild-ID für das Poster, falls bekannt.</param>
+    /// <returns>Ein Tupel mit Navigationsziel-ID, Medientyp, Poster-URL, Titel sowie Staffel- und Episoden-ID.</returns>
     private (long targetId, string? mediaType, string? posterUrl, string title, long? seasonId, long? episodeId) GetEntryDetails(object entry, long? pictureId)
     {
         string? mediaType = null;
@@ -697,8 +771,13 @@ public class HomePageViewModel : INotifyPropertyChanged
         }
     }
 
+    /// <inheritdoc/>
     public event PropertyChangedEventHandler? PropertyChanged;
 
+    /// <summary>
+    /// Löst das <see cref="PropertyChanged"/>-Ereignis aus.
+    /// </summary>
+    /// <param name="propertyName">Der Name der geänderten Eigenschaft (wird automatisch ermittelt).</param>
     protected virtual void OnPropertyChanged([CallerMemberName] string? propertyName = null)
     {
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));

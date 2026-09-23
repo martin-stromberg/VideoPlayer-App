@@ -1,0 +1,118 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:mvu="clr-namespace:VideoPlayer.Mvu;assembly=VideoPlayer.Mvu"
+             x:Class="VideoPlayer.Maui.Pages.DownloadsPage"
+             x:Name="RootPage"
+             Title="Downloads"
+             x:DataType="mvu:MvuHost">
+
+    <Grid Padding="20"
+          RowDefinitions="Auto,Auto,Auto,*"
+          RowSpacing="12">
+
+        <!-- Kontingent-Belegung des Speicherplatzes für Downloads. -->
+        <Label x:Name="QuotaLabel"
+               Grid.Row="0"
+               FontSize="12"
+               TextColor="{StaticResource VpTextMuted}" />
+
+        <!-- Hinweis im Offline-Zustand: die Liste liegt lokal vor;
+             wartende Downloads starten mit der Verbindung. -->
+        <Border x:Name="OfflineBanner"
+                Grid.Row="1"
+                Padding="12,8"
+                StrokeShape="RoundRectangle 8"
+                Stroke="{StaticResource VpBorderStrong}"
+                BackgroundColor="{StaticResource VpSurfaceHigh}"
+                IsVisible="False">
+            <Label Text="Offline – Downloads werden fortgesetzt, sobald eine Verbindung besteht."
+                   TextColor="{StaticResource VpText}"
+                   FontAttributes="Bold" />
+        </Border>
+
+        <ActivityIndicator x:Name="LoadingIndicator"
+                           Grid.Row="2"
+                           IsRunning="{Binding Model.Downloads.IsLoading}"
+                           IsVisible="{Binding Model.Downloads.IsLoading}"
+                           Color="{StaticResource VpPrimary}" />
+
+        <VerticalStackLayout x:Name="ErrorPanel"
+                             Grid.Row="2"
+                             Spacing="8"
+                             IsVisible="False">
+            <Label x:Name="ErrorLabel" TextColor="{StaticResource VpDanger}" />
+            <Button x:Name="RetryButton"
+                    Text="Erneut laden"
+                    Clicked="OnRetryClicked"
+                    HorizontalOptions="Start" />
+        </VerticalStackLayout>
+
+        <Label x:Name="EmptyLabel"
+               Grid.Row="2"
+               Text="Keine Downloads vorhanden. Medien lassen sich auf der Detailseite herunterladen."
+               IsVisible="False" />
+
+        <!-- Download-Liste: Titel, Zustand, Fortschritt und die Aktionen
+             Abbrechen/Erneut versuchen/Löschen je Eintrag. Die
+             ItemsSource wird einmalig im Code-Behind auf eine stabile
+             ObservableCollection gesetzt — Fortschritts-Ticks
+             aktualisieren nur den betroffenen Eintrag in-place, ohne
+             dass die Liste neu aufgebaut wird (Flackern). -->
+        <CollectionView x:Name="DownloadsCollection"
+                        Grid.Row="3">
+            <CollectionView.ItemTemplate>
+                <DataTemplate x:DataType="mvu:DownloadItemViewModel">
+                    <Border Padding="12"
+                            Margin="0,0,0,10"
+                            StrokeShape="RoundRectangle 8"
+                            BackgroundColor="{StaticResource VpSurface}">
+                        <Border.Shadow>
+                            <Shadow Brush="{StaticResource VpShadowBrush}" Offset="0,2" Radius="4" Opacity="0.3" />
+                        </Border.Shadow>
+                        <VerticalStackLayout Spacing="6">
+                            <Label Text="{Binding Title}"
+                                   FontSize="16"
+                                   FontAttributes="Bold"
+                                   TextColor="{StaticResource VpPrimarySoft}"
+                                   MaxLines="2"
+                                   LineBreakMode="TailTruncation" />
+                            <HorizontalStackLayout Spacing="8">
+                                <Label Text="{Binding MediaTypeText}"
+                                       FontSize="12"
+                                       TextColor="{StaticResource VpTextMuted}" />
+                                <Label Text="{Binding StateText}"
+                                       FontSize="12"
+                                       FontAttributes="Bold" />
+                                <Label Text="{Binding ProgressPercentText}"
+                                       FontSize="12"
+                                       IsVisible="{Binding ShowProgress}" />
+                            </HorizontalStackLayout>
+                            <ProgressBar Progress="{Binding Progress}"
+                                         ProgressColor="{StaticResource VpPrimary}"
+                                         IsVisible="{Binding ShowProgress}" />
+                            <Label Text="{Binding ErrorText}"
+                                   FontSize="12"
+                                   TextColor="{StaticResource VpDanger}"
+                                   IsVisible="{Binding HasError}" />
+                            <HorizontalStackLayout Spacing="8">
+                                <Button Text="Abbrechen"
+                                        FontSize="12"
+                                        Clicked="OnCancelClicked"
+                                        IsVisible="{Binding CanCancel}" />
+                                <Button Text="Erneut versuchen"
+                                        FontSize="12"
+                                        Clicked="OnRetryDownloadClicked"
+                                        IsVisible="{Binding CanRetry}" />
+                                <Button Text="Löschen"
+                                        FontSize="12"
+                                        Clicked="OnDeleteClicked" />
+                            </HorizontalStackLayout>
+                        </VerticalStackLayout>
+                    </Border>
+                </DataTemplate>
+            </CollectionView.ItemTemplate>
+        </CollectionView>
+    </Grid>
+
+</ContentPage>

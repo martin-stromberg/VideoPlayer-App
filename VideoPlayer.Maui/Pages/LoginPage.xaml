@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="VideoPlayer.Maui.Pages.LoginPage"
+             Title="Anmeldung">
+    <ScrollView>
+        <VerticalStackLayout Padding="24" Spacing="12">
+
+            <Label Text="Anmeldung"
+                   FontSize="24"
+                   FontAttributes="Bold" />
+            <Label Text="Bitte mit den Zugangsdaten des VideoPlayer-Servers anmelden." />
+            <Label x:Name="ServerLabel"
+                   AutomationId="LoginServerLabel"
+                   FontSize="12"
+                   TextColor="{StaticResource VpTextMuted}"
+                   IsVisible="false" />
+
+            <Label Text="E-Mail" FontAttributes="Bold" />
+            <Entry x:Name="UsernameEntry"
+                   AutomationId="LoginUsernameEntry"
+                   Placeholder="E-Mail-Adresse"
+                   Keyboard="Email" />
+            <Label Text="Passwort" FontAttributes="Bold" />
+            <Entry x:Name="PasswordEntry"
+                   AutomationId="LoginPasswordEntry"
+                   Placeholder="Passwort"
+                   IsPassword="True" />
+
+            <Button x:Name="LoginButton"
+                    AutomationId="LoginButton"
+                    Text="Anmelden"
+                    Clicked="OnLoginClicked" />
+            <ActivityIndicator x:Name="LoginIndicator" IsRunning="false" IsVisible="false" />
+            <Label x:Name="ErrorLabel"
+                   AutomationId="LoginErrorLabel"
+                   TextColor="{StaticResource VpDanger}"
+                   IsVisible="false" />
+
+            <Button x:Name="ServerSetupButton"
+                    AutomationId="LoginServerSetupButton"
+                    Text="Anderen Server einrichten"
+                    Clicked="OnServerSetupClicked" />
+
+        </VerticalStackLayout>
+    </ScrollView>
+</ContentPage>

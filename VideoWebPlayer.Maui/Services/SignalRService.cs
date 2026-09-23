@@ -25,11 +25,18 @@ public class SignalRService : IAsyncDisposable
     /// Event wird ausgelöst wenn neue Videos gescannt wurden.
     /// </summary>
     public event EventHandler<NewVideosScannedEventArgs>? NewVideosScanned;
+
+    /// <summary>
+    /// Event wird ausgelöst wenn sich der Status einer Hintergrund-Operation ändert.
+    /// </summary>
     public event EventHandler<StatusChangedEventArgs>? StatusChanged;
 
     /// <summary>
     /// Verbindet mit dem SignalR Hub.
     /// </summary>
+    /// <param name="serverAddress">Die Adresse des Servers, zu dem verbunden wird.</param>
+    /// <param name="token">Das Authentifizierungstoken für die Hub-Verbindung.</param>
+    /// <returns>Ein Task, der den Verbindungsaufbau abschließt.</returns>
     public async Task ConnectAsync(string serverAddress, string token)
     {
         await _connectionLock.WaitAsync();
@@ -158,8 +165,13 @@ public class SignalRService : IAsyncDisposable
         }
     }
 
+    /// <summary>
+    /// Ruft ab, ob aktuell eine Verbindung zum SignalR Hub besteht.
+    /// </summary>
+    /// <value><c>true</c>, wenn verbunden; sonst <c>false</c>.</value>
     public bool IsConnected => _isConnected;
 
+    /// <inheritdoc/>
     public async ValueTask DisposeAsync()
     {
         await DisconnectAsync();
@@ -179,9 +191,23 @@ public class SignalRService : IAsyncDisposable
 /// </summary>
 public class NewVideosScannedEventArgs : EventArgs
 {
+    /// <summary>
+    /// Ruft die ID der Medienquelle ab, in der neue Videos gefunden wurden.
+    /// </summary>
+    /// <value>Die ID der gescannten Medienquelle.</value>
     public long SourceId { get; }
+
+    /// <summary>
+    /// Ruft die Anzahl der neu gefundenen Videos ab.
+    /// </summary>
+    /// <value>Die Anzahl der gescannten neuen Videos.</value>
     public int Count { get; }
 
+    /// <summary>
+    /// Initialisiert eine neue Instanz der <see cref="NewVideosScannedEventArgs"/>-Klasse.
+    /// </summary>
+    /// <param name="sourceId">Die ID der Medienquelle.</param>
+    /// <param name="count">Die Anzahl der neuen Videos.</param>
     public NewVideosScannedEventArgs(long sourceId, int count)
     {
         SourceId = sourceId;
@@ -193,9 +219,18 @@ public class NewVideosScannedEventArgs : EventArgs
 /// </summary>
 public class StatusChangedEventArgs : EventArgs
 {
+    /// <summary>
+    /// Initialisiert eine neue Instanz der <see cref="StatusChangedEventArgs"/>-Klasse.
+    /// </summary>
+    /// <param name="message">Die Statusmeldung.</param>
     public StatusChangedEventArgs(string message)
     {
         Message = message;
     }
+
+    /// <summary>
+    /// Ruft die Statusmeldung ab.
+    /// </summary>
+    /// <value>Die Meldung des Statuswechsels.</value>
     public string Message { get; }
 }

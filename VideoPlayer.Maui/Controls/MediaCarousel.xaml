@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentView xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:controls="clr-namespace:VideoPlayer.Maui.Controls"
+             xmlns:mvu="clr-namespace:VideoPlayer.Mvu;assembly=VideoPlayer.Mvu"
+             x:Class="VideoPlayer.Maui.Controls.MediaCarousel"
+             x:Name="Root">
+    <VerticalStackLayout Spacing="12">
+        <Label Text="{Binding Source={x:Reference Root}, Path=Title}"
+               FontSize="22"
+               FontAttributes="Bold"
+               FontFamily="OpenSansSemibold"
+               Padding="20,0" />
+        <ScrollView Orientation="Horizontal"
+                    HorizontalScrollBarVisibility="Always">
+            <HorizontalStackLayout BindableLayout.ItemsSource="{Binding Source={x:Reference Root}, Path=Items}"
+                                   Spacing="15"
+                                   Padding="20,0">
+                <BindableLayout.ItemTemplate>
+                    <DataTemplate x:DataType="mvu:HomeMediaItem">
+                        <VerticalStackLayout WidthRequest="140" Spacing="6">
+                            <Border WidthRequest="140"
+                                    HeightRequest="210"
+                                    Padding="0"
+                                    Margin="0"
+                                    StrokeThickness="0"
+                                    Opacity="{Binding CardOpacity}"
+                                    BackgroundColor="{StaticResource VpSurface}">
+                                <Border.StrokeShape>
+                                    <RoundRectangle CornerRadius="8" />
+                                </Border.StrokeShape>
+                                <Border.Shadow>
+                                    <Shadow Brush="{StaticResource VpShadowBrush}" Offset="0,2" Radius="4" Opacity="0.3" />
+                                </Border.Shadow>
+                                <Border.GestureRecognizers>
+                                    <TapGestureRecognizer Tapped="OnItemTapped" />
+                                </Border.GestureRecognizers>
+                                <Grid>
+                                    <!-- Titel-Fallback: liegt unter dem Bild und bleibt sichtbar,
+                                         solange kein Poster geladen ist. -->
+                                    <Label Text="{Binding Title}"
+                                           TextColor="{StaticResource VpText}"
+                                           FontSize="13"
+                                           Padding="8"
+                                           HorizontalTextAlignment="Center"
+                                           VerticalOptions="Center"
+                                           MaxLines="4"
+                                           LineBreakMode="WordWrap" />
+                                    <controls:CachedPosterImage PictureId="{Binding PosterPictureId}"
+                                                                Aspect="AspectFill"
+                                                                IsVisible="{Binding HasPoster}" />
+                                    <ProgressBar Progress="{Binding Progress}"
+                                                 IsVisible="{Binding ShowProgress}"
+                                                 ProgressColor="{StaticResource VpPrimary}"
+                                                 BackgroundColor="{StaticResource VpSurfaceBright}"
+                                                 HeightRequest="4"
+                                                 VerticalOptions="End" />
+                                    <!-- Platzhalter-Markierung fehlender
+                                         Offline-Episoden (nicht abspielbar). -->
+                                    <Border x:Name="PlaceholderBadge"
+                                            IsVisible="{Binding IsPlaceholder}"
+                                            BackgroundColor="{StaticResource VpOverlay}"
+                                            Padding="8,4"
+                                            HorizontalOptions="Center"
+                                            VerticalOptions="End"
+                                            Margin="0,0,0,10">
+                                        <Border.StrokeShape>
+                                            <RoundRectangle CornerRadius="999" />
+                                        </Border.StrokeShape>
+                                        <Label Text="Nicht heruntergeladen"
+                                               TextColor="{StaticResource VpText}"
+                                               FontSize="10" />
+                                    </Border>
+                                </Grid>
+                            </Border>
+                            <Label Text="{Binding Title}"
+                                   FontSize="12"
+                                   MaxLines="2"
+                                   LineBreakMode="TailTruncation" />
+                        </VerticalStackLayout>
+                    </DataTemplate>
+                </BindableLayout.ItemTemplate>
+            </HorizontalStackLayout>
+        </ScrollView>
+    </VerticalStackLayout>
+</ContentView>

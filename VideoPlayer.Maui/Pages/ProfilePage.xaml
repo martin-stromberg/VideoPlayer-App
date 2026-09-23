@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:mvu="clr-namespace:VideoPlayer.Mvu;assembly=VideoPlayer.Mvu"
+             x:Class="VideoPlayer.Maui.Pages.ProfilePage"
+             Title="Profil"
+             x:DataType="mvu:MvuHost">
+
+    <ScrollView>
+        <VerticalStackLayout Padding="20" Spacing="16">
+
+            <ActivityIndicator x:Name="LoadingIndicator"
+                               IsRunning="{Binding Model.Profile.IsLoading}"
+                               IsVisible="{Binding Model.Profile.IsLoading}"
+                               Color="{StaticResource VpPrimary}" />
+
+            <!-- Offline-Hinweis: ohne Serververbindung stehen die
+                 Profilinformationen nicht zur Verfügung. -->
+            <Border x:Name="ProfileOfflineBanner"
+                    Padding="12,8"
+                    StrokeShape="RoundRectangle 8"
+                    Stroke="{StaticResource VpBorderStrong}"
+                    BackgroundColor="{StaticResource VpSurfaceHigh}"
+                    IsVisible="False">
+                <Label Text="Offline-Modus – Profilinformationen stehen ohne Serververbindung nicht zur Verfügung."
+                       TextColor="{StaticResource VpText}"
+                       FontAttributes="Bold" />
+            </Border>
+
+            <!-- Angemeldeter Server-Benutzer: Benutzername und E-Mail aus
+                 den Claims des Anmelde-Tokens bzw. der gespeicherten
+                 Anmelde-Kennung (kein Benutzerinfo-Endpunkt vorhanden). -->
+            <Border x:Name="UserInfoBorder"
+                    Padding="16"
+                    StrokeShape="RoundRectangle 8"
+                    BackgroundColor="{StaticResource VpSurface}">
+                <Border.Shadow>
+                    <Shadow Brush="{StaticResource VpShadowBrush}" Offset="0,2" Radius="4" Opacity="0.3" />
+                </Border.Shadow>
+                <VerticalStackLayout Spacing="10">
+                    <Label Text="Angemeldeter Benutzer"
+                           FontSize="14"
+                           FontAttributes="Bold"
+                           TextColor="{StaticResource VpPrimarySoft}" />
+                    <Grid ColumnDefinitions="Auto,*" ColumnSpacing="16" RowSpacing="4">
+                        <Label Grid.Row="0" Grid.Column="0" Text="Benutzername" />
+                        <Label Grid.Row="0" Grid.Column="1"
+                               Text="{Binding Model.Profile.UsernameText}"
+                               FontAttributes="Bold" />
+                        <Label Grid.Row="1" Grid.Column="0" Text="E-Mail" />
+                        <Label Grid.Row="1" Grid.Column="1"
+                               Text="{Binding Model.Profile.EmailText}" />
+                    </Grid>
+                </VerticalStackLayout>
+            </Border>
+
+            <!-- Lokale Installation: aktives Profil und verbundener Server. -->
+            <Border Padding="16"
+                    StrokeShape="RoundRectangle 8"
+                    BackgroundColor="{StaticResource VpSurface}">
+                <Border.Shadow>
+                    <Shadow Brush="{StaticResource VpShadowBrush}" Offset="0,2" Radius="4" Opacity="0.3" />
+                </Border.Shadow>
+                <VerticalStackLayout Spacing="10">
+                    <Label Text="Lokale Installation"
+                           FontSize="14"
+                           FontAttributes="Bold"
+                           TextColor="{StaticResource VpPrimarySoft}" />
+                    <Grid ColumnDefinitions="Auto,*" ColumnSpacing="16" RowSpacing="4">
+                        <Label Grid.Row="0" Grid.Column="0" Text="Profil" />
+                        <Label Grid.Row="0" Grid.Column="1"
+                               Text="{Binding Model.Profile.ProfileNameText}"
+                               FontAttributes="Bold" />
+                        <Label Grid.Row="1" Grid.Column="0" Text="Server" />
+                        <Label Grid.Row="1" Grid.Column="1"
+                               Text="{Binding Model.ActiveServerAddress}" />
+                    </Grid>
+                </VerticalStackLayout>
+            </Border>
+
+            <!-- Abmelden: beendet die Sitzung lokal (Token/Zugangsdaten
+                 werden verworfen) und führt zur Anmeldemaske. -->
+            <Button x:Name="LogoutButton"
+                    Text="Abmelden"
+                    Clicked="OnLogoutClicked"
+                    HorizontalOptions="Start" />
+
+        </VerticalStackLayout>
+    </ScrollView>
+
+</ContentPage>
