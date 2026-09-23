@@ -228,4 +228,108 @@ public class PairingContractTests
         // Geräte-Token des aktiven Servers an beliebige Adressen senden.
         Assert.DoesNotContain("ClientGate.Resolve()", probe, StringComparison.Ordinal);
     }
+
+    /// <summary>
+    /// Prüft SecureStorageSecretStore: ein einziger, plattformübergreifend
+    /// identischer Codepfad auf der MAUI-Abstraktion ISecureStorage. Die
+    /// plattformspezifischen Backends (iOS-Keychain, Android-Keystore,
+    /// Windows-Credential-Manager) liegen unterhalb dieser Abstraktion —
+    /// der auf Windows verifizierte Codepfad ist bis auf das OS-Backend
+    /// buchstäblich derselbe.
+    /// </summary>
+    [Fact]
+    public void SecureStorageSecretStore_UsesSharedPlatformAbstraction()
+    {
+        var store = MauiFile("Services", "SecureStorageSecretStore.cs");
+
+        Assert.Contains("ISecretStore", store, StringComparison.Ordinal);
+        Assert.Contains("ISecureStorage", store, StringComparison.Ordinal);
+        // Keine bedingte Kompilierung: kein einziger plattformspezifischer
+        // Zweig — derselbe Quelltext läuft auf iOS, Android und Windows.
+        Assert.DoesNotContain("#if", store, StringComparison.Ordinal);
+        Assert.DoesNotContain("#elif", store, StringComparison.Ordinal);
+        Assert.DoesNotContain("#else", store, StringComparison.Ordinal);
+        Assert.DoesNotContain("#endif", store, StringComparison.Ordinal);
+        // Backend-Fehler lesen als „leer" statt zu werfen — u. a. der
+        // Android-Fall „aus Cloud-Backup wiederhergestellt, Keystore-
+        // Schlüssel fehlt" führt so zu erneutem Pairing statt zum Absturz.
+        Assert.Contains("catch (Exception", store, StringComparison.Ordinal);
+        Assert.Contains("return null", store, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// Prüft MauiProgram: die ISecretStore-Registrierung bindet den Adapter
+    /// an SecureStorage.Default — auf jeder Plattform das plattformeigene
+    /// sichere Backend (iOS: Keychain, Android: Keystore, Windows:
+    /// Credential Manager). Es gibt keine zweite ISecretStore-Implementierung.
+    /// </summary>
+    [Fact]
+    public void MauiProgram_BindsSecretStoreToSecureStorageDefault()
+    {
+        var program = MauiFile("MauiProgram.cs");
+
+        Assert.Contains(
+            "AddSingleton<ISecretStore>(_ => new SecureStorageSecretStore(SecureStorage.Default))",
+            program, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// Prüft die iOS-Entitlements: keychain-access-groups ist gesetzt —
+    /// ohne diese Entitlement schlägt SecureStorage auf einem physischen
+    /// iOS-Gerät fehl (der Simulator toleriert den Zugriff; der Fehler
+    /// zeigt sich daher nur im echten Gerätetest). Die Datei liegt am
+    /// MAUI-Standardort Platforms/iOS/Entitlements.plist und wird vom
+    /// Build automatisch als CodesignEntitlements übernommen; eine
+    /// explizite csproj-Einstellung darf nicht auf eine andere Datei
+    /// ohne die Keychain-Entitlement zeigen.
+    /// </summary>
+    [Fact]
+    public void IosEntitlements_GrantKeychainAccess()
+    {
+        var plistPath = Path.Combine(
+            Root, "VideoPlayer.Maui", "Platforms", "iOS", "Entitlements.plist");
+        var plist = File.ReadAllText(plistPath);
+
+        Assert.Contains("keychain-access-groups", plist, StringComparison.Ordinal);
+
+        // Keine zweite Entitlements-Datei, die den Standardort verdrängen
+        // und die Keychain-Entitlement verlieren könnte.
+        var others = Directory
+            .EnumerateFiles(Path.GetDirectoryName(plistPath)!, "Entitlements*.plist")
+            .Where(f => !string.Equals(f, plistPath, StringComparison.OrdinalIgnoreCase));
+        Assert.Empty(others);
+
+        // Setzt das Projekt CodesignEntitlements explizit, muss es auf
+        // dieselbe Datei zeigen — sonst ginge die Entitlement verloren.
+        var csproj = File.ReadAllText(
+            Path.Combine(Root, "VideoPlayer.Maui", "VideoPlayer.Maui.csproj"));
+        if (csproj.Contains("CodesignEntitlements", StringComparison.Ordinal))
+        {
+            Assert.Matches(
+                @"CodesignEntitlements[^<]*Platforms[/\\]iOS[/\\]Entitlements\.plist",
+                csproj);
+        }
+    }
+
+    /// <summary>
+    /// Prüft DeviceTokenService: die Geräte-Token-Persistenz läuft
+    /// ausschließlich über AppSecretsService (→ ISecretStore →
+    /// SecureStorage) — kein Umgehungsweg an der sicheren Ablage vorbei.
+    /// </summary>
+    [Fact]
+    public void DeviceTokenService_PersistsViaSecretsService()
+    {
+        var service = File.ReadAllText(
+            Path.Combine(Root, "VideoPlayer.Mvu", "DeviceTokenService.cs"));
+
+        Assert.Contains("AppSecretsService", service, StringComparison.Ordinal);
+        Assert.Contains("GetDeviceTokenAsync", service, StringComparison.Ordinal);
+        Assert.Contains("ClearDeviceTokenAsync", service, StringComparison.Ordinal);
+        // Kein Direktzugriff auf Plattform-Ablagen (das Projekt ist zwar
+        // plattformneutral — die Prüfung verhindert künftige Umgehungen
+        // über ISecretStore-hinausgehende Konstrukte wie ISettingsStore).
+        Assert.DoesNotContain("ISettingsStore", service, StringComparison.Ordinal);
+        Assert.DoesNotContain("SecureStorage", service, StringComparison.Ordinal);
+        Assert.DoesNotContain("Preferences", service, StringComparison.Ordinal);
+    }
 }
