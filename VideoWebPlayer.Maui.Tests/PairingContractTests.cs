@@ -164,11 +164,16 @@ public class PairingContractTests
     {
         var script = File.ReadAllText(
             Path.Combine(Root, "scripts", "iOS-Deployment.ps1"));
+        var responseFileHelper = File.ReadAllText(
+            Path.Combine(Root, "scripts", "iOS-Deployment.ResponseFile.ps1"));
 
         Assert.Contains("VideoPlayerApiToken", script, StringComparison.Ordinal);
         Assert.Contains("VIDEOWEBPLAYER_MAUI_API_TOKEN", script, StringComparison.Ordinal);
-        // Der Token wird in der Konsolenanzeige maskiert.
-        Assert.Contains("$Name -eq \"VideoPlayerApiToken\"", script, StringComparison.Ordinal);
+        // Der Token wird in der Konsolenanzeige maskiert — die
+        // Maskierliste liegt seit dem Response-Datei-Fix in der
+        // dot-gesourcten Helper-Datei.
+        Assert.Contains("MaskedPropertyNames", responseFileHelper, StringComparison.Ordinal);
+        Assert.Contains("\"VideoPlayerApiToken\"", responseFileHelper, StringComparison.Ordinal);
     }
 
     /// <summary>Prüft ServerHealthProbe: liefert das dreiwertige Ergebnis.</summary>
