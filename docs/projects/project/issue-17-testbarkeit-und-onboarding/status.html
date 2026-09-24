@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>Projekt Issue #17 — Status</title>
+<style>
+  body { font-family: Segoe UI, sans-serif; background: #121212; color: #e0e0e0; margin: 2rem; }
+  h1 { font-size: 1.4rem; }
+  table { border-collapse: collapse; width: 100%; }
+  th, td { border: 1px solid #333; padding: .5rem .75rem; text-align: left; }
+  th { background: #1e1e1e; }
+  .pending { color: #aaa; }
+  .running { color: #00a8e8; }
+  .done { color: #4caf50; }
+</style>
+</head>
+<body>
+<h1>Projekt Issue #17 — Testbarkeit und Onboarding</h1>
+<p>Projektbranch: <code>project/issue-17-testbarkeit-und-onboarding</code> · Plan: <code>project-plan.md</code> · Schritte: <code>steps.md</code></p>
+<table>
+<tr><th>#</th><th>Schritt</th><th>Branch</th><th>Status</th></tr>
+<tr><td>1</td><td>iOS-Deployment-Skript reparieren (MSB1006)</td><td><code>task/issue-17-ios-deploy-fix</code></td><td class="done">abgenommen (5cc6d46)</td></tr>
+<tr><td>2</td><td>Developer-API (Debug/Opt-in)</td><td><code>task/issue-17-developer-api</code></td><td class="running">in Arbeit</td></tr>
+<tr><td>3</td><td>E2E-Tests mit FlaUI</td><td><code>task/issue-17-flaui-e2e</code></td><td class="pending">ausstehend (nach 2)</td></tr>
+<tr><td>4</td><td>Serververbindungs-UI modernisieren</td><td><code>task/issue-17-server-setup-ui</code></td><td class="pending">ausstehend</td></tr>
+<tr><td>5a</td><td>QR-Bootstrap Server</td><td>Server-Repo <code>487c3041-…</code></td><td class="pending">ausstehend</td></tr>
+<tr><td>5b</td><td>QR-Bootstrap App</td><td><code>task/issue-17-qr-bootstrap-app</code></td><td class="pending">ausstehend (nach 5a, 4)</td></tr>
+</table>
+</body>
+</html>

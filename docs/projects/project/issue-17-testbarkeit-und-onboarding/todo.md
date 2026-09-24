@@ -11,9 +11,9 @@ Basisbranch: `project/issue-17-testbarkeit-und-onboarding` (abgezweigt von `stag
 | [x] | 3 | Anforderung aufbereiten (Unteragent) | `requirement.md` |
 | [x] | 3 | Bestandsaufnahme (Unteragent) | `inventory.md`, `inventory/` |
 | [x] | 4 | Projektplan (Unteragent) | `project-plan.md` |
-| [ ] | 4 | Offene Punkte klären | `project-plan.md` (aktualisiert) |
-| [ ] | 4 | Planprüfung (Unteragent) | `project-plan-check.md` |
-| [ ] | 5 | Planungscommit | – |
-| [ ] | 5 | Schritte-Tracking anlegen | `steps.md`, `status.html` |
-| [ ] | 6 | Entwicklungsschritte abarbeiten (je Lifecycle auf Schritt-Branch) | `acceptance-schritt-{n}.md` |
+| [x] | 4 | Offene Punkte klären | `project-plan.md` (aktualisiert, 7 Entscheidungen) |
+| [x] | 4 | Planprüfung (Unteragent) | `project-plan-check.md` (8 Befunde eingearbeitet) |
+| [x] | 5 | Planungscommit | `0546a54` |
+| [x] | 5 | Schritte-Tracking anlegen | `steps.md`, `status.html` |
+| [~] | 6 | Entwicklungsschritte abarbeiten (je Lifecycle auf Schritt-Branch) — Schritt 1 abgenommen | `acceptance-schritt-{n}.md` |
 | [ ] | 7 | Abschluss und Aufräumen | – |
