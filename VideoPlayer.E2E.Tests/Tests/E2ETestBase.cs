@@ -28,11 +28,15 @@ public abstract class E2ETestBase
     /// Baut die App (einmalig) und startet sie mit einem eigenen Profil.
     /// </summary>
     /// <param name="testName">Testname (Teil des Profilnamens; Standard: Aufrufername).</param>
+    /// <param name="profile">Expliziter Profilname für einen Neustart mit
+    /// bestehender Ablage; <c>null</c> = frisches Testprofil.</param>
     /// <returns>Die laufende App-Instanz.</returns>
-    protected async Task<AppInstance> StartAppAsync([CallerMemberName] string testName = "")
+    protected async Task<AppInstance> StartAppAsync(
+        [CallerMemberName] string testName = "", string? profile = null)
     {
         var exePath = await fixture.EnsureBuiltAsync();
-        return await AppInstance.StartAsync(exePath, testName, cancellationToken: Ct);
+        return await AppInstance.StartAsync(
+            exePath, testName, cancellationToken: Ct, profile: profile);
     }
 
     /// <summary>

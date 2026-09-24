@@ -32,6 +32,8 @@
 	<string>de.martinstromberg.videos</string>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
+	<key>NSCameraUsageDescription</key>
+	<string>Zum Scannen des Kopplungs-QR-Codes der Serververwaltung.</string>
 	<key>NSAppTransportSecurity</key>
 	<dict>
 		<key>NSAllowsArbitraryLoads</key>

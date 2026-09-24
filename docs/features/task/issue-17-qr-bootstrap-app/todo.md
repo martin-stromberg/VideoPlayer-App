@@ -11,12 +11,12 @@ Server-Vertrag: `acceptance-schritt-5a.md` (Server-Repo `487c3041-…`, Branch `
 | [x] | 3 | Anforderung aufbereiten | `requirement.md` |
 | [x] | 4 | Bestandsaufnahme | `inventory.md`, `inventory/` |
 | [x] | 5/5a/5b | Umsetzungsplan + Planprüfung | `plan.md`, `plan-check.md` |
-| [x] | 5c | Planungscommit | `<hash>` |
-| [~] | 6 | Implementierung (Parser, ApiClient, MVU, UI, Refresh, Tests) | – |
-| [ ] | 7–9 | Reviews (Funktion, Usability, Code) | `review.md`, `review-usability.md`, `review-code.md` |
-| [ ] | 10 | Voller Testlauf + Screenshots | `test-results.md`, `live-verification/` |
-| [ ] | 11 | Iteration/ggf. `continue.md` | – |
-| [ ] | 12/12b/12c | Doku (`docs/API.md`, `docs/help/serververwaltung-erststart.md`, `README.md`, `docs/RELEASE_NOTES.md`) | – |
+| [x] | 5c | Planungscommit | `e65de0a` |
+| [x] | 6 | Implementierung (Parser, ApiClient, MVU, UI, Refresh, Tests) | – |
+| [x] | 7–9 | Reviews (Funktion: Vollständig umgesetzt; Usability: Keine Befunde; Code: 2 Befunde in Iteration behoben) | `review.md`, `review-usability.md`, `review-code.md` |
+| [x] | 10 | Voller Testlauf (1013 Unit + 17 E2E) + Screenshots | `test-results.md`, `live-verification/` |
+| [x] | 11 | Iteration/ggf. `continue.md` — nicht nötig (alle Prüfungen grün) | – |
+| [x] | 12/12b/12c | Doku (`docs/help/*`, `README.md`, `docs/RELEASE_NOTES.md`) | – |
 | [ ] | – | Abschluss-Commit (Feature-Verzeichnis bleibt im Repo – Projektkonvention) | – |
 | [ ] | – | Optional: Scratch-Lauf gegen echten Server (Issue-#231-Branch, eigene Scratch-DB) | `live-verification/` |
 

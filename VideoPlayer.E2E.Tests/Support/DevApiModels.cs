@@ -74,6 +74,12 @@ public sealed class DevApiModel
     /// <summary>Fehlertext des letzten Pairings.</summary>
     [JsonPropertyName("pairingError")] public string? PairingError { get; set; }
 
+    /// <summary>Der Bootstrap-Austausch des QR-/Ticket-Onboardings läuft.</summary>
+    [JsonPropertyName("isBootstrapRunning")] public bool IsBootstrapRunning { get; set; }
+
+    /// <summary>Inline-Fehlertext der Kopplungs-Eingabe.</summary>
+    [JsonPropertyName("bootstrapError")] public string? BootstrapError { get; set; }
+
     /// <summary>Hinweistext der Ablage.</summary>
     [JsonPropertyName("storageNotice")] public string? StorageNotice { get; set; }
 

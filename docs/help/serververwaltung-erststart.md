@@ -1,8 +1,11 @@
-# Serververwaltung und Erststart-Einrichtung (Entwicklungsschritt 4)
+# Serververwaltung und Erststart-Einrichtung (Entwicklungsschritte 4 + 5b)
 
 Die neue VideoPlayer-App verwaltet mehrere bekannte Server, merkt sich den
 zuletzt verbundenen Server und startet künftig direkt mit ihm. Beim ersten
-Start ohne hinterlegten Server erscheint ein Einrichtungsdialog.
+Start ohne hinterlegten Server erscheint ein Einrichtungsdialog. Über den
+Kopplungs-QR-Code der Serververwaltung (oder die Ticket-Adresse bzw. den
+Kurzcode) ist die komplette Einrichtung in einem Schritt möglich — ohne
+Adresseingabe, Einmal-Code und Anmeldemaske.
 
 ## Erststart-Einrichtung
 
@@ -31,6 +34,45 @@ nur ein erreichbarer Server wird gespeichert und übernommen. Ungültige
 Adressen oder nicht erreichbare Server erzeugen einen Inline-Hinweis —
 es wird nichts gespeichert. Nach erfolgreicher Einrichtung startet die App
 künftig direkt mit dem gespeicherten Server.
+
+## Kopplung per QR-Code oder Kurzcode (Schritt 5b)
+
+Der schnellste Einstieg ist die Karte „Mit Kopplungscode verbinden" —
+sie braucht keine Adresseingabe und keine Anmeldung:
+
+- **QR-Code scannen (iOS/Android):** die Serververwaltung
+  (Profilseite „Geräte") stellt einen QR-Code bereit, der eine
+  Ticket-Adresse der Form `https://<server>/pairing?t=<ticket>`
+  enthält. „QR-Code scannen" öffnet eine Kamera-Seite (beim ersten
+  Mal fragt das System nach der Kamera-Berechtigung); der gelesene
+  Code wird direkt eingelöst.
+- **Ticket-Adresse eingeben:** derselbe Inhalt lässt sich manuell
+  eingeben oder einfügen — die App zerlegt die Adresse in Server und
+  Ticket; Unterpfade der Serveradresse bleiben erhalten.
+- **Kurzcode eingeben:** alternativ löst die Serververwaltung den
+  Kurzcode (8 Zeichen) aus — dieser Weg nutzt den bereits verbundenen
+  Server; ohne verbundenen Server weist ein Hinweis darauf hin.
+
+Bei einer Ticket-Adresse prüft die App den Server zuerst auf
+Erreichbarkeit; nur ein erreichbarer Server wird gespeichert und
+übernommen. Danach löst `POST api/pairing/bootstrap` das Ticket gegen
+ein verschlüsseltes Session-Paket (ECDH P-256, AES-256-GCM — derselbe
+Handshake wie das klassische Pairing) ein: Geräte-Token, Anmelde-Token
+und Refresh-Token liegen anschließend sicher in der Plattformablage —
+die App landet ohne Anmeldemaske direkt auf der Startseite. Ein
+8-stelliger Kurzcode geht als Ticket-Alias durch denselben Endpunkt.
+
+Fehler erscheinen inline in der Karte: unlesbare Eingabe, Server nicht
+erreichbar (wird dann nicht übernommen), Ticket ungültig oder
+abgelaufen, zu viele Versuche, Server ohne Bootstrap-Endpunkt.
+Alle übrigen Wege (Adresseingabe, Einmal-Code-Pairing, Anmeldemaske)
+bleiben als Fallback unverändert verfügbar. Auf Windows gibt es keinen
+Kamera-Scan — dort steht die manuelle Eingabe zur Verfügung.
+
+Die Sitzung erneuert sich anschließend selbst: der Refresh-Token wird
+bei Bedarf über `POST api/auth/refresh` rotiert (der alte ist ab da
+ungültig); das Abmelden widerruft den Refresh-Token zusätzlich am
+Server (`POST api/auth/logout`).
 
 ## Gerät koppeln (Pairing)
 
@@ -109,27 +151,41 @@ Fallback für API-Aufrufe, gilt aber nicht als „hinterlegter Server".
   (parallele Probes, Merge + Deduplizierung, Fehlerisolation).
 - `VideoPlayer.Mvu`: `AppPage.ServerSetup`, Model-Erweiterung
   (`KnownServers`, `ActiveServerAddress`, `DiscoveredServers`,
-  Lauf-/Fehlerflags, `IsPairingRequired`/`IsPairingRunning`/`PairingError`),
-  Messages/Effekte für Laden, Discovery, Prüfung, Übernahme und Pairing
-  (`PairingCodeSubmitted`, `PairingCompleted`, `DeviceTokenRevoked` /
-  `ExchangePairingCode`); `PairingCode` (Normalisierung/Validierung),
-  `DeviceTokenService` (Provider-Pflege, Gate-Probe per
-  `POST api/auth/login` — `api/health` ist serverseitig nicht
+  Lauf-/Fehlerflags, `IsPairingRequired`/`IsPairingRunning`/`PairingError`,
+  `IsBootstrapRunning`/`BootstrapError`),
+  Messages/Effekte für Laden, Discovery, Prüfung, Übernahme, Pairing und
+  Bootstrap (`PairingCodeSubmitted`, `PairingCompleted`,
+  `DeviceTokenRevoked`, `BootstrapTicketSubmitted`,
+  `BootstrapServerChecked`, `BootstrapCompleted` /
+  `ExchangePairingCode`, `CheckBootstrapServer`,
+  `ExchangeBootstrapTicket`); `PairingCode`
+  (Normalisierung/Validierung), `BootstrapTicketParser` (Zerlegung der
+  Ticket-Adresse in Server + opakes Ticket bzw. Kurzcode),
+  `BootstrapStatus`, `DeviceTokenService` (Provider-Pflege, Gate-Probe
+  per `POST api/auth/login` — `api/health` ist serverseitig nicht
   gate-geschützt —, Widerruf-Ereignis `DeviceTokenRejected`);
+  `AuthSessionService` (Refresh-Token-first in der stillen
+  Neuanmeldung, best-effort Widerruf beim Logout);
   der Start-Workflow lädt die Serververwaltung vor dem Health-Check.
 - `VideoPlayer.Maui`: `Pages/ServerSetupPage` (Erststart als Window-Root,
   „Server wechseln" als Shell-Route `serversetup` ohne Menüeintrag;
   kartenbasierte Oberfläche — Aktiver-Server-Karte mit
   `ServerHealth`-Status-Badge, Karten für bekannte/gefundene Server,
-  Verbinden- und geführte Pairing-Karte, alle Zustände aus
-  `AppModel`),
+  Verbinden-, Kopplungs- und geführte Pairing-Karte, alle Zustände aus
+  `AppModel`), `Pages/QrScannerPage` (modale Kamera-Seite auf
+  iOS/Android, ZXing.Net.Maui `CameraBarcodeReaderView`),
   `ServerAddressProvider` (zuletzt verbunden → Umgebungsvariable →
   IIS-Default), `ServerHealthProbe.CheckAsync(Uri)` für
   Kandidatenadressen (mit adressspezifisch aufgelöstem Gate-Schlüssel,
   niemals dem Geräte-Token eines anderen Servers),
   `ShellAppEffectHandler`-Zweige.
-- `VideoPlayer.ApiClient`: `DevicePairingClient` (öffentlicher
-  Pairing-Endpunkt ohne Gate-/Bearer-Header und ohne Wiederholungen),
+- `VideoPlayer.Storage`: `AppSecretsService.RefreshTokenKey` —
+  Refresh-Token in der sicheren Plattformablage, profilbezogen;
+  `ClearCredentialsAsync` räumt ihn mit.
+- `VideoPlayer.ApiClient`: `DevicePairingClient` (öffentliche
+  Pairing-Endpunkte `exchange` + `bootstrap` ohne Gate-/Bearer-Header
+  und ohne Wiederholungen), `VideoPlayerApiClient.RefreshSessionAsync`
+  /`LogoutSessionAsync`,
   `ClientGate.DeviceTokenProvider`/`ResolveStatic` (Geräte-Token vor den
   statischen Quellen), `HealthCheckResult` (unterscheidet
   Gate-Ablehnung von Nichterreichbarkeit).

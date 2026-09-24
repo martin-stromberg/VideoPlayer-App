@@ -36,7 +36,8 @@ Kuratierter JSON-Snapshot des unveränderlichen `AppModel`
 (`MvuHost.Model`): `currentPage`, `connectionState`, `serverHealth`/
 `serverHealthText`, Start-/Login-/Sync-Flags, `activeServerAddress`,
 `knownServers`/`discoveredServers`, Discovery-/Check-Flags,
-`serverSetupError`, Pairing-Flags/`pairingError`, `storageNotice`,
+`serverSetupError`, Pairing-Flags/`pairingError`,
+Bootstrap-Flags/`bootstrapError`, `storageNotice`,
 `heroTitle` sowie Zähler der Startseiten-Listen. Tokens und Passwörter
 stehen per Konstruktion nicht im Modell.
 

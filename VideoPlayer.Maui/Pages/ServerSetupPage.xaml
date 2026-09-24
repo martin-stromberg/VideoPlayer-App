@@ -265,10 +265,64 @@
                     </VerticalStackLayout>
                 </Border>
 
+                <!-- Kopplungs-Karte: QR-/Ticket-Onboarding — immer sichtbar,
+                     weil die Ticket-Adresse den Server selbst mitbringt
+                     (QR-Scan auf iOS/Android oder manuelle Eingabe der
+                     Ticket-Adresse bzw. des Kurzcodes, der den verbundenen
+                     Server nutzt). Der klassische Einmal-Code bleibt die
+                     geführte Pairing-Karte darunter. -->
+                <Border x:Name="BootstrapSection"
+                        AutomationId="BootstrapSection"
+                        StrokeShape="RoundRectangle 8"
+                        Stroke="{StaticResource VpBorder}"
+                        BackgroundColor="{StaticResource VpSurface}"
+                        Padding="16,12">
+                    <VerticalStackLayout Spacing="8">
+                        <Label Text="Mit Kopplungscode verbinden"
+                               FontSize="16"
+                               FontAttributes="Bold" />
+                        <Label Text="In der Serververwaltung (Profilseite „Geräte“) liegt ein QR-Code bereit — scanne ihn oder gib die Ticket-Adresse bzw. den Kurzcode ein. Adresse und Anmeldung entfallen."
+                               FontSize="12"
+                               TextColor="{StaticResource VpTextMuted}" />
+                        <Button x:Name="QrScanButton"
+                                AutomationId="QrScanButton"
+                                Text="QR-Code scannen"
+                                Clicked="OnQrScanClicked"
+                                IsVisible="false"
+                                HorizontalOptions="Start" />
+                        <Entry x:Name="BootstrapTicketEntry"
+                               AutomationId="BootstrapTicketEntry"
+                               Placeholder="Ticket-Adresse oder Kurzcode"
+                               Keyboard="Text"
+                               IsSpellCheckEnabled="False"
+                               IsTextPredictionEnabled="False" />
+                        <HorizontalStackLayout Spacing="12">
+                            <Button x:Name="BootstrapButton"
+                                    AutomationId="BootstrapButton"
+                                    Text="Kopplungscode einlösen"
+                                    Clicked="OnBootstrapClicked" />
+                            <ActivityIndicator x:Name="BootstrapIndicator"
+                                               IsRunning="false"
+                                               IsVisible="false"
+                                               VerticalOptions="Center" />
+                            <Label x:Name="BootstrapRunningLabel"
+                                   AutomationId="BootstrapRunningLabel"
+                                   Text="Kopplung läuft …"
+                                   FontSize="12"
+                                   TextColor="{StaticResource VpTextMuted}"
+                                   IsVisible="false"
+                                   VerticalOptions="Center" />
+                        </HorizontalStackLayout>
+                        <Label x:Name="BootstrapErrorLabel"
+                               AutomationId="BootstrapErrorLabel"
+                               TextColor="{StaticResource VpDanger}"
+                               IsVisible="false" />
+                    </VerticalStackLayout>
+                </Border>
+
                 <!-- Gerät koppeln: hervorgehobene, geführte Karte — sichtbar,
                      wenn der erreichbare Server ein Geräte-Pairing verlangt
-                     (kein nutzbarer Gate-Schlüssel). Einstiegspunkt für den
-                     späteren QR-/Ticket-Flow; dieser wird hier nicht gebaut. -->
+                     (kein nutzbarer Gate-Schlüssel). -->
                 <Border x:Name="PairingSection"
                         AutomationId="PairingSection"
                         IsVisible="false"

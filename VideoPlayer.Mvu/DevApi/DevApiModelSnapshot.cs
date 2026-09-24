@@ -74,6 +74,12 @@ public sealed record DevApiModelSnapshot
     /// <summary>Inline-Fehlertext der Pairing-Eingabe.</summary>
     public string? PairingError { get; init; }
 
+    /// <summary>Der Bootstrap-Austausch des QR-/Ticket-Onboardings läuft.</summary>
+    public bool IsBootstrapRunning { get; init; }
+
+    /// <summary>Inline-Fehlertext der Kopplungs-Eingabe.</summary>
+    public string? BootstrapError { get; init; }
+
     /// <summary>Hinweis der Ablage-Wiederherstellung.</summary>
     public string? StorageNotice { get; init; }
 
@@ -135,6 +141,8 @@ public sealed record DevApiModelSnapshot
             IsPairingRequired = model.IsPairingRequired,
             IsPairingRunning = model.IsPairingRunning,
             PairingError = model.PairingError,
+            IsBootstrapRunning = model.IsBootstrapRunning,
+            BootstrapError = model.BootstrapError,
             StorageNotice = model.StorageNotice,
             HeroTitle = model.HeroTitle,
             ContinueWatchingCount = model.ContinueWatching.Count,

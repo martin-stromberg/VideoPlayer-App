@@ -59,6 +59,26 @@ public sealed record PersistActiveServerEffect(string Address, string? DisplayNa
 public sealed record ExchangePairingCodeEffect(string ServerAddress, string Code) : AppEffect;
 
 /// <summary>
+/// Erreichbarkeitsprüfung des Servers aus einer Ticket-Adresse
+/// (QR-/Ticket-Onboarding; Ergebnis: <c>BootstrapServerCheckedMessage</c>).
+/// </summary>
+/// <param name="Address">Zu prüfende Serveradresse aus dem Ticket.</param>
+/// <param name="Ticket">Das einzulösende Ticket (wird zur Ergebnis-Nachricht weitergereicht).</param>
+/// <returns>Effekt-Datensatz für die Prüfung.</returns>
+public sealed record CheckBootstrapServerEffect(string Address, string Ticket) : AppEffect;
+
+/// <summary>
+/// Bootstrap-Austausch ausführen: das Ticket gegen das verschlüsselte
+/// Session-Paket einlösen (<c>api/pairing/bootstrap</c>; Ergebnis:
+/// <c>BootstrapCompletedMessage</c>). Der Effekt-Handler persistiert
+/// Geräte-Token, Anmelde-Token und Refresh-Token.
+/// </summary>
+/// <param name="ServerAddress">Adresse des Bootstrap-Servers.</param>
+/// <param name="Ticket">Das einzulösende Ticket bzw. der Kurzcode.</param>
+/// <returns>Effekt-Datensatz für den Bootstrap-Austausch.</returns>
+public sealed record ExchangeBootstrapTicketEffect(string ServerAddress, string Ticket) : AppEffect;
+
+/// <summary>
 /// Automatische Anmeldung mit den gespeicherten Zugangsdaten ausführen
 /// (Ergebnis: <c>AutoLoginCompletedMessage</c>).
 /// </summary>
