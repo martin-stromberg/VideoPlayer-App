@@ -120,6 +120,13 @@ namespace VideoPlayer.Maui
                 fonts.AddFont("OpenSans-Semibold.ttf", "OpenSansSemibold");
             });
 
+#if DEBUG || DEV_API
+            // Developer-API (nur Debug oder explizites Opt-in via DEV_API-Define,
+            // niemals Release): lokaler Mini-HTTP-Server auf 127.0.0.1 zur
+            // UI-Automatisierung; Start erfolgt in App.CreateWindow.
+            builder.Services.AddSingleton<DevApi.DevApiService>();
+#endif
+
 #if DEBUG
             builder.Logging.AddDebug();
 #endif
