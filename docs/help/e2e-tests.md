@@ -24,7 +24,7 @@ mitlaufender lokaler Mock-Server — kein reales Server-Deployment nötig.
 dotnet test VideoPlayer.E2E.Tests/VideoPlayer.E2E.Tests.csproj
 ```
 
-Erwartetes Ergebnis: 10 Tests, alle bestanden (Laufzeit ca. 15–20 min,
+Erwartetes Ergebnis: 11 Tests, alle bestanden (Laufzeit ca. 15–20 min,
 geprägt von App-Starts und echten Wartezeiten, u. a. beim
 nicht-erreichbaren Server).
 
@@ -50,11 +50,14 @@ nicht-erreichbaren Server).
   Button-Invoke, Flyout-Navigation per `SelectionItem` — bewusst ohne
   Koordinatenklicks.
 
-## Szenarien (10 Tests)
+## Szenarien (11 Tests)
 
-- **Server-Einrichtung** (4): Erststart zeigt die Einrichtungsseite;
-  ungültige Adresse → Validierungsfehler; nicht erreichbarer Server →
-  sichtbarer Fehler; erreichbarer Server → „Pairing erforderlich".
+- **Server-Einrichtung** (5): Erststart zeigt die Einrichtungsseite
+  (inkl. `ConnectCard` im Elementbaum); ungültige Adresse →
+  Validierungsfehler; nicht erreichbarer Server → sichtbarer Fehler;
+  erreichbarer Server → „Pairing erforderlich"; erreichbarer Server →
+  Aktiver-Server-Karte mit Status-Badge „Server: erreichbar" und
+  geführter Pairing-Karte.
 - **Pairing** (3): ungültiges Format → lokaler Formatfehler; falscher
   Code → Pairing-Fehler vom Server; gültiger Code → Anmeldemaske.
 - **Anmeldung** (2): falsches Passwort → sichtbarer Login-Fehler;

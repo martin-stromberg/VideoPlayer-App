@@ -31,6 +31,14 @@ public sealed class ServerSetupTests : E2ETestBase
         Assert.Null(model.ActiveServerAddress);
         Assert.True(app.Ui.Exists("AddressEntry"));
         Assert.True(app.Ui.Exists("ConnectButton"));
+
+        // Kartenstruktur der modernisierten Seite: die „Neuen Server
+        // verbinden"-Karte ist im Elementbaum sichtbar (Border-Karten
+        // erscheinen nicht in der UIA — Nachweis über die Dev-API).
+        var tree = await app.DevApi.GetTreeAsync(Ct);
+        var connectCard = tree.FindByAutomationId("ConnectCard");
+        Assert.NotNull(connectCard);
+        Assert.True(connectCard.IsVisible);
     }
 
     /// <summary>
@@ -101,5 +109,65 @@ public sealed class ServerSetupTests : E2ETestBase
         Assert.True(app.Ui.Exists("PairButton"));
         var tree = await app.DevApi.GetTreeAsync(Ct);
         Assert.NotNull(tree.FindByAutomationId("PairingCodeEntry"));
+    }
+
+    /// <summary>
+    /// Modernisierte Oberfläche: der erreichbare Server erscheint als
+    /// Aktiver-Server-Karte mit Status-Badge „erreichbar"; die
+    /// Pairing-Eingabe ist eine hervorgehobene, geführte Karte mit
+    /// Hinweistext auf die Server-Verwaltung.
+    /// </summary>
+    [Fact]
+    public async Task ReachableServer_ShowsHealthBadgeAndGuidedPairing()
+    {
+        using var server = new MockVideoServer("E2ETEST", "e2e-device-a", "e2e@example.test", "e2e-pass");
+        using var app = await StartAppAsync();
+
+        await ConnectToPairingRequiredAsync(app, server);
+
+        var model = await app.DevApi.GetModelAsync(Ct);
+        Assert.Equal("Reachable", model.ServerHealth);
+        Assert.Equal(server.BaseAddress, model.ActiveServerAddress);
+
+        var tree = await app.DevApi.GetTreeAsync(Ct);
+
+        // Aktiver-Server-Karte mit Adresse und Status-Badge.
+        var activeCard = tree.FindByAutomationId("ActiveServerCard");
+        Assert.NotNull(activeCard);
+        Assert.True(activeCard.IsVisible);
+        var activeLabel = tree.FindByAutomationId("ActiveServerLabel");
+        Assert.NotNull(activeLabel);
+        Assert.Equal(server.BaseAddress, activeLabel.Text);
+        var healthLabel = tree.FindByAutomationId("ServerHealthLabel");
+        Assert.NotNull(healthLabel);
+        Assert.Equal("Server: erreichbar", healthLabel.Text);
+
+        // Geführte Pairing-Karte: sichtbar, mit Führungstext zur
+        // Server-Verwaltung und bedienbarer Code-Eingabe.
+        var pairingCard = tree.FindByAutomationId("PairingSection");
+        Assert.NotNull(pairingCard);
+        Assert.True(pairingCard.IsVisible);
+        var hintTexts = CollectTexts(pairingCard);
+        Assert.Contains(hintTexts, t => t.Contains("Verwaltung"));
+        Assert.Contains(hintTexts, t => t.Contains("Gerät koppeln"));
+        Assert.True(app.Ui.Exists("PairingCodeEntry"));
+        Assert.True(app.Ui.Exists("PairButton"));
+    }
+
+    /// <summary>Sammelt alle Texte eines Baumknotens inklusive Kinder.</summary>
+    private static List<string> CollectTexts(DevApiTreeNode node)
+    {
+        var texts = new List<string>();
+        if (!string.IsNullOrEmpty(node.Text))
+        {
+            texts.Add(node.Text);
+        }
+
+        foreach (var child in node.Children)
+        {
+            texts.AddRange(CollectTexts(child));
+        }
+
+        return texts;
     }
 }

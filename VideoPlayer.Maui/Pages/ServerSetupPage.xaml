@@ -7,107 +7,320 @@
              Title="Server">
     <Grid RowDefinitions="Auto,*,Auto"
           Padding="24"
-          RowSpacing="12">
+          RowSpacing="16">
 
-        <!-- Kopfbereich: Titel, Hinweis, aktiver Server -->
-        <VerticalStackLayout Spacing="8">
+        <!-- Kopfbereich: Kicker-Badge, Titel, Hinweis, Aktiver-Server-Karte
+             mit Status-Badge (Muster: HomePage Kicker/Banner-Karten). -->
+        <VerticalStackLayout Spacing="10">
+            <Border StrokeShape="RoundRectangle 4"
+                    Stroke="{StaticResource VpBorder}"
+                    BackgroundColor="{StaticResource VpOverlay}"
+                    Padding="10,4"
+                    HorizontalOptions="Start">
+                <Label Text="SERVERVERBINDUNG" FontSize="11" />
+            </Border>
             <Label Text="VideoPlayer-Server"
-                   FontSize="24"
+                   FontSize="32"
                    FontAttributes="Bold" />
-            <Label Text="Die App verbindet sich mit einem VideoPlayer-Server im eigenen Netzwerk." />
-            <VerticalStackLayout x:Name="ActiveServerSection" IsVisible="false" Spacing="4">
-                <Label Text="Aktiver Server" FontAttributes="Bold" />
-                <Label x:Name="ActiveServerLabel" AutomationId="ActiveServerLabel" />
-            </VerticalStackLayout>
+            <Label Text="Die App verbindet sich mit einem VideoPlayer-Server im eigenen Netzwerk."
+                   TextColor="{StaticResource VpTextMuted}" />
+
+            <!-- Aktiver Server als eigene Karte inklusive Status-Badge:
+                 Pill-Form (999) mit farbigem Punkt und Text aus dem
+                 Model (ServerHealth/ServerHealthText). -->
+            <Border x:Name="ActiveServerSection"
+                    AutomationId="ActiveServerCard"
+                    IsVisible="false"
+                    Margin="0,4,0,0"
+                    StrokeShape="RoundRectangle 8"
+                    Stroke="{StaticResource VpBorderStrong}"
+                    BackgroundColor="{StaticResource VpSurfaceHigh}"
+                    Padding="16,12">
+                <Grid ColumnDefinitions="*,Auto"
+                      RowDefinitions="Auto,Auto"
+                      ColumnSpacing="12">
+                    <Label Text="Aktiver Server"
+                           FontSize="12"
+                           TextColor="{StaticResource VpTextMuted}" />
+                    <Label Grid.Row="1"
+                           x:Name="ActiveServerLabel"
+                           AutomationId="ActiveServerLabel"
+                           FontSize="16"
+                           FontAttributes="Bold" />
+                    <Border Grid.Column="1"
+                            Grid.RowSpan="2"
+                            VerticalOptions="Center"
+                            StrokeShape="RoundRectangle 999"
+                            Stroke="{StaticResource VpBorder}"
+                            BackgroundColor="{StaticResource VpSurfaceLow}"
+                            Padding="10,4">
+                        <HorizontalStackLayout Spacing="6">
+                            <ActivityIndicator x:Name="ServerHealthIndicator"
+                                               IsRunning="false"
+                                               IsVisible="false"
+                                               HeightRequest="18"
+                                               WidthRequest="18" />
+                            <BoxView x:Name="ServerHealthDot"
+                                     WidthRequest="8"
+                                     HeightRequest="8"
+                                     CornerRadius="4"
+                                     VerticalOptions="Center"
+                                     Color="{StaticResource VpTextMuted}">
+                                <!-- Farbe folgt dem Model-Zustand (erreichbar
+                                     blau, nicht erreichbar rot, sonst gedimmt);
+                                     die Datenquelle ist der MvuHost. -->
+                                <BoxView.Triggers>
+                                    <DataTrigger TargetType="BoxView"
+                                                 Binding="{Binding Model.ServerHealth}"
+                                                 Value="Reachable">
+                                        <Setter Property="Color" Value="{StaticResource VpSecondary}" />
+                                    </DataTrigger>
+                                    <DataTrigger TargetType="BoxView"
+                                                 Binding="{Binding Model.ServerHealth}"
+                                                 Value="Unreachable">
+                                        <Setter Property="Color" Value="{StaticResource VpDanger}" />
+                                    </DataTrigger>
+                                    <DataTrigger TargetType="BoxView"
+                                                 Binding="{Binding Model.ServerHealth}"
+                                                 Value="Checking">
+                                        <Setter Property="Color" Value="{StaticResource VpTextMuted}" />
+                                    </DataTrigger>
+                                    <DataTrigger TargetType="BoxView"
+                                                 Binding="{Binding Model.ServerHealth}"
+                                                 Value="Unknown">
+                                        <Setter Property="Color" Value="{StaticResource VpTextMuted}" />
+                                    </DataTrigger>
+                                </BoxView.Triggers>
+                            </BoxView>
+                            <Label x:Name="ServerHealthLabel"
+                                   AutomationId="ServerHealthLabel"
+                                   FontSize="12">
+                                <Label.Triggers>
+                                    <DataTrigger TargetType="Label"
+                                                 Binding="{Binding Model.ServerHealth}"
+                                                 Value="Unreachable">
+                                        <Setter Property="TextColor" Value="{StaticResource VpDanger}" />
+                                    </DataTrigger>
+                                    <DataTrigger TargetType="Label"
+                                                 Binding="{Binding Model.ServerHealth}"
+                                                 Value="Reachable">
+                                        <Setter Property="TextColor" Value="{StaticResource VpSecondarySoft}" />
+                                    </DataTrigger>
+                                </Label.Triggers>
+                            </Label>
+                        </HorizontalStackLayout>
+                    </Border>
+                </Grid>
+            </Border>
         </VerticalStackLayout>
 
-        <!-- Listenbereich: bekannte und gefundene Server scrollen intern,
-             damit Kopf und Eingabeformular immer sichtbar bleiben. -->
-        <Grid Grid.Row="1"
-              RowDefinitions="Auto,*,Auto,*"
-              RowSpacing="8">
+        <!-- Listenbereich: bekannte und gefundene Server als Karten;
+             scrollt intern, damit Kopf und Fuß sichtbar bleiben. -->
+        <ScrollView Grid.Row="1">
+            <VerticalStackLayout Spacing="16">
 
-            <Label x:Name="KnownServersHeader"
-                   Text="Bekannte Server"
-                   FontAttributes="Bold"
-                   IsVisible="false" />
-            <CollectionView x:Name="KnownServersView"
-                            Grid.Row="1"
-                            AutomationId="KnownServersView"
-                            SelectionMode="Single"
-                            SelectionChanged="OnKnownSelectionChanged">
-                <CollectionView.ItemTemplate>
-                    <DataTemplate x:DataType="storage:KnownServer">
-                        <Grid RowDefinitions="Auto,Auto" Padding="0,4">
-                            <Label Text="{Binding NameOrAddress}" FontAttributes="Bold" />
-                            <Label Grid.Row="1" Text="{Binding Address}" FontSize="12" TextColor="{StaticResource VpTextMuted}" />
-                        </Grid>
-                    </DataTemplate>
-                </CollectionView.ItemTemplate>
-            </CollectionView>
+                <VerticalStackLayout Spacing="8">
+                    <Label x:Name="KnownServersHeader"
+                           Text="Bekannte Server"
+                           FontSize="16"
+                           FontAttributes="Bold"
+                           IsVisible="false" />
+                    <CollectionView x:Name="KnownServersView"
+                                    AutomationId="KnownServersView"
+                                    SelectionMode="Single"
+                                    SelectionChanged="OnKnownSelectionChanged">
+                        <CollectionView.ItemTemplate>
+                            <DataTemplate x:DataType="storage:KnownServer">
+                                <Border StrokeShape="RoundRectangle 8"
+                                        Stroke="{StaticResource VpBorder}"
+                                        BackgroundColor="{StaticResource VpSurface}"
+                                        Padding="14,10"
+                                        Margin="0,0,0,8">
+                                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                                        <VerticalStackLayout Spacing="2">
+                                            <Label Text="{Binding NameOrAddress}" FontAttributes="Bold" />
+                                            <Label Text="{Binding Address}"
+                                                   FontSize="12"
+                                                   TextColor="{StaticResource VpTextMuted}" />
+                                            <Label Text="{Binding LastUsedAtUtc, StringFormat='Zuletzt verwendet: {0:dd.MM.yyyy}'}"
+                                                   FontSize="11"
+                                                   TextColor="{StaticResource VpTextMuted}" />
+                                        </VerticalStackLayout>
+                                        <Label Grid.Column="1"
+                                               Text="Auswählen"
+                                               FontSize="12"
+                                               TextColor="{StaticResource VpSecondarySoft}"
+                                               VerticalOptions="Center" />
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </CollectionView.ItemTemplate>
+                    </CollectionView>
+                </VerticalStackLayout>
 
-            <VerticalStackLayout Grid.Row="2" Spacing="8">
-                <Button x:Name="DiscoverButton"
-                        AutomationId="DiscoverButton"
-                        Text="Server im Netzwerk suchen"
-                        Clicked="OnDiscoverClicked" />
-                <ActivityIndicator x:Name="DiscoveryIndicator" IsRunning="false" IsVisible="false" />
-                <Label x:Name="DiscoveryEmptyLabel"
-                       AutomationId="DiscoveryEmptyLabel"
-                       Text="Kein Server gefunden. Bitte die Adresse manuell eingeben."
-                       IsVisible="false" />
+                <VerticalStackLayout Spacing="8">
+                    <Label Text="Im Netzwerk suchen"
+                           FontSize="16"
+                           FontAttributes="Bold" />
+                    <Label Text="Die App kann VideoPlayer-Server im eigenen Netzwerk automatisch finden."
+                           FontSize="12"
+                           TextColor="{StaticResource VpTextMuted}" />
+                    <Button x:Name="DiscoverButton"
+                            AutomationId="DiscoverButton"
+                            Text="Server im Netzwerk suchen"
+                            Clicked="OnDiscoverClicked"
+                            HorizontalOptions="Start" />
+                    <HorizontalStackLayout Spacing="8">
+                        <ActivityIndicator x:Name="DiscoveryIndicator"
+                                           IsRunning="false"
+                                           IsVisible="false" />
+                        <Label x:Name="DiscoveryRunningLabel"
+                               AutomationId="DiscoveryRunningLabel"
+                               Text="Suche läuft …"
+                               FontSize="12"
+                               TextColor="{StaticResource VpTextMuted}"
+                               IsVisible="false"
+                               VerticalOptions="Center" />
+                    </HorizontalStackLayout>
+                    <Label x:Name="DiscoveryEmptyLabel"
+                           AutomationId="DiscoveryEmptyLabel"
+                           Text="Kein Server gefunden. Bitte die Adresse manuell eingeben."
+                           IsVisible="false" />
+                    <CollectionView x:Name="DiscoveredServersView"
+                                    AutomationId="DiscoveredServersView"
+                                    SelectionMode="Single"
+                                    SelectionChanged="OnDiscoveredSelectionChanged">
+                        <CollectionView.ItemTemplate>
+                            <DataTemplate x:DataType="discovery:DiscoveredServer">
+                                <Border StrokeShape="RoundRectangle 8"
+                                        Stroke="{StaticResource VpBorder}"
+                                        BackgroundColor="{StaticResource VpSurface}"
+                                        Padding="14,10"
+                                        Margin="0,0,0,8">
+                                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                                        <VerticalStackLayout Spacing="2">
+                                            <Label Text="{Binding NameOrAddress}" FontAttributes="Bold" />
+                                            <Label Text="{Binding Address}"
+                                                   FontSize="12"
+                                                   TextColor="{StaticResource VpTextMuted}" />
+                                            <Label Text="Im Netzwerk gefunden"
+                                                   FontSize="11"
+                                                   TextColor="{StaticResource VpSecondarySoft}" />
+                                        </VerticalStackLayout>
+                                        <Label Grid.Column="1"
+                                               Text="Auswählen"
+                                               FontSize="12"
+                                               TextColor="{StaticResource VpSecondarySoft}"
+                                               VerticalOptions="Center" />
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </CollectionView.ItemTemplate>
+                    </CollectionView>
+                </VerticalStackLayout>
             </VerticalStackLayout>
-            <CollectionView x:Name="DiscoveredServersView"
-                            Grid.Row="3"
-                            AutomationId="DiscoveredServersView"
-                            SelectionMode="Single"
-                            SelectionChanged="OnDiscoveredSelectionChanged">
-                <CollectionView.ItemTemplate>
-                    <DataTemplate x:DataType="discovery:DiscoveredServer">
-                        <Grid RowDefinitions="Auto,Auto" Padding="0,4">
-                            <Label Text="{Binding NameOrAddress}" FontAttributes="Bold" />
-                            <Label Grid.Row="1" Text="{Binding Address}" FontSize="12" TextColor="{StaticResource VpTextMuted}" />
-                        </Grid>
-                    </DataTemplate>
-                </CollectionView.ItemTemplate>
-            </CollectionView>
-        </Grid>
+        </ScrollView>
 
-        <!-- Fußbereich: manuelle Eingabe bleibt ohne Scrollen erreichbar -->
-        <VerticalStackLayout Grid.Row="2" Spacing="8">
-            <Label Text="Adresse manuell eingeben" FontAttributes="Bold" />
-            <Entry x:Name="AddressEntry"
-                   AutomationId="AddressEntry"
-                   Placeholder="http://server/videoplayer/"
-                   Keyboard="Url" />
-            <Button x:Name="ConnectButton"
-                    AutomationId="ConnectButton"
-                    Text="Verbinden"
-                    Clicked="OnConnectClicked" />
-            <ActivityIndicator x:Name="CheckIndicator" IsRunning="false" IsVisible="false" />
-            <Label x:Name="ErrorLabel" AutomationId="ErrorLabel" TextColor="{StaticResource VpDanger}" IsVisible="false" />
+        <!-- Fußbereich: Karte für manuelle Eingabe und geführte
+             Pairing-Karte; scrollt bei kleinen Fenstern. -->
+        <ScrollView Grid.Row="2">
+            <VerticalStackLayout Spacing="12">
 
-            <!-- Gerät koppeln: sichtbar, wenn der erreichbare Server ein
-                 Geräte-Pairing verlangt (kein nutzbarer Gate-Schlüssel). -->
-            <VerticalStackLayout x:Name="PairingSection" IsVisible="false" Spacing="8">
-                <Label Text="Gerät koppeln" FontAttributes="Bold" />
-                <Label Text="Den Einmal-Code erstellst du in der Verwaltung deines Servers (Bereich „Geräte“). Gib ihn hier vollständig ein." />
-                <!-- Kein MaxLength: die Codelänge ist serverseitig
-                     konfigurierbar (Pairing:CodeLength) — ein hartes Limit
-                     würde längere Codes still abschneiden. -->
-                <Entry x:Name="PairingCodeEntry"
-                       AutomationId="PairingCodeEntry"
-                       Placeholder="Pairing-Code"
-                       Keyboard="Text"
-                       IsSpellCheckEnabled="False"
-                       IsTextPredictionEnabled="False" />
-                <Button x:Name="PairButton"
-                        AutomationId="PairButton"
-                        Text="Koppeln"
-                        Clicked="OnPairClicked" />
-                <ActivityIndicator x:Name="PairingIndicator" IsRunning="false" IsVisible="false" />
-                <Label x:Name="PairingErrorLabel" AutomationId="PairingErrorLabel" TextColor="{StaticResource VpDanger}" IsVisible="false" />
+                <Border AutomationId="ConnectCard"
+                        StrokeShape="RoundRectangle 8"
+                        Stroke="{StaticResource VpBorder}"
+                        BackgroundColor="{StaticResource VpSurface}"
+                        Padding="16,12">
+                    <VerticalStackLayout Spacing="8">
+                        <Label Text="Neuen Server verbinden"
+                               FontSize="16"
+                               FontAttributes="Bold" />
+                        <Label Text="Adresse manuell eingeben"
+                               FontSize="12"
+                               TextColor="{StaticResource VpTextMuted}" />
+                        <Entry x:Name="AddressEntry"
+                               AutomationId="AddressEntry"
+                               Placeholder="http://server/videoplayer/"
+                               Keyboard="Url" />
+                        <HorizontalStackLayout Spacing="12">
+                            <Button x:Name="ConnectButton"
+                                    AutomationId="ConnectButton"
+                                    Text="Verbinden"
+                                    Clicked="OnConnectClicked" />
+                            <ActivityIndicator x:Name="CheckIndicator"
+                                               IsRunning="false"
+                                               IsVisible="false"
+                                               VerticalOptions="Center" />
+                            <Label x:Name="CheckStatusLabel"
+                                   AutomationId="CheckStatusLabel"
+                                   FontSize="12"
+                                   TextColor="{StaticResource VpTextMuted}"
+                                   IsVisible="false"
+                                   VerticalOptions="Center" />
+                        </HorizontalStackLayout>
+                        <Label x:Name="ErrorLabel"
+                               AutomationId="ErrorLabel"
+                               TextColor="{StaticResource VpDanger}"
+                               IsVisible="false" />
+                    </VerticalStackLayout>
+                </Border>
+
+                <!-- Gerät koppeln: hervorgehobene, geführte Karte — sichtbar,
+                     wenn der erreichbare Server ein Geräte-Pairing verlangt
+                     (kein nutzbarer Gate-Schlüssel). Einstiegspunkt für den
+                     späteren QR-/Ticket-Flow; dieser wird hier nicht gebaut. -->
+                <Border x:Name="PairingSection"
+                        AutomationId="PairingSection"
+                        IsVisible="false"
+                        StrokeShape="RoundRectangle 8"
+                        Stroke="{StaticResource VpSecondary}"
+                        BackgroundColor="{StaticResource VpSurfaceHigh}"
+                        Padding="16,12">
+                    <VerticalStackLayout Spacing="10">
+                        <Border StrokeShape="RoundRectangle 4"
+                                Stroke="{StaticResource VpSecondary}"
+                                BackgroundColor="{StaticResource VpOverlay}"
+                                Padding="10,4"
+                                HorizontalOptions="Start">
+                            <Label Text="NÄCHSTER SCHRITT" FontSize="11" />
+                        </Border>
+                        <Label Text="Gerät koppeln"
+                               FontSize="18"
+                               FontAttributes="Bold" />
+                        <Label Text="Der Server ist erreichbar, verlangt aber eine Kopplung dieses Geräts. Öffne die Verwaltung deines Servers (Profilseite „Geräte“), erstelle dort einen Einmal-Code und gib ihn hier ein." />
+                        <!-- Kein MaxLength: die Codelänge ist serverseitig
+                             konfigurierbar (Pairing:CodeLength) — ein hartes Limit
+                             würde längere Codes still abschneiden. -->
+                        <Entry x:Name="PairingCodeEntry"
+                               AutomationId="PairingCodeEntry"
+                               Placeholder="Pairing-Code"
+                               Keyboard="Text"
+                               IsSpellCheckEnabled="False"
+                               IsTextPredictionEnabled="False" />
+                        <HorizontalStackLayout Spacing="12">
+                            <Button x:Name="PairButton"
+                                    AutomationId="PairButton"
+                                    Text="Koppeln"
+                                    Clicked="OnPairClicked" />
+                            <ActivityIndicator x:Name="PairingIndicator"
+                                               IsRunning="false"
+                                               IsVisible="false"
+                                               VerticalOptions="Center" />
+                            <Label x:Name="PairingRunningLabel"
+                                   AutomationId="PairingRunningLabel"
+                                   Text="Kopplung läuft …"
+                                   FontSize="12"
+                                   TextColor="{StaticResource VpTextMuted}"
+                                   IsVisible="false"
+                                   VerticalOptions="Center" />
+                        </HorizontalStackLayout>
+                        <Label x:Name="PairingErrorLabel"
+                               AutomationId="PairingErrorLabel"
+                               TextColor="{StaticResource VpDanger}"
+                               IsVisible="false" />
+                    </VerticalStackLayout>
+                </Border>
             </VerticalStackLayout>
-        </VerticalStackLayout>
+        </ScrollView>
     </Grid>
 </ContentPage>
