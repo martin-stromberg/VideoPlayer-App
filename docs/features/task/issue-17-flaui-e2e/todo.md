@@ -13,19 +13,19 @@ ausgeführt.
 | [x] | — | Einstiegspunkt ermittelt: Schritt 3 (keine Artefakte vorhanden) | — |
 | [x] | 3 | Anforderung übersetzen | `requirement.md` |
 | [x] | 4 | Bestandsaufnahme | `inventory.md`, `inventory/` |
-| [ ] | 5 | Umsetzungsplanung | `plan.md` |
-| [ ] | 5a | Offene Punkte prüfen und ggf. Planung wiederholen | `plan.md` (aktualisiert) |
-| [ ] | 5b | Plan gegen Anforderung und Testbedarf prüfen | `plan-check.md` |
-| [ ] | 5c | Planungscommit | — |
-| [ ] | 6 | Implementierung | Codeänderungen |
-| [ ] | 7 | Plan-Review | `review.md` |
-| [ ] | 8 | Usability-Review (bei UI-Änderungen) | `review-usability.md` |
-| [ ] | 9 | Code-Review | `review-code.md` |
-| [ ] | 10 | Tests ausführen | `test-results.md` |
-| [ ] | — | Iteration oder Abschluss entscheiden | — |
-| [ ] | 11 | Folgeaufgaben dokumentieren (bei Schleifenabbruch) | `continue.md` |
-| [ ] | 12 | Dokumentation erstellen | `docs/help/` |
-| [ ] | 12b | README aktualisieren | `README.md` |
-| [ ] | 12c | Release Notes aktualisieren | `docs/RELEASE_NOTES.md` |
-| [ ] | — | Feature-Verzeichnis löschen | — |
-| [ ] | — | Commit durchführen | — |
+| [x] | 5 | Umsetzungsplanung | `plan.md` |
+| [x] | 5a | Offene Punkte prüfen und ggf. Planung wiederholen | `plan.md` (aktualisiert) |
+| [x] | 5b | Plan gegen Anforderung und Testbedarf prüfen | `plan-check.md` |
+| [x] | 5c | Planungscommit | `41dd282` |
+| [x] | 6 | Implementierung | Codeänderungen |
+| [x] | 7 | Plan-Review | `review.md` |
+| [x] | 8 | Usability-Review (bei UI-Änderungen) | `review-usability.md` |
+| [x] | 9 | Code-Review | `review-code.md` |
+| [x] | 10 | Tests ausführen | `test-results.md` |
+| [x] | — | Iteration oder Abschluss entscheiden | Abschluss: 10/10 E2E + 926/926 Bestand |
+| [x] | 11 | Folgeaufgaben dokumentieren (bei Schleifenabbruch) | nicht nötig (kein Schleifenabbruch); Befund Shell-Tab-Stack in `review-code.md` |
+| [x] | 12 | Dokumentation erstellen | `docs/help/e2e-tests.md`, `docs/help/index.md`, `docs/help/developer-api.md` |
+| [x] | 12b | README aktualisieren | `README.md` |
+| [x] | 12c | Release Notes aktualisieren | `docs/RELEASE_NOTES.md`, `changes.log` |
+| [x] | — | Feature-Verzeichnis aufräumen | Verzeichnis bleibt als Doku erhalten (Konvention wie `issue-15-*`) |
+| [x] | — | Commit durchführen | `e840986` |

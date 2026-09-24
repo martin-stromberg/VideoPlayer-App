@@ -54,14 +54,23 @@ Listeneinträge sieht.
 
 ```json
 {"automationId":"ConnectButton"}
+{"automationId":"KnownServersView","itemIndex":0}
 ```
 
 Findet das Element per AutomationId und löst auf dem UI-Thread das
 Clicked-Äquivalent aus: `SendClicked()` auf `Button`/`ImageButton`,
 Toggle auf `Switch`/`CheckBox`, `Activate()` auf `MenuItem`, sonst
 `Command`-Ausführung (inkl. Tap-Gesten mit Command).
+
+Mit optionalem `itemIndex` wird stattdessen der Eintrag einer
+`CollectionView` ausgewählt (`SelectedItem` gesetzt → echtes
+`SelectionChanged`-Event mit dem regulären App-Nachrichtenfluss) —
+der koordinatenfreie Listenpfad für Einträge, die Windows-UIA nicht
+zuverlässig adressiert.
+
 Antworten: `200 {"invoked":true,…}`, `404` Element nicht gefunden,
-`400` Element nicht auslösbar oder Body ungültig.
+`400` Element nicht auslösbar, `itemIndex` auf Nicht-CollectionView
+oder außerhalb der Liste bzw. Body ungültig.
 
 ### `POST /set-text`
 
@@ -95,4 +104,4 @@ Fehlerantworten tragen `{"error":"<deutscher Text>"}`.
   Verdrahtung in `VideoPlayer.Maui/DevApi/` (Visual Tree, Dienst).
 - Primärer Einsatzzweck sind die FlaUI-E2E-Tests (Projekt Schritt 3):
   FlaUI für Fenster/Klicks, Dev-API für Zustands-Assertions und
-  Listen-Interaktion.
+  Listen-Interaktion — siehe `docs/help/e2e-tests.md`.

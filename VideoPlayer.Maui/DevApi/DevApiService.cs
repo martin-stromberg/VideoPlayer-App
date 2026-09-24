@@ -83,7 +83,7 @@ public sealed class DevApiService : IDisposable
             return DevApiResponse.Error(400, bodyError ?? "Der Body benötigt das Feld 'automationId'.");
         }
 
-        return await MainThread.InvokeOnMainThreadAsync(() => InvokeOnPage(body.AutomationId));
+        return await MainThread.InvokeOnMainThreadAsync(() => InvokeOnPage(body.AutomationId, body.ItemIndex));
     }
 
     /// <summary>Setzt den Text des Eingabefelds mit der angegebenen AutomationId.</summary>
@@ -99,7 +99,7 @@ public sealed class DevApiService : IDisposable
         return await MainThread.InvokeOnMainThreadAsync(() => SetTextOnPage(body.AutomationId, body.Text));
     }
 
-    private DevApiResponse InvokeOnPage(string automationId)
+    private DevApiResponse InvokeOnPage(string automationId, int? itemIndex)
     {
         var element = FindElement(automationId, out var pageMissing);
         if (element is null)
@@ -107,6 +107,19 @@ public sealed class DevApiService : IDisposable
             return pageMissing
                 ? DevApiResponse.Error(500, "Es gibt kein aktives Fenster mit einer Seite.")
                 : DevApiResponse.Error(404, $"Kein Element mit der AutomationId '{automationId}' gefunden.");
+        }
+
+        // Item-Auswahl in einer CollectionView (UIA-Lücke: Einträge fehlen im
+        // Automation-Baum): SelectedItem setzen feuert SelectionChanged — dieselbe
+        // Ereigniskette wie ein Fingertipp auf die Zeile.
+        if (itemIndex is not null)
+        {
+            if (!DevApiVisualTree.TrySelectItem(element, itemIndex.Value, out var selectError))
+            {
+                return DevApiResponse.Error(400, selectError!);
+            }
+
+            return DevApiResponse.Json(new { invoked = true, automationId, itemIndex, type = element.GetType().Name });
         }
 
         if (!DevApiVisualTree.TryInvoke(element, out var error))
@@ -181,6 +194,9 @@ public sealed class DevApiService : IDisposable
     private sealed class InvokeBody
     {
         public string? AutomationId { get; set; }
+
+        /// <summary>Optionaler Index eines CollectionView-Eintrags zur Auswahl.</summary>
+        public int? ItemIndex { get; set; }
     }
 
     private sealed class SetTextBody

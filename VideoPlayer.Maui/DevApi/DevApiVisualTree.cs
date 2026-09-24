@@ -142,6 +142,56 @@ public static class DevApiVisualTree
     }
 
     /// <summary>
+    /// Wählt den Eintrag <paramref name="itemIndex"/> einer <see cref="CollectionView"/>
+    /// aus (<c>SelectedItem</c>-Setter — feuert <c>SelectionChanged</c> wie ein
+    /// Fingertipp). Schließt die UIA-Lücke: CollectionView-Einträge fehlen unter
+    /// Windows im Automation-Baum und sind sonst nur per Koordinatenklick
+    /// erreichbar.
+    /// </summary>
+    /// <param name="element">Das Zielelement (muss eine <see cref="CollectionView"/> sein).</param>
+    /// <param name="itemIndex">Nullbasierter Index in der <c>ItemsSource</c>.</param>
+    /// <param name="error">Deutscher Fehlertext, wenn die Auswahl nicht möglich ist.</param>
+    /// <returns><c>true</c>, wenn der Eintrag ausgewählt wurde.</returns>
+    public static bool TrySelectItem(Element element, int itemIndex, out string? error)
+    {
+        ArgumentNullException.ThrowIfNull(element);
+        error = null;
+        if (element is not CollectionView collectionView)
+        {
+            error = $"Das Element vom Typ '{element.GetType().Name}' ist keine CollectionView.";
+            return false;
+        }
+
+        if (collectionView.ItemsSource is not IEnumerable items)
+        {
+            error = "Die CollectionView hat keine ItemsSource.";
+            return false;
+        }
+
+        object? target = null;
+        var index = 0;
+        var count = 0;
+        foreach (var item in items)
+        {
+            if (index++ == itemIndex)
+            {
+                target = item;
+            }
+
+            count++;
+        }
+
+        if (itemIndex < 0 || itemIndex >= count)
+        {
+            error = $"Der Item-Index {itemIndex} liegt außerhalb der Liste ({count} Einträge).";
+            return false;
+        }
+
+        collectionView.SelectedItem = target;
+        return true;
+    }
+
+    /// <summary>
     /// Setzt den Text eines Eingabefelds (<see cref="InputView"/>); der
     /// Setter feuert das <c>TextChanged</c>-Ereignis wie eine Eingabe.
     /// </summary>
