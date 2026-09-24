@@ -53,6 +53,10 @@ dotnet build VideoWebPlayer.Maui/VideoWebPlayer.Maui.csproj -f net10.0-android
 dotnet build VideoPlayer.Maui/VideoPlayer.Maui.csproj -f net10.0-android
 ```
 
+## Developer-API (nur Debug/Opt-in)
+
+Der Debug-Build von `VideoPlayer.Maui` startet einen lokalen Mini-HTTP-Server auf `127.0.0.1` mit systemvergebenem Port (`devapi.json` im Programmverzeichnis): `GET /model` (App-Zustand), `GET /tree` (Elementbaum inkl. CollectionView-Items), `POST /invoke` und `POST /set-text` zur UI-Automatisierung. Release-Builds enthalten die API nicht; Opt-in über das Define `DEV_API`. Details: `docs/help/developer-api.md`.
+
 ## Web-API-Vertrag
 
 Das Web-Repository besitzt die verbindliche API-Dokumentation unter `docs/API.md`. Für produktive Änderungen an Endpunkten, DTOs oder Authentifizierung muss das Web-Repository zuerst den Vertrag aktualisieren und testen.

@@ -20,4 +20,5 @@
 ## Infrastruktur
 
 - [Server-API-Client](api-client/index.md) — Plattformneutraler Zugriff auf die öffentliche VideoPlayer-Server-API mit Wiederholungsstrategie, Token-Erneuerung und Geräte-Pairing-Endpunkt.
+- [Developer-API für UI-Automatisierung](developer-api.md) — lokaler Mini-HTTP-Server (nur Debug/Opt-in) mit `GET /model`, `GET /tree`, `POST /invoke` und `POST /set-text` für automatisierte UI-Tests.
 - [Staging-Branch](staging-branch.md) — Branching- und Release-Prozess.

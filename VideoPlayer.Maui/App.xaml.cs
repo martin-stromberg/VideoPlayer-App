@@ -38,6 +38,15 @@ namespace VideoPlayer.Maui
                 Title = "VideoPlayer"
             };
 
+#if DEBUG || DEV_API
+            // Developer-API (nur Debug oder explizites Opt-in via DEV_API-Define):
+            // lokaler HTTP-Server auf 127.0.0.1; Port steht in devapi.json
+            // neben der Exe. Läuft mit dem Fenster-Lebenszyklus.
+            var devApi = services.GetRequiredService<DevApi.DevApiService>();
+            devApi.Start();
+            window.Destroying += (_, _) => devApi.Dispose();
+#endif
+
             if (!startupDispatched)
             {
                 startupDispatched = true;
