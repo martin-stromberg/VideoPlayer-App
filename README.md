@@ -65,7 +65,7 @@ Der statische Gate-Schlüssel bleibt als Übergangs-/Fallback-Mechanismus konfig
 
 1. Geräte-Token des aktiven Servers (`ClientGate.DeviceTokenProvider`, gepflegt vom `DeviceTokenService`)
 2. Umgebungsvariable `VIDEOWEBPLAYER_MAUI_API_TOKEN`
-3. MSBuild-Eigenschaft `VideoPlayerApiToken` beim Build/Publish (Assembly-Metadata `VideoPlayer.ApiClient.ApiToken`), z. B. `dotnet publish VideoPlayer.Maui/VideoPlayer.Maui.csproj -p:VideoPlayerApiToken="<MAUI_CLIENT_API_TOKEN>"` oder `scripts/iOS-Deployment.ps1 -VideoPlayerApiToken "<MAUI_CLIENT_API_TOKEN>"`
+3. MSBuild-Eigenschaft `VideoPlayerApiToken` beim Build/Publish (Assembly-Metadata `VideoPlayer.ApiClient.ApiToken`), z. B. `dotnet publish VideoPlayer.Maui/VideoPlayer.Maui.csproj -p:VideoPlayerApiToken="<MAUI_CLIENT_API_TOKEN>"` oder `scripts/iOS-Deployment.ps1 -VideoPlayerApiToken "<MAUI_CLIENT_API_TOKEN>"` (das Skript lehnt Werte mit Anführungszeichen, Raute oder Zeilenumbruch mit verständlicher Meldung ab — der Token darf diese Zeichen nicht enthalten)
 4. Token-Datei `client-api-token.txt` im lokalen Anwendungsdatenverzeichnis (`%LocalAppData%/VideoPlayer` bzw. Plattformäquivalent)
 5. Platzhalter `<MAUI_CLIENT_API_TOKEN>` — oder explizit pro Client über `VideoPlayerApiClientOptions.ApiKey`
 

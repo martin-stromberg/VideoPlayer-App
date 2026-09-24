@@ -1,5 +1,12 @@
 # Änderungsprotokoll
 
+## 2026-09-24 — iOS-Deployment: MSB1006-Fehler beim Store-Build behoben
+
+- **MSB1006-Ursache eingegrenzt:** Die Response-Datei des iOS-Deployments (`scripts/iOS-Deployment.ps1`) schrieb `-p:Name="Wert"` ungeprüft. Ein Anführungszeichen oder Zeilenumbruch im Wert (z. B. mitkopiert im `VideoPlayerApiToken`) zerlegt die Zeile so, dass MSBuild ein `-p:`-Argument ohne gültigen Eigenschaftsnamen liest — programmatisch mit einem minimalen Test-csproj nachgewiesen (Repro-Tabelle in der Feature-Inventur).
+- **Sanitizing statt kryptischem Fehler:** Die in `scripts/iOS-Deployment.ResponseFile.ps1` ausgelagerten Response-Datei-Hilfsfunktionen trimmen Werte und brechen bei Anführungszeichen, Raute oder Zeilenumbruch mit einer verständlichen deutschen Fehlermeldung ab — Eigenschaftsname, Zeichenart und Position werden genannt, die betroffene Zeile erscheint maskiert (`***` für `ServerPassword`/`VideoPlayerApiToken`).
+- **Fehlschlag-Transparenz:** Schlägt ein `dotnet`-Aufruf fehl, gibt das Skript die Response-Datei-Inhalte maskiert aus — jetzt an allen drei Stellen (Build, Simulator/Gerät-Run, Device-via-SSH, letzterer zeigte bisher gar keine Anzeige).
+- **Tests:** `IosDeploymentResponseFileTests` führt die Sanitizing-Logik real per `pwsh` aus (Trimmen, Abbruch je Zeichenklasse, Maskierung, UTF-8 ohne BOM) und pinnt die Skript-Verdrahtung per Quelltext-Prüfung; Suite 896/896 grün.
+
 ## 2026-09-23 — Fehlerbehebungen aus der E2E-Verifikation des Geräte-Pairings
 
 - **Re-Pairing-Eingabe blieb unsichtbar:** Nach einer Gate-Ablehnung (widerrufener Geräte-Token oder abgelehnter statischer Schlüssel) zeigte die Serverseite den Pairing-Abschnitt nur kurz — das aus `OnAppearing` nachgeladene Serververzeichnis (`ServersLoadedMessage`) wertete den *vorhandenen, aber ungültigen* statischen Schlüssel wieder als ausreichend und setzte `IsPairingRequired` zurück. `AppUpdate.UpdateServersLoaded` hebt einen aktiven Re-Pairing-Zustand (`NeedsServerSetup && IsPairingRequired`) nicht mehr auf.

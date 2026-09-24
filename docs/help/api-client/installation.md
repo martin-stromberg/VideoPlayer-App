@@ -26,7 +26,7 @@
    ```bash
    dotnet build VideoPlayer.ApiClient/VideoPlayer.ApiClient.csproj -p:VideoPlayerApiToken="<MAUI_CLIENT_API_TOKEN>"
    ```
-   Das Deployment-Skript `scripts/iOS-Deployment.ps1` reicht die Eigenschaft über den Parameter `-VideoPlayerApiToken` (Standard: Umgebungsvariable `VIDEOWEBPLAYER_MAUI_API_TOKEN`) in alle Build-/Publish-Response-Dateien durch und maskiert den Wert in der Konsolenanzeige (`-p:VideoPlayerApiToken=***`). Diese Einbettung ist die transitionale Zwischenlösung für Server ohne Pairing-Endpunkt und Alt-App-Versionen.
+   Das Deployment-Skript `scripts/iOS-Deployment.ps1` reicht die Eigenschaft über den Parameter `-VideoPlayerApiToken` (Standard: Umgebungsvariable `VIDEOWEBPLAYER_MAUI_API_TOKEN`) in alle Build-/Publish-Response-Dateien durch und maskiert den Wert in der Konsolenanzeige (`-p:VideoPlayerApiToken=***`). Diese Einbettung ist die transitionale Zwischenlösung für Server ohne Pairing-Endpunkt und Alt-App-Versionen. Werte werden beim Eintragen in die Response-Datei getrimmt; enthält ein Wert ein Anführungszeichen, eine Raute oder einen Zeilenumbruch, bricht das Skript mit einer verständlichen Fehlermeldung und der maskierten Zeile ab — statt des kryptischen MSBuild-Fehlers `MSB1006`. Schlägt der `dotnet`-Aufruf fehl, gibt das Skript die Response-Datei-Inhalte maskiert aus (Secrets als `***`).
 4. Token-Datei `client-api-token.txt` im lokalen Anwendungsdatenverzeichnis (`%LocalAppData%/VideoPlayer`)
 5. Platzhalter `<MAUI_CLIENT_API_TOKEN>`
 
