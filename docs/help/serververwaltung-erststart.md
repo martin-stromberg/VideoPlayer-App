@@ -7,7 +7,14 @@ Start ohne hinterlegten Server erscheint ein Einrichtungsdialog.
 ## Erststart-Einrichtung
 
 Ist noch kein Server hinterlegt, zeigt die App nach dem Start die Seite
-„Server" statt der Startseite. Zwei Wege führen zum Ziel:
+„Server" statt der Startseite. Die Seite ist in Karten gegliedert:
+oben der Kopfbereich mit der Karte des aktiven Servers inklusive
+Status-Badge („Server: erreichbar" / „Server: nicht erreichbar"),
+darunter die Listen bekannter und im Netzwerk gefundener Server als
+auswählbare Karten und im Fuß die Karte „Neuen Server verbinden".
+Jeder laufende Schritt nennt seine Phase in Textform („Suche läuft …",
+„Verbindung wird geprüft …", „Kopplung läuft …"). Zwei Wege führen
+zum Ziel:
 
 - **Server im Netzwerk suchen** — die App sucht im lokalen Netzwerk nach
   VideoPlayer-Servern (mDNS-Dienstsuche auf `_http._tcp.local.` sowie
@@ -28,8 +35,9 @@ künftig direkt mit dem gespeicherten Server.
 ## Gerät koppeln (Pairing)
 
 Ist der Server erreichbar, aber weder ein gepaartes Geräte-Token noch ein
-statischer Gate-Schlüssel vorhanden, blendet die Serverseite den Abschnitt
-„Gerät koppeln" ein:
+statischer Gate-Schlüssel vorhanden, blendet die Serverseite die
+hervorgehobene Karte „Gerät koppeln" ein (Badge „NÄCHSTER SCHRITT",
+Führungstext mit Weg zur Server-Verwaltung):
 
 - Der Einmal-Code wird in der Verwaltung des Servers (Bereich „Geräte")
   erzeugt und hier eingegeben (in der Regel 8 Zeichen, Großbuchstaben
@@ -58,8 +66,11 @@ Pairing-Eingabe mit einem Hinweis erneut angezeigt.
 In den „Einstellungen" führt der Eintrag „Server wechseln" (Abschnitt
 „Server" am Seitenende) zur selben Verwaltungsseite:
 
-- **Aktiver Server** und die Liste **bekannter Server** (zuletzt verwendet
-  zuerst) werden angezeigt.
+- Der **aktive Server** erscheint als eigene Karte im Kopfbereich —
+  mit Status-Badge, das die laufende Erreichbarkeitsprüfung und das
+  Ergebnis („erreichbar"/„nicht erreichbar") anzeigt.
+- Die **bekannten Server** liegen als Kartenliste darunter (zuletzt
+  verwendet zuerst; je Karte Name, Adresse und „Zuletzt verwendet").
 - Ein Tipp auf einen bekannten Server wechselt nach erfolgreicher
   Verbindungsprüfung zu ihm.
 - Neue Server lassen sich über die Netzwerk-Suche oder die manuelle
@@ -107,8 +118,11 @@ Fallback für API-Aufrufe, gilt aber nicht als „hinterlegter Server".
   gate-geschützt —, Widerruf-Ereignis `DeviceTokenRejected`);
   der Start-Workflow lädt die Serververwaltung vor dem Health-Check.
 - `VideoPlayer.Maui`: `Pages/ServerSetupPage` (Erststart als Window-Root,
-  „Server wechseln" als Shell-Route `serversetup` ohne Menüeintrag,
-  Pairing-Abschnitt mit Code-Eingabe),
+  „Server wechseln" als Shell-Route `serversetup` ohne Menüeintrag;
+  kartenbasierte Oberfläche — Aktiver-Server-Karte mit
+  `ServerHealth`-Status-Badge, Karten für bekannte/gefundene Server,
+  Verbinden- und geführte Pairing-Karte, alle Zustände aus
+  `AppModel`),
   `ServerAddressProvider` (zuletzt verbunden → Umgebungsvariable →
   IIS-Default), `ServerHealthProbe.CheckAsync(Uri)` für
   Kandidatenadressen (mit adressspezifisch aufgelöstem Gate-Schlüssel,

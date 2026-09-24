@@ -52,11 +52,33 @@ public class ServerSetupContractTests
         {
             "KnownServersView", "ActiveServerLabel", "DiscoverButton",
             "DiscoveredServersView", "DiscoveryEmptyLabel",
-            "AddressEntry", "ConnectButton", "ErrorLabel"
+            "AddressEntry", "ConnectButton", "ErrorLabel",
+            // Modernisierung (Issue 17, Schritt 4): neue Elemente der
+            // Kartenstruktur und des Zustandsfeedbacks — bewusste
+            // Erweiterung der gepinnten Menge, kein Pin wurde entfernt.
+            "ActiveServerCard", "ServerHealthLabel",
+            "DiscoveryRunningLabel", "ConnectCard", "CheckStatusLabel",
+            "PairingSection", "PairingRunningLabel"
         })
         {
             Assert.Contains(id, automationIds);
         }
+    }
+
+    /// <summary>Prüft ServerSetupPage: die Modernisierung nutzt Karten und Vp*-Tokens.</summary>
+    [Fact]
+    public void ServerSetupPage_UsesCardLayout()
+    {
+        var xaml = MauiFile("Pages", "ServerSetupPage.xaml");
+
+        // Kartenform: abgerundete Flächen (Radius 8 wie die übrigen Karten
+        // der App — Pin aus DesignTokensContractTests).
+        Assert.Contains("RoundRectangle 8", xaml, StringComparison.Ordinal);
+        // Status-Badge des aktiven Servers (Pill-Form) mit Model-Bindung.
+        Assert.Contains("ServerHealthLabel", xaml, StringComparison.Ordinal);
+        Assert.Contains("RoundRectangle 999", xaml, StringComparison.Ordinal);
+        // Keine harten Farben — nur Vp*-Tokens.
+        Assert.DoesNotContain("#", xaml, StringComparison.Ordinal);
     }
 
     /// <summary>Prüft ServerSetupPage: im Code-Behind werden MVU-Nachrichten dispatcht.</summary>

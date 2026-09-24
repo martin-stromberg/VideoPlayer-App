@@ -60,7 +60,7 @@ Der Debug-Build von `VideoPlayer.Maui` startet einen lokalen Mini-HTTP-Server au
 
 ## Windows-E2E-Tests (FlaUI)
 
-`dotnet test VideoPlayer.E2E.Tests/VideoPlayer.E2E.Tests.csproj` — nur unter Windows mit Desktop-Session; baut die App als Debug, startet je Test einen eigenen Exe-Prozess mit isoliertem `VIDEOPLAYER_PROFILE` und spielt Server-Einrichtung, Pairing, Anmeldung und Serverwechsel gegen einen lokalen Mock-Server durch (10 Tests). Details: `docs/help/e2e-tests.md`.
+`dotnet test VideoPlayer.E2E.Tests/VideoPlayer.E2E.Tests.csproj` — nur unter Windows mit Desktop-Session; baut die App als Debug, startet je Test einen eigenen Exe-Prozess mit isoliertem `VIDEOPLAYER_PROFILE` und spielt Server-Einrichtung, Pairing, Anmeldung und Serverwechsel gegen einen lokalen Mock-Server durch (11 Tests). Details: `docs/help/e2e-tests.md`.
 
 ## Web-API-Vertrag
 
