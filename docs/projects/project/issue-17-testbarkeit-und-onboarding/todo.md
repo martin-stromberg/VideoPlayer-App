@@ -15,5 +15,5 @@ Basisbranch: `project/issue-17-testbarkeit-und-onboarding` (abgezweigt von `stag
 | [x] | 4 | Planprüfung (Unteragent) | `project-plan-check.md` (8 Befunde eingearbeitet) |
 | [x] | 5 | Planungscommit | `0546a54` |
 | [x] | 5 | Schritte-Tracking anlegen | `steps.md`, `status.html` |
-| [~] | 6 | Entwicklungsschritte abarbeiten (je Lifecycle auf Schritt-Branch) — Schritt 1 abgenommen | `acceptance-schritt-{n}.md` |
-| [ ] | 7 | Abschluss und Aufräumen | – |
+| [x] | 6 | Entwicklungsschritte abarbeiten — alle 6 Schritte abgenommen (1–4 App, 5a Server, 5b App) | `acceptance-schritt-{1..5b}.md` |
+| [~] | 7 | Abschluss und Aufräumen — Restnachweise dokumentiert (Kamera-Lauf, Live-Lauf, Server-Merge) | `steps.md` |
