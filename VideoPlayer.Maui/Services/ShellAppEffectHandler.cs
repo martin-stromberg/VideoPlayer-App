@@ -118,6 +118,12 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
             case ExchangePairingCodeEffect exchange:
                 await ExchangePairingCodeAsync(exchange.ServerAddress, exchange.Code, cancellationToken);
                 break;
+            case CheckBootstrapServerEffect check:
+                await CheckBootstrapServerAsync(check.Address, check.Ticket, cancellationToken);
+                break;
+            case ExchangeBootstrapTicketEffect bootstrap:
+                await ExchangeBootstrapTicketAsync(bootstrap.ServerAddress, bootstrap.Ticket, cancellationToken);
+                break;
             case AttemptAutoLoginEffect autoLogin:
                 await AttemptAutoLoginAsync(autoLogin.ServerAddress, cancellationToken);
                 break;
@@ -1285,6 +1291,117 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
         }
 
         await DispatchMessageAsync(new PairingCompletedMessage(status));
+    }
+
+    /// <summary>
+    /// Prüft die Erreichbarkeit des Servers aus einer Ticket-Adresse
+    /// (QR-/Ticket-Onboarding): erst bei Erfolg übernimmt das Update den
+    /// Server und startet den Bootstrap-Austausch. Eine Gate-Ablehnung
+    /// zählt als „erreichbar" — der Server hat geantwortet; das Bootstrap
+    /// liefert ohnehin ein frisches Geräte-Token.
+    /// </summary>
+    /// <param name="address">Adresse aus der Ticket-Adresse.</param>
+    /// <param name="Ticket">Das einzulösende Ticket (wird an die Ergebnis-Nachricht weitergereicht).</param>
+    /// <param name="cancellationToken">Abbruchtoken.</param>
+    private async Task CheckBootstrapServerAsync(string address, string Ticket, CancellationToken cancellationToken)
+    {
+        var success = false;
+        try
+        {
+            var result = await healthProbe.CheckAsync(new Uri(address), cancellationToken);
+            success = result != HealthCheckResult.Unreachable;
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[ShellAppEffectHandler] Bootstrap-Serverprüfung fehlgeschlagen: {ex.Message}");
+        }
+
+        var host = services.GetRequiredService<MvuHost>();
+        await MainThread.InvokeOnMainThreadAsync(
+            () => host.DispatchAsync(new BootstrapServerCheckedMessage(address, success, Ticket)));
+    }
+
+    /// <summary>
+    /// Löst das Ticket gegen das verschlüsselte Session-Paket ein
+    /// (<c>api/pairing/bootstrap</c>) und persistiert Geräte-Token,
+    /// Anmelde-Token und Refresh-Token — nur wenn der Bootstrap-Kontext
+    /// noch aktuell ist (Staler-Guard wie <see cref="ExchangePairingCodeAsync"/>).
+    /// </summary>
+    /// <param name="serverAddress">Adresse des Bootstrap-Servers.</param>
+    /// <param name="ticket">Das einzulösende Ticket bzw. der Kurzcode.</param>
+    /// <param name="cancellationToken">Abbruchtoken.</param>
+    private async Task ExchangeBootstrapTicketAsync(string serverAddress, string ticket, CancellationToken cancellationToken)
+    {
+        BootstrapStatus status;
+        try
+        {
+            var payload = await pairing.BootstrapAsync(
+                new Uri(serverAddress), ticket, GetDeviceName(), cancellationToken);
+
+            // Provider-/Session-Aktivierung nur, wenn der Bootstrap-Kontext
+            // noch aktuell ist — ein zwischenzeitlich gestarteter
+            // Servercheck hat den Provider bereits umgestellt; die Session
+            // (JWT + Refresh-Token) gehört zudem zum Server des Tickets und
+            // darf bei veraltetem Kontext nicht global hinterlegt werden.
+            var model = services.GetRequiredService<MvuHost>().Model;
+            var bootstrapCurrent = model.IsBootstrapRunning
+                && ServerAddress.TryNormalize(model.ActiveServerAddress, out var activeAddress)
+                && ServerAddress.TryNormalize(serverAddress, out var pairedAddress)
+                && string.Equals(activeAddress, pairedAddress, StringComparison.OrdinalIgnoreCase);
+            if (bootstrapCurrent)
+            {
+                // Atomarer Stale-Guard: persistiert + aktiviert das
+                // Geräte-Token nur, wenn die Adresse noch der aktuell
+                // bediente Server ist (Muster: ExchangePairingCodeAsync).
+                var activated = await deviceTokens.SetPairedTokenIfCurrentAsync(
+                    serverAddress, payload.DeviceToken, cancellationToken);
+                if (activated)
+                {
+                    authSession.Client?.SetApiKey(payload.DeviceToken);
+                }
+
+                // Sitzung des Bootstrap-Pakets persistieren — die
+                // anschließende automatische Anmeldung validiert das
+                // Token und führt direkt zur Startseite.
+                await secrets.SetAuthTokenAsync(payload.Token);
+                await secrets.SetRefreshTokenAsync(payload.RefreshToken);
+            }
+            else
+            {
+                // Veralteter Kontext: das Geräte-Token bleibt unter seiner
+                // eigenen Adresse hinterlegt; die Session wird verworfen,
+                // weil sie dem Ticket-Server gehört, nicht dem aktiven.
+                await secrets.SetDeviceTokenAsync(serverAddress, payload.DeviceToken);
+            }
+
+            status = BootstrapStatus.Succeeded;
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (ApiException ex)
+        {
+            status = ex.StatusCode switch
+            {
+                HttpStatusCode.Unauthorized => BootstrapStatus.InvalidTicket,
+                HttpStatusCode.TooManyRequests => BootstrapStatus.RateLimited,
+                HttpStatusCode.BadRequest => BootstrapStatus.InvalidRequest,
+                HttpStatusCode.NotFound => BootstrapStatus.NotSupported,
+                null => BootstrapStatus.ServerUnreachable,
+                _ => BootstrapStatus.Failed
+            };
+            System.Diagnostics.Debug.WriteLine($"[ShellAppEffectHandler] Bootstrap-Austausch fehlgeschlagen: {ex.Message}");
+        }
+        catch (Exception ex)
+        {
+            // Ungültige/nicht entschlüsselbare Antwort oder sonstiger
+            // Fehler → allgemeiner Bootstrap-Fehler.
+            System.Diagnostics.Debug.WriteLine($"[ShellAppEffectHandler] Bootstrap-Austausch fehlgeschlagen: {ex.Message}");
+            status = BootstrapStatus.Failed;
+        }
+
+        await DispatchMessageAsync(new BootstrapCompletedMessage(status));
     }
 
     /// <summary>

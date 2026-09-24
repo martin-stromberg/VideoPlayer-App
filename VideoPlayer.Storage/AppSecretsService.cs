@@ -19,6 +19,12 @@ public sealed class AppSecretsService
     public const string AuthTokenKey = "AuthToken";
 
     /// <summary>
+    /// Ablageschlüssel des Refresh-Tokens (sichere Ablage) — gehört wie das
+    /// Anmelde-Token zur aktiven Sitzung des Profils, nicht zu einem Server.
+    /// </summary>
+    public const string RefreshTokenKey = "RefreshToken";
+
+    /// <summary>
     /// Basis-Schlüssel der Geräte-Tokens aus dem Pairing (sichere Ablage);
     /// der effektive Schlüssel hängt zusätzlich von der normalisierten
     /// Serveradresse ab.
@@ -68,12 +74,13 @@ public sealed class AppSecretsService
         await secrets.SetAsync(profile.PrefixKey(PasswordKey), password ?? string.Empty);
     }
 
-    /// <summary>Entfernt Benutzername, Passwort und Token des aktiven Profils.</summary>
+    /// <summary>Entfernt Benutzername, Passwort, Token und Refresh-Token des aktiven Profils.</summary>
     public async Task ClearCredentialsAsync()
     {
         settings.Remove(profile.PrefixKey(UsernameKey));
         await secrets.RemoveAsync(profile.PrefixKey(PasswordKey));
         await ClearAuthTokenAsync();
+        await ClearRefreshTokenAsync();
     }
 
     /// <summary>Anmelde-Token aus der sicheren Ablage (inkl. Legacy-Migration).</summary>
@@ -97,6 +104,27 @@ public sealed class AppSecretsService
     {
         settings.Remove(profile.PrefixKey(AuthTokenKey));
         await secrets.RemoveAsync(profile.PrefixKey(AuthTokenKey));
+    }
+
+    /// <summary>Refresh-Token der aktiven Sitzung aus der sicheren Ablage.</summary>
+    /// <returns>Das gespeicherte Refresh-Token oder <c>null</c>.</returns>
+    public async Task<string?> GetRefreshTokenAsync()
+    {
+        var token = await secrets.GetAsync(profile.PrefixKey(RefreshTokenKey));
+        return string.IsNullOrEmpty(token) ? null : token;
+    }
+
+    /// <summary>Speichert das Refresh-Token sicher (Rotation: ersetzt den Vorgänger).</summary>
+    /// <param name="token">Zu speicherndes Refresh-Token.</param>
+    public async Task SetRefreshTokenAsync(string token)
+    {
+        await secrets.SetAsync(profile.PrefixKey(RefreshTokenKey), token ?? string.Empty);
+    }
+
+    /// <summary>Entfernt das Refresh-Token aus der sicheren Ablage.</summary>
+    public async Task ClearRefreshTokenAsync()
+    {
+        await secrets.RemoveAsync(profile.PrefixKey(RefreshTokenKey));
     }
 
     /// <summary>

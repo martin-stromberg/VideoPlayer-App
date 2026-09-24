@@ -16,13 +16,26 @@ public static class MockPairingCrypto
     private const int TagLength = 16;
 
     /// <summary>
-    /// Verschlüsselt das Geräte-Token für den anfragenden Client.
+    /// Verschlüsselt das Geräte-Token für den anfragenden Client
+    /// (<c>api/pairing/exchange</c> — Klartext-Token).
     /// </summary>
     /// <param name="clientPublicKeyBase64">Öffentlicher Client-Schlüssel (SPKI/DER, Base64).</param>
     /// <param name="deviceToken">Das auszustellende Geräte-Token (Klartext).</param>
     /// <returns>Öffentlicher Serverschlüssel und verschlüsseltes Token (je Base64).</returns>
     public static (string ServerPublicKey, string EncryptedToken) EncryptToken(
-        string clientPublicKeyBase64, string deviceToken)
+        string clientPublicKeyBase64, string deviceToken) =>
+        EncryptPayload(clientPublicKeyBase64, deviceToken);
+
+    /// <summary>
+    /// Verschlüsselt ein beliebiges Paket für den anfragenden Client —
+    /// beim Bootstrap (<c>api/pairing/bootstrap</c>) das JSON-Session-Paket
+    /// mit Geräte-Token, Anmelde-Token, Ablauf und Refresh-Token.
+    /// </summary>
+    /// <param name="clientPublicKeyBase64">Öffentlicher Client-Schlüssel (SPKI/DER, Base64).</param>
+    /// <param name="payload">Das zu verschlüsselnde Paket (Klartext).</param>
+    /// <returns>Öffentlicher Serverschlüssel und verschlüsseltes Paket (je Base64).</returns>
+    public static (string ServerPublicKey, string EncryptedPayload) EncryptPayload(
+        string clientPublicKeyBase64, string payload)
     {
         using var serverKey = ECDiffieHellman.Create(ECCurve.NamedCurves.nistP256);
         using var clientKey = ECDiffieHellman.Create();
@@ -31,7 +44,7 @@ public static class MockPairingCrypto
             clientKey.PublicKey, HashAlgorithmName.SHA256, null, null, null);
 
         var nonce = RandomNumberGenerator.GetBytes(NonceLength);
-        var plaintext = Encoding.UTF8.GetBytes(deviceToken);
+        var plaintext = Encoding.UTF8.GetBytes(payload);
         var ciphertext = new byte[plaintext.Length];
         var tag = new byte[TagLength];
         using (var aes = new AesGcm(aesKey, TagLength))
@@ -39,13 +52,13 @@ public static class MockPairingCrypto
             aes.Encrypt(nonce, plaintext, ciphertext, tag);
         }
 
-        var payload = new byte[NonceLength + ciphertext.Length + TagLength];
-        nonce.CopyTo(payload, 0);
-        ciphertext.CopyTo(payload, NonceLength);
-        tag.CopyTo(payload, NonceLength + ciphertext.Length);
+        var wire = new byte[NonceLength + ciphertext.Length + TagLength];
+        nonce.CopyTo(wire, 0);
+        ciphertext.CopyTo(wire, NonceLength);
+        tag.CopyTo(wire, NonceLength + ciphertext.Length);
 
         return (
             Convert.ToBase64String(serverKey.ExportSubjectPublicKeyInfo()),
-            Convert.ToBase64String(payload));
+            Convert.ToBase64String(wire));
     }
 }

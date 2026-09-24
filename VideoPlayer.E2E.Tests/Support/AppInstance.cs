@@ -58,24 +58,28 @@ public sealed class AppInstance : IDisposable
     /// <param name="testName">Name des Tests (Teil des Profilnamens).</param>
     /// <param name="startupTimeout">Maximale Wartezeit auf API + Fenster.</param>
     /// <param name="cancellationToken">Abbruchtoken.</param>
+    /// <param name="profile">Expliziter Profilname (z. B. für einen
+    /// Neustart-Test mit dem Profil einer früheren Instanz);
+    /// <c>null</c> = frisches, eindeutiges Testprofil.</param>
     /// <returns>Die laufende Instanz.</returns>
     public static async Task<AppInstance> StartAsync(
         string exePath, string testName, TimeSpan? startupTimeout = null,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        string? profile = null)
     {
         var timeout = startupTimeout ?? TimeSpan.FromSeconds(45);
         var exeDirectory = Path.GetDirectoryName(exePath)!;
         var metadataPath = Path.Combine(exeDirectory, "devapi.json");
         TryDelete(metadataPath);
 
-        var profile = $"e2e-{Sanitize(testName)}-{Guid.NewGuid():N}";
+        var resolvedProfile = profile ?? $"e2e-{Sanitize(testName)}-{Guid.NewGuid():N}";
 
         var startInfo = new ProcessStartInfo(exePath)
         {
             WorkingDirectory = exeDirectory,
             UseShellExecute = false
         };
-        startInfo.Environment[ProfileEnvironmentVariable] = profile;
+        startInfo.Environment[ProfileEnvironmentVariable] = resolvedProfile;
         // Der statische Gate-Schlüssel darf nicht geerbt werden — sonst
         // gilt IsPairingRequired=false und der Pairing-Pfad wäre untestbar.
         startInfo.Environment.Remove(ApiTokenEnvironmentVariable);
@@ -86,7 +90,7 @@ public sealed class AppInstance : IDisposable
         try
         {
             var port = await WaitForDevApiPortAsync(metadataPath, process, timeout, cancellationToken);
-            var instance = new AppInstance(process, exeDirectory, profile, port);
+            var instance = new AppInstance(process, exeDirectory, resolvedProfile, port);
 
             // Die API meldet sich, sobald das Fenster steht — bis der
             // erste Modell-Snapshot lesbar ist, kann noch etwas Zeit
@@ -107,7 +111,16 @@ public sealed class AppInstance : IDisposable
     /// (<see cref="Process.Kill(bool)"/> als Garantie). Löscht
     /// <c>devapi.json</c> und das Profilverzeichnis.
     /// </summary>
-    public void Dispose()
+    public void Dispose() => Dispose(deleteProfile: true);
+
+    /// <summary>
+    /// Beendet die App wie <see cref="Dispose"/>, lässt das
+    /// Profilverzeichnis aber auf Wunsch bestehen — für Neustart-Tests,
+    /// die mit derselben Ablage weiterarbeiten (die Folge-Instanz räumt
+    /// dann beim regulären Dispose auf).
+    /// </summary>
+    /// <param name="deleteProfile"><c>true</c> = Profilverzeichnis entfernen (Standard).</param>
+    public void Dispose(bool deleteProfile)
     {
         if (disposed)
         {
@@ -137,7 +150,10 @@ public sealed class AppInstance : IDisposable
         {
             process.Dispose();
             TryDelete(Path.Combine(exeDirectory, "devapi.json"));
-            DeleteProfileDirectory();
+            if (deleteProfile)
+            {
+                DeleteProfileDirectory();
+            }
             automation.Dispose();
         }
     }

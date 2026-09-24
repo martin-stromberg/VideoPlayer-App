@@ -53,6 +53,11 @@
     <PackageReference Include="CommunityToolkit.Maui.MediaElement" Version="10.0.0" />
     <PackageReference Include="Microsoft.AspNetCore.SignalR.Client" Version="10.0.10" />
     <PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="10.0.10" />
+    <!-- QR-/Ticket-Onboarding: Kamera-Scan nur iOS/Android (MIT-Lizenz;
+         ZXing hat keinen Windows-Kamera-Support — Windows/MacCatalyst
+         nutzen den manuellen Ticket-Einstieg). -->
+    <PackageReference Include="ZXing.Net.Maui.Controls" Version="0.10.4"
+                      Condition="'$(TargetFramework)' == 'net10.0-android' or '$(TargetFramework)' == 'net10.0-ios'" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\VideoPlayer.ApiClient\VideoPlayer.ApiClient.csproj" />

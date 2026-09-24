@@ -129,6 +129,51 @@ public class VideoPlayerApiClient
         return token;
     }
 
+    /// <summary>
+    /// Erneuert die Sitzung über den Refresh-Token
+    /// (<c>POST api/auth/refresh</c>): der Server rotiert den Refresh-Token
+    /// atomar — die Antwort enthält das neue Anmelde-Token und den
+    /// Nachfolge-Refresh-Token. Der Endpunkt liegt hinter dem Client-Gate;
+    /// der Header wird wie bei allen Anfragen dieses Clients mitgesendet.
+    /// Keine 401-Erneuerung auf diesem Aufruf (der Aufruf <b>ist</b> die
+    /// Erneuerung).
+    /// </summary>
+    /// <param name="refreshToken">Der aktuell gültige Refresh-Token.</param>
+    /// <param name="cancellationToken">Abbruchtoken.</param>
+    /// <returns>Die erneuerte Sitzung (Anmelde-Token + rotierter Refresh-Token).</returns>
+    public async Task<RefreshSessionResult> RefreshSessionAsync(
+        string refreshToken,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(refreshToken);
+
+        return await PostJsonAsync<RefreshSessionResult>(
+            "api/auth/refresh",
+            new RefreshTokenRequest { RefreshToken = refreshToken },
+            cancellationToken,
+            allowReauth: false);
+    }
+
+    /// <summary>
+    /// Widerruft den Refresh-Token serverseitig
+    /// (<c>POST api/auth/logout</c>). Der Endpunkt ist idempotent und
+    /// antwortet auch bei bereits ungültigem Token mit HTTP 200.
+    /// </summary>
+    /// <param name="refreshToken">Der zu widerrufende Refresh-Token.</param>
+    /// <param name="cancellationToken">Abbruchtoken.</param>
+    public async Task LogoutSessionAsync(
+        string refreshToken,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(refreshToken);
+
+        await PostJsonAsync(
+            "api/auth/logout",
+            new RefreshTokenRequest { RefreshToken = refreshToken },
+            cancellationToken,
+            allowReauth: false);
+    }
+
     #endregion
 
     #region Health

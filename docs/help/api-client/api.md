@@ -30,6 +30,20 @@ Der Server kann `429 Too Many Requests` liefern; der Client wiederholt dann wie 
 
 **Fehler:** `ApiException`, `ArgumentException` bei leeren Zugangsdaten.
 
+### `RefreshSessionAsync(refreshToken)` / `POST api/auth/refresh`
+
+**Beschreibung:** Erneuert die Sitzung ohne Zugangsdaten. Der Server rotiert den Refresh-Token dabei — der alte ist ab der Antwort ungültig und muss sofort ersetzt werden. Keine 401-Erneuerung auf diesem Aufruf (`allowReauth: false`).
+
+**Rückgabe:** `RefreshSessionResult` (`Token`, `Expires`, `RefreshToken` — der rotierte Nachfolge-Token).
+
+**Fehler:** `ApiException` mit `StatusCode` 401 bei ungültigem/abgelaufenem Refresh-Token (Sitzung ist zu beenden, Anmeldemaske), `ArgumentException` bei leerem Token.
+
+### `LogoutSessionAsync(refreshToken)` / `POST api/auth/logout`
+
+**Beschreibung:** Widerruft den Refresh-Token serverseitig — idempotent, antwortet auch bei bereits ungültigem Token mit HTTP 200. Best-effort beim Abmelden aufzurufen; anschließend lokale Geheimnisse löschen. Keine 401-Erneuerung auf diesem Aufruf.
+
+**Fehler:** `ApiException` (vom Aufrufer zu schlucken — der lokale Logout ist davon unabhängig), `ArgumentException` bei leerem Token.
+
 ### `CheckHealthAsync()` / `GET api/health`
 
 **Rückgabe:** `HealthCheckResult` — `Reachable` bei Erfolgsantwort, `GateRejected` bei HTTP 401 (das Client-Gate lehnt den Schlüssel ab, z. B. ein widerrufenes Geräte-Token), `Unreachable` bei sonstigem Fehlschlag oder Nichterreichbarkeit.
@@ -47,6 +61,14 @@ Der Server kann `429 Too Many Requests` liefern; der Client wiederholt dann wie 
 **Rückgabe:** `string` — das entschlüsselte Geräte-Token (anschließend als `X-API-Key` zu verwenden und sicher zu hinterlegen).
 
 **Fehler:** `ApiException` mit `StatusCode` 400 (ungültige Anfrage), 401 (Code ungültig/abgelaufen/verbraucht), 404 (Server ohne Pairing-Endpunkt), 429 (Ratenlimit/IP-Sperre), `null` (Transportfehler); `CryptographicException` bei ungültiger/nicht entschlüsselbarer Antwort.
+
+### `DevicePairingClient.BootstrapAsync(baseAddress, ticket, deviceName)` / `POST api/pairing/bootstrap`
+
+**Beschreibung:** Öffentlicher Onboarding-Endpunkt — löst ein serverseitig erzeugtes Pairing-Ticket (aus dem Kopplungs-QR-Code der Serververwaltung; ein 8-stelliger Kurzcode gilt als Ticket-Alias) gegen ein komplettes Session-Paket ein. Gleicher Handshake wie `ExchangeAsync`: flüchtiges ECDH-P-256-Schlüsselpaar, `clientPublicKey` (SPKI/DER, Base64) samt `ticket` und optionalem `deviceName`; `encryptedPayload` der Antwort wird per AES-256-GCM entschlüsselt (`nonce(12) ‖ ciphertext ‖ tag(16)`). Sendet bewusst **keinen** `X-API-Key`- und **keinen** Bearer-Header, ohne Wiederholungen. Die Payload enthält zusätzlich zum Geräte-Token ein Anmelde-Token samt Ablauf und einen Refresh-Token — der übliche Login-Schritt entfällt.
+
+**Rückgabe:** `BootstrapResult` (`DeviceToken`, `Token`, `Expires`, `RefreshToken`).
+
+**Fehler:** `ApiException` mit `StatusCode` 400 (ungültige Anfrage), 401 (Ticket ungültig/abgelaufen/verbraucht), 404 (Server ohne Bootstrap-Endpunkt), 429 (Ratenlimit/IP-Sperre), `null` (Transportfehler); `CryptographicException` bei ungültiger/nicht entschlüsselbarer Antwort; `InvalidOperationException` bei strukturell unvollständiger Payload.
 
 ### `GetSourcesAsync()` / `GET api/Sources` · `GetSourceAsync(id)` / `GET api/Sources/{id}` · `GetSourceGenresAsync(id)` / `GET api/SourceGenres/{id}`
 

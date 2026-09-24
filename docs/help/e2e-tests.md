@@ -24,7 +24,7 @@ mitlaufender lokaler Mock-Server — kein reales Server-Deployment nötig.
 dotnet test VideoPlayer.E2E.Tests/VideoPlayer.E2E.Tests.csproj
 ```
 
-Erwartetes Ergebnis: 11 Tests, alle bestanden (Laufzeit ca. 15–20 min,
+Erwartetes Ergebnis: 17 Tests, alle bestanden (Laufzeit ca. 20–25 min,
 geprägt von App-Starts und echten Wartezeiten, u. a. beim
 nicht-erreichbaren Server).
 
@@ -42,15 +42,18 @@ nicht-erreichbaren Server).
   `CollectionView`), `POST /set-text`.
 - **`MockVideoServer`** — `TcpListener` auf `127.0.0.1` mit OS-Port;
   implementiert `api/health`, `api/pairing/exchange` (ECDH P-256 +
-  AES-256-GCM, deckungsgleich mit `PairingCrypto`), `api/auth/login`
-  und die Listen-Endpunkte, die Home/Synchronisation benötigen.
+  AES-256-GCM, deckungsgleich mit `PairingCrypto`), `api/pairing/bootstrap`
+  (Ticket → verschlüsseltes Session-Paket inkl. Refresh-Token,
+  Kurzcode-Alias), `api/auth/login`, `api/auth/refresh` (atomare
+  Refresh-Rotation) und `api/auth/logout` (idempotenter Widerruf)
+  sowie die Listen-Endpunkte, die Home/Synchronisation benötigen.
   Unterscheidet Gate-Ablehnung (`application/problem+json`) von
   Credential-Ablehnung (`text/plain`) wie der echte Server.
 - **`UiDriver`** — AutomationId-Suche, Texteingabe per Value-Pattern,
   Button-Invoke, Flyout-Navigation per `SelectionItem` — bewusst ohne
   Koordinatenklicks.
 
-## Szenarien (11 Tests)
+## Szenarien (17 Tests)
 
 - **Server-Einrichtung** (5): Erststart zeigt die Einrichtungsseite
   (inkl. `ConnectCard` im Elementbaum); ungültige Adresse →
@@ -66,6 +69,14 @@ nicht-erreichbaren Server).
   über Einstellungen auf Server B wechseln, dann Server A aus der
   Liste bekannter Server per `/invoke` `itemIndex` auswählen →
   Rückkehr zur Startseite mit Server A (Regression aus Issue #15).
+- **Bootstrap** (6): Ticket-Adresse → direkt auf die Startseite ohne
+  Anmeldung (Server wird vorher übernommen); Kurzcode auf dem
+  verbundenen Server → Startseite; ungültiges Ticket →
+  Kopplungs-Fehler vom Server; nicht erreichbarer Ticket-Server →
+  Fehler ohne Speicherung; fehlerhafte Eingabe → lokaler
+  Validierungsfehler ohne Serverkontakt; Bootstrap-Sitzung
+  übersteht einen App-Neustart (Refresh-/Geräte-Token bleiben
+  wirksam, keine erneute Eingabe).
 
 ## Grenzen und Hinweise
 
