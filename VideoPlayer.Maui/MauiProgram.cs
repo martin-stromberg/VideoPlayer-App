@@ -28,6 +28,13 @@ namespace VideoPlayer.Maui
             // PiP; Windows: MediaPlayerElement).
             builder.UseMauiCommunityToolkitMediaElement(true);
 
+#if ANDROID || IOS
+            // QR-/Ticket-Onboarding: Kamera-Scan nur auf Mobilgeräten
+            // (ZXing.Net.Maui.Controls 0.10.4; Windows/MacCatalyst nutzen
+            // den manuellen Ticket-Einstieg der ServerSetupPage).
+            builder.UseBarcodeReader();
+#endif
+
             // MVU-Zyklus: Host hält das unveränderliche App-Model, der Effekt-Handler
             // führt Navigation und Server-Erreichbarkeitsprüfung am App-Rand aus.
             builder.Services.AddSingleton<IServerAddressProvider, ServerAddressProvider>();
@@ -119,6 +126,13 @@ namespace VideoPlayer.Maui
                 fonts.AddFont("OpenSans-Regular.ttf", "OpenSansRegular");
                 fonts.AddFont("OpenSans-Semibold.ttf", "OpenSansSemibold");
             });
+
+#if DEBUG || DEV_API
+            // Developer-API (nur Debug oder explizites Opt-in via DEV_API-Define,
+            // niemals Release): lokaler Mini-HTTP-Server auf 127.0.0.1 zur
+            // UI-Automatisierung; Start erfolgt in App.CreateWindow.
+            builder.Services.AddSingleton<DevApi.DevApiService>();
+#endif
 
 #if DEBUG
             builder.Logging.AddDebug();

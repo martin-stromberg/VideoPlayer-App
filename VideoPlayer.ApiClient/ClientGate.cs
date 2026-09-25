@@ -37,13 +37,20 @@ public static class ClientGate
     public const string ApiTokenFileName = "client-api-token.txt";
 
     /// <summary>
+    /// Umgebungsvariable des Anwendungsprofils — spiegelt
+    /// <c>AppProfile.EnvironmentVariable</c> (VideoPlayer.Storage), ohne
+    /// eine Projekt-Abhängigkeit einzuführen.
+    /// </summary>
+    private const string ProfileEnvironmentVariable = "VIDEOPLAYER_PROFILE";
+
+    /// <summary>
     /// Verzeichnis der Token-Datei: <c>%LocalAppData%/VideoPlayer</c>
     /// bzw. das plattformspezifische lokale Anwendungsdatenverzeichnis.
+    /// Mit gesetztem <c>VIDEOPLAYER_PROFILE</c> liegt die Datei im
+    /// Profil-Unterverzeichnis — ein isoliertes Profil (E2E-Tests)
+    /// erbt so nicht den Gate-Schlüssel des Standardprofils.
     /// </summary>
-    public static string TokenFileDirectory { get; } =
-        Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "VideoPlayer");
+    public static string TokenFileDirectory { get; } = ResolveTokenFileDirectory();
 
     /// <summary>Vollständiger Pfad der Token-Datei.</summary>
     public static string TokenFilePath { get; } =
@@ -119,6 +126,21 @@ public static class ClientGate
             .GetCustomAttributes<AssemblyMetadataAttribute>()
             .FirstOrDefault(attribute => attribute.Key == ApiTokenAssemblyMetadataKey)
             ?.Value;
+    }
+
+    private static string ResolveTokenFileDirectory()
+    {
+        var root = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "VideoPlayer");
+
+        // Normalisierung wie AppProfile.Create: trimmen, kleinschreiben,
+        // leer/„default" = Standardprofil ohne Unterverzeichnis.
+        var profile = Environment.GetEnvironmentVariable(ProfileEnvironmentVariable)
+            ?.Trim().ToLowerInvariant();
+        return string.IsNullOrEmpty(profile) || profile == "default"
+            ? root
+            : Path.Combine(root, profile);
     }
 
     private static string? ReadTokenFile()

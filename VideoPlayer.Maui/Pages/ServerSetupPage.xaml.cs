@@ -20,6 +20,15 @@ public partial class ServerSetupPage : ContentPage
     {
         InitializeComponent();
         this.mvuHost = mvuHost;
+        // BindingContext für die XAML-Trigger des Status-Badges
+        // (Model.ServerHealth); MvuHost meldet PropertyChanged("Model").
+        BindingContext = mvuHost;
+#if ANDROID || IOS
+        // Kamera-Scan nur auf Mobilgeräten — Windows/MacCatalyst bekommen
+        // den manuellen Einstieg über das Ticket-Feld (ZXing hat keinen
+        // Windows-Kamera-Support; die App ist unpackaged).
+        QrScanButton.IsVisible = true;
+#endif
         UpdateUi(mvuHost.Model);
     }
 
@@ -50,6 +59,13 @@ public partial class ServerSetupPage : ContentPage
         ActiveServerSection.IsVisible = model.ActiveServerAddress is not null;
         ActiveServerLabel.Text = model.ActiveServerAddress;
 
+        // Status-Badge des aktiven Servers: Text aus dem Model, die
+        // Farben ergeben sich über die XAML-Trigger (Model.ServerHealth).
+        ServerHealthLabel.Text = model.ServerHealthText;
+        ServerHealthIndicator.IsRunning = model.ServerHealth == ServerHealthStatus.Checking;
+        ServerHealthIndicator.IsVisible = model.ServerHealth == ServerHealthStatus.Checking;
+        ServerHealthDot.IsVisible = model.ServerHealth != ServerHealthStatus.Checking;
+
         KnownServersView.ItemsSource = model.KnownServers;
         KnownServersHeader.IsVisible = model.KnownServers.Count > 0;
         KnownServersView.IsVisible = model.KnownServers.Count > 0;
@@ -58,12 +74,19 @@ public partial class ServerSetupPage : ContentPage
         DiscoveredServersView.IsVisible = model.DiscoveredServers.Count > 0;
         DiscoveryIndicator.IsRunning = model.IsDiscoveryRunning;
         DiscoveryIndicator.IsVisible = model.IsDiscoveryRunning;
+        DiscoveryRunningLabel.IsVisible = model.IsDiscoveryRunning;
         DiscoverButton.IsEnabled = !model.IsDiscoveryRunning;
         DiscoveryEmptyLabel.IsVisible =
             model.DiscoveryAttempted && !model.IsDiscoveryRunning && model.DiscoveredServers.Count == 0;
 
         CheckIndicator.IsRunning = model.IsServerCheckRunning;
         CheckIndicator.IsVisible = model.IsServerCheckRunning;
+        // Nach erfolgreicher Prüfung läuft die Anzeige während der
+        // automatischen Anmeldung weiter — der Text benennt die Phase.
+        CheckStatusLabel.Text = model.ConnectionState == ConnectionState.Connecting
+            ? "Verbindung wird hergestellt …"
+            : "Verbindung wird geprüft …";
+        CheckStatusLabel.IsVisible = model.IsServerCheckRunning;
         ConnectButton.IsEnabled = !model.IsServerCheckRunning;
 
         ErrorLabel.Text = model.ServerSetupError;
@@ -75,10 +98,24 @@ public partial class ServerSetupPage : ContentPage
         PairingSection.IsVisible = model.IsPairingRequired;
         PairingIndicator.IsRunning = model.IsPairingRunning;
         PairingIndicator.IsVisible = model.IsPairingRunning;
+        PairingRunningLabel.IsVisible = model.IsPairingRunning;
         PairButton.IsEnabled = !model.IsPairingRunning;
         PairingCodeEntry.IsEnabled = !model.IsPairingRunning;
         PairingErrorLabel.Text = model.PairingError;
         PairingErrorLabel.IsVisible = model.PairingError is not null;
+
+        // Kopplungs-Abschnitt (QR-/Ticket-Onboarding): immer sichtbar —
+        // die Ticket-Adresse trägt den Server selbst; während einer
+        // Serverprüfung oder des Bootstraps bleibt die Eingabe gesperrt.
+        var bootstrapBusy = model.IsBootstrapRunning || model.IsServerCheckRunning;
+        BootstrapIndicator.IsRunning = model.IsBootstrapRunning;
+        BootstrapIndicator.IsVisible = model.IsBootstrapRunning;
+        BootstrapRunningLabel.IsVisible = model.IsBootstrapRunning;
+        BootstrapButton.IsEnabled = !bootstrapBusy;
+        BootstrapTicketEntry.IsEnabled = !bootstrapBusy;
+        QrScanButton.IsEnabled = !bootstrapBusy;
+        BootstrapErrorLabel.Text = model.BootstrapError;
+        BootstrapErrorLabel.IsVisible = model.BootstrapError is not null;
     }
 
     private void OnDiscoverClicked(object? sender, EventArgs e)
@@ -94,6 +131,53 @@ public partial class ServerSetupPage : ContentPage
     private void OnPairClicked(object? sender, EventArgs e)
     {
         _ = mvuHost.DispatchAsync(new PairingCodeSubmittedMessage(PairingCodeEntry.Text ?? string.Empty));
+    }
+
+    private void OnBootstrapClicked(object? sender, EventArgs e)
+    {
+        _ = mvuHost.DispatchAsync(new BootstrapTicketSubmittedMessage(BootstrapTicketEntry.Text ?? string.Empty));
+    }
+
+    private async void OnQrScanClicked(object? sender, EventArgs e)
+    {
+#if ANDROID || IOS
+        try
+        {
+            // Geräte ohne Kamera und verweigerte Permission werden lokal
+            // abgefangen — der Kopplungs-Fluss startet erst mit einem
+            // gelesenen Code, daher kein Model-Fehler.
+            if (!ZXing.Net.Maui.BarcodeScanning.IsSupported)
+            {
+                await DisplayAlert(
+                    "Kamera nicht verfügbar",
+                    "Dieses Gerät hat keine nutzbare Kamera. Bitte die Ticket-Adresse oder den Kurzcode eingeben.",
+                    "OK");
+                return;
+            }
+
+            var permission = await Permissions.RequestAsync<Permissions.Camera>();
+            if (permission != PermissionStatus.Granted)
+            {
+                await DisplayAlert(
+                    "Kamera-Zugriff fehlt",
+                    "Bitte den Kamera-Zugriff erlauben oder die Ticket-Adresse bzw. den Kurzcode eingeben.",
+                    "OK");
+                return;
+            }
+
+            await Navigation.PushModalAsync(new QrScannerPage(mvuHost));
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[ServerSetupPage] QR-Scan konnte nicht gestartet werden: {ex.Message}");
+            await DisplayAlert(
+                "Scan nicht möglich",
+                "Der QR-Scan konnte nicht gestartet werden. Bitte die Ticket-Adresse oder den Kurzcode eingeben.",
+                "OK");
+        }
+#else
+        await Task.CompletedTask;
+#endif
     }
 
     private void OnDiscoveredSelectionChanged(object? sender, SelectionChangedEventArgs e)

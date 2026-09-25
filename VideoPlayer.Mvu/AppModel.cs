@@ -104,6 +104,18 @@ public sealed record AppModel
     public string? PairingError { get; init; }
 
     /// <summary>
+    /// Der Bootstrap-Austausch des QR-/Ticket-Onboardings läuft
+    /// (Serverprüfung der Ticket-Adresse oder <c>api/pairing/bootstrap</c>).
+    /// </summary>
+    public bool IsBootstrapRunning { get; init; }
+
+    /// <summary>
+    /// Inline-Fehlertext der Kopplungs-Eingabe (ungültige Eingabe, Ticket
+    /// abgelehnt, Sperrung, Server nicht erreichbar); <c>null</c> = kein Fehler.
+    /// </summary>
+    public string? BootstrapError { get; init; }
+
+    /// <summary>
     /// Startseiten-Liste „Weiterschauen" — Stand der lokalen Cache-Ablage
     /// (Cache-First beim Start, aktualisiert nach Synchronisation und
     /// Server-Ereignissen).

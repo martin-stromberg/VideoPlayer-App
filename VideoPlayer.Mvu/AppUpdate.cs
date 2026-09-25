@@ -50,6 +50,27 @@ public static class AppUpdate
     /// <summary>Fehlertext der Pairing-Eingabe, nachdem der Server das Geräte-Token verworfen hat.</summary>
     public const string DeviceRevokedError = "Der Geräte-Zugang wurde vom Server abgelehnt. Bitte das Gerät erneut koppeln.";
 
+    /// <summary>Hinweistext der Kopplungs-Eingabe bei leerer oder nicht als Ticket-Adresse/Kurzcode lesbarer Eingabe.</summary>
+    public const string InvalidBootstrapInputError = "Bitte eine gültige Ticket-Adresse oder einen gültigen Kurzcode eingeben.";
+
+    /// <summary>Hinweistext der Kopplungs-Eingabe, wenn ein Kurzcode ohne verbundenen Server eingegeben wird.</summary>
+    public const string BootstrapNeedsServerError = "Für einen Kurzcode muss zuerst ein Server verbunden sein — oder die vollständige Ticket-Adresse eingeben.";
+
+    /// <summary>Fehlertext der Kopplungs-Eingabe bei ungültigem/abgelaufenem Ticket (HTTP 400/401).</summary>
+    public const string InvalidBootstrapTicketError = "Der Kopplungscode ist ungültig oder abgelaufen. Bitte in der Serververwaltung (Profilseite „Geräte“) einen neuen Code erstellen.";
+
+    /// <summary>Fehlertext der Kopplungs-Eingabe bei serverseitiger Versuchssperre (HTTP 429).</summary>
+    public const string BootstrapRateLimitedError = "Zu viele Kopplungsversuche. Bitte später erneut versuchen.";
+
+    /// <summary>Fehlertext der Kopplungs-Eingabe bei Servern ohne Bootstrap-Endpunkt (HTTP 404).</summary>
+    public const string BootstrapNotSupportedError = "Der Server unterstützt das Koppeln per Code nicht — bitte den Server aktualisieren oder dich an die Person wenden, die den Server eingerichtet hat.";
+
+    /// <summary>Fehlertext der Kopplungs-Eingabe bei nicht erreichbarem Server aus der Ticket-Adresse.</summary>
+    public const string BootstrapServerUnreachableError = "Der Server aus dem Kopplungscode ist nicht erreichbar. Bitte die Verbindung prüfen.";
+
+    /// <summary>Fehlertext der Kopplungs-Eingabe bei sonstigen Bootstrap-Fehlern.</summary>
+    public const string BootstrapFailedError = "Das Koppeln ist fehlgeschlagen. Bitte erneut versuchen.";
+
     /// <summary>Fehlertext der Wiedergabeseite bei nicht verfügbarer/abspielbarer Quelle.</summary>
     public const string PlaybackUnavailableError = "Das Video kann nicht abgespielt werden.";
 
@@ -86,6 +107,9 @@ public static class AppUpdate
             PairingCodeSubmittedMessage submitted => UpdatePairingCodeSubmitted(model, submitted),
             PairingCompletedMessage completed => UpdatePairingCompleted(model, completed),
             DeviceTokenRevokedMessage => UpdateDeviceTokenRevoked(model),
+            BootstrapTicketSubmittedMessage submitted => UpdateBootstrapTicketSubmitted(model, submitted),
+            BootstrapServerCheckedMessage check => UpdateBootstrapServerChecked(model, check),
+            BootstrapCompletedMessage completed => UpdateBootstrapCompleted(model, completed),
             AutoLoginCompletedMessage autoLogin => UpdateAutoLoginCompleted(model, autoLogin),
             LoginSubmittedMessage submitted => UpdateLoginSubmitted(model, submitted),
             LoginCompletedMessage completed => UpdateLoginCompleted(model, completed),
@@ -291,9 +315,9 @@ public static class AppUpdate
 
     private static AppTransition BeginServerCheck(AppModel model, string normalizedAddress, string? displayName)
     {
-        // Eine neue Serverprüfung ersetzt den Pairing-Kontext — ein alter
-        // Pairing-Fehler oder ein hängendes IsPairingRequired darf nicht
-        // über den nächsten Check hinweg sichtbar bleiben.
+        // Eine neue Serverprüfung ersetzt den Pairing-/Bootstrap-Kontext —
+        // ein alter Fehler oder ein hängender Zustand darf nicht über den
+        // nächsten Check hinweg sichtbar bleiben.
         return new AppTransition(
             model with
             {
@@ -301,7 +325,9 @@ public static class AppUpdate
                 ServerSetupError = null,
                 IsPairingRequired = false,
                 IsPairingRunning = false,
-                PairingError = null
+                PairingError = null,
+                IsBootstrapRunning = false,
+                BootstrapError = null
             },
             [new CheckCandidateServerEffect(normalizedAddress, displayName)]);
     }
@@ -317,7 +343,9 @@ public static class AppUpdate
                     ServerSetupError = UnreachableServerError,
                     IsPairingRequired = false,
                     IsPairingRunning = false,
-                    PairingError = null
+                    PairingError = null,
+                    IsBootstrapRunning = false,
+                    BootstrapError = null
                 },
                 []);
         }
@@ -352,6 +380,8 @@ public static class AppUpdate
                 IsPairingRequired = true,
                 IsPairingRunning = false,
                 PairingError = null,
+                IsBootstrapRunning = false,
+                BootstrapError = null,
                 ConnectionState = ConnectionState.NeedsServerSetup,
                 CurrentPage = AppPage.ServerSetup
             };
@@ -382,6 +412,8 @@ public static class AppUpdate
                 IsPairingRequired = false,
                 IsPairingRunning = false,
                 PairingError = null,
+                IsBootstrapRunning = false,
+                BootstrapError = null,
                 SourcesOverview = SourcesOverviewState.Initial,
                 SourceBrowser = SourceBrowserState.Empty,
                 // Auch das servergenerierte Hero-Bild gehört zum
@@ -439,7 +471,9 @@ public static class AppUpdate
                 ServerHealth = ServerHealthStatus.Unreachable,
                 IsPairingRequired = false,
                 IsPairingRunning = false,
-                PairingError = null
+                PairingError = null,
+                IsBootstrapRunning = false,
+                BootstrapError = null
             },
             [new CheckOfflineDataEffect()]);
     }
@@ -551,6 +585,146 @@ public static class AppUpdate
         _ => PairingFailedError
     };
 
+    private static AppTransition UpdateBootstrapTicketSubmitted(AppModel model, BootstrapTicketSubmittedMessage message)
+    {
+        if (model.IsBootstrapRunning)
+        {
+            // Doppel-Submit bei laufendem Bootstrap ignorieren (Muster:
+            // UpdatePairingCodeSubmitted).
+            return AppTransition.Unchanged(model);
+        }
+
+        if (!BootstrapTicketParser.TryParse(message.Text, out var ticket) || ticket is null)
+        {
+            // Lokale Prüfung: kein Server-Kontakt — die Eingabe ist keine
+            // lesbare Ticket-Adresse und kein Kurzcode.
+            return new AppTransition(
+                model with { BootstrapError = InvalidBootstrapInputError },
+                []);
+        }
+
+        if (ticket.Kind == BootstrapTicketKind.Url)
+        {
+            // Die Ticket-Adresse trägt den Server selbst: zuerst die
+            // Erreichbarkeit prüfen — erst danach wird der Server
+            // übernommen und der Bootstrap-Austausch gestartet.
+            return new AppTransition(
+                model with { IsBootstrapRunning = true, BootstrapError = null },
+                [new CheckBootstrapServerEffect(ticket.ServerAddress!, ticket.Ticket)]);
+        }
+
+        // Kurzcode: wird gegen den bereits verbundenen (geprüften)
+        // Server eingelöst — ohne aktiven Server ist die Eingabe
+        // unvollständig, nicht ungültig.
+        if (model.ActiveServerAddress is null)
+        {
+            return new AppTransition(
+                model with { BootstrapError = BootstrapNeedsServerError },
+                []);
+        }
+
+        return new AppTransition(
+            model with { IsBootstrapRunning = true, BootstrapError = null },
+            [new ExchangeBootstrapTicketEffect(model.ActiveServerAddress, ticket.Ticket)]);
+    }
+
+    private static AppTransition UpdateBootstrapServerChecked(AppModel model, BootstrapServerCheckedMessage message)
+    {
+        if (!model.IsBootstrapRunning)
+        {
+            // Verspätetes Prüfergebnis — der Bootstrap-Kontext wurde
+            // bereits ersetzt (Muster: UpdatePairingCompleted).
+            return AppTransition.Unchanged(model);
+        }
+
+        if (!message.Success)
+        {
+            return new AppTransition(
+                model with
+                {
+                    IsBootstrapRunning = false,
+                    BootstrapError = BootstrapServerUnreachableError
+                },
+                []);
+        }
+
+        // Der Server aus der Ticket-Adresse ist erreichbar: als aktiven
+        // Server übernehmen und in die bekannten Server aufnehmen
+        // (PersistActiveServerEffect läuft vor dem Austausch — der
+        // Gate-Provider steht dann bereit), dann erst das Ticket einlösen.
+        var normalized = ServerAddress.Normalize(message.Address);
+        var server = new KnownServer
+        {
+            Address = normalized,
+            DisplayName = string.Empty,
+            LastUsedAtUtc = DateTime.UtcNow
+        };
+
+        var known = model.KnownServers
+            .Where(s => !string.Equals(s.Address, normalized, StringComparison.OrdinalIgnoreCase))
+            .ToList();
+        known.Insert(0, server);
+
+        return new AppTransition(
+            model with
+            {
+                IsBootstrapRunning = true,
+                BootstrapError = null,
+                ActiveServerAddress = normalized,
+                KnownServers = known,
+                ServerHealth = ServerHealthStatus.Reachable
+            },
+            [new PersistActiveServerEffect(normalized, null), new ExchangeBootstrapTicketEffect(normalized, message.Ticket)]);
+    }
+
+    private static AppTransition UpdateBootstrapCompleted(AppModel model, BootstrapCompletedMessage message)
+    {
+        if (!model.IsBootstrapRunning)
+        {
+            // Verspätetes Ergebnis — der Bootstrap-Kontext wurde ersetzt.
+            return AppTransition.Unchanged(model);
+        }
+
+        if (message.Status == BootstrapStatus.Succeeded)
+        {
+            // Das Session-Paket liegt bereits in der sicheren Ablage —
+            // die automatische Anmeldung validiert das Token und führt
+            // über EnterConnected direkt zur Startseite (keine Adress-/
+            // Passworteingabe).
+            var updated = model with
+            {
+                IsBootstrapRunning = false,
+                IsPairingRequired = false,
+                PairingError = null,
+                BootstrapError = null,
+                ConnectionState = ConnectionState.Connecting
+            };
+            return model.ActiveServerAddress is null
+                ? new AppTransition(updated, [])
+                : new AppTransition(updated, [new AttemptAutoLoginEffect(model.ActiveServerAddress)]);
+        }
+
+        // Fehler bleiben inline auf der Kopplungs-Eingabe — der Benutzer
+        // kann den Code korrigiert erneut senden.
+        return new AppTransition(
+            model with
+            {
+                IsBootstrapRunning = false,
+                BootstrapError = BootstrapErrorFor(message.Status)
+            },
+            []);
+    }
+
+    private static string BootstrapErrorFor(BootstrapStatus status) => status switch
+    {
+        BootstrapStatus.InvalidTicket => InvalidBootstrapTicketError,
+        BootstrapStatus.InvalidRequest => InvalidBootstrapTicketError,
+        BootstrapStatus.RateLimited => BootstrapRateLimitedError,
+        BootstrapStatus.NotSupported => BootstrapNotSupportedError,
+        BootstrapStatus.ServerUnreachable => BootstrapServerUnreachableError,
+        _ => BootstrapFailedError
+    };
+
     private static AppTransition UpdateDeviceTokenRevoked(AppModel model)
     {
         if (model.ConnectionState == ConnectionState.NeedsServerSetup && model.IsPairingRequired)
@@ -564,6 +738,8 @@ public static class AppUpdate
             IsStartupRunning = false,
             IsServerCheckRunning = false,
             IsPairingRunning = false,
+            IsBootstrapRunning = false,
+            BootstrapError = null,
             IsLoginRunning = false,
             IsPairingRequired = true,
             // Das Gate hat geantwortet — der Server ist erreichbar.

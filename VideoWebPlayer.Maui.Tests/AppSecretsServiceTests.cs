@@ -219,4 +219,72 @@ public class AppSecretsServiceTests
         Assert.Null(await service.GetDeviceTokenAsync("http://nas/"));
         Assert.False(await service.HasDeviceTokenAsync("http://nas/"));
     }
+
+    /// <summary>Prüft Refresh-Token: landet ausschließlich im SecretStore (nie in den Einstellungen).</summary>
+    [Fact]
+    public async Task RefreshToken_GoesToSecretStore_Only()
+    {
+        var settings = new InMemorySettingsStore();
+        var secrets = new InMemorySecretStore();
+        var service = CreateService(settings, secrets);
+
+        await service.SetRefreshTokenAsync("refresh-1");
+
+        Assert.Contains(AppSecretsService.RefreshTokenKey, secrets.Keys);
+        Assert.DoesNotContain(AppSecretsService.RefreshTokenKey, settings.Keys);
+        Assert.Equal("refresh-1", await service.GetRefreshTokenAsync());
+    }
+
+    /// <summary>Prüft Refresh-Token: die Rotation ersetzt den Vorgänger-Wert.</summary>
+    [Fact]
+    public async Task SetRefreshToken_Rotation_ReplacesValue()
+    {
+        var service = CreateService(new InMemorySettingsStore(), new InMemorySecretStore());
+
+        await service.SetRefreshTokenAsync("refresh-alt");
+        await service.SetRefreshTokenAsync("refresh-neu");
+
+        Assert.Equal("refresh-neu", await service.GetRefreshTokenAsync());
+    }
+
+    /// <summary>Prüft Refresh-Token: ist pro Profil isoliert.</summary>
+    [Fact]
+    public async Task RefreshToken_IsProfileIsolated()
+    {
+        var settings = new InMemorySettingsStore();
+        var secrets = new InMemorySecretStore();
+        var defaultService = CreateService(settings, secrets);
+        var otherService = CreateService(settings, secrets, "second");
+
+        await defaultService.SetRefreshTokenAsync("refresh-default");
+        await otherService.SetRefreshTokenAsync("refresh-second");
+
+        Assert.Equal("refresh-default", await defaultService.GetRefreshTokenAsync());
+        Assert.Equal("refresh-second", await otherService.GetRefreshTokenAsync());
+        Assert.Contains($"second_{AppSecretsService.RefreshTokenKey}", secrets.Keys);
+    }
+
+    /// <summary>Prüft ClearCredentials: entfernt auch das Refresh-Token der Sitzung.</summary>
+    [Fact]
+    public async Task ClearCredentials_RemovesRefreshToken()
+    {
+        var secrets = new InMemorySecretStore();
+        var service = CreateService(new InMemorySettingsStore(), secrets);
+        await service.SetAuthTokenAsync("token");
+        await service.SetRefreshTokenAsync("refresh-1");
+
+        await service.ClearCredentialsAsync();
+
+        Assert.Null(await service.GetRefreshTokenAsync());
+        Assert.Empty(secrets.Keys);
+    }
+
+    /// <summary>Prüft GetRefreshToken: ohne Eintrag → null.</summary>
+    [Fact]
+    public async Task GetRefreshToken_WithoutEntry_ReturnsNull()
+    {
+        var service = CreateService(new InMemorySettingsStore(), new InMemorySecretStore());
+
+        Assert.Null(await service.GetRefreshTokenAsync());
+    }
 }

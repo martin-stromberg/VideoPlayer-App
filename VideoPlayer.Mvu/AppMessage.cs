@@ -110,6 +110,33 @@ public sealed record PairingCompletedMessage(PairingStatus Status) : AppMessage;
 public sealed record DeviceTokenRevokedMessage : AppMessage;
 
 /// <summary>
+/// Der Benutzer hat eine Kopplungs-Eingabe abgeschickt: eine Ticket-Adresse
+/// (QR-Code-Inhalt oder Paste, trägt die Serveradresse selbst) oder einen
+/// Kurzcode (wird gegen den aktiven Server eingelöst).
+/// </summary>
+/// <param name="Text">Die Roheingabe (wird vom <see cref="BootstrapTicketParser"/> zerlegt).</param>
+/// <returns>Nachricht für die Kopplungs-Eingabe.</returns>
+public sealed record BootstrapTicketSubmittedMessage(string Text) : AppMessage;
+
+/// <summary>
+/// Ergebnis der Erreichbarkeitsprüfung des Servers aus einer Ticket-Adresse —
+/// erst danach wird der Server persistiert und der Bootstrap-Austausch gestartet.
+/// </summary>
+/// <param name="Address">Die geprüfte Serveradresse.</param>
+/// <param name="Success"><c>true</c>, wenn der Server erreichbar ist.</param>
+/// <param name="Ticket">Das einzulösende Ticket (wird für den Folge-Effekt weitergereicht).</param>
+/// <returns>Nachricht mit dem Prüfergebnis.</returns>
+public sealed record BootstrapServerCheckedMessage(
+    string Address,
+    bool Success,
+    string Ticket) : AppMessage;
+
+/// <summary>Ergebnis des Bootstrap-Austauschs (<c>api/pairing/bootstrap</c>).</summary>
+/// <param name="Status">Ergebnisstatus des Bootstraps.</param>
+/// <returns>Nachricht mit dem Bootstrap-Ergebnis.</returns>
+public sealed record BootstrapCompletedMessage(BootstrapStatus Status) : AppMessage;
+
+/// <summary>
 /// Ergebnis der automatischen Anmeldung mit gespeicherten Zugangsdaten.
 /// <paramref name="Username"/> trägt den bekannten Benutzernamen zur
 /// Vorbefüllung der Anmeldemaske.

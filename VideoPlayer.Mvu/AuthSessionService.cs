@@ -149,17 +149,19 @@ public sealed class AuthSessionService
     }
 
     /// <summary>
-    /// Beendet die Sitzung lokal („Abmelden"): der gehaltene API-Client
-    /// wird freigegeben und die gespeicherten Zugangsdaten samt Token
+    /// Beendet die Sitzung („Abmelden"): der gehaltene API-Client wird
+    /// freigegeben, ein vorhandenes Refresh-Token wird best-effort
+    /// serverseitig widerrufen (<c>api/auth/logout</c>) und die
+    /// gespeicherten Zugangsdaten samt Token und Refresh-Token werden
     /// entfernt — danach ist keine automatische Anmeldung mehr möglich.
-    /// Die API besitzt keinen Logout-Endpunkt (zustandslose JWT); die
-    /// Sitzung endet durch Verwerfen der lokalen Geheimnisse.
     /// </summary>
     /// <returns>Eine abgeschlossene Aufgabe nach dem Räumen der Sitzung.</returns>
     public async Task LogoutAsync()
     {
+        var baseAddress = ClientBaseAddress;
         Client = null;
         ClientBaseAddress = null;
+        await RevokeRefreshTokenAsync(baseAddress);
         try
         {
             await secrets.ClearCredentialsAsync();
@@ -170,6 +172,41 @@ public sealed class AuthSessionService
             // nicht — der Client ist bereits freigegeben; Reste werden
             // bei der nächsten Anmeldung überschrieben.
             System.Diagnostics.Debug.WriteLine($"[AuthSessionService] Zugangsdaten entfernen fehlgeschlagen: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Widerruft das gespeicherte Refresh-Token best-effort am Server
+    /// (<c>api/auth/logout</c>): Fehler werden nur protokolliert — die
+    /// lokale Abmeldung hängt nicht am Serverkontakt, und der Server
+    /// behandelt bereits ungültige Token idempotent.
+    /// </summary>
+    /// <param name="serverAddress">Adresse der zu beendenden Sitzung; <c>null</c>/ungültig → kein Aufruf.</param>
+    /// <returns>Eine abgeschlossene Aufgabe nach dem Widerrufsversuch.</returns>
+    private async Task RevokeRefreshTokenAsync(string? serverAddress)
+    {
+        try
+        {
+            var refreshToken = await secrets.GetRefreshTokenAsync();
+            if (string.IsNullOrWhiteSpace(refreshToken)
+                || !ServerAddress.TryNormalize(serverAddress, out var normalized))
+            {
+                return;
+            }
+
+            using var http = httpClientFactory(new Uri(normalized));
+            var client = new VideoPlayerApiClient(http, new VideoPlayerApiClientOptions
+            {
+                BaseAddress = new Uri(normalized),
+                DelayAsync = delayAsync
+            });
+            await client.LogoutSessionAsync(refreshToken, CancellationToken.None);
+        }
+        catch (Exception ex)
+        {
+            // Best effort: ein unerreichbarer Server oder ein bereits
+            // ungültiges Token verhindert die lokale Abmeldung nicht.
+            System.Diagnostics.Debug.WriteLine($"[AuthSessionService] Refresh-Token-Widerruf fehlgeschlagen: {ex.Message}");
         }
     }
 
@@ -291,17 +328,28 @@ public sealed class AuthSessionService
     }
 
     /// <summary>
-    /// Stille Neuanmeldung mit den gespeicherten Zugangsdaten über einen
-    /// eigenen kurzlebigen Client (vermeidet Rekursion im aufrufenden
-    /// Request). Bei fehlenden oder abgelehnten Zugangsdaten wird
-    /// <see cref="SessionExpired"/> ausgelöst und <c>null</c> geliefert;
-    /// bei vorübergehenden Fehlern nur <c>null</c>.
+    /// Stille Neuanmeldung: zuerst der Refresh-Token der Sitzung
+    /// (<c>api/auth/refresh</c>, Bootstrap-Sitzungen besitzen keine
+    /// Zugangsdaten), dann die gespeicherten Zugangsdaten — jeweils über
+    /// einen eigenen kurzlebigen Client (vermeidet Rekursion im
+    /// aufrufenden Request). Bei fehlenden oder abgelehnten
+    /// Erneuerungswegen wird <see cref="SessionExpired"/> ausgelöst und
+    /// <c>null</c> geliefert; bei vorübergehenden Fehlern nur <c>null</c>.
     /// </summary>
     /// <param name="serverAddress">Adresse des Servers, an dem neu angemeldet wird.</param>
     /// <param name="cancellationToken">Bricht die Neuanmeldung ab.</param>
     /// <returns>Das neue Anmelde-Token; <c>null</c> bei Fehlschlag.</returns>
     private async Task<AuthToken?> SilentReloginAsync(Uri serverAddress, CancellationToken cancellationToken)
     {
+        // Erneuerung ohne Zugangsdaten: das rotierte Paket wird
+        // vollständig persistiert; ein endgültig abgelehnter Refresh-Token
+        // wird verworfen und der Zugangsdaten-Pfad greift danach.
+        var refreshed = await TryRefreshSessionAsync(serverAddress, cancellationToken);
+        if (refreshed is not null)
+        {
+            return refreshed;
+        }
+
         if (!await secrets.HasCredentialsAsync())
         {
             await secrets.ClearAuthTokenAsync();
@@ -346,6 +394,91 @@ public sealed class AuthSessionService
             // Vorübergehender Fehler: die ursprüngliche Anfrage scheitert
             // regulär — kein falscher Anmeldezwang bei Netzproblemen.
             System.Diagnostics.Debug.WriteLine($"[AuthSessionService] Stille Neuanmeldung fehlgeschlagen: {ex.Message}");
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Versucht die Sitzungserneuerung über das gespeicherte Refresh-Token
+    /// (<c>api/auth/refresh</c>): bei Erfolg werden das neue Anmelde-Token
+    /// und der rotierte Refresh-Token persistiert. Ein 401/403 wird per
+    /// Gate-Probe aufgetrennt — Gerätewiderruf bleibt Gerätewiderruf; ein
+    /// endgültig abgelehntes Refresh-Token wird verworfen und der
+    /// Zugangsdaten-Pfad darf danach greifen.
+    /// </summary>
+    /// <param name="serverAddress">Adresse des Servers, an dem erneuert wird.</param>
+    /// <param name="cancellationToken">Bricht die Erneuerung ab.</param>
+    /// <returns>Das neue Anmelde-Token; <c>null</c>, wenn kein Refresh-Weg greift.</returns>
+    private async Task<AuthToken?> TryRefreshSessionAsync(Uri serverAddress, CancellationToken cancellationToken)
+    {
+        string? refreshToken;
+        try
+        {
+            refreshToken = await secrets.GetRefreshTokenAsync();
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[AuthSessionService] Refresh-Token nicht lesbar: {ex.Message}");
+            return null;
+        }
+
+        if (string.IsNullOrWhiteSpace(refreshToken))
+        {
+            return null;
+        }
+
+        try
+        {
+            using var http = httpClientFactory(serverAddress);
+            var refreshClient = new VideoPlayerApiClient(http, new VideoPlayerApiClientOptions
+            {
+                BaseAddress = serverAddress,
+                DelayAsync = delayAsync
+            });
+            var session = await refreshClient.RefreshSessionAsync(refreshToken, cancellationToken);
+            if (string.IsNullOrWhiteSpace(session.Token) || string.IsNullOrWhiteSpace(session.RefreshToken))
+            {
+                // Unvollständige Rotation würde die Sitzung korrumpieren —
+                // lieber auf den Zugangsdaten-Pfad zurückfallen.
+                return null;
+            }
+
+            await secrets.SetAuthTokenAsync(session.Token);
+            await secrets.SetRefreshTokenAsync(session.RefreshToken);
+            return new AuthToken { Token = session.Token, Expires = session.Expires };
+        }
+        catch (ApiException ex) when (ex.StatusCode is HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden)
+        {
+            // Das 401/403 kann vom Client-Gate (widerrufenes Geräte-Token)
+            // oder vom Refresh-Token stammen — die Gate-Probe trennt beide
+            // Fälle (Muster: SilentReloginAsync-Credentials-Pfad).
+            if (await HandleGateRejectionAsync(serverAddress, cancellationToken))
+            {
+                return null;
+            }
+
+            // Refresh-Token endgültig abgelehnt → verwerfen; danach greift
+            // der Zugangsdaten-Pfad der stillen Neuanmeldung.
+            try
+            {
+                await secrets.ClearRefreshTokenAsync();
+            }
+            catch (Exception clearEx)
+            {
+                System.Diagnostics.Debug.WriteLine($"[AuthSessionService] Refresh-Token konnte nicht verworfen werden: {clearEx.Message}");
+            }
+
+            return null;
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception ex) when (ex is ApiException or HttpRequestException or TaskCanceledException)
+        {
+            // Vorübergehender Fehler: der Zugangsdaten-Pfad darf es noch
+            // versuchen — schadet nicht und erhöht die Erfolgschance.
+            System.Diagnostics.Debug.WriteLine($"[AuthSessionService] Sitzungserneuerung per Refresh-Token fehlgeschlagen: {ex.Message}");
             return null;
         }
     }

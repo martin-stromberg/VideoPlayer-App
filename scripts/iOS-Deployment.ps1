@@ -78,6 +78,10 @@ param(
     [switch]$NoPrompt
 )
 
+# Response-Datei-Hilfsfunktionen (Sanitizing, Maskierung, rsp-Erzeugung)
+# liegen in einer eigenen Datei, damit sie einzeln testbar bleiben.
+. (Join-Path $PSScriptRoot "iOS-Deployment.ResponseFile.ps1")
+
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $projectPath = Join-Path $repoRoot "VideoPlayer.Maui/VideoPlayer.Maui.csproj"
 $framework = "net10.0-ios"
@@ -682,39 +686,6 @@ function Invoke-Upload {
     Write-Host "Upload abgeschlossen." -ForegroundColor Green
 }
 
-function Add-PropertyLine {
-    param(
-        [System.Collections.Generic.List[string]]$List,
-        [string]$Name,
-        [string]$Value
-    )
-    if (-not $Value) { return }
-    $List.Add("-p:$Name=`"$Value`"")
-}
-
-function Add-MaskedDisplay {
-    param(
-        [System.Collections.Generic.List[string]]$List,
-        [string]$Name,
-        [string]$Value
-    )
-    if (-not $Value) { return }
-    if ($Name -eq "ServerPassword" -or $Name -eq "VideoPlayerApiToken") {
-        $List.Add("-p:$Name=***")
-    }
-    else {
-        $List.Add("-p:$Name=`"$Value`"")
-    }
-}
-
-function New-ResponseFile {
-    param([string[]]$Lines)
-    $rspName = ".ios-deploy-$([Guid]::NewGuid().ToString('n')).rsp"
-    $rspPath = Join-Path $repoRoot $rspName
-    [System.IO.File]::WriteAllLines($rspPath, $Lines)
-    return $rspPath
-}
-
 function Invoke-Build {
     $rid = Get-RuntimeIdentifier -Action "build"
     $config = Get-Configuration -Action "build"
@@ -760,7 +731,7 @@ function Invoke-Build {
         Write-Host "Baue iOS-App ohne Codesigning..." -ForegroundColor Cyan
     }
 
-    $rspPath = New-ResponseFile -Lines $rspLines
+    $rspPath = New-ResponseFile -Lines $rspLines -Directory $repoRoot
     try {
         Write-Host "dotnet $verb $projectPath -f $framework -c $config @$rspPath" -ForegroundColor Gray
         $baseArgs = @($verb, $projectPath, "-f", $framework, "-c", $config, "@$rspPath")
@@ -772,6 +743,8 @@ function Invoke-Build {
 
         if ($LASTEXITCODE -ne 0) {
             Write-Host "Build fehlgeschlagen (Exit-Code: $LASTEXITCODE)." -ForegroundColor Red
+            Write-Host "Response-Datei (maskiert):" -ForegroundColor Gray
+            Write-MaskedPropertyLines -Lines $rspLines
             exit 1
         }
 
@@ -931,7 +904,7 @@ function Invoke-Run {
         }
     }
 
-    $rspPath = New-ResponseFile -Lines $rspLines
+    $rspPath = New-ResponseFile -Lines $rspLines -Directory $repoRoot
     try {
         Write-Host "Starte iOS $Action ..." -ForegroundColor Cyan
         $baseArgs = @("build", $projectPath, "-t:Run", "-f", $framework, "-c", $config, "@$rspPath")
@@ -943,6 +916,8 @@ function Invoke-Run {
 
         if ($LASTEXITCODE -ne 0) {
             Write-Host "$Action fehlgeschlagen (Exit-Code: $LASTEXITCODE)." -ForegroundColor Red
+            Write-Host "Response-Datei (maskiert):" -ForegroundColor Gray
+            Write-MaskedPropertyLines -Lines $rspLines
             exit 1
         }
         Write-Host "iOS $Action erfolgreich." -ForegroundColor Green
@@ -982,12 +957,14 @@ function Invoke-DeviceViaSsh {
     Add-PropertyLine -List $rspLines -Name "CodesignKey" -Value $CodesignKey
     Add-PropertyLine -List $rspLines -Name "CodesignProvision" -Value $CodesignProvision
 
-    $rspPath = New-ResponseFile -Lines $rspLines
+    $rspPath = New-ResponseFile -Lines $rspLines -Directory $repoRoot
     try {
         Write-Host "Baue iOS-App via Pair-to-Mac ($config/$rid) ..." -ForegroundColor Cyan
         & dotnet publish $projectPath -f $framework -c $config "@$rspPath"
         if ($LASTEXITCODE -ne 0) {
             Write-Host "Build fehlgeschlagen (Exit-Code: $LASTEXITCODE)." -ForegroundColor Red
+            Write-Host "Response-Datei (maskiert):" -ForegroundColor Gray
+            Write-MaskedPropertyLines -Lines $rspLines
             exit 1
         }
     }

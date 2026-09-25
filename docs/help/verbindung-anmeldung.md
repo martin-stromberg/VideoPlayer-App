@@ -58,12 +58,21 @@ im Normalbetrieb.
   fehler, Zeitüberschreitungen sowie „Zeitüberschreitung der Anfrage"
   (408) und „zu viele Anfragen" (429). Eindeutige Clientfehler werden
   nicht wiederholt.
-- Läuft das Anmelde-Token während der Nutzung ab, meldet sich die App im
-  Hintergrund erneut mit den gespeicherten Zugangsdaten an und setzt die
-  ursprüngliche Anfrage fort — ohne dass eine erneute Eingabe nötig ist.
-  Nur wenn die gespeicherten Zugangsdaten fehlen oder vom Server
-  abgelehnt werden, erscheint die Anmeldemaske mit dem Hinweis „Die
-  Anmeldung ist abgelaufen."
+- Läuft das Anmelde-Token während der Nutzung ab, erneuert die App die
+  Sitzung im Hintergrund und setzt die ursprüngliche Anfrage fort —
+  ohne dass eine erneute Eingabe nötig ist. Liegt ein Refresh-Token
+  vor (ab Schritt 5b bei Anmeldung und QR-/Ticket-Kopplung), läuft
+  die Erneuerung über `POST api/auth/refresh`; der Server rotiert
+  den Refresh-Token dabei und die App ersetzt ihn sofort in der
+  sicheren Ablage. Ohne Refresh-Token (ältere Installation oder
+  klassischer Login) greift der bisherige Rückfall über die
+  gespeicherten Zugangsdaten. Nur wenn beides scheitert — Refresh
+  abgelehnt und keine/anfechtbare Zugangsdaten — erscheint die
+  Anmeldemaske mit dem Hinweis „Die Anmeldung ist abgelaufen."
+- Das Abmelden widerruft den Refresh-Token best-effort am Server
+  (`POST api/auth/logout`) und löscht anschließend alle lokalen
+  Sitzungsgeheimnisse — auch wenn der Server gerade nicht
+  erreichbar ist.
 - Lehnt das Client-Gate den bereitgestellten Schlüssel ab (HTTP 401 am
   Gate), unterscheidet die App per Probe, ob das Geräte-Token widerrufen
   wurde oder die Zugangsdaten abgelehnt sind: Ein widerrufenes
@@ -93,6 +102,12 @@ Benutzernamen — eine erneute Passworteingabe genügt.
 | „Der Server unterstützt kein Geräte-Pairing" | Serverinstallation aktualisieren oder die Person kontaktieren, die den Server eingerichtet hat — es gibt keinen automatischen Rückfall auf einen statischen Schlüssel |
 | „Das Geräte-Pairing ist fehlgeschlagen." | Vorgang mit einem neuen Einmal-Code erneut versuchen; bei anhaltendem Fehler Server-Adresse und Netzwerk prüfen |
 | „Der Geräte-Zugang wurde vom Server abgelehnt." | Gerät erneut koppeln — das widerrufene Geräte-Token wurde verworfen |
+| „Bitte eine gültige Ticket-Adresse oder einen gültigen Kurzcode eingeben." | QR-Code der Serververwaltung erneut scannen oder die komplette Ticket-Adresse (mit `?t=`) bzw. den 8-stelligen Kurzcode eingeben |
+| „Für einen Kurzcode muss zuerst ein Server verbunden sein" | Erst die Serveradresse verbinden — oder die vollständige Ticket-Adresse eingeben |
+| „Der Server aus dem Kopplungscode ist nicht erreichbar." | Server starten und Netzwerk prüfen — der Server wird erst nach erfolgreicher Prüfung übernommen |
+| „Der Kopplungscode ist ungültig oder abgelaufen." | Neuen Kopplungscode/Ticket in der Serververwaltung (Profilseite „Geräte") erzeugen und erneut versuchen |
+| „Zu viele Kopplungsversuche." | Vorübergehende Sperre abwarten, dann mit einem neuen Code erneut versuchen |
+| „Der Server unterstützt das Koppeln per Code nicht" | Serverinstallation aktualisieren oder die Person kontaktieren, die den Server eingerichtet hat — alternativ den klassischen Einmal-Code oder die Anmeldemaske verwenden |
 | App bleibt im Offline-Modus | Server erreichbar machen oder über „Einstellungen → Serververwaltung" einen anderen Server wählen |
 | Anmeldemaske nach Backup-Wiederherstellung | Passwort erneut eingeben — Geheimnisse werden aus Sicherheitsgründen nicht gesichert |
 
@@ -101,8 +116,12 @@ Benutzernamen — eine erneute Passworteingabe genügt.
 - `VideoPlayer.Mvu`: `ConnectionState` (`Unknown`/`Connecting`/
   `Connected`/`NeedsLogin`/`NeedsServerSetup`/`Offline`) im `AppModel`;
   Verzweigungen in `AppUpdate`; `AuthSessionService` (Anmeldung über
-  `VideoPlayerApiClient.LoginAsync`, Persistenz via `AppSecretsService`,
-  `TokenRefresher`-Verdrahtung für die stille Neuanmeldung,
+  `VideoPlayerApiClient.LoginAsync`, Bootstrap-Session aus
+  `CompleteBootstrapAsync` — ohne Passwortpfad —, Persistenz via
+  `AppSecretsService` inkl. `RefreshTokenKey`,
+  `TokenRefresher`-Verdrahtung: stille Neuanmeldung zuerst über
+  `RefreshSessionAsync`, Rückfall auf die Zugangsdaten, Logout mit
+  best-effort `LogoutSessionAsync`-Widerruf,
   `SessionExpired`-Ereignis); `DeviceTokenService` (Geräte-Token-Provider
   für `ClientGate`, Gate-Probe `IsGateRejectedAsync` per
   `POST api/auth/login`, `DeviceTokenRejected`-Ereignis) — eine

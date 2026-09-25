@@ -1,0 +1,25 @@
+  Wiederherzustellende Projekte werden ermittelt...
+  Alle Projekte sind für die Wiederherstellung auf dem neuesten Stand.
+  VideoPlayer.E2E.Tests -> D:\Repositories\softwareschmiede\8e923b89-04a9-47c4-b487-b58ac5bce398\VideoPlayer.E2E.Tests\bin\Debug\net10.0-windows\VideoPlayer.E2E.Tests.dll
+Testlauf für "D:\Repositories\softwareschmiede\8e923b89-04a9-47c4-b487-b58ac5bce398\VideoPlayer.E2E.Tests\bin\Debug\net10.0-windows\VideoPlayer.E2E.Tests.dll" (.NETCoreApp,Version=v10.0)
+Insgesamt 1 Testdateien stimmten mit dem angegebenen Muster überein.
+[xUnit.net 00:00:00.00] xUnit.net VSTest Adapter v3.1.5+1b188a7b0a (64-bit .NET 10.0.12)
+[xUnit.net 00:00:00.16]   Discovering: VideoPlayer.E2E.Tests
+[xUnit.net 00:00:00.33]   Discovered:  VideoPlayer.E2E.Tests
+[xUnit.net 00:00:00.47]   Starting:    VideoPlayer.E2E.Tests
+  Bestanden VideoPlayer.E2E.Tests.Tests.PairingTests.MalformedCode_ShowsFormatError [15 m 13 s]
+  Bestanden VideoPlayer.E2E.Tests.Tests.PairingTests.ValidCode_ShowsLoginPage [3 s]
+  Bestanden VideoPlayer.E2E.Tests.Tests.PairingTests.WrongCode_ShowsPairingError [2 s]
+  Bestanden VideoPlayer.E2E.Tests.Tests.ServerSwitchTests.SwitchToKnownServer_ReturnsToHomePage [7 s]
+  Bestanden VideoPlayer.E2E.Tests.Tests.LoginTests.ValidLogin_ShowsHomePage [3 s]
+  Bestanden VideoPlayer.E2E.Tests.Tests.LoginTests.WrongPassword_ShowsLoginError [3 s]
+  Bestanden VideoPlayer.E2E.Tests.Tests.ServerSetupTests.ReachableServer_RequiresPairing [2 s]
+  Bestanden VideoPlayer.E2E.Tests.Tests.ServerSetupTests.UnreachableServer_ShowsError [17 s]
+  Bestanden VideoPlayer.E2E.Tests.Tests.ServerSetupTests.FreshStart_ShowsServerSetupPage [1 s]
+[xUnit.net 00:15:57.83]   Finished:    VideoPlayer.E2E.Tests (ID = '3d8b0b324af0d8270583229c9e9543db8edc1121fb75e883f7030038f96f7857')
+  Bestanden VideoPlayer.E2E.Tests.Tests.ServerSetupTests.InvalidAddress_ShowsValidationError [1 s]
+
+Der Testlauf war erfolgreich.
+Gesamtzahl Tests: 10
+     Bestanden: 10
+ Gesamtzeit: 15,9689 Minuten
