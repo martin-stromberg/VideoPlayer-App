@@ -3,6 +3,10 @@ using Microsoft.Extensions.Logging;
 using VideoPlayer.Maui.Services;
 using VideoPlayer.Mvu;
 using VideoPlayer.Storage;
+#if ANDROID || IOS
+// ZXing.Net.Maui.Controls wird nur für die mobilen TFMs referenziert.
+using ZXing.Net.Maui.Controls;
+#endif
 
 namespace VideoPlayer.Maui
 {
