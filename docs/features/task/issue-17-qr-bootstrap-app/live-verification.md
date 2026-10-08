@@ -36,7 +36,28 @@ Fensterrechteck (`GetWindowRect`).
 - **Erfolg:** Übergang ServerSetup → Home ohne Zwischenmaske —
   der Kernnutzen des Features ist visuell belegt.
 
-## Randnotiz
+| `live-verification/bootstrap-05-echter-server.png` | Live-Lauf echter Server | Startseite `http://localhost:83/` mit echtem Hero-Bild und Kontoinhalt nach Ticket-Einlösung (siehe Nachtrag) |
 
-Auf Windows fehlt der QR-Scan-Button bewusst (kein Kamera-Pfad);
-die mobile Scan-Seite `QrScannerPage` ist Gerätetest-Restnachweis.
+## Nachtrag 2026-10-08 — Lauf gegen den echten Server
+
+Nach dem Merge des Server-PRs (martin-stromberg/VideoPlayer#232) und der
+lokalen Installation der Server-Version mit `api/pairing/bootstrap` wurde
+der komplette Ablauf gegen die echte IIS-Instanz `http://localhost:83`
+(SQLite `D:\Dashboard\VideoPlayer\Data\WebVideoPlayer.db`) verifiziert:
+
+- Testticket direkt in `PairingCodes` eingesetzt (`Kind=1`, SHA-256-Hashes
+  wie `PairingBootstrapService`), Benutzer `devin@example.com`.
+- App mit frischem Profil (`VIDEOPLAYER_PROFILE=livetest-bootstrap-*`)
+  gestartet, Dev-API: `BootstrapTicketEntry` ←
+  `http://localhost:83/pairing?t=<ticket>`, `BootstrapButton` per Invoke.
+- Ergebnis `/model`: `currentPage=Home`, `connectionState=Connected`,
+  `activeServerAddress=http://localhost:83/` — **ohne Adress- und
+  Passworteingabe**.
+- Serverseitig belegt: Ticket atomar verbraucht (`ConsumedAtUtc` gesetzt),
+  `PairedDevices` Id 4 (`DESKTOP-CM8OBSG`, `CreatedByUserId`=devin-User),
+  `RefreshTokens` Id 1 (DeviceId=4, 30 Tage, nicht widerrufen).
+- Screenshot `live-verification/bootstrap-05-echter-server.png`:
+  Startseite mit echtem Hero-Bild und „Weiterschauen"-Inhalt des Kontos.
+
+Damit ist der Restnachweis „Live-Lauf gegen echten Server" erbracht;
+offen bleibt nur der Kamera-Scan auf echtem iOS-/Android-Gerät.
