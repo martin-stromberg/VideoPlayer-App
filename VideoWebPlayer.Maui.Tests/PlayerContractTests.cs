@@ -109,16 +109,48 @@ public class PlayerContractTests
         // das Layout belegt das gesamte Grid über dem MediaElement.
         Assert.Equal("Start", (string?)overlay.Attribute("VerticalOptions"));
 
-        // Das sichtbare Kopfband bleibt für Eingaben durchlässig;
-        // nur der Mini-Player-Schalter ist davon ausgenommen.
+        // Das sichtbare Kopfband bleibt für Eingaben durchlässig.
         var band = overlay.Element(mauiNs + "Border");
         Assert.NotNull(band);
         Assert.Equal("True", (string?)band.Attribute("InputTransparent"));
 
-        var pipButton = band.Descendants(mauiNs + "Button")
-            .Single(e => (string?)e.Attribute(xNs + "Name") == "PipButton");
-        Assert.Equal("False", (string?)pipButton.Attribute("InputTransparent"));
+        // Der Mini-Player-Schalter darf NICHT innerhalb des input-
+        // transparenten Bandes liegen: unter Windows deaktiviert
+        // IsHitTestVisible=false am Elternelement den gesamten Teilbaum —
+        // ein InputTransparent="False" am Kind reaktiviert ihn nicht.
+        // Der Schalter ist deshalb eigenes Grid-Element über dem Band.
+        Assert.Empty(band.Descendants(mauiNs + "Button"));
+
+        var rootGrid = document.Descendants(mauiNs + "Grid")
+            .SingleOrDefault(e => (string?)e.Attribute(xNs + "Name") == "PlayerRoot");
+        Assert.NotNull(rootGrid);
+        var pipButton = rootGrid.Elements(mauiNs + "Button")
+            .SingleOrDefault(e => (string?)e.Attribute(xNs + "Name") == "PipButton");
+        Assert.NotNull(pipButton);
         Assert.Equal("OnPipClicked", (string?)pipButton.Attribute("Clicked"));
+    }
+
+    /// <summary>
+    /// Prüft PlayerPage: Windows-Workaround für die Transportsteuerung.
+    /// Das MediaPlayerElement blendet seine Steuerung nach dem Timeout
+    /// in dieser Kombination nicht mehr über eigene Pointer-Ereignisse
+    /// ein — ein Tip auf die Videofläche ruft deshalb
+    /// <c>TransportControls.Show()</c> (nur Windows; iOS/Android regeln
+    /// das Einblenden nativ).
+    /// </summary>
+    [Fact]
+    public void PlayerPage_TapShowsTransportControlsOnWindows()
+    {
+        var code = Read("VideoPlayer.Maui", "Pages", "PlayerPage.xaml.cs");
+        var xaml = Read("VideoPlayer.Maui", "Pages", "PlayerPage.xaml");
+
+        Assert.Contains("x:Name=\"PlayerRoot\"", xaml, StringComparison.Ordinal);
+        var ctor = MethodBody(code, "public PlayerPage(");
+        Assert.Contains("#if WINDOWS", ctor, StringComparison.Ordinal);
+        Assert.Contains("TapGestureRecognizer", ctor, StringComparison.Ordinal);
+        Assert.Contains("OnPlayerTapped", ctor, StringComparison.Ordinal);
+        Assert.Contains("TransportControls?.Show()",
+            MethodBody(code, "private void OnPlayerTapped"), StringComparison.Ordinal);
     }
 
     /// <summary>Prüft PictureInPictureService: Windows-CompactOverlay (Mini-Player).</summary>

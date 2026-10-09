@@ -7,7 +7,7 @@
              Title="Wiedergabe"
              x:DataType="mvu:MvuHost">
 
-    <Grid BackgroundColor="{StaticResource VpBgDeep}">
+    <Grid x:Name="PlayerRoot" BackgroundColor="{StaticResource VpBgDeep}">
 
         <!-- Videofläche -->
         <mct:MediaElement x:Name="VideoElement"
@@ -27,18 +27,21 @@
                            HeightRequest="48"
                            WidthRequest="48" />
 
-        <!-- Kopf-Overlay: Titel, „angesehen"-Hinweis, Mini-Player-Schalter.
+        <!-- Kopf-Overlay: Titel und „angesehen"-Hinweis.
              VerticalOptions="Start" ist Pflicht: Ohne Angabe füllt das Layout
              (Default Fill) das gesamte Grid und fängt als Hit-Test-Blocker
              alle Eingaben auf dem MediaElement ab. Das Kopfband selbst ist
-             eingabedurchlässig — nur der Mini-Player-Schalter nimmt Klicks an. -->
+             eingabedurchlässig. Achtung: Ein interaktives Element darf sich
+             nicht in diesem Border befinden — unter Windows deaktiviert
+             InputTransparent auf dem Elternelement den gesamten Teilbaum,
+             ein InputTransparent="False" am Kind reaktiviert es nicht. -->
         <VerticalStackLayout x:Name="OverlayChrome"
                              VerticalOptions="Start"
                              Spacing="0">
             <Border Padding="12"
                     InputTransparent="True"
                     BackgroundColor="{StaticResource VpOverlay}">
-                <Grid ColumnDefinitions="*,Auto,Auto"
+                <Grid ColumnDefinitions="*,Auto"
                       ColumnSpacing="8">
                     <Label x:Name="TitleLabel"
                            Grid.Column="0"
@@ -54,17 +57,21 @@
                            TextColor="{StaticResource VpSecondary}"
                            VerticalOptions="Center"
                            IsVisible="False" />
-                    <Button x:Name="PipButton"
-                            Grid.Column="2"
-                            Text="Mini-Player"
-                            FontSize="12"
-                            HeightRequest="36"
-                            IsVisible="False"
-                            InputTransparent="False"
-                            Clicked="OnPipClicked" />
                 </Grid>
             </Border>
         </VerticalStackLayout>
+
+        <!-- Mini-Player-Schalter liegt als eigenes Element über dem Kopfband,
+             damit er nicht vom eingabedurchlässigen Border mit blockiert wird. -->
+        <Button x:Name="PipButton"
+                Text="Mini-Player"
+                FontSize="12"
+                HeightRequest="36"
+                Margin="0,16,16,0"
+                HorizontalOptions="End"
+                VerticalOptions="Start"
+                IsVisible="False"
+                Clicked="OnPipClicked" />
 
         <!-- Fehlerhinweis (Quelle nicht verfügbar / Wiedergabefehler) -->
         <Border x:Name="ErrorPanel"

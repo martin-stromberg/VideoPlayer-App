@@ -271,6 +271,25 @@ function Resolve-CodesigningInteractive {
     $isStore = $Action -in @('store', 'upload')
     $isDevice = $Action -eq 'device'
 
+    # VIDEOPLAYER_IOS_CODESIGN_KEY / VIDEOPLAYER_IOS_PROVISIONING_PROFILE sind
+    # fuer den Store-Upload gedacht (sie enthalten dort das Distribution-Profil).
+    # Beim lokalen Geraete-Deployment werden aus den Umgebungsvariablen
+    # stammende Werte verworfen — die Auswahl wird dann zwingend angeboten,
+    # damit kein Store-Profil still in den Device-Pfad rutscht und der Build
+    # mit "Keine iOS-Signaturidentitaet entspricht ..." scheitert.
+    # Explizit uebergebene -CodesignKey/-CodesignProvision bleiben bestehen.
+    if ($isDevice) {
+        if ($env:VIDEOPLAYER_IOS_PROVISIONING_PROFILE -and
+            $CodesignProvision -eq $env:VIDEOPLAYER_IOS_PROVISIONING_PROFILE) {
+            Write-Host "Hinweis: VIDEOPLAYER_IOS_PROVISIONING_PROFILE ('$CodesignProvision') gilt fuer den Store-Upload - Geraete-Deployment fragt das Profil ab." -ForegroundColor Yellow
+            $script:CodesignProvision = ""
+        }
+        if ($env:VIDEOPLAYER_IOS_CODESIGN_KEY -and
+            $CodesignKey -eq $env:VIDEOPLAYER_IOS_CODESIGN_KEY) {
+            $script:CodesignKey = ""
+        }
+    }
+
     # Ein fuer die Aktion unpassender vorgegebener Schluessel (z. B. Distribution bei 'device')
     # wird verworfen und stattdessen interaktiv gewaehlt.
     if ($isDevice -and $CodesignKey -like 'Apple Distribution:*') {

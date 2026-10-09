@@ -22,11 +22,19 @@ Die nativen Transportsteuerungen des `MediaElement`
 (`ShouldShowPlaybackControls` — Play/Pause, Positionsregler/Seek und
 die übrigen Transportfunktionen) sind in der normalen Vollansicht
 direkt bedienbar. Das App-Kopfband `OverlayChrome` (Titel,
-„Angesehen"-Hinweis, Mini-Player-Schalter) liegt nur am oberen Rand
-(`VerticalOptions="Start"`) und belegt die Videofläche nicht mehr
-vollständig; die Titelfläche ist zudem eingabedurchlässig
-(`InputTransparent`), sodass nur der Mini-Player-Schalter selbst
-Eingaben beansprucht.
+„Angesehen"-Hinweis) liegt nur am oberen Rand
+(`VerticalOptions="Start"`) und ist eingabedurchlässig
+(`InputTransparent`); der Mini-Player-Schalter liegt als eigenes
+Element über dem Kopfband, da `InputTransparent` unter Windows den
+gesamten Teilbaum vom Hit-Test ausnimmt — ein eingebetteter Button
+wäre sonst unbedienbar.
+
+**Windows-Besonderheit:** Das `MediaPlayerElement` blendet die
+Steuerung nach dem Timeout zwar zuverlässig aus, aber in dieser
+Kombination nicht über eigene Zeiger-Ereignisse wieder ein. Ein Tip
+auf die Videofläche ruft daher `TransportControls.Show()`; das
+Ausblenden übernimmt weiterhin der Auto-Timer. Auf iOS/Android
+regelt der Plattform-Player das Einblenden nativ bei Berührung.
 
 ## Quellen
 
