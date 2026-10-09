@@ -81,6 +81,28 @@ public class IosDeploymentResponseFileTests
     }
 
     /// <summary>
+    /// Prüft: beim Geräte-Deployment (Aktion 'device') verwirft das Skript
+    /// per VIDEOPLAYER_IOS_*-Umgebungsvariable vorgegebene Signatur-Werte —
+    /// sie sind für den Store-Upload gedacht und würden sonst ein
+    /// Distributionsprofil still in den Device-Pfad ziehen (Fehler
+    /// „Keine iOS-Signaturidentität entspricht dem Bereitstellungsprofil").
+    /// Die Auswahl wird dadurch zwingend angeboten.
+    /// </summary>
+    [Fact]
+    public void DeploymentScript_DeviceActionDiscardsEnvCodesignValues()
+    {
+        var script = ScriptFile;
+
+        Assert.Contains("$CodesignProvision -eq $env:VIDEOPLAYER_IOS_PROVISIONING_PROFILE",
+            script, StringComparison.Ordinal);
+        Assert.Contains("$CodesignKey -eq $env:VIDEOPLAYER_IOS_CODESIGN_KEY",
+            script, StringComparison.Ordinal);
+        // Die Profil-Auswahl für 'device' bleibt auf Entwicklungsprofile
+        // (get-task-allow) gefiltert.
+        Assert.Contains("Where-Object { $_.DevProfile }", script, StringComparison.Ordinal);
+    }
+
+    /// <summary>
     /// Prüft: der Helper prüft genau die Zeichenklasse, die den
     /// Response-Datei-Parser bricht (Beleg: inventory/msb1006-repro.md).
     /// </summary>
