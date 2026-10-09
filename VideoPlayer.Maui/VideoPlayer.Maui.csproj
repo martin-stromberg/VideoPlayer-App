@@ -30,7 +30,11 @@
     <Copyright>Copyright (c) Martin Stromberg</Copyright>
     <Authors>Martin Stromberg</Authors>
   </PropertyGroup>
-  <PropertyGroup Condition="'$(TargetFramework)'=='net10.0-ios'">
+  <PropertyGroup Condition="'$(TargetFramework)'=='net10.0-ios' and !$(RuntimeIdentifier.StartsWith('iossimulator'))">
+    <!-- Nur Geraete-Builds signieren — Simulator-Builds werden ad-hoc
+         signiert und duerfen keinen Keychain-Eintrag voraussetzen
+         (CI-Runner ohne Zertifikate; iOS-SDK 27 wertet den Key sonst
+         auch im Simulator-Build aus). -->
     <CodesignKey>Apple Development: Created via API (466MVK852A)</CodesignKey>
     <CodesignProvision>VS: WildCard Development</CodesignProvision>
   </PropertyGroup>
