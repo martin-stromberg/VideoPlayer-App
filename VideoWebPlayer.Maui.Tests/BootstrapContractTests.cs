@@ -77,6 +77,43 @@ public class BootstrapContractTests
         Assert.Contains("IsVisible=\"false\"", xaml, StringComparison.Ordinal);
     }
 
+    /// <summary>
+    /// Prüft LoginPage: der Kurzcode-Einstieg liegt auf der Anmeldemaske —
+    /// er wird gegen den bereits verbundenen Server eingelöst (der QR-Code
+    /// mit der Serveradresse bleibt dagegen bei der Serververbindung).
+    /// Pinnt die Workflow-Korrektur: Kopplung ohne Umweg über
+    /// „Anderen Server einrichten".
+    /// </summary>
+    [Fact]
+    public void LoginPage_OffersShortCodeBootstrap()
+    {
+        var xaml = MauiFile("Pages", "LoginPage.xaml");
+        var code = MauiFile("Pages", "LoginPage.xaml.cs");
+
+        Assert.Contains("LoginBootstrapCodeEntry", xaml, StringComparison.Ordinal);
+        Assert.Contains("LoginBootstrapButton", xaml, StringComparison.Ordinal);
+        Assert.Contains("LoginBootstrapErrorLabel", xaml, StringComparison.Ordinal);
+        Assert.Contains("OnBootstrapClicked", code, StringComparison.Ordinal);
+        Assert.Contains("BootstrapTicketSubmittedMessage", code, StringComparison.Ordinal);
+        Assert.Contains("model.IsBootstrapRunning", code, StringComparison.Ordinal);
+        Assert.Contains("model.BootstrapError", code, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// Prüft ServerSetupPage: ein neuer Kopplungsfehler wird zusätzlich
+    /// zum Label als Dialog gezeigt — nach dem QR-Scan kehrt die modale
+    /// Scanner-Seite hierher zurück und ein Fehler darf nicht unbemerkt
+    /// untergehen.
+    /// </summary>
+    [Fact]
+    public void ServerSetupPage_AlertsOnNewBootstrapError()
+    {
+        var code = MauiFile("Pages", "ServerSetupPage.xaml.cs");
+
+        Assert.Contains("DisplayAlert", code, StringComparison.Ordinal);
+        Assert.Contains("lastBootstrapError", code, StringComparison.Ordinal);
+    }
+
     /// <summary>Prüft EffectHandler: behandelt Serverprüfung und Ticket-Austausch.</summary>
     [Fact]
     public void EffectHandler_HandlesBootstrapEffects()

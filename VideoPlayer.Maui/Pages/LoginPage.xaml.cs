@@ -66,6 +66,21 @@ public partial class LoginPage : ContentPage
 
         ErrorLabel.Text = model.LoginError;
         ErrorLabel.IsVisible = model.LoginError is not null;
+
+        // Kopplungs-Felder: laufender Bootstrap sperrt beide Wege —
+        // Login und Kopplung konkurrieren um dieselbe Session.
+        var busy = model.IsLoginRunning || model.IsBootstrapRunning;
+        BootstrapIndicator.IsRunning = model.IsBootstrapRunning;
+        BootstrapIndicator.IsVisible = model.IsBootstrapRunning;
+        BootstrapLoginButton.IsEnabled = !busy;
+        BootstrapCodeEntry.IsEnabled = !busy;
+        BootstrapErrorLabel.Text = model.BootstrapError;
+        BootstrapErrorLabel.IsVisible = model.BootstrapError is not null;
+    }
+
+    private void OnBootstrapClicked(object? sender, EventArgs e)
+    {
+        _ = mvuHost.DispatchAsync(new BootstrapTicketSubmittedMessage(BootstrapCodeEntry.Text ?? string.Empty));
     }
 
     private void OnLoginClicked(object? sender, EventArgs e)

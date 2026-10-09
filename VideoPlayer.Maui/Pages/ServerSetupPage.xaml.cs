@@ -13,6 +13,7 @@ namespace VideoPlayer.Maui.Pages;
 public partial class ServerSetupPage : ContentPage
 {
     private readonly MvuHost mvuHost;
+    private string? lastBootstrapError;
 
     /// <summary>Initialisiert eine neue Instanz der <see cref="ServerSetupPage"/>-Klasse.</summary>
     /// <param name="mvuHost">MVU-Host; liefert den Einrichtungszustand und nimmt die Benutzer-Nachrichten entgegen.</param>
@@ -116,6 +117,15 @@ public partial class ServerSetupPage : ContentPage
         QrScanButton.IsEnabled = !bootstrapBusy;
         BootstrapErrorLabel.Text = model.BootstrapError;
         BootstrapErrorLabel.IsVisible = model.BootstrapError is not null;
+
+        // Nach dem QR-Scan kehrt die modale Scanner-Seite hierher zurück —
+        // ein neuer Kopplungsfehler wird zusätzlich als Dialog gezeigt,
+        // damit er nicht unbemerkt im Label untergeht.
+        if (model.BootstrapError is not null && model.BootstrapError != lastBootstrapError)
+        {
+            _ = DisplayAlert("Kopplung fehlgeschlagen", model.BootstrapError, "OK");
+        }
+        lastBootstrapError = model.BootstrapError;
     }
 
     private void OnDiscoverClicked(object? sender, EventArgs e)

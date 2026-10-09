@@ -62,12 +62,16 @@ und Refresh-Token liegen anschließend sicher in der Plattformablage —
 die App landet ohne Anmeldemaske direkt auf der Startseite. Ein
 8-stelliger Kurzcode geht als Ticket-Alias durch denselben Endpunkt.
 
-Fehler erscheinen inline in der Karte: unlesbare Eingabe, Server nicht
-erreichbar (wird dann nicht übernommen), Ticket ungültig oder
-abgelaufen, zu viele Versuche, Server ohne Bootstrap-Endpunkt.
+Fehler erscheinen inline in der Karte und zusätzlich als Dialog:
+unlesbare Eingabe, Server nicht erreichbar (wird dann nicht übernommen),
+Ticket ungültig oder abgelaufen, zu viele Versuche, Server ohne
+Bootstrap-Endpunkt.
 Alle übrigen Wege (Adresseingabe, Einmal-Code-Pairing, Anmeldemaske)
 bleiben als Fallback unverändert verfügbar. Auf Windows gibt es keinen
-Kamera-Scan — dort steht die manuelle Eingabe zur Verfügung.
+Kamera-Scan — dort steht die manuelle Eingabe zur Verfügung. Der
+Kurzcode liegt zusätzlich auf der Anmeldemaske selbst — er wird gegen
+den bereits verbundenen Server eingelöst, ohne dass ein Rückweg über
+„Anderen Server einrichten" nötig ist.
 
 Die Sitzung erneuert sich anschließend selbst: der Refresh-Token wird
 bei Bedarf über `POST api/auth/refresh` rotiert (der alte ist ab da
