@@ -1,3 +1,6 @@
+// Die Developer-API ist auf DEBUG/DEV_API kompiliert — in Release fehlt
+// der Namespace und diese Tests haetten kein Compile-Ziel.
+#if DEBUG || DEV_API
 using System.Text.Json;
 using VideoPlayer.Mvu;
 using VideoPlayer.Mvu.DevApi;
@@ -83,3 +86,4 @@ public class DevApiModelSnapshotTests
         Assert.DoesNotContain("secret", json, StringComparison.Ordinal);
     }
 }
+#endif

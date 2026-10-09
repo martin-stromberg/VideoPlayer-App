@@ -1,3 +1,6 @@
+// Die Developer-API ist auf DEBUG/DEV_API kompiliert — in Release fehlt
+// der Namespace und diese Tests haetten kein Compile-Ziel.
+#if DEBUG || DEV_API
 #pragma warning disable xUnit1051 // Kurzlebige Unit-Tests: TestContext-CancellationToken nicht erforderlich
 using System.Text;
 using VideoPlayer.Mvu.DevApi;
@@ -119,3 +122,4 @@ public class DevApiRequestReaderTests
         public string? Text { get; set; }
     }
 }
+#endif
