@@ -2,6 +2,9 @@ using CommunityToolkit.Maui.Core;
 using CommunityToolkit.Maui.Views;
 using VideoPlayer.Maui.Services;
 using VideoPlayer.Mvu;
+#if WINDOWS
+using Microsoft.UI.Xaml.Controls;
+#endif
 
 namespace VideoPlayer.Maui.Pages;
 
@@ -38,6 +41,16 @@ public partial class PlayerPage : ContentPage
         this.pictureInPicture = pictureInPicture;
         BindingContext = mvuHost;
         PipButton.IsVisible = pictureInPicture.IsToggleSupported;
+#if WINDOWS
+        // Unter Windows blenden die Transportsteuerungen des MediaElements
+        // sich nach dem Timeout nicht mehr über eigene Pointer-Ereignisse ein
+        // (die Tap-/Hover-Erkennung des MediaPlayerElement greift in dieser
+        // Kombination nicht). Workaround: Ein Tip auf die Videofläche ruft
+        // TransportControls.Show() — Ausblenden erledigt der Auto-Timer.
+        var tap = new TapGestureRecognizer();
+        tap.Tapped += OnPlayerTapped;
+        PlayerRoot.GestureRecognizers.Add(tap);
+#endif
         UpdateUi(mvuHost.Model);
     }
 
@@ -220,5 +233,21 @@ public partial class PlayerPage : ContentPage
     private void OnPipClicked(object? sender, EventArgs e)
     {
         _ = mvuHost.DispatchAsync(new PictureInPictureRequestedMessage());
+    }
+
+    /// <summary>
+    /// Windows-Workaround: Ein Tip auf die Videofläche blendet die
+    /// Transportsteuerung wieder ein. Das Ausblenden übernimmt weiterhin der
+    /// Auto-Timer des MediaPlayerElement.
+    /// </summary>
+    private void OnPlayerTapped(object? sender, TappedEventArgs e)
+    {
+#if WINDOWS
+        if (VideoElement.Handler?.PlatformView is Panel panel
+            && panel.Children.OfType<MediaPlayerElement>().FirstOrDefault() is { } mpe)
+        {
+            mpe.TransportControls?.Show();
+        }
+#endif
     }
 }
