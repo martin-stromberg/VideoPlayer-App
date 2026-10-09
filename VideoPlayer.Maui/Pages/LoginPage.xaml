@@ -37,6 +37,34 @@
                    TextColor="{StaticResource VpDanger}"
                    IsVisible="false" />
 
+            <!-- Kopplungs-Einstieg: Der Kurzcode der Serververwaltung
+                 (Profilseite „Geräte") wird gegen den bereits verbundenen
+                 Server eingelöst — ohne Passwort. Der QR-Code bleibt bei
+                 der Serververbindung, weil er die Adresse selbst trägt. -->
+            <BoxView HeightRequest="1"
+                     BackgroundColor="{StaticResource VpBorder}"
+                     Margin="0,12" />
+            <Label Text="Oder mit Kopplungscode verbinden"
+                   FontAttributes="Bold" />
+            <Label Text="Kurzcode aus der Serververwaltung (Profilseite „Geräte“) eingeben — er wird gegen den verbundenen Server eingelöst."
+                   FontSize="12"
+                   TextColor="{StaticResource VpTextMuted}" />
+            <Entry x:Name="BootstrapCodeEntry"
+                   AutomationId="LoginBootstrapCodeEntry"
+                   Placeholder="Kopplungscode"
+                   Keyboard="Text"
+                   IsSpellCheckEnabled="False"
+                   IsTextPredictionEnabled="False" />
+            <Button x:Name="BootstrapLoginButton"
+                    AutomationId="LoginBootstrapButton"
+                    Text="Kopplungscode einlösen"
+                    Clicked="OnBootstrapClicked" />
+            <ActivityIndicator x:Name="BootstrapIndicator" IsRunning="false" IsVisible="false" />
+            <Label x:Name="BootstrapErrorLabel"
+                   AutomationId="LoginBootstrapErrorLabel"
+                   TextColor="{StaticResource VpDanger}"
+                   IsVisible="false" />
+
             <Button x:Name="ServerSetupButton"
                     AutomationId="LoginServerSetupButton"
                     Text="Anderen Server einrichten"

@@ -42,6 +42,14 @@ Maske („Benutzername und Passwort prüfen", „Server nicht erreichbar",
 „erneut versuchen"). Über „Anderen Server einrichten" gelangt man zurück
 zur Serverauswahl (bekannte Server, Netzwerk-Suche, manuelle Eingabe).
 
+Alternativ zur Anmeldung liegt auf der Maske der Abschnitt „Mit
+Kopplungscode verbinden": Dort löst der 8-stellige **Kurzcode** aus der
+Serververwaltung (Profilseite „Geräte") das Gerät gegen den bereits
+verbundenen Server ein — ohne Passworteingabe. (Der QR-Code bleibt bei
+der Serververbindung, weil er die Serveradresse selbst trägt.) Nach
+erfolgreicher Kopplung landet die App direkt auf der Startseite; Fehler
+erscheinen ebenfalls inline auf der Maske.
+
 ## Offline-Modus
 
 Ist der Server nicht erreichbar und liegen lokale Daten vor (gecachte
