@@ -90,9 +90,9 @@ jobs:
     needs: release
     # Das aktuelle MAUI-Workload-Paket Microsoft.iOS.Sdk.net10.0_27.0
     # verlangt Xcode 27 — macos-latest liefert hoechstens 26.x. Das
-    # xcode-27-arm64-Image (Preview) traegt Xcode 27 als Default.
+    # xcode-27-Image (Preview) traegt Xcode 27 als Default.
     # Kann auf macos-latest zurueck, sobald dort Xcode 27 GA ist.
-    runs-on: xcode-27-arm64
+    runs-on: xcode-27
     steps:
       - name: Checkout release tag
         uses: actions/checkout@v4
