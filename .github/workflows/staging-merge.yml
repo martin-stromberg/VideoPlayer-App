@@ -110,11 +110,14 @@ jobs:
       - name: Set application version
         run: pwsh .github/scripts/Set-Version.ps1 -Version '${{ needs.release.outputs.tag }}'
 
+      # EnableCodeSigning=false: der Runner hat keine Zertifikate im
+      # Keychain; Simulator-Builds sind ohnehin ad-hoc signiert. Ab
+      # iOS-SDK 27 wird sonst "No valid iOS code signing keys" gemeldet.
       - name: Build iOS
-        run: dotnet build VideoWebPlayer.Maui/VideoWebPlayer.Maui.csproj --configuration Release --framework net10.0-ios --runtime iossimulator-arm64
+        run: dotnet build VideoWebPlayer.Maui/VideoWebPlayer.Maui.csproj --configuration Release --framework net10.0-ios --runtime iossimulator-arm64 -p:EnableCodeSigning=false
 
       - name: Build iOS (VideoPlayer.Maui)
-        run: dotnet build VideoPlayer.Maui/VideoPlayer.Maui.csproj --configuration Release --framework net10.0-ios --runtime iossimulator-arm64
+        run: dotnet build VideoPlayer.Maui/VideoPlayer.Maui.csproj --configuration Release --framework net10.0-ios --runtime iossimulator-arm64 -p:EnableCodeSigning=false
 
       - name: Upload iOS artifact
         env:
