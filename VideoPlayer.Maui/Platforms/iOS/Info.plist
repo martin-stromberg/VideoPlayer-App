@@ -34,6 +34,8 @@
 	<false/>
 	<key>NSCameraUsageDescription</key>
 	<string>Zum Scannen des Kopplungs-QR-Codes der Serververwaltung.</string>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>Um den VideoPlayer-Server in deinem Netzwerk zu finden und zu verbinden.</string>
 	<key>NSAppTransportSecurity</key>
 	<dict>
 		<key>NSAllowsArbitraryLoads</key>

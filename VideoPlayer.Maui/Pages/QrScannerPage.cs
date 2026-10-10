@@ -17,6 +17,7 @@ namespace VideoPlayer.Maui.Pages;
 public sealed class QrScannerPage : ContentPage
 {
     private readonly MvuHost mvuHost;
+    private readonly CameraBarcodeReaderView cameraView;
     private int handled;
 
     /// <summary>Erstellt die Scanner-Seite.</summary>
@@ -26,7 +27,7 @@ public sealed class QrScannerPage : ContentPage
         this.mvuHost = mvuHost;
         Title = "QR-Code scannen";
 
-        var cameraView = new CameraBarcodeReaderView
+        cameraView = new CameraBarcodeReaderView
         {
             Options = new BarcodeReaderOptions
             {
@@ -72,6 +73,18 @@ public sealed class QrScannerPage : ContentPage
         };
         Grid.SetRow(hint, 1);
         Grid.SetRow(cancel, 2);
+    }
+
+    /// <inheritdoc/>
+    protected override void OnDisappearing()
+    {
+        // Die AVCaptureSession der Kamera muss vor dem Abbau der Seite
+        // stehen: Laeuft sie weiter, ruft der native Delegate den
+        // bereits entsorgten Handler auf — stiller Absturz auf iOS
+        // kurz nach dem Schliessen.
+        cameraView.IsDetecting = false;
+        cameraView.BarcodesDetected -= OnBarcodesDetected;
+        base.OnDisappearing();
     }
 
     /// <summary>
