@@ -1,0 +1,254 @@
+name: Package iOS
+
+inputs:
+  release-version:
+    description: Version ohne fuehrendes v, als -p:Version (z. B. 1.2.3 oder 1.2.3-RC.1).
+    required: true
+  release-tag:
+    description: Release-Tag (z. B. v1.2.3 oder v1.2.3-RC.1). Fuer eine stabile Aufrufsignatur ueber die Packaging-Actions hinweg.
+    required: true
+  codesign-key:
+    description: iOS-Signaturidentitaet als -p:CodesignKey (z. B. Apple Distribution), vom Aufrufer aus Repository-Secrets.
+    required: false
+    default: ''
+  provisioning-profile:
+    description: iOS-Provisioning-Profil als -p:CodesignProvision, vom Aufrufer aus Repository-Secrets.
+    required: false
+    default: ''
+  api-key-id:
+    description: App Store Connect API-Key-ID. Zusammen mit api-key-p8/api-issuer-id wird die gebaute .ipa per iTMSTransporter nach TestFlight geladen.
+    required: false
+    default: ''
+  api-issuer-id:
+    description: App Store Connect API-Issuer-ID.
+    required: false
+    default: ''
+  api-key-p8:
+    description: App Store Connect API Private Key (.p8-Inhalt), vom Aufrufer aus Repository-Secrets.
+    required: false
+    default: ''
+  certificate-p12-base64:
+    description: Base64-kodierter .p12-Export des Distribution-Zertifikats inkl. Private Key (Keychain-Access-Export).
+    required: false
+    default: ''
+  certificate-p12-password:
+    description: Passwort des exportierten .p12.
+    required: false
+    default: ''
+  provisioning-profile-base64:
+    description: Base64-kodierte .mobileprovision-Datei.
+    required: false
+    default: ''
+  ios-workload-version:
+    description: Microsoft.iOS.Sdk-Pack-/Manifestversion, die vor dem Restore gepinnt wird. Muss zu einem Release-Xcode auf dem Runner passen - der App Store lehnt Builds aus Beta-Xcode ab.
+    required: false
+    default: '26.5.10318'
+
+runs:
+  using: composite
+  steps:
+    # SDK-Band 10.0.1xx pinnen: die iOS-Workload-Manifeste werden pro
+    # SDK-Band publiziert; 26.x-Manifeste (Release-Xcode-kompatibel)
+    # existieren nur im 10.0.100-Feed, der 10.0.400-Feed kennt nur
+    # 27.x-Workloads, die Beta-Xcode verlangen (Store lehnt Beta ab).
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v6
+      with:
+        dotnet-version: '10.0.1xx'
+
+    # global.json nur im CI-Workspace: der Runner bringt zusaetzlich ein
+    # neueres SDK (10.0.4xx) mit; ohne global.json waehlt der Host-Resolver
+    # immer das hoechste SDK und der Workload-Band waere wieder 10.0.400.
+    # Die Datei wird absichtlich nicht committed - lokal darf jede
+    # 10.0.x-SDK verwendet werden.
+    - name: Pin SDK band for this job
+      run: |
+        printf '{"sdk":{"version":"10.0.100","rollForward":"latestPatch","allowPrerelease":false}}\n' > global.json
+        dotnet --version
+      shell: bash
+
+    # Workload-Version pinnen: 'workload install' aktualisiert die
+    # Manifeste immer auf 'latest' (aktuell 27.x mit Beta-Xcode-
+    # Anforderung - Store lehnt Beta ab) und wuerde den Pin wieder
+    # deinstallieren. Deshalb: erst per Rollback-File das iOS-Manifest
+    # pinnen, dann mit --skip-manifest-update installieren, damit exakt
+    # die gepinnte Manifest-Version aufgeloest wird.
+    - name: Install .NET MAUI workload
+      run: |
+        set -euo pipefail
+        printf '{"microsoft.net.sdk.ios": "%s"}\n' "${{ inputs.ios-workload-version }}" > "$RUNNER_TEMP/workload-rollback.json"
+        dotnet workload update --from-rollback-file "$RUNNER_TEMP/workload-rollback.json"
+        dotnet workload install maui-ios ios --skip-manifest-update
+        # Auf dem Runner vorinstallierte iOS-Packs anderer Version
+        # entfernen: die TPV-Resolution wuerde sonst das neueste Pack
+        # waehlen - unabhaengig vom gepinnten Manifest.
+        for d in "$HOME"/.dotnet/packs/Microsoft.iOS.Sdk.net10.0_*/*/; do
+          [ -d "$d" ] || continue
+          [ "$(basename "$d")" = "${{ inputs.ios-workload-version }}" ] || rm -rf "$(dirname "$d")"
+        done
+      shell: bash
+
+    # -r ios-arm64 ist Pflicht: publish unten laeuft mit
+    # --no-restore und braucht das RID-Ziel im assets file.
+    # TargetFrameworks wird auf net10.0-ios eingeschraenkt: das csproj
+    # deklariert android/maccatalyst mit, auf dem Runner fehlen aber
+    # deren Workloads.
+    - name: Restore
+      run: dotnet restore VideoPlayer.Maui/VideoPlayer.Maui.csproj -r ios-arm64 -p:TargetFrameworks=net10.0-ios
+      shell: bash
+
+    # Signatur-Material importieren: das Runner-Image hat weder
+    # Distribution-Zertifikat noch Provisioning-Profil. Temporaere
+    # Keychain mit Zufallspasswort; set-key-partition-list verhindert
+    # den GUI-Passwort-Prompt beim Signieren.
+    - name: Install signing certificate and provisioning profile
+      if: ${{ inputs.certificate-p12-base64 != '' }}
+      shell: bash
+      env:
+        P12_BASE64: ${{ inputs.certificate-p12-base64 }}
+        P12_PASSWORD: ${{ inputs.certificate-p12-password }}
+        PROFILE_BASE64: ${{ inputs.provisioning-profile-base64 }}
+      run: |
+        set -euo pipefail
+        KEYCHAIN_PATH="$RUNNER_TEMP/app-signing.keychain-db"
+        KEYCHAIN_PASSWORD="$(openssl rand -base64 32)"
+        security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+        security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+        security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+        echo "$P12_BASE64" | base64 -d > "$RUNNER_TEMP/dist.p12"
+        security import "$RUNNER_TEMP/dist.p12" -k "$KEYCHAIN_PATH" -P "$P12_PASSWORD" -T /usr/bin/codesign -T /usr/bin/security -T /usr/bin/productbuild
+        rm -f "$RUNNER_TEMP/dist.p12"
+        EXISTING=$(security list-keychains -d user | tr -d '"')
+        security list-keychains -d user -s "$KEYCHAIN_PATH" $EXISTING
+        security set-key-partition-list -S apple-tool:,apple: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH" >/dev/null
+        mkdir -p "$HOME/Library/MobileDevice/Provisioning Profiles"
+        echo "$PROFILE_BASE64" | base64 -d > "$RUNNER_TEMP/profile.mobileprovision"
+        cp "$RUNNER_TEMP/profile.mobileprovision" "$HOME/Library/MobileDevice/Provisioning Profiles/"
+        rm -f "$RUNNER_TEMP/profile.mobileprovision"
+        echo "$KEYCHAIN_PATH" > "$RUNNER_TEMP/keychain-path.txt"
+        unset KEYCHAIN_PASSWORD
+
+    # ApplicationDisplayVersion/ApplicationVersion explizit setzen: die
+    # csproj pinnt beide fuer lokale Builds. Die Buildnummer ist die
+    # Commit-Anzahl - repo-weit monoton, anders als github.run_number,
+    # das pro Workflow zaehlt (staging-merge und main-merge wuerden sonst
+    # kollidierende CFBundleVersion-Werte erzeugen). run_attempt erhoeht
+    # bei Repair-Uploads desselben Commits.
+    # ApplicationDisplayVersion akzeptiert nur dreiteilige numerische
+    # Versionen - bei Pre-Releases (1.1.0-RC.1) wird der Suffix
+    # abgeschnitten (CFBundleShortVersionString muss numerisch sein).
+    # MauiXamlInflator=XamlC: die csproj aktiviert SourceGen-XAML, der
+    # CodeBehindGenerator der gepinnten Runner-MAUI-Version erzeugt in
+    # der iOS-Kompilierung teils invaliden Code (siehe Reporter-CI).
+    - name: Publish (ios)
+      run: |
+        set -euo pipefail
+        DISPLAY_VERSION="${{ inputs.release-version }}"
+        DISPLAY_VERSION="${DISPLAY_VERSION%%-*}"
+        BUILD_NUMBER=$(( $(git rev-list --count HEAD) + ${{ github.run_attempt }} - 1 ))
+        dotnet publish VideoPlayer.Maui/VideoPlayer.Maui.csproj -p:Version=${{ inputs.release-version }} \
+          -p:TargetFrameworks=net10.0-ios \
+          -p:ApplicationDisplayVersion="$DISPLAY_VERSION" \
+          -p:ApplicationVersion=$BUILD_NUMBER \
+          --configuration Release --framework net10.0-ios \
+          -p:RuntimeIdentifier=ios-arm64 \
+          -p:ArchiveOnBuild=true \
+          -p:CodesignKey="${{ inputs.codesign-key }}" \
+          -p:CodesignProvision="${{ inputs.provisioning-profile }}" \
+          -p:MauiXamlInflator=XamlC \
+          --no-restore
+      shell: bash
+
+    - name: Collect iOS package
+      shell: bash
+      run: |
+        set -euo pipefail
+        ipas=()
+        while IFS= read -r -d '' file; do
+          ipas+=("$file")
+        done < <(find VideoPlayer.Maui/bin/Release -name '*.ipa' -print0 | sort -z)
+        if [ "${#ipas[@]}" -eq 0 ]; then
+          echo "::error::No .ipa artifact found under VideoPlayer.Maui/bin/Release after publish."
+          exit 1
+        fi
+        # dotnet publish may write the same artifact to both the RID directory and publish/ — deduplicate by basename.
+        distinct=$(printf '%s\n' "${ipas[@]##*/}" | sort -u | wc -l)
+        if [ "$distinct" -gt 1 ]; then
+          echo "::error::Multiple distinct .ipa artifacts found under VideoPlayer.Maui/bin/Release; expected exactly one:"
+          printf '%s\n' "${ipas[@]##*/}" | sort -u
+          exit 1
+        fi
+        ipa=""
+        for f in "${ipas[@]}"; do
+          case "$f" in */publish/*) ipa="$f"; break;; esac
+        done
+        if [ -z "$ipa" ]; then ipa="${ipas[0]}"; fi
+        cp "$ipa" release-ios.ipa
+
+    # TestFlight-Upload: laeuft nur, wenn die API-Key-Secrets gesetzt sind.
+    # iTMSTransporter liegt auf den Runnern nicht in Transporter.app -
+    # gesucht wird in den Apple-Standardorten (gleiche Liste wie
+    # Get-TransporterFindScript in scripts/iOS-Deployment.ps1).
+    - name: Upload to TestFlight
+      if: ${{ inputs.api-key-p8 != '' }}
+      shell: bash
+      env:
+        ASC_KEY_ID: ${{ inputs.api-key-id }}
+        ASC_ISSUER_ID: ${{ inputs.api-issuer-id }}
+        ASC_KEY_P8: ${{ inputs.api-key-p8 }}
+      run: |
+        set -euo pipefail
+        mkdir -p "$HOME/.appstoreconnect/private_keys"
+        chmod 700 "$HOME/.appstoreconnect/private_keys"
+        printf '%s' "$ASC_KEY_P8" > "$HOME/.appstoreconnect/private_keys/AuthKey_${ASC_KEY_ID}.p8"
+        # iTMSTransporter finden: Developer/usr/bin (und xcrun) liefern
+        # auf aktuellem Xcode nur einen Stub, der 'iTMSTransporter is now
+        # part of Transporter' meldet - die echten Orte sind die
+        # Transporter.app-Installation und das Standalone-Paket unter
+        # /usr/local/itms bzw. das ContentDeliveryServices.framework.
+        DEVDIR="$(xcode-select -p 2>/dev/null || true)"
+        CANDIDATES=(
+          "/Applications/Transporter.app/Contents/itms/bin/iTMSTransporter"
+          "$HOME/Applications/Transporter.app/Contents/itms/bin/iTMSTransporter"
+          "/usr/local/itms/bin/iTMSTransporter"
+        )
+        if [ -n "$DEVDIR" ]; then
+          CANDIDATES+=(
+            "$DEVDIR/../SharedFrameworks/ContentDeliveryServices.framework/Versions/A/itms/bin/iTMSTransporter"
+          )
+        fi
+        ITMS=""
+        for c in "${CANDIDATES[@]}"; do
+          if [ -x "$c" ]; then ITMS="$c"; break; fi
+        done
+        # Fallback: offizielles Standalone-Paket von Apples CDN
+        # installieren (Transporter.app ist auf den Runnern nicht
+        # vorinstalliert, Xcode liefert nur den Stub).
+        if [ -z "$ITMS" ]; then
+          echo "Kein funktionierender iTMSTransporter gefunden - installiere Standalone-Paket ..."
+          curl -fsSL "https://itunesconnect.apple.com/WebObjects/iTunesConnect.woa/ra/resources/download/public/Transporter__OSX/bin/" \
+            -o "$RUNNER_TEMP/itmstransporter.pkg"
+          sudo installer -pkg "$RUNNER_TEMP/itmstransporter.pkg" -target /
+          rm -f "$RUNNER_TEMP/itmstransporter.pkg"
+          if [ -x /usr/local/itms/bin/iTMSTransporter ]; then
+            ITMS=/usr/local/itms/bin/iTMSTransporter
+          fi
+        fi
+        if [ -z "$ITMS" ]; then
+          echo "::error::iTMSTransporter not found on runner (or only the deprecated stub)."
+          exit 1
+        fi
+        echo "Using iTMSTransporter: $ITMS"
+        "$ITMS" -m upload -assetFile release-ios.ipa -apiKey "$ASC_KEY_ID" -apiIssuer "$ASC_ISSUER_ID"
+
+    # Keychain-Reste entfernen, auch bei Fehlschlag.
+    - name: Remove signing keychain
+      if: always()
+      shell: bash
+      run: |
+        KEYCHAIN_PATH="$(cat "$RUNNER_TEMP/keychain-path.txt" 2>/dev/null || true)"
+        rm -f "$RUNNER_TEMP/keychain-path.txt" "$RUNNER_TEMP/dist.p12" "$RUNNER_TEMP/profile.mobileprovision"
+        if [ -n "$KEYCHAIN_PATH" ]; then
+          security list-keychains -d user -s login.keychain-db || true
+          security delete-keychain "$KEYCHAIN_PATH" 2>/dev/null || true
+        fi

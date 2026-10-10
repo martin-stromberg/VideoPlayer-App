@@ -9,8 +9,10 @@
         simulator -> App bauen, im iOS-Simulator starten und Screenshot speichern (nur auf macOS)
         device    -> App bauen und auf einem echten iOS-Geraet starten (nur auf macOS)
         store     -> Signierten Release-Build erzeugen, validieren und zu App Store Connect
-                     hochladen (TestFlight). Erhoeht automatisch die Buildnummer
-                     (Opt-out: -NoBumpBuildNumber). Auf Windows per SSH an den Mac delegiert.
+                     hochladen (TestFlight). Setzt die Buildnummer (CFBundleVersion) auf die
+                     Anzahl der Commits - dieselbe Zaehlung wie die CI-Pipeline
+                     (Opt-out: -NoBumpBuildNumber, manueller Override: -BuildNumber).
+                     Auf Windows per SSH an den Mac delegiert.
         upload    -> Vorhandene .ipa validieren und zu App Store Connect hochladen
         list      -> Verfuegbare Simulatoren/Geraete anzeigen (nur macOS)
         menu      -> Interaktives Menue
@@ -71,6 +73,8 @@ param(
     [Parameter(HelpMessage = "Bei 'device' via SSH: App-Output (--console) nach dem Start streamen (Ctrl+C zum Loesen).")]
     [switch]$Console,
     [switch]$NoBumpBuildNumber,
+    [Parameter(HelpMessage = "CFBundleVersion manuell setzen (Standard: Anzahl der Commits, wie CI). Fuer einen erneuten Upload desselben Commits einen groesseren Wert uebergeben.")]
+    [int]$BuildNumber = 0,
     [string]$LogDir = "logs",
     [Parameter(HelpMessage = "Statischer Client-Gate-Schluessel (MSBuild-Eigenschaft VideoPlayerApiToken); wird in der Anzeige maskiert.")]
     [string]$VideoPlayerApiToken = $env:VIDEOWEBPLAYER_MAUI_API_TOKEN,
@@ -448,20 +452,19 @@ function Assert-TransporterAvailable {
     }
 }
 
-function Update-BuildNumber {
-    $csprojPath = $projectPath
-    $content = [System.IO.File]::ReadAllText($csprojPath)
-    $m = [regex]::Match($content, '<ApplicationVersion>(\d+)</ApplicationVersion>')
-    if (-not $m.Success) {
-        Write-Host "Warnung: <ApplicationVersion> nicht in $csprojPath gefunden - kein Buildnummer-Bump." -ForegroundColor Yellow
-        return
+function Get-CommitBuildNumber {
+    # CFBundleVersion = Anzahl der Commits - dieselbe Zaehlung wie die
+    # CI-Pipeline (.github/actions/package-ios). Repo-weit monoton, das
+    # csproj bleibt unveraendert (kein lokaler Zaehler-Stand, keine
+    # Dirty-Diffs nach jedem Store-Lauf). Apple verlangt je Upload eine
+    # neue Nummer: bei einem erneuten Upload desselben Commits
+    # -BuildNumber mit einem groesseren Wert uebergeben.
+    $count = & git -C $repoRoot rev-list --count HEAD 2>$null
+    if ($LASTEXITCODE -ne 0 -or -not ($count -match '^\d+$')) {
+        Write-Host "Warnung: Commit-Anzahl nicht bestimmbar - csproj-Wert wird verwendet." -ForegroundColor Yellow
+        return $null
     }
-    $old = [int]$m.Groups[1].Value
-    $new = $old + 1
-    $content = $content.Replace($m.Value, "<ApplicationVersion>$new</ApplicationVersion>")
-    $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
-    [System.IO.File]::WriteAllText($csprojPath, $content, $utf8NoBom)
-    Write-Host "Buildnummer erhoeht (CFBundleVersion): $old -> $new" -ForegroundColor Green
+    return $count
 }
 
 function Get-LatestIpa {
@@ -681,8 +684,14 @@ function Invoke-Store {
     Assert-StorePrerequisites -Action "store"
     Assert-CodesigningForAction -Action "store"
     Assert-TransporterAvailable
-    if (-not $NoBumpBuildNumber) { Update-BuildNumber }
-    Invoke-Build
+    $applicationVersion = $null
+    if (-not $NoBumpBuildNumber) {
+        $applicationVersion = if ($BuildNumber -gt 0) { "$BuildNumber" } else { Get-CommitBuildNumber }
+        if ($applicationVersion) {
+            Write-Host "Buildnummer (CFBundleVersion): $applicationVersion (Commit-Anzahl)" -ForegroundColor Green
+        }
+    }
+    Invoke-Build -ApplicationVersionOverride $applicationVersion
     $ipa = Get-LatestIpa
     Write-Host "IPA: $ipa" -ForegroundColor Green
     Copy-ApiKeyToMac | Out-Null
@@ -706,6 +715,8 @@ function Invoke-Upload {
 }
 
 function Invoke-Build {
+    param([string]$ApplicationVersionOverride = "")
+
     $rid = Get-RuntimeIdentifier -Action "build"
     $config = Get-Configuration -Action "build"
     $hasCodesigning = $CodesignKey -and $CodesignProvision
@@ -713,6 +724,7 @@ function Invoke-Build {
     $rspLines = New-Object System.Collections.Generic.List[string]
     Add-PropertyLine -List $rspLines -Name "RuntimeIdentifier" -Value $rid
     Add-PropertyLine -List $rspLines -Name "VideoPlayerApiToken" -Value $VideoPlayerApiToken
+    Add-PropertyLine -List $rspLines -Name "ApplicationVersion" -Value $ApplicationVersionOverride
 
     if ($isWindows) {
         Add-PropertyLine -List $rspLines -Name "ServerAddress" -Value $ServerAddress
@@ -725,6 +737,7 @@ function Invoke-Build {
     $displayLines = New-Object System.Collections.Generic.List[string]
     Add-PropertyLine -List $displayLines -Name "RuntimeIdentifier" -Value $rid
     Add-MaskedDisplay -List $displayLines -Name "VideoPlayerApiToken" -Value $VideoPlayerApiToken
+    Add-PropertyLine -List $displayLines -Name "ApplicationVersion" -Value $ApplicationVersionOverride
     if ($isWindows) {
         Add-PropertyLine -List $displayLines -Name "ServerAddress" -Value $ServerAddress
         Add-PropertyLine -List $displayLines -Name "ServerUser" -Value $ServerUser
