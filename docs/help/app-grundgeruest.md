@@ -54,6 +54,23 @@ Die neue App besteht aus zwei Projekten:
 - `VideoPlayer.Maui` — MAUI-App (Shell-Navigation, Seiten, Effekt-Ausführung,
   Anbindung an `VideoPlayer.ApiClient` für die Erreichbarkeitsprüfung).
 
+### Seiten-Lebenszyklus und ModelChanged-Abonnements
+
+Alle Seiten, die `MvuHost.ModelChanged` abonnieren, tun dies nur,
+solange sie sichtbar sind: Das Abo wird in `OnAppearing` angemeldet
+(idempotent, mit `-=` vor `+=`) und in `OnDisappearing` wieder
+abgemeldet. Zusätzlich sperrt ein `subscribed`-Feld die per
+`MainThread.BeginInvokeOnMainThread` gemarshallten `UpdateUi`-
+Rückrufe verlassener Seiten. So bleiben verwaiste Seiten-Instanzen
+nicht am `MvuHost` hängen (Speicherleck) und reagieren nicht mehr auf
+Modelländerungen. Das Muster gilt einheitlich für `HomePage`,
+`MediaDetailsPage`, `DownloadsPage`, `FavoritesPage`,
+`SourceOverviewPage`, `ProfilePage`, `PlayerPage`, `SettingsPage`,
+`LoginPage` und `ServerSetupPage` (eingeführt mit der `PlayerPage`,
+verallgemeinert in Issue #11; per `PageLifecycleContractTests`
+gepinnt). Ausnahme: die `AppShell` abonniert dauerhaft im Konstruktor —
+sie lebt für die gesamte App-Laufzeit.
+
 Build (Windows):
 
 ```powershell
