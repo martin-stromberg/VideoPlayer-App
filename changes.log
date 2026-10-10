@@ -1,5 +1,13 @@
 # Änderungsprotokoll
 
+## 2026-10-10 — Developer-API in Bibliotheken msTools.DeveloperApi(.Maui) ausgelagert (Issue 18)
+
+- **Neue Bibliothek `msTools.DeveloperApi`:** Der plattformneutrale Kern der Developer-API (Mini-HTTP-Server `DevApiHttpServer`, `DevApiRequestReader`, `DevApiRouter`, Request/Response-Modelle, `DevApiMetadata`) wandert aus `VideoPlayer.Mvu/DevApi/` in die eigene Klassenbibliothek (net10.0, keine MAUI-Abhängigkeit). Neu: `DevApiServer`-Fassade (Server + `devapi.json` mit Primär-/Fallback-Verzeichnis), Delegat `DevApiEndpointHandler` und `DevApiRouterExtensions.MapModel` als Snapshot-Provider-Schnittstelle für `GET /model`.
+- **Neue Bibliothek `msTools.DeveloperApi.Maui`:** `DevApiVisualTree`, `DevApiTreeNode`/`DevApiBounds`/`DevApiTreeItem` und die Endpunkt-Verdrahtung (`MauiDevApiService`: `MainThread`-Marshalling, `devapi.json` via `AppContext.BaseDirectory` + `FileSystem.AppDataDirectory`) bilden das MAUI-Paket; `Microsoft.Maui.*` ist wie in der App auf `10.0.90` gepinnt.
+- **App-Seite:** `DevApiService` in `VideoPlayer.Maui/DevApi/` ist nur noch ein dünner Adapter (`MvuHost` -> `DevApiModelSnapshot`-Provider); `DevApiModelSnapshot` bleibt app-gebunden in `VideoPlayer.Mvu`. HTTP-Vertrag, `devapi.json`-Format und `#if DEBUG || DEV_API`-Ausschluss unveraendert.
+- **Referenzierungsweg:** Projekt-Referenzen im selben Repo (kein NuGet-Feed vorhanden); dokumentiert in `docs/help/developer-api.md` inkl. `DEV_API`-Define-Propagation.
+- **Tests:** Contract-Tests auf die neue Struktur erweitert (vier Verzeichnisse, `MapModel`-Registrierung, MAUI-Freiheit des Kerns, kein `dispatch`, keine Geheimnis-Bezeichner); neue `DevApiServerTests_Metadata` und `DevApiRouterTests_MapModel`. Suite 1047/1047 gruen, E2E 17/17 gruen.
+
 ## 2026-10-10 — Header-Bild der Offline-Detailseite wird beim Reconnect nachgeladen (Issue 12)
 
 - **Reconnect-Nachladung des Detail-Kopfbilds:** `EnterConnected` (`VideoPlayer.Mvu/AppUpdate.cs`) ruft jetzt neben `WithHeroLoad` auch `WithDetailsHeaderLoad` auf — eine aus dem Offline-Snapshot geöffnete Detailseite lädt ihr Kopfbereichs-Bild mit der zurückkehrenden Verbindung nach, ohne dass die Seite erneut geöffnet werden muss.

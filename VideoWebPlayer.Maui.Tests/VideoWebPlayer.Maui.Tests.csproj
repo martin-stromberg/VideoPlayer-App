@@ -26,6 +26,7 @@
     <Using Include="Xunit" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\msTools.DeveloperApi\msTools.DeveloperApi.csproj" />
     <ProjectReference Include="..\VideoPlayer.ApiClient\VideoPlayer.ApiClient.csproj" />
     <ProjectReference Include="..\VideoPlayer.Mvu\VideoPlayer.Mvu.csproj" />
     <ProjectReference Include="..\VideoPlayer.Storage\VideoPlayer.Storage.csproj" />

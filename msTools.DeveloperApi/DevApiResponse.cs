@@ -1,7 +1,7 @@
 #if DEBUG || DEV_API
 using System.Text.Json;
 
-namespace VideoPlayer.Mvu.DevApi;
+namespace msTools.DeveloperApi;
 
 /// <summary>
 /// Eine ausgehende Antwort der Developer-API (Statuscode plus JSON-Body).
@@ -20,9 +20,9 @@ public sealed record DevApiResponse
     public string ContentType { get; init; } = "application/json; charset=utf-8";
 
     /// <summary>Erzeugt eine 200er-Antwort mit camelCase-serialisiertem JSON-Body.</summary>
-    /// <param name="payload">Das zu serialisierende Objekt.</param>
+    /// <param name="payload">Das zu serialisierende Objekt (kann <c>null</c> sein).</param>
     /// <returns>Die Antwort.</returns>
-    public static DevApiResponse Json(object payload) =>
+    public static DevApiResponse Json(object? payload) =>
         new() { StatusCode = 200, Body = JsonSerializer.Serialize(payload, JsonOptions) };
 
     /// <summary>Erzeugt eine Fehlerantwort im Format <c>{"error":"…"}</c>.</summary>

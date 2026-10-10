@@ -75,6 +75,8 @@
                       Condition="'$(TargetFramework)' == 'net10.0-android' or '$(TargetFramework)' == 'net10.0-ios'" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\msTools.DeveloperApi\msTools.DeveloperApi.csproj" />
+    <ProjectReference Include="..\msTools.DeveloperApi.Maui\msTools.DeveloperApi.Maui.csproj" />
     <ProjectReference Include="..\VideoPlayer.ApiClient\VideoPlayer.ApiClient.csproj" />
     <ProjectReference Include="..\VideoPlayer.Mvu\VideoPlayer.Mvu.csproj" />
     <ProjectReference Include="..\VideoPlayer.Storage\VideoPlayer.Storage.csproj" />

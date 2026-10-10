@@ -1,5 +1,5 @@
 #if DEBUG || DEV_API
-namespace VideoPlayer.Mvu.DevApi;
+namespace msTools.DeveloperApi;
 
 /// <summary>
 /// Routen-Tabelle der Developer-API: bildet (Methode, Pfad) auf einen
@@ -14,7 +14,7 @@ public sealed class DevApiRouter
     /// <param name="method">HTTP-Methode (Groß-/Kleinschreibung egal).</param>
     /// <param name="path">Absoluter Pfad (z. B. <c>/model</c>).</param>
     /// <param name="handler">Der auszuführende Handler.</param>
-    public void Map(string method, string path, Func<DevApiRequest, CancellationToken, Task<DevApiResponse>> handler)
+    public void Map(string method, string path, DevApiEndpointHandler handler)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(method);
         ArgumentException.ThrowIfNullOrWhiteSpace(path);
@@ -54,6 +54,6 @@ public sealed class DevApiRouter
     private sealed record Route(
         string Method,
         string Path,
-        Func<DevApiRequest, CancellationToken, Task<DevApiResponse>> Handler);
+        DevApiEndpointHandler Handler);
 }
 #endif

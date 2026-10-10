@@ -4,7 +4,10 @@ Die App `VideoPlayer.Maui` enthält im **Debug-Build** (oder mit explizitem
 Opt-in über das Define `DEV_API`, niemals im Release) eine lokale
 Developer-API: einen minimalen HTTP-Server, der strukturierte
 UI-Analyse und -Steuerung für automatisierte Tests ermöglicht
-(Projekt Issue #17, Schritt 2).
+(Projekt Issue #17, Schritt 2). Die Implementierung liegt in den
+wiederverwendbaren Bibliotheken `msTools.DeveloperApi` und
+`msTools.DeveloperApi.Maui` (Issue #18) — siehe unten
+[Wiederverwendung](#wiederverwendung-in-anderen-projekten).
 
 ## Aktivierung und Ablage
 
@@ -100,9 +103,60 @@ Fehlerantworten tragen `{"error":"<deutscher Text>"}`.
 - Es existiert **kein** `POST /dispatch` – bewusste Entscheidung: Die
   API bleibt auf der echten UI-Eingabekette, Automatisierung wirkt wie
   echte Bedienung.
-- Implementierung: plattformneutraler Kern in `VideoPlayer.Mvu/DevApi/`
-  (Parser, Router, Server, Modell-Snapshot, Metadaten), MAUI-gebundene
-  Verdrahtung in `VideoPlayer.Maui/DevApi/` (Visual Tree, Dienst).
+- Implementierung: wiederverwendbare Bibliotheken `msTools.DeveloperApi`
+  (plattformneutraler Kern: Parser, Router, Server, Metadaten,
+  Server-Fassade `DevApiServer`, `GET /model`-Provider) und
+  `msTools.DeveloperApi.Maui` (Visual Tree, `MauiDevApiService` mit den
+  drei UI-Endpunkten). App-gebunden bleiben der `AppModel`-Snapshot
+  (`VideoPlayer.Mvu/DevApi/DevApiModelSnapshot.cs`) und der dünne
+  Adapter `VideoPlayer.Maui/DevApi/DevApiService.cs`.
 - Primärer Einsatzzweck sind die FlaUI-E2E-Tests (Projekt Schritt 3):
   FlaUI für Fenster/Klicks, Dev-API für Zustands-Assertions und
   Listen-Interaktion — siehe `docs/help/e2e-tests.md`.
+
+## Wiederverwendung in anderen Projekten
+
+Die Developer-API liegt seit Issue #18 in zwei Bibliotheken im selben
+Repository; der Referenzierungsweg ist die **Projekt-Referenz** (es
+existiert kein NuGet-Feed — eine spätere Paket-Veröffentlichung bleibt
+vorbereitet, `IsPackable` ist nicht deaktiviert):
+
+| Projekt | Inhalt | Abhängigkeiten |
+|---------|--------|----------------|
+| `msTools.DeveloperApi` | `DevApiHttpServer`, `DevApiRequestReader`, `DevApiRouter` (+ Delegat `DevApiEndpointHandler`), `DevApiRequest`/`DevApiResponse`, `DevApiRequestException`, `DevApiMetadata`, `DevApiServer`, `DevApiRouterExtensions.MapModel` | keine — net10.0 |
+| `msTools.DeveloperApi.Maui` | `DevApiVisualTree`, `DevApiTreeNode`/`DevApiBounds`/`DevApiTreeItem`, `MauiDevApiService` | `msTools.DeveloperApi`, `Microsoft.Maui.*` (Pin `10.0.90`, gleicher Stand wie die App) |
+
+### Verwendung (MAUI-App)
+
+1. `ProjectReference` auf `msTools.DeveloperApi.Maui` (zieht den Kern
+   transitiv mit).
+2. `MauiDevApiService` mit einem Snapshot-Provider erzeugen und starten —
+   er registriert selbst alle vier Endpunkte:
+
+   ```csharp
+   var devApi = new MauiDevApiService(() => MyModelSnapshot.FromModel(host.Model));
+   devApi.Start();          // devapi.json → AppContext.BaseDirectory
+   window.Destroying += (_, _) => devApi.Dispose();
+   ```
+
+   Der Provider läuft je Anfrage auf dem Request-Thread (thread-sicher
+   lesbares Modell nötig) und darf keine Zugangsdaten oder Geheimnisse
+   zurückgeben.
+
+### Verwendung (Nicht-MAUI-Projekt)
+
+Nur `msTools.DeveloperApi` referenzieren: `DevApiRouter` mit eigenen
+Handlern füllen (`Map("GET", "/pfad", handler)` bzw. `MapModel(provider)`
+für `GET /model`) und an `DevApiServer` übergeben — das ist die
+Handler-Schnittstelle, für die der Kern ohne MAUI schlank bleibt.
+
+### Aktivierung
+
+- Sämtliche Dateien beider Bibliotheken stehen unter
+  `#if DEBUG || DEV_API` — im Release-Build sind die Assemblies leer.
+  Jeder Verweis außerhalb eines `#if`-Blocks erzeugt damit einen
+  Compile-Fehler statt eines stillen Laufzeitpfads.
+- Das `DEV_API`-Opt-in muss **für App und Bibliotheken gemeinsam**
+  gesetzt werden — beim Build propagiert `-p:DefineConstants=DEV_API`
+  in alle Projekte; ein Define nur in der App-csproj ließe die
+  Bibliotheken leer.

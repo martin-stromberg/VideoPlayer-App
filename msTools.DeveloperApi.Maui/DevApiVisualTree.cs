@@ -2,7 +2,7 @@
 using System.Collections;
 using System.Reflection;
 
-namespace VideoPlayer.Maui.DevApi;
+namespace msTools.DeveloperApi.Maui;
 
 /// <summary>
 /// Baut den logischen Elementbaum für <c>GET /tree</c> auf und führt die
