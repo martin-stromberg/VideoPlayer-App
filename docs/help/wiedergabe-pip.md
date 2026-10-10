@@ -52,7 +52,10 @@ Die Quellauflösung (`PlaybackSourceService`) wählt automatisch:
 
 - **Fortsetzen:** beim Öffnen springt die Wiedergabe auf den gemerkten
   Stand der Weiterschauen-Liste — online vom Server, sonst aus der
-  gespeicherten Kopie (`cached_lists`).
+  gespeicherten Kopie (`cached_lists`). Der Sprung wird angewendet,
+  sobald der Player wiedergabebereit ist; erreicht ein Medium die
+  Bereitschaft nie, beginnt die Wiedergabe ohne Sprung am Anfang
+  (Degradation statt Absturz, siehe „Stabilität" unten).
 - **Fortschrittsmeldung:** alle 5 Sekunden wird die Position an den
   Server gemeldet, solange die Wiedergabe läuft; unveränderte
   Positionen (Pause) werden nicht erneut gesendet. Beim Ende und beim
@@ -81,6 +84,9 @@ Ist eine Quelle nicht verfügbar oder bricht die Wiedergabe ab,
 erscheint eine verständliche Meldung; bei Serien fällt der Player
 automatisch auf die nächste Episode zurück. Ohne Folge-Episode bleibt
 der Fehlerhinweis stehen und die Seite lässt sich normal verlassen.
+Fehler beim Wiedergabestart — etwa eine ungültige Quell-Adresse oder
+ein fehlgeschlagener Positions-Sprung — landen ebenfalls in diesem
+Fehlerhinweis; die Anwendung wird dadurch nicht beendet.
 
 ## Picture-in-Picture / Mini-Player
 
@@ -117,6 +123,32 @@ diese Ereignisse unter Windows auf Threadpool-Threads auslösen; ein
 thread-fremder Zugriff (z. B. `SeekTo` → `MediaManager.PlatformSeek` →
 `MediaPlayerElement.get_MediaPlayer`) führte dort zur unbehandelten
 `COMException 0x8001010E` (`RPC_E_WRONG_THREAD`).
+
+**iOS — Absturz beim Fortsetzen behoben:** Auf iOS feuert das
+`MediaOpened`-Ereignis des Toolkit-`MediaElement` (10.0.0) noch vor
+`AVPlayerItemStatus.ReadyToPlay` (Toolkit-Issue #3249; der Fix des
+Toolkits ist gemergt, aber in keinem NuGet-Release enthalten). Ein
+`SeekTo` in diesem Fenster warf im `async void`-Handler des Toolkits
+eine unbehandelte Ausnahme — `EXC_CRASH (SIGABRT)`, nur im
+Resume-Fall reproduzierbar. Die Seite merkt die Fortsetzungsposition
+daher bei `MediaOpened` nur noch (`pendingResumePosition`) und wendet
+den Sprung über `TryApplyPendingResumeSeek` an, sobald der Player
+`Playing` oder `Paused` meldet — beide Zustände implizieren
+`ReadyToPlay`. `ApplyResumeSeekAsync` läuft mit einer
+Abbruchschwelle von 10 Sekunden (`ResumeSeekTimeout`), weil die
+Toolkit-Vollendung des Seeks im Fehlerfall ausbleiben kann.
+
+Zusätzlich sind alle nativen `VideoElement`-Zugriffe fehlerisoliert
+(Quellenwechsel und Leeren der Quelle in `UpdateUi`, der
+Fortsetzungs-Seek, `ReportPosition` und die Zustandsabfrage im
+Fortschrittstakt) und `IsValidSourceLocation` prüft die Quell-Adresse
+vor der Übergabe ans Element (Server-Stream: absolute
+http/https-URL; lokale Datei: nicht leerer Pfad). Fehler dieser Pfade
+laufen als `PlaybackFailedMessage` in den MVU-Zyklus — sichtbar im
+Fehlerpanel bzw. mit Episoden-Rückfall — statt den Prozess zu
+beenden; das Flag `sourceApplyFailed` erzwingt dabei, dass die
+nächste Modelländerung den Quellenwechsel nach einem Fehlschlag
+erneut durchläuft (auch bei unveränderter oder leerender Adresse).
 
 ## MVU-Anbindung
 

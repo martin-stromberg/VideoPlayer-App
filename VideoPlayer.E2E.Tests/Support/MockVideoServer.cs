@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Sockets;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace VideoPlayer.E2E.Tests.Support;
 
@@ -105,6 +106,30 @@ public sealed class MockVideoServer : IDisposable
     /// <summary>Alle empfangenen Login-Bodies in Reihenfolge (Diagnose).</summary>
     public List<string> LoginRequestBodies { get; } = [];
 
+    /// <summary>
+    /// Opt-in Wiedergabefluss: Id des angebotenen Films; <c>null</c> =
+    /// Standard (leere Listen, unbekannte Item-/Stream-Routen liefern
+    /// 404). Belegt liefert „Neu im Programm" den Movie-Eintrag
+    /// <see cref="PlaybackMovieTitle"/>, die Detail-Route die Movie-JSON,
+    /// „continue-watching" optional einen Fortsetzungseintrag
+    /// (<see cref="PlaybackResumePositionSeconds"/>) und der Stream-
+    /// Endpunkt <see cref="PlaybackVideoPath"/> (oder 404 bei
+    /// <see cref="PlaybackStreamFails"/>).
+    /// </summary>
+    public long? PlaybackMovieId { get; set; }
+
+    /// <summary>Anzeigetitel des Opt-in-Wiedergabefluss-Films.</summary>
+    public string PlaybackMovieTitle { get; set; } = "E2E-Testfilm";
+
+    /// <summary>Pfad der MP4-Datei, die der Stream-Endpunkt ausliefert.</summary>
+    public string? PlaybackVideoPath { get; set; }
+
+    /// <summary>Weiterschauen-Position in Sekunden; <c>null</c> = kein Fortsetzungseintrag.</summary>
+    public long? PlaybackResumePositionSeconds { get; set; }
+
+    /// <summary><c>true</c> = der Stream-Endpunkt antwortet mit 404 (Wiedergabefehler-Pfad).</summary>
+    public bool PlaybackStreamFails { get; set; }
+
     /// <inheritdoc/>
     public void Dispose()
     {
@@ -143,8 +168,8 @@ public sealed class MockVideoServer : IDisposable
                     return;
                 }
 
-                var (status, contentType, body) = Route(request.Value);
-                await WriteResponseAsync(client.GetStream(), status, contentType, body, cancellation.Token);
+                var response = Route(request.Value);
+                await WriteResponseAsync(client.GetStream(), response, cancellation.Token);
             }
             catch (Exception)
             {
@@ -154,7 +179,23 @@ public sealed class MockVideoServer : IDisposable
         }
     }
 
-    private (int Status, string ContentType, byte[] Body) Route((string Method, string Path, Dictionary<string, string> Headers, string Body) request)
+    /// <summary>
+    /// Eine Antwort des Mock-Servers — Tupel-Notation der bisherigen
+    /// Routen wird implizit konvertiert; zusätzliche Header nur für
+    /// Endpunkte, die sie brauchen (Stream: Accept-Ranges/Content-Range).
+    /// </summary>
+    private sealed record MockResponse(
+        int Status,
+        string ContentType,
+        byte[] Body,
+        IReadOnlyDictionary<string, string>? Headers = null)
+    {
+        /// <summary>Wandelt das bisherige Antwort-Tupel um (ohne Zusatz-Header).</summary>
+        public static implicit operator MockResponse((int Status, string ContentType, byte[] Body) tuple) =>
+            new(tuple.Status, tuple.ContentType, tuple.Body);
+    }
+
+    private MockResponse Route((string Method, string Path, Dictionary<string, string> Headers, string Body) request)
     {
         var path = request.Path.Split('?')[0].TrimEnd('/');
         var method = request.Method;
@@ -189,6 +230,52 @@ public sealed class MockVideoServer : IDisposable
             return HandleLogout(request);
         }
 
+        if (method == "POST" && path.Equals("/api/continue-watching/progress", StringComparison.OrdinalIgnoreCase))
+        {
+            if (!IsGateValid(request))
+            {
+                return GateRejected();
+            }
+
+            if (!IsBearerValid(request))
+            {
+                return (401, "text/plain", Encoding.UTF8.GetBytes("unauthorized"));
+            }
+
+            // Fortschritts-Senke: die Meldung wird angenommen, sonst nichts.
+            return (204, "text/plain", Array.Empty<byte>());
+        }
+
+        // Opt-in Wiedergabefluss: Movie-Details und Stream-Endpunkt.
+        if (method == "GET" && path.StartsWith("/api/items/movie/", StringComparison.OrdinalIgnoreCase))
+        {
+            if (path.EndsWith("/stream", StringComparison.OrdinalIgnoreCase))
+            {
+                // Der native Player sendet keine App-Header — die Stream-
+                // URL authentifiziert sich über den access_token-Parameter
+                // (Konvention des PlaybackSourceService/echten Servers).
+                var token = QueryValue(request.Path, "access_token");
+                if (!string.Equals(token, AuthToken, StringComparison.Ordinal))
+                {
+                    return (401, "text/plain", Encoding.UTF8.GetBytes("unauthorized"));
+                }
+            }
+            else
+            {
+                if (!IsGateValid(request))
+                {
+                    return GateRejected();
+                }
+
+                if (!IsBearerValid(request))
+                {
+                    return (401, "text/plain", Encoding.UTF8.GetBytes("unauthorized"));
+                }
+            }
+
+            return HandleMovieItem(path, request);
+        }
+
         // Authentifizierte Listen-Endpunkte: Gate + Bearer prüfen,
         // leere Liste liefern (ausreichend für Token-Validierung und Sync).
         // Ablehnung ohne Bearer → text/plain wie die Credential-Ablehnung
@@ -207,10 +294,207 @@ public sealed class MockVideoServer : IDisposable
                 return (401, "text/plain", Encoding.UTF8.GetBytes("unauthorized"));
             }
 
+            // Opt-in Wiedergabefluss: konfigurierte Listenantworten statt
+            // der Standard-Leerliste.
+            if (PlaybackMovieId is not null && ListOverride(path) is { } overrideBody)
+            {
+                return (200, "application/json", overrideBody);
+            }
+
             return (200, "application/json", JsonBody(Array.Empty<object>()));
         }
 
         return (404, "application/json", JsonBody(new { error = "not found" }));
+    }
+
+    /// <summary>
+    /// Opt-in-Listenantworten des Wiedergabeflusses: „Neu im Programm"
+    /// liefert den konfigurierten Movie-Eintrag, „continue-watching" den
+    /// Fortsetzungseintrag (nur bei gesetzter <see cref="PlaybackResumePositionSeconds"/>).
+    /// </summary>
+    private byte[]? ListOverride(string path)
+    {
+        if (path.Equals("/api/items/recent", StringComparison.OrdinalIgnoreCase))
+        {
+            return JsonBody(new[]
+            {
+                new
+                {
+                    id = 1L,
+                    mediaSourceId = 1L,
+                    publishedAt = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc),
+                    // RecentEntryKind.Movie (numerisch serialisiert).
+                    type = 0,
+                    entry = new PlaybackMediaEntryJson
+                    {
+                        Id = PlaybackMovieId!.Value,
+                        Name = PlaybackMovieTitle,
+                        MediaSourceId = 1
+                    }
+                }
+            });
+        }
+
+        if (path.Equals("/api/continue-watching", StringComparison.OrdinalIgnoreCase)
+            && PlaybackResumePositionSeconds is > 0)
+        {
+            return JsonBody(new[]
+            {
+                new
+                {
+                    mediaType = "movie",
+                    entry = new PlaybackMediaEntryJson
+                    {
+                        Id = PlaybackMovieId!.Value,
+                        Name = PlaybackMovieTitle,
+                        MediaSourceId = 1
+                    },
+                    positionSeconds = PlaybackResumePositionSeconds.Value,
+                    durationSeconds = 20L,
+                    title = PlaybackMovieTitle
+                }
+            });
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Medieneintrag im Server-JSON-Format (<c>$type</c>-Diskriminator
+    /// der polymorphen MediaEntry-Hierarchie).
+    /// </summary>
+    private sealed class PlaybackMediaEntryJson
+    {
+        [JsonPropertyName("$type")] public string Type { get; set; } = "movie";
+
+        [JsonPropertyName("id")] public long Id { get; set; }
+
+        [JsonPropertyName("name")] public string Name { get; set; } = string.Empty;
+
+        [JsonPropertyName("mediaSourceId")] public long MediaSourceId { get; set; }
+    }
+
+    /// <summary>
+    /// <c>GET api/items/movie/{id}</c> (Movie-Details) und
+    /// <c>GET api/items/movie/{id}/stream</c> (Videodaten mit minimalem
+    /// Range-Support für den Seek: <c>Accept-Ranges</c>, <c>206 Partial
+    /// Content</c> auf <c>Range</c>-Requests).
+    /// </summary>
+    private MockResponse HandleMovieItem(
+        string path,
+        (string Method, string Path, Dictionary<string, string> Headers, string Body) request)
+    {
+        if (PlaybackMovieId is not { } movieId)
+        {
+            return (404, "application/json", JsonBody(new { error = "not found" }));
+        }
+
+        var rest = path["/api/items/movie/".Length..];
+        if (rest.EndsWith("/stream", StringComparison.OrdinalIgnoreCase))
+        {
+            var idPart = rest[..^"/stream".Length];
+            if (!long.TryParse(idPart, out var streamId)
+                || streamId != movieId
+                || PlaybackStreamFails
+                || PlaybackVideoPath is null
+                || !File.Exists(PlaybackVideoPath))
+            {
+                return (404, "application/json", JsonBody(new { error = "not found" }));
+            }
+
+            return ServeVideo(request, File.ReadAllBytes(PlaybackVideoPath));
+        }
+
+        if (!long.TryParse(rest, out var id) || id != movieId)
+        {
+            return (404, "application/json", JsonBody(new { error = "not found" }));
+        }
+
+        return (200, "application/json", JsonBody(new PlaybackMediaEntryJson
+        {
+            Id = movieId,
+            Name = PlaybackMovieTitle,
+            MediaSourceId = 1
+        }));
+    }
+
+    /// <summary>
+    /// Liefert die Videodatei: ganz (<c>200 OK</c>, <c>Accept-Ranges:
+    /// bytes</c>) oder als Byte-Range (<c>206 Partial Content</c> mit
+    /// <c>Content-Range</c>).
+    /// </summary>
+    private static MockResponse ServeVideo(
+        (string Method, string Path, Dictionary<string, string> Headers, string Body) request,
+        byte[] video)
+    {
+        var headers = new Dictionary<string, string> { ["Accept-Ranges"] = "bytes" };
+        if (request.Headers.TryGetValue("Range", out var rangeHeader)
+            && TryParseRange(rangeHeader, video.Length, out var start, out var end))
+        {
+            var slice = new byte[end - start + 1];
+            Array.Copy(video, (int)start, slice, 0, slice.Length);
+            headers["Content-Range"] = $"bytes {start}-{end}/{video.Length}";
+            return new MockResponse(206, "video/mp4", slice, headers);
+        }
+
+        return new MockResponse(200, "video/mp4", video, headers);
+    }
+
+    /// <summary>Liest einen Query-Parameter aus dem Request-Pfad.</summary>
+    private static string? QueryValue(string path, string name)
+    {
+        var queryStart = path.IndexOf('?');
+        if (queryStart < 0)
+        {
+            return null;
+        }
+
+        foreach (var pair in path[(queryStart + 1)..].Split('&', StringSplitOptions.RemoveEmptyEntries))
+        {
+            var parts = pair.Split('=', 2);
+            if (parts.Length == 2 && parts[0].Equals(name, StringComparison.OrdinalIgnoreCase))
+            {
+                return Uri.UnescapeDataString(parts[1]);
+            }
+        }
+
+        return null;
+    }
+
+    /// <summary>Parst <c>bytes=start-end</c>, <c>bytes=start-</c> und <c>bytes=-suffix</c>.</summary>
+    private static bool TryParseRange(string header, long length, out long start, out long end)
+    {
+        start = 0;
+        end = length - 1;
+        if (!header.StartsWith("bytes=", StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        var parts = header["bytes=".Length..].Split('-', 2);
+        if (parts[0].Length > 0)
+        {
+            if (!long.TryParse(parts[0], out start))
+            {
+                return false;
+            }
+
+            end = parts.Length > 1 && long.TryParse(parts[1], out var explicitEnd)
+                ? Math.Min(explicitEnd, length - 1)
+                : length - 1;
+        }
+        else
+        {
+            // Suffix-Form „bytes=-N": die letzten N Bytes.
+            if (parts.Length < 2 || !long.TryParse(parts[1], out var suffix))
+            {
+                return false;
+            }
+
+            start = Math.Max(0, length - suffix);
+        }
+
+        return start >= 0 && start < length && end >= start;
     }
 
     /// <summary>
@@ -553,20 +837,31 @@ public sealed class MockVideoServer : IDisposable
     }
 
     private static async Task WriteResponseAsync(
-        NetworkStream stream, int status, string contentType, byte[] body, CancellationToken cancellationToken)
+        NetworkStream stream, MockResponse response, CancellationToken cancellationToken)
     {
-        var reason = status switch
+        var reason = response.Status switch
         {
             200 => "OK",
+            204 => "No Content",
+            206 => "Partial Content",
             400 => "Bad Request",
             401 => "Unauthorized",
             404 => "Not Found",
             429 => "Too Many Requests",
             _ => "Error"
         };
-        var head = Encoding.ASCII.GetBytes(
-            $"HTTP/1.1 {status} {reason}\r\nContent-Type: {contentType}\r\nContent-Length: {body.Length}\r\nConnection: close\r\n\r\n");
-        await stream.WriteAsync(head, cancellationToken);
-        await stream.WriteAsync(body, cancellationToken);
+        var head = new StringBuilder(
+            $"HTTP/1.1 {response.Status} {reason}\r\nContent-Type: {response.ContentType}\r\nContent-Length: {response.Body.Length}\r\n");
+        if (response.Headers is not null)
+        {
+            foreach (var (name, value) in response.Headers)
+            {
+                head.Append($"{name}: {value}\r\n");
+            }
+        }
+
+        head.Append("Connection: close\r\n\r\n");
+        await stream.WriteAsync(Encoding.ASCII.GetBytes(head.ToString()), cancellationToken);
+        await stream.WriteAsync(response.Body, cancellationToken);
     }
 }

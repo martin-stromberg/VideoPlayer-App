@@ -190,6 +190,21 @@ runs:
         done
         if [ -z "$ipa" ]; then ipa="${ipas[0]}"; fi
         cp "$ipa" release-ios.ipa
+        # dSYM-Bundles des Builds archivieren, damit kuenftige
+        # TestFlight-/Store-Crash-Reports symbolisierbar sind. Kein Fund
+        # ist nur eine Warnung — der Upload-Schritt ist existenz-guarded.
+        dsym_dir="$RUNNER_TEMP/release-ios-dsym"
+        mkdir -p "$dsym_dir"
+        dsym_found=0
+        while IFS= read -r -d '' d; do
+          dsym_found=1
+          cp -R "$d" "$dsym_dir/"
+        done < <(find VideoPlayer.Maui/bin/Release -name '*.dSYM' -type d -print0 | sort -z)
+        if [ "$dsym_found" -eq 1 ]; then
+          (cd "$dsym_dir" && zip -qr "$GITHUB_WORKSPACE/release-ios-dsym.zip" .)
+        else
+          echo "::warning::No .dSYM bundles found under VideoPlayer.Maui/bin/Release; skipping dsym archive."
+        fi
 
     # TestFlight-Upload: laeuft nur, wenn die API-Key-Secrets gesetzt sind.
     # iTMSTransporter liegt auf den Runnern nicht in Transporter.app -

@@ -54,7 +54,7 @@ dotnet build .\VideoPlayer.Maui\VideoPlayer.Maui.csproj -f net10.0-windows10.0.1
 | `msTools.DeveloperApi` | Wiederverwendbarer Kern der lokalen Developer-API (Loopback-HTTP-Server, Routing, `devapi.json`, Snapshot-Provider) — plattformneutral, nur Debug/`DEV_API` |
 | `msTools.DeveloperApi.Maui` | MAUI-Handler der Developer-API (`/tree`, `/invoke`, `/set-text`, Elementbaum) — baut auf `msTools.DeveloperApi` auf |
 | `VideoWebPlayer.Maui.Tests` | Testprojekt (Contract-Tests der MAUI-Oberfläche, MVU-Verhalten, API-Client) |
-| `VideoPlayer.E2E.Tests` | Windows-End-to-End-Tests (FlaUI/UI-Automation gegen die echte App + lokalen Mock-Server) |
+| `VideoPlayer.E2E.Tests` | Windows-End-to-End-Tests (FlaUI/UI-Automation gegen die echte App + lokalen Mock-Server, inkl. Wiedergabestart) |
 | `scripts/` | Deployment-Skripte (u. a. `iOS-Deployment.ps1` für Simulator-, Geräte- und Store-Builds) |
 
 ## Secrets und Client-Gate
@@ -76,7 +76,7 @@ Der Debug-Build startet einen lokalen Mini-HTTP-Server auf `127.0.0.1` (`GET /mo
 ## Branching und CI
 
 - `staging` ist der Integrationsbranch; Pull Requests gegen `staging` laufen durch Build-, Test- und Lint-Prüfungen.
-- `main` wird ausschließlich aus `staging` über PRs aktualisiert. Nach dem Merge entsteht ein Prerelease bzw. Semantic Release.
+- `main` wird ausschließlich aus `staging` über PRs aktualisiert. Nach dem Merge entsteht ein Prerelease bzw. Semantic Release; der iOS-Build legt neben der `.ipa` das Symbolarchiv `release-ios-dsym.zip` am Release ab, damit TestFlight-Crash-Reports symbolisierbar bleiben.
 - Details: `docs/help/staging-branch.md`.
 
 ## Dokumentation

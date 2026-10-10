@@ -21,14 +21,24 @@ namespace VideoPlayer.Maui.Pages;
 public partial class PlayerPage : ContentPage
 {
     private static readonly TimeSpan ProgressTickInterval = TimeSpan.FromSeconds(5);
+    private static readonly TimeSpan ResumeSeekTimeout = TimeSpan.FromSeconds(10);
 
     private readonly MvuHost mvuHost;
     private readonly IPictureInPictureService pictureInPicture;
     private string? appliedLocation;
-    // volatile: werden sowohl auf dem UI-Thread als auch auf dem
-    // Thread des jeweiligen Toolkit-Events gelesen/geschrieben.
-    private volatile bool resumeApplied;
+    // Gesetzt, wenn der letzte Quellenwechsel fehlschlug: erzwingt, dass
+    // UpdateUi den Setz-/Leerpfad erneut durchläuft — auch wenn das Modell
+    // dieselbe Adresse erneut liefert oder die Quelle leert (null == null
+    // würde sonst per Frühreturn den Stop der noch laufenden Quelle
+    // überspringen).
+    private bool sourceApplyFailed;
+    // Gemerkter Fortsetzungs-Seek der aktuellen Quelle — wird erst bei
+    // Wiedergabebereitschaft angewendet (Zugriff ausschließlich auf dem
+    // UI-Thread, alle Schreiber/Leser laufen in MainThread-Marshals).
+    private TimeSpan? pendingResumePosition;
     private bool timerRunning;
+    // volatile: wird sowohl auf dem UI-Thread als auch auf dem
+    // Thread des jeweiligen Toolkit-Events gelesen/geschrieben.
     private volatile bool subscribed;
 
     /// <summary>Initialisiert eine neue Instanz der <see cref="PlayerPage"/>-Klasse.</summary>
@@ -105,9 +115,19 @@ public partial class PlayerPage : ContentPage
                 return false;
             }
 
-            if (VideoElement.CurrentState == MediaElementState.Playing)
+            try
             {
-                ReportPosition();
+                if (VideoElement.CurrentState == MediaElementState.Playing)
+                {
+                    ReportPosition();
+                }
+            }
+            catch (Exception ex)
+            {
+                // Wie ReportPosition: ein Fehler am nativen Element darf im
+                // Dispatcher-Timer-Callback nicht unbehandelt bleiben (nur
+                // protokollieren; der nächste Takt versucht es erneut).
+                System.Diagnostics.Debug.WriteLine($"[PlayerPage] Zustandsabfrage im Fortschrittstakt fehlgeschlagen: {ex.Message}");
             }
 
             return true;
@@ -116,12 +136,22 @@ public partial class PlayerPage : ContentPage
 
     private void ReportPosition()
     {
-        var state = VideoElement.CurrentState;
-        _ = mvuHost.DispatchAsync(new PlaybackProgressMessage(
-            VideoElement.Position,
-            VideoElement.Duration,
-            state == MediaElementState.Playing,
-            state is MediaElementState.Buffering or MediaElementState.Opening));
+        try
+        {
+            var state = VideoElement.CurrentState;
+            _ = mvuHost.DispatchAsync(new PlaybackProgressMessage(
+                VideoElement.Position,
+                VideoElement.Duration,
+                state == MediaElementState.Playing,
+                state is MediaElementState.Buffering or MediaElementState.Opening));
+        }
+        catch (Exception ex)
+        {
+            // Der Aufruf läuft aus dem Dispatcher-Timer-Callback — ein
+            // Fehler am nativen Element darf nicht unbehandelt bleiben
+            // (nur protokollieren; der nächste Takt versucht es erneut).
+            System.Diagnostics.Debug.WriteLine($"[PlayerPage] Positionsmeldung fehlgeschlagen: {ex.Message}");
+        }
     }
 
     private void OnModelChanged(object? sender, EventArgs e)
@@ -152,34 +182,92 @@ public partial class PlayerPage : ContentPage
         LoadingIndicator.IsRunning = LoadingIndicator.IsVisible;
 
         var location = player.Source?.Location;
-        if (location == appliedLocation)
+        if (!sourceApplyFailed && location == appliedLocation)
         {
             return;
         }
 
+        sourceApplyFailed = false;
         appliedLocation = location;
-        resumeApplied = false;
+        pendingResumePosition = null;
         if (location is null || player.Source is null)
         {
-            VideoElement.Stop();
-            VideoElement.Source = null;
+            try
+            {
+                VideoElement.Stop();
+                VideoElement.Source = null;
+            }
+            catch (Exception ex)
+            {
+                FailPlaybackStart($"Zurücksetzen der Quelle fehlgeschlagen: {ex.Message}");
+            }
+
             return;
         }
 
-        VideoElement.Source = player.Source.Kind == PlaybackSourceKind.LocalFile
-            ? MediaSource.FromFile(location)
-            : MediaSource.FromUri(location);
+        if (!IsValidSourceLocation(player.Source, location))
+        {
+            FailPlaybackStart($"Ungültige Quell-Adresse ({player.Source.Kind}): '{location}'");
+            return;
+        }
+
+        try
+        {
+            VideoElement.Source = player.Source.Kind == PlaybackSourceKind.LocalFile
+                ? MediaSource.FromFile(location)
+                : MediaSource.FromUri(location);
+        }
+        catch (Exception ex)
+        {
+            FailPlaybackStart($"Setzen der Quelle fehlgeschlagen: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Frühvalidierung der aufgelösten Quell-Adresse vor der Übergabe an
+    /// das native Element: <see cref="PlaybackSourceKind.ServerStream"/>
+    /// verlangt eine absolute http/https-URL, <see cref="PlaybackSourceKind.LocalFile"/>
+    /// einen nicht leeren Pfad — ungültige Werte lösen am nativen Player
+    /// sonst unausweichende Ausnahmen aus.
+    /// </summary>
+    private static bool IsValidSourceLocation(PlaybackSource source, string location)
+    {
+        return source.Kind switch
+        {
+            PlaybackSourceKind.ServerStream =>
+                Uri.TryCreate(location, UriKind.Absolute, out var uri)
+                && uri.Scheme is "http" or "https",
+            PlaybackSourceKind.LocalFile => !string.IsNullOrWhiteSpace(location),
+            _ => false
+        };
+    }
+
+    /// <summary>
+    /// Meldet einen Fehler des Wiedergabestarts in den MVU-Zyklus
+    /// (<see cref="PlaybackFailedMessage"/> → Fehlerpanel/Episoden-Rückfall)
+    /// und merkt den Fehlschlag über <see cref="sourceApplyFailed"/>, damit
+    /// die nächste Modelländerung den Quellenwechsel erneut durchläuft —
+    /// unabhängig davon, ob das Modell dieselbe Adresse erneut liefert
+    /// oder die Quelle leert.
+    /// </summary>
+    private void FailPlaybackStart(string logMessage)
+    {
+        System.Diagnostics.Debug.WriteLine($"[PlayerPage] {logMessage}");
+        sourceApplyFailed = true;
+        if (subscribed)
+        {
+            _ = mvuHost.DispatchAsync(new PlaybackFailedMessage());
+        }
     }
 
     private void OnMediaOpened(object? sender, EventArgs e)
     {
-        // Einmalig pro Quelle auf die Fortsetzungsposition springen.
-        if (resumeApplied)
-        {
-            return;
-        }
-
-        resumeApplied = true;
+        // Fortsetzungsposition der Quelle lediglich merken: auf iOS feuert
+        // MediaOpened noch vor AVPlayerItemStatus.ReadyToPlay (Toolkit-
+        // Issue #3249) — ein sofortiger Seek wirft im async-void-Handler
+        // des Toolkits eine unbehandelte Ausnahme (SIGABRT). Der Seek
+        // wird daher erst über TryApplyPendingResumeSeek angestoßen,
+        // sobald der Player Playing/Paused meldet.
         var resume = mvuHost.Model.Player.Source?.ResumePosition;
         if (resume.HasValue && resume.Value > TimeSpan.Zero)
         {
@@ -192,9 +280,73 @@ public partial class PlayerPage : ContentPage
             {
                 if (subscribed)
                 {
-                    _ = VideoElement.SeekTo(position);
+                    pendingResumePosition = position;
+                    TryApplyPendingResumeSeek();
                 }
             });
+        }
+    }
+
+    /// <summary>
+    /// Wendet einen gemerkten Fortsetzungs-Seek an, sobald das Element
+    /// wiedergabebereit ist (<see cref="MediaElementState.Playing"/> oder
+    /// <see cref="MediaElementState.Paused"/> — beide implizieren
+    /// ReadyToPlay). Liegt der Bereitschaftszustand noch nicht vor,
+    /// bleibt der Wunsch bis zum nächsten Zustandswechsel liegen.
+    /// Läuft ausschließlich auf dem UI-Thread.
+    /// </summary>
+    private void TryApplyPendingResumeSeek()
+    {
+        if (pendingResumePosition is not { } position)
+        {
+            return;
+        }
+
+        MediaElementState state;
+        try
+        {
+            state = VideoElement.CurrentState;
+        }
+        catch (Exception ex)
+        {
+            // Der Aufruf läuft aus BeginInvokeOnMainThread-Marshals — ein
+            // Wurf des nativen Elements darf dem Lambda nicht entkommen.
+            // Der Seek-Wunsch bleibt liegen und wird beim nächsten
+            // Zustandswechsel erneut geprüft.
+            System.Diagnostics.Debug.WriteLine($"[PlayerPage] Bereitschaftsprüfung des Fortsetzungs-Seeks fehlgeschlagen: {ex.Message}");
+            return;
+        }
+
+        if (state is not (MediaElementState.Playing or MediaElementState.Paused))
+        {
+            return;
+        }
+
+        pendingResumePosition = null;
+        _ = ApplyResumeSeekAsync(position);
+    }
+
+    /// <summary>
+    /// Führt den Fortsetzungs-Seek mit Zeitlimit aus: die Toolkit-
+    /// Vollendung kann im Fehlerfall ausbleiben — ohne Abbruchschwelle
+    /// hinge das await ewig und blockierte die interne Seek-Semaphore
+    /// für alle Folge-Seeks. Timeout oder Fehler werden als
+    /// Wiedergabefehler gemeldet statt den Prozess abzubrechen.
+    /// </summary>
+    private async Task ApplyResumeSeekAsync(TimeSpan position)
+    {
+        try
+        {
+            using var timeout = new CancellationTokenSource(ResumeSeekTimeout);
+            await VideoElement.SeekTo(position, timeout.Token);
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[PlayerPage] Fortsetzungs-Seek auf {position} fehlgeschlagen: {ex.Message}");
+            if (subscribed)
+            {
+                _ = mvuHost.DispatchAsync(new PlaybackFailedMessage());
+            }
         }
     }
 
@@ -226,6 +378,9 @@ public partial class PlayerPage : ContentPage
             if (subscribed)
             {
                 ReportPosition();
+                // Erreicht der Player Playing/Paused, ist er bereit —
+                // ein noch liegender Fortsetzungs-Seek wird angewendet.
+                TryApplyPendingResumeSeek();
             }
         });
     }

@@ -24,9 +24,9 @@ mitlaufender lokaler Mock-Server — kein reales Server-Deployment nötig.
 dotnet test VideoPlayer.E2E.Tests/VideoPlayer.E2E.Tests.csproj
 ```
 
-Erwartetes Ergebnis: 17 Tests, alle bestanden (Laufzeit ca. 20–25 min,
+Erwartetes Ergebnis: 19 Tests, alle bestanden (Laufzeit ca. 20–25 min,
 geprägt von App-Starts und echten Wartezeiten, u. a. beim
-nicht-erreichbaren Server).
+nicht-erreichbaren Server und dem Wiedergabestart).
 
 ## Architektur
 
@@ -39,7 +39,7 @@ nicht-erreichbaren Server).
   `CloseMainWindow`), Metadatei und Profilverzeichnisse auf.
 - **`DevApiClient`** — `GET /model`-Polling mit Timeout und Letztstand
   im Fehlertext, `GET /tree`, `POST /invoke` (inkl. `itemIndex` für
-  `CollectionView`), `POST /set-text`.
+  `CollectionView` und `BindableLayout`-Container), `POST /set-text`.
 - **`MockVideoServer`** — `TcpListener` auf `127.0.0.1` mit OS-Port;
   implementiert `api/health`, `api/pairing/exchange` (ECDH P-256 +
   AES-256-GCM, deckungsgleich mit `PairingCrypto`), `api/pairing/bootstrap`
@@ -49,11 +49,19 @@ nicht-erreichbaren Server).
   sowie die Listen-Endpunkte, die Home/Synchronisation benötigen.
   Unterscheidet Gate-Ablehnung (`application/problem+json`) von
   Credential-Ablehnung (`text/plain`) wie der echte Server.
+  Opt-in pro Test (über `PlaybackMovieId` u. a. aktiviert, Standard
+  bleiben die Leerlisten): `api/items/recent` mit Movie-Eintrag,
+  `api/items/movie/{id}` (Details), `api/continue-watching` mit
+  Fortsetzungsposition, `api/items/movie/{id}/stream` (`video/mp4`
+  aus `Assets/testvideo.mp4`, `Accept-Ranges`/`206 Partial Content`
+  auf `Range`-Requests, per `access_token`-Query authentifiziert,
+  optionaler 404-Fehlschlag) und die Fortschritts-Senke
+  `POST api/continue-watching/progress` (204).
 - **`UiDriver`** — AutomationId-Suche, Texteingabe per Value-Pattern,
   Button-Invoke, Flyout-Navigation per `SelectionItem` — bewusst ohne
   Koordinatenklicks.
 
-## Szenarien (17 Tests)
+## Szenarien (19 Tests)
 
 - **Server-Einrichtung** (5): Erststart zeigt die Einrichtungsseite
   (inkl. `ConnectCard` im Elementbaum); ungültige Adresse →
@@ -77,6 +85,15 @@ nicht-erreichbaren Server).
   Validierungsfehler ohne Serverkontakt; Bootstrap-Sitzung
   übersteht einen App-Neustart (Refresh-/Geräte-Token bleiben
   wirksam, keine erneute Eingabe).
+- **Wiedergabe** (2, `PlaybackTests`): Wiedergabestart mit
+  Fortsetzungsposition — Eintrag des „Neu im Programm"-Karussells
+  (`AutomationId="RecentCarousel"`, BindableLayout-Container) per
+  `/invoke`+`itemIndex` wählen → Detailseite → „Abspielen"
+  (`AutomationId="PlayButton"`) → `playerIsActive`/`playerIsPlaying`
+  und `playerPositionSeconds` ≥ Weiterschauen-Position, Prozess lebt
+  (Regressionsschutz für den iOS-Absturz beim Resume-Start); sowie
+  Stream-Fehlschlag (Endpunkt → 404) → `playerError` im Modell
+  sichtbar statt Prozessabbruch.
 
 ## Grenzen und Hinweise
 

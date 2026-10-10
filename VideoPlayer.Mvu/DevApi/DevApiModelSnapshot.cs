@@ -95,6 +95,18 @@ public sealed record DevApiModelSnapshot
     /// <summary>Anzahl der Neu-im-Programm-Einträge.</summary>
     public int RecentEntriesCount { get; init; }
 
+    /// <summary>Eine Wiedergabe ist angefordert (Player-Zustand belegt).</summary>
+    public bool PlayerIsActive { get; init; }
+
+    /// <summary>Die Wiedergabe läuft gerade.</summary>
+    public bool PlayerIsPlaying { get; init; }
+
+    /// <summary>Zuletzt gemeldete Wiedergabeposition in Sekunden.</summary>
+    public double PlayerPositionSeconds { get; init; }
+
+    /// <summary>Fehlertext der letzten Wiedergabe-Störung; <c>null</c> = kein Fehler.</summary>
+    public string? PlayerError { get; init; }
+
     /// <summary>Erzeugt den Snapshot aus dem aktuellen Modell.</summary>
     /// <param name="model">Das unveränderliche App-Modell.</param>
     /// <returns>Der serialisierbare Auszug.</returns>
@@ -147,7 +159,11 @@ public sealed record DevApiModelSnapshot
             HeroTitle = model.HeroTitle,
             ContinueWatchingCount = model.ContinueWatching.Count,
             FavoritesCount = model.Favorites.Count,
-            RecentEntriesCount = model.RecentEntries.Count
+            RecentEntriesCount = model.RecentEntries.Count,
+            PlayerIsActive = model.Player.IsActive,
+            PlayerIsPlaying = model.Player.IsPlaying,
+            PlayerPositionSeconds = model.Player.Position.TotalSeconds,
+            PlayerError = model.Player.Error
         };
     }
 }

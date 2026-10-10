@@ -207,7 +207,9 @@ public class PlayerContractTests
     /// unter Windows auf Threadpool-Threads feuern; ein direkter
     /// <c>SeekTo</c>/Positionszugriff dort löst die beobachtete
     /// <c>COMException 0x8001010E</c> (<c>RPC_E_WRONG_THREAD</c>) in
-    /// <c>MediaManager.PlatformSeek</c> aus.
+    /// <c>MediaManager.PlatformSeek</c> aus. Der einzige Seek-Aufruf
+    /// steht in <c>ApplyResumeSeekAsync</c> und ist ausschließlich über
+    /// das UI-Thread-Gate <c>TryApplyPendingResumeSeek</c> erreichbar.
     /// </summary>
     [Fact]
     public void PlayerPage_MarshalsNativeElementAccessOnMainThread()
@@ -219,14 +221,121 @@ public class PlayerContractTests
         Assert.Contains("BeginInvokeOnMainThread",
             MethodBody(code, "private void OnMediaStateChanged"), StringComparison.Ordinal);
 
-        // Der einzige SeekTo-Aufruf steht innerhalb des MainThread-
-        // Marshals in OnMediaOpened — kein direkter Aufruf im
-        // Event-Thread.
-        var opened = MethodBody(code, "private void OnMediaOpened");
-        var marshal = opened.IndexOf("BeginInvokeOnMainThread", StringComparison.Ordinal);
-        var seek = opened.IndexOf("SeekTo(", StringComparison.Ordinal);
-        Assert.True(seek > marshal, "SeekTo muss innerhalb des MainThread-Marshals stehen.");
+        // Genau ein SeekTo-Aufruf im gesamten Code-Behind — in
+        // ApplyResumeSeekAsync, das nur über das UI-Thread-Gate
+        // TryApplyPendingResumeSeek angestoßen wird.
         Assert.Equal(1, code.Split("SeekTo(", StringSplitOptions.None).Length - 1);
+        Assert.Contains("SeekTo(",
+            MethodBody(code, "private async Task ApplyResumeSeekAsync"), StringComparison.Ordinal);
+        Assert.Contains("TryApplyPendingResumeSeek",
+            MethodBody(code, "private void OnMediaOpened"), StringComparison.Ordinal);
+        Assert.Contains("TryApplyPendingResumeSeek",
+            MethodBody(code, "private void OnMediaStateChanged"), StringComparison.Ordinal);
+        Assert.DoesNotContain("ApplyResumeSeekAsync",
+            MethodBody(code, "private void OnMediaOpened"), StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// Prüft PlayerPage: der Fortsetzungs-Seek wartet die
+    /// Wiedergabebereitschaft ab — <c>OnMediaOpened</c> merkt die
+    /// Position nur noch, weil das Toolkit auf iOS <c>MediaOpened</c>
+    /// vor <c>AVPlayerItemStatus.ReadyToPlay</c> feuert (Issue #3249)
+    /// und ein Seek in diesem Fenster im async-void-Handler des
+    /// Toolkits eine unbehandelte Ausnahme auslöst (SIGABRT).
+    /// </summary>
+    [Fact]
+    public void PlayerPage_ResumeSeek_WaitsForReadyState()
+    {
+        var code = Read("VideoPlayer.Maui", "Pages", "PlayerPage.xaml.cs");
+
+        // Kein direkter Seek im MediaOpened-Handler — nur das Merken
+        // des Seek-Wunsches und der Gate-Aufruf.
+        var opened = MethodBody(code, "private void OnMediaOpened");
+        Assert.DoesNotContain("SeekTo(", opened, StringComparison.Ordinal);
+        Assert.Contains("pendingResumePosition", opened, StringComparison.Ordinal);
+
+        // Das Gate prüft den Bereitschaftszustand und wendet den
+        // gemerkten Wunsch genau einmal an.
+        var gate = MethodBody(code, "private void TryApplyPendingResumeSeek");
+        Assert.Contains("MediaElementState.Playing", gate, StringComparison.Ordinal);
+        Assert.Contains("MediaElementState.Paused", gate, StringComparison.Ordinal);
+        Assert.Contains("pendingResumePosition = null", gate, StringComparison.Ordinal);
+        Assert.Contains("ApplyResumeSeekAsync", gate, StringComparison.Ordinal);
+
+        // Der Seek selbst ist zeitlich begrenzt, damit eine
+        // ausbleibende Toolkit-Vollendung nicht ewig hängt.
+        var seek = MethodBody(code, "private async Task ApplyResumeSeekAsync");
+        Assert.Contains("CancellationTokenSource", seek, StringComparison.Ordinal);
+        Assert.Contains("ResumeSeekTimeout", seek, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// Prüft PlayerPage: alle nativen Elementzugriffe sind fehlerisoliert
+    /// — eine durchschlagende Ausnahme am <c>MediaElement</c> landet als
+    /// <c>PlaybackFailedMessage</c> (Fehlerpanel) statt als Prozessabbruch.
+    /// </summary>
+    [Fact]
+    public void PlayerPage_NativeAccessesAreFailureIsolated()
+    {
+        var code = Read("VideoPlayer.Maui", "Pages", "PlayerPage.xaml.cs");
+
+        var updateUi = MethodBody(code, "private void UpdateUi");
+        Assert.Contains("try", updateUi, StringComparison.Ordinal);
+        Assert.Contains("catch", updateUi, StringComparison.Ordinal);
+        // Fehlerpfad → PlaybackFailedMessage (FailPlaybackStart meldet
+        // den Fehler und setzt appliedLocation für den Neuversuch zurück).
+        Assert.Contains("FailPlaybackStart", updateUi, StringComparison.Ordinal);
+        Assert.Contains("PlaybackFailedMessage",
+            MethodBody(code, "private void FailPlaybackStart"), StringComparison.Ordinal);
+        // Quell-Adresse wird validiert, bevor eine MediaSource gebaut wird.
+        Assert.Contains("IsValidSourceLocation", updateUi, StringComparison.Ordinal);
+        Assert.Contains("Uri.TryCreate", code, StringComparison.Ordinal);
+
+        var seek = MethodBody(code, "private async Task ApplyResumeSeekAsync");
+        Assert.Contains("try", seek, StringComparison.Ordinal);
+        Assert.Contains("catch", seek, StringComparison.Ordinal);
+        Assert.Contains("PlaybackFailedMessage", seek, StringComparison.Ordinal);
+
+        var report = MethodBody(code, "private void ReportPosition");
+        Assert.Contains("try", report, StringComparison.Ordinal);
+        Assert.Contains("catch", report, StringComparison.Ordinal);
+
+        // Reine Lesezugriffe bleiben ebenfalls isoliert: der Timer-
+        // Callback und das Seek-Gate laufen aus Dispatcher-/Marshal-
+        // Kontexten ohne eigene Ausnahmebehandlung — ein Wurf des
+        // nativen Elements wäre dort sonst unbehandelt (Prozessabbruch).
+        var timer = MethodBody(code, "private void StartProgressTimer");
+        Assert.Contains("CurrentState", timer, StringComparison.Ordinal);
+        Assert.Contains("try", timer, StringComparison.Ordinal);
+        Assert.Contains("catch", timer, StringComparison.Ordinal);
+
+        var gate = MethodBody(code, "private void TryApplyPendingResumeSeek");
+        Assert.Contains("CurrentState", gate, StringComparison.Ordinal);
+        Assert.Contains("try", gate, StringComparison.Ordinal);
+        Assert.Contains("catch", gate, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// Prüft PlayerPage: ein fehlgeschlagener Quellenwechsel darf den
+    /// Stop-/Leerpfad des nächsten <c>UpdateUi</c>-Laufs nicht
+    /// überspringen. <c>FailPlaybackStart</c> markiert den Fehlschlag
+    /// über ein Invalidierungs-Flag statt <c>appliedLocation</c> auf
+    /// <c>null</c> zu setzen — sonst träfe ein geleertes
+    /// Modell-<c>Source</c> auf <c>null == null</c>, der Frühreturn
+    /// griffe und <c>VideoElement.Stop()</c>/<c>Source = null</c>
+    /// würden nie laufen (eine zuvor gesetzte Quelle spielt weiter).
+    /// </summary>
+    [Fact]
+    public void PlayerPage_FailedSourceApply_KeepsStopPathReachable()
+    {
+        var code = Read("VideoPlayer.Maui", "Pages", "PlayerPage.xaml.cs");
+
+        var fail = MethodBody(code, "private void FailPlaybackStart");
+        Assert.DoesNotContain("appliedLocation = null", fail, StringComparison.Ordinal);
+        Assert.Contains("sourceApplyFailed = true", fail, StringComparison.Ordinal);
+
+        var updateUi = MethodBody(code, "private void UpdateUi");
+        Assert.Contains("sourceApplyFailed", updateUi, StringComparison.Ordinal);
     }
 
     /// <summary>

@@ -144,11 +144,14 @@ public static class DevApiVisualTree
     /// <summary>
     /// Wählt den Eintrag <paramref name="itemIndex"/> einer <see cref="CollectionView"/>
     /// aus (<c>SelectedItem</c>-Setter — feuert <c>SelectionChanged</c> wie ein
-    /// Fingertipp). Schließt die UIA-Lücke: CollectionView-Einträge fehlen unter
-    /// Windows im Automation-Baum und sind sonst nur per Koordinatenklick
-    /// erreichbar.
+    /// Fingertipp) oder löst bei Elementen mit einem
+    /// <see cref="BindableLayout"/>-Container im Teilbaum den
+    /// <see cref="TapGestureRecognizer"/> des indexierten Eintrags aus
+    /// (dieselbe Ereigniskette wie ein Fingertipp). Schließt die UIA-Lücke:
+    /// Einträge beider Listenformen fehlen unter Windows im Automation-Baum
+    /// und sind sonst nur per Koordinatenklick erreichbar.
     /// </summary>
-    /// <param name="element">Das Zielelement (muss eine <see cref="CollectionView"/> sein).</param>
+    /// <param name="element">Das Zielelement (<see cref="CollectionView"/> oder Element mit <see cref="BindableLayout"/>-Container).</param>
     /// <param name="itemIndex">Nullbasierter Index in der <c>ItemsSource</c>.</param>
     /// <param name="error">Deutscher Fehlertext, wenn die Auswahl nicht möglich ist.</param>
     /// <returns><c>true</c>, wenn der Eintrag ausgewählt wurde.</returns>
@@ -156,28 +159,60 @@ public static class DevApiVisualTree
     {
         ArgumentNullException.ThrowIfNull(element);
         error = null;
-        if (element is not CollectionView collectionView)
+        if (element is CollectionView collectionView)
         {
-            error = $"Das Element vom Typ '{element.GetType().Name}' ist keine CollectionView.";
-            return false;
-        }
-
-        if (collectionView.ItemsSource is not IEnumerable items)
-        {
-            error = "Die CollectionView hat keine ItemsSource.";
-            return false;
-        }
-
-        object? target = null;
-        var index = 0;
-        var count = 0;
-        foreach (var item in items)
-        {
-            if (index++ == itemIndex)
+            if (collectionView.ItemsSource is not IEnumerable items)
             {
-                target = item;
+                error = "Die CollectionView hat keine ItemsSource.";
+                return false;
             }
 
+            object? target = null;
+            var index = 0;
+            var count = 0;
+            foreach (var item in items)
+            {
+                if (index++ == itemIndex)
+                {
+                    target = item;
+                }
+
+                count++;
+            }
+
+            if (itemIndex < 0 || itemIndex >= count)
+            {
+                error = $"Der Item-Index {itemIndex} liegt außerhalb der Liste ({count} Einträge).";
+                return false;
+            }
+
+            collectionView.SelectedItem = target;
+            return true;
+        }
+
+        return TrySelectBindableLayoutItem(element, itemIndex, out error);
+    }
+
+    /// <summary>
+    /// Item-Auswahl über einen <see cref="BindableLayout"/>-Container im
+    /// Teilbaum des Elements: das indexierte Kind-View wird genommen und
+    /// der erste <see cref="TapGestureRecognizer"/> in seinem Teilbaum per
+    /// internem <c>SendTapped</c>-Aufruf ausgelöst — exakt der Aufruf, den
+    /// der Plattform-Gesture-Manager bei einem Fingertipp macht
+    /// (<c>Tapped</c> feuert mit <c>sender</c> = Eintrags-View).
+    /// </summary>
+    private static bool TrySelectBindableLayoutItem(Element element, int itemIndex, out string? error)
+    {
+        error = null;
+        if (FindBindableLayoutContainer(element) is not Layout layout)
+        {
+            error = $"Das Element vom Typ '{element.GetType().Name}' ist keine CollectionView und enthält keinen BindableLayout-Container.";
+            return false;
+        }
+
+        var count = 0;
+        foreach (var _ in BindableLayout.GetItemsSource(layout))
+        {
             count++;
         }
 
@@ -187,8 +222,116 @@ public static class DevApiVisualTree
             return false;
         }
 
-        collectionView.SelectedItem = target;
-        return true;
+        if (itemIndex >= layout.Count || layout[itemIndex] is not View childView)
+        {
+            error = $"Der Eintrag {itemIndex} des BindableLayout-Containers ist keine Ansicht.";
+            return false;
+        }
+
+        var recognizer = FindTapRecognizer(childView, out var tapOwner);
+        if (recognizer is null)
+        {
+            error = $"Der Eintrag {itemIndex} des BindableLayout-Containers enthält keinen TapGestureRecognizer.";
+            return false;
+        }
+
+        // SendTapped ist internal — Signatur pinnen: schlägt die
+        // Auflösung nach einem MAUI-Upgrade fehl, wird ein klarer
+        // Fehler gemeldet statt still nichts auszulösen. Die Lazy-
+        // Auswertung liegt im try/catch, damit auch ein Wurf der
+        // Reflection selbst (z. B. AmbiguousMatchException bei
+        // mehreren Überladungen) als Fehlertext gemeldet wird.
+        try
+        {
+            var sendTapped = SendTappedMethod.Value;
+            if (sendTapped is null)
+            {
+                error = "Der interne SendTapped-Aufruf des TapGestureRecognizer ist in dieser MAUI-Version nicht verfügbar.";
+                return false;
+            }
+
+            sendTapped.Invoke(recognizer, [tapOwner, null]);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            error = $"Der Tipp auf den Eintrag {itemIndex} konnte nicht ausgelöst werden: {ex.GetBaseException().Message}";
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Interner <c>TapGestureRecognizer.SendTapped(View, Func&lt;IElement?, Point?&gt;?)</c>
+    /// — wird einmalig per Reflection aufgelöst und auf die Signatur gepinnt.
+    /// </summary>
+    private static readonly Lazy<MethodInfo?> SendTappedMethod = new(() =>
+    {
+        var method = typeof(TapGestureRecognizer).GetMethod(
+            "SendTapped", BindingFlags.NonPublic | BindingFlags.Instance);
+        var parameters = method?.GetParameters();
+        return method is not null
+            && parameters is { Length: 2 }
+            && parameters[0].ParameterType == typeof(View)
+            && parameters[1].ParameterType == typeof(Func<IElement?, Point?>)
+            ? method
+            : null;
+    });
+
+    /// <summary>
+    /// Sucht das erste <see cref="BindableObject"/> im Teilbaum (inklusive
+    /// des Elements selbst), dem per <see cref="BindableLayout"/> eine
+    /// <c>ItemsSource</c> zugewiesen ist.
+    /// </summary>
+    private static BindableObject? FindBindableLayoutContainer(Element element)
+    {
+        if (BindableLayout.GetItemsSource(element) is IEnumerable)
+        {
+            return element;
+        }
+
+        foreach (var child in VisualChildren(element))
+        {
+            var found = FindBindableLayoutContainer(child);
+            if (found is not null)
+            {
+                return found;
+            }
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Sucht den ersten <see cref="TapGestureRecognizer"/> im Teilbaum
+    /// (Tiefensuche) und liefert die Ansicht, an der er registriert ist.
+    /// </summary>
+    /// <param name="element">Wurzelelement der Suche.</param>
+    /// <param name="owner">Die tragende Ansicht des gefundenen Recognizers.</param>
+    private static TapGestureRecognizer? FindTapRecognizer(Element element, out View? owner)
+    {
+        if (element is View view)
+        {
+            foreach (var recognizer in view.GestureRecognizers)
+            {
+                if (recognizer is TapGestureRecognizer tap)
+                {
+                    owner = view;
+                    return tap;
+                }
+            }
+        }
+
+        foreach (var child in VisualChildren(element))
+        {
+            var found = FindTapRecognizer(child, out owner);
+            if (found is not null)
+            {
+                return found;
+            }
+        }
+
+        owner = null;
+        return null;
     }
 
     /// <summary>
@@ -264,12 +407,19 @@ public static class DevApiVisualTree
 
     /// <summary>
     /// Leitet die Einträge einer <c>CollectionView</c> aus deren
-    /// <c>ItemsSource</c> ab (UIA-Lücke: die Items erscheinen unter Windows
-    /// nicht im Automation-Baum).
+    /// <c>ItemsSource</c> ab bzw. die Einträge eines
+    /// <see cref="BindableLayout"/>-Containers im Teilbaum (UIA-Lücke:
+    /// die Items beider Listenformen erscheinen unter Windows nicht im
+    /// Automation-Baum).
     /// </summary>
     private static IReadOnlyList<DevApiTreeItem>? ItemsOf(Element element)
     {
-        if (element is not CollectionView collectionView || collectionView.ItemsSource is not IEnumerable items)
+        var items = element is CollectionView collectionView
+            ? collectionView.ItemsSource
+            : FindBindableLayoutContainer(element) is { } container
+                ? BindableLayout.GetItemsSource(container)
+                : null;
+        if (items is null)
         {
             return null;
         }

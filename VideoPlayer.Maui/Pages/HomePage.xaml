@@ -157,6 +157,7 @@
                                     Items="{Binding Model.Favorites}"
                                     ItemTapped="OnMediaItemTapped" />
             <controls:MediaCarousel Title="Neu im Programm"
+                                    AutomationId="RecentCarousel"
                                     Items="{Binding Model.RecentEntries}"
                                     ItemTapped="OnMediaItemTapped" />
 

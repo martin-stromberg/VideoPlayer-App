@@ -714,6 +714,27 @@ function Invoke-Upload {
     Write-Host "Upload abgeschlossen." -ForegroundColor Green
 }
 
+function Export-DsymArchive {
+    # Legt die dSYM-Bundles des Build-Outputs als Zip neben der .ipa ab,
+    # damit Crash-Reports des Builds spaeter symbolisiert werden koennen.
+    # Fehlende dSYMs sind eine Warnung, kein Fehlschlag.
+    param(
+        [string]$IpaPath,
+        [string]$Config,
+        [string]$Rid
+    )
+    $binDir = Join-Path $repoRoot "VideoPlayer.Maui/bin/$Config/$framework/$Rid"
+    $dsyms = @(Get-ChildItem -Path $binDir -Recurse -Directory -Filter "*.dSYM" -ErrorAction SilentlyContinue)
+    if ($dsyms.Count -eq 0) {
+        Write-Host "Warnung: Keine .dSYM-Bundles unter $binDir gefunden - kein Symbolisierungsarchiv erzeugt." -ForegroundColor Yellow
+        return
+    }
+    $ipaName = [IO.Path]::GetFileNameWithoutExtension($IpaPath)
+    $zipPath = Join-Path (Split-Path -Parent $IpaPath) "$ipaName-dsym.zip"
+    Compress-Archive -Path ($dsyms | ForEach-Object { $_.FullName }) -DestinationPath $zipPath -Force
+    Write-Host "dSYM-Archiv: $zipPath ($($dsyms.Count) Bundle(s))" -ForegroundColor Green
+}
+
 function Invoke-Build {
     param([string]$ApplicationVersionOverride = "")
 
@@ -787,6 +808,7 @@ function Invoke-Build {
                 exit 1
             }
             Write-Host "IPA gefunden: $($ipa.FullName)" -ForegroundColor Green
+            Export-DsymArchive -IpaPath $ipa.FullName -Config $config -Rid $rid
         }
         else {
             Write-Host "Build erfolgreich (ohne Codesigning, keine .ipa)." -ForegroundColor Green

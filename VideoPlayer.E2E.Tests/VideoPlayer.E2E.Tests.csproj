@@ -29,4 +29,10 @@
   <ItemGroup>
     <None Include="../LICENSE" Pack="true" PackagePath="\" />
   </ItemGroup>
+  <ItemGroup>
+    <!-- Generiertes Mini-Testvideo (ffmpeg, H.264, 20 s) — wird vom
+         MockVideoServer als Stream-Endpunkt-Body aus dem Output-
+         Verzeichnis ausgeliefert. -->
+    <Content Include="Assets/testvideo.mp4" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
 </Project>

@@ -170,7 +170,13 @@ jobs:
       - name: Upload iOS artifact
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh release upload '${{ needs.release.outputs.tag }}' release-ios.ipa --clobber
+        run: |
+          gh release upload '${{ needs.release.outputs.tag }}' release-ios.ipa --clobber
+          # dSYM-Archiv des Builds mit hochladen (wenn von der Action erzeugt),
+          # damit TestFlight-Crash-Reports dieses Builds symbolisierbar sind.
+          if [ -f release-ios-dsym.zip ]; then
+            gh release upload '${{ needs.release.outputs.tag }}' release-ios-dsym.zip --clobber
+          fi
         shell: bash
 
   draft-pr:
