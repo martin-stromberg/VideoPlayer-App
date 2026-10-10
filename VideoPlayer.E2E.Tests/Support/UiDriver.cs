@@ -84,7 +84,17 @@ public sealed class UiDriver : IDisposable
         var element = FindByAutomationId(automationId);
         var textBox = element.AsTextBox();
         textBox.Focus();
-        textBox.Enter(text);
+        // ValuePattern setzt den Text atomar — simulierte Tasten gehen
+        // unter Last gelegentlich verloren (Truncated-Input-Flakes wie
+        // „server" statt „ftp://server"). Feuert TextChanged ebenso.
+        if (textBox.Patterns.Value.IsSupported)
+        {
+            textBox.Patterns.Value.Pattern.SetValue(text);
+        }
+        else
+        {
+            textBox.Enter(text);
+        }
     }
 
     /// <summary>
