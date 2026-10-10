@@ -147,6 +147,22 @@ public class BootstrapContractTests
         Assert.Contains("net10.0-ios", csproj, StringComparison.Ordinal);
     }
 
+    /// <summary>
+    /// Prüft QrScannerPage: die Kamera-Detection wird beim Abbau der
+    /// Seite gestoppt und abgemeldet — eine weiterlaufende
+    /// AVCaptureSession ruft sonst den entsorgten Delegate und
+    /// produziert den stillen iOS-Absturz nach dem Schließen.
+    /// </summary>
+    [Fact]
+    public void QrScannerPage_StopsDetectionOnDisappearing()
+    {
+        var code = MauiFile("Pages", "QrScannerPage.cs");
+
+        Assert.Contains("OnDisappearing", code, StringComparison.Ordinal);
+        Assert.Contains("IsDetecting = false", code, StringComparison.Ordinal);
+        Assert.Contains("BarcodesDetected -= OnBarcodesDetected", code, StringComparison.Ordinal);
+    }
+
     /// <summary>Prüft Plattform-Manifeste: Kamera-Permission und Verwendungsbeschreibung.</summary>
     [Fact]
     public void PlatformManifests_DeclareCameraUsage()
