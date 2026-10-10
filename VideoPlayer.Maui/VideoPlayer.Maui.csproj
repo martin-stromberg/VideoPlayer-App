@@ -1,7 +1,18 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFrameworks>net10.0-android</TargetFrameworks>
-    <TargetFrameworks Condition="!$([MSBuild]::IsOSPlatform('linux'))">$(TargetFrameworks);net10.0-ios;net10.0-maccatalyst</TargetFrameworks>
+    <!-- Zielplattformen einzeln abschaltbar (Reporter-Muster): die CI-
+         Store-Builds setzen IncludeAndroidTarget/IncludeMacCatalystTarget
+         auf false, weil auf dem macOS-Runner nur die iOS-Workload
+         installiert wird. Ohne Schalter wuerde ein globales
+         -p:TargetFrameworks in die net10.0-Bibliotheken propagiert
+         und deren Restore mit NETSDK1147 brechen. -->
+    <IncludeIosTarget Condition="'$(IncludeIosTarget)' == ''">true</IncludeIosTarget>
+    <IncludeAndroidTarget Condition="'$(IncludeAndroidTarget)' == ''">true</IncludeAndroidTarget>
+    <IncludeMacCatalystTarget Condition="'$(IncludeMacCatalystTarget)' == ''">true</IncludeMacCatalystTarget>
+    <TargetFrameworks />
+    <TargetFrameworks Condition="'$(IncludeAndroidTarget)' == 'true'">$(TargetFrameworks);net10.0-android</TargetFrameworks>
+    <TargetFrameworks Condition="!$([MSBuild]::IsOSPlatform('linux')) and '$(IncludeIosTarget)' == 'true'">$(TargetFrameworks);net10.0-ios</TargetFrameworks>
+    <TargetFrameworks Condition="!$([MSBuild]::IsOSPlatform('linux')) and '$(IncludeMacCatalystTarget)' == 'true'">$(TargetFrameworks);net10.0-maccatalyst</TargetFrameworks>
     <TargetFrameworks Condition="$([MSBuild]::IsOSPlatform('windows'))">$(TargetFrameworks);net10.0-windows10.0.19041.0</TargetFrameworks>
     <OutputType>Exe</OutputType>
     <RootNamespace>VideoPlayer.Maui</RootNamespace>
