@@ -19,7 +19,10 @@ Nach dem Start erscheint eine Ladeanzeige mit Statustext
 - **Server erreichbar, Zugangsdaten vorhanden:** automatische Anmeldung —
   danach Startseite.
 - **Server erreichbar, Zugangsdaten fehlen oder werden abgelehnt:**
-  Anmeldemaske (siehe unten).
+  Anmeldemaske (siehe unten) — wurde die Verbindung gerade auf der
+  Einrichtungsseite hergestellt, bleibt der Fluss dort: die Seite
+  bietet dann **Kurzcode** oder **Zugangsdaten** als zwei Optionen
+  nebeneinander an, ohne auf die Anmeldemaske zu wechseln.
 - **Server erreichbar, Geräte-Pairing erforderlich:** der Server verlangt
   ein gerätegebundenes Token und es ist weder eines hinterlegt noch ein
   statischer Gate-Schlüssel konfiguriert — die Einrichtungsseite zeigt die

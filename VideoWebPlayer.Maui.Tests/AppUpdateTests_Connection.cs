@@ -137,6 +137,31 @@ public class AppUpdateTests_Connection
         Assert.Single(transition.Effects);
     }
 
+    /// <summary>
+    /// Prüft AutoLoginCompleted: steht die Servereinrichtung im Fokus
+    /// (der Nutzer hat gerade verbunden), wird nicht auf die Anmeldeseite
+    /// gewechselt — die Einrichtungsseite bietet als zweite Stufe die
+    /// Wahl zwischen Kurzcode und Zugangsdaten.
+    /// </summary>
+    [Fact]
+    public void AutoLoginCompleted_OnServerSetup_StaysOnSetupPage()
+    {
+        var model = new AppModel
+        {
+            CurrentPage = AppPage.ServerSetup,
+            IsServerCheckRunning = true,
+            ActiveServerAddress = Server
+        };
+
+        var transition = AppUpdate.Update(
+            model,
+            new AutoLoginCompletedMessage(AuthAttemptStatus.MissingCredentials, "martin"));
+
+        Assert.Equal(ConnectionState.NeedsLogin, transition.Model.ConnectionState);
+        Assert.Equal(AppPage.ServerSetup, transition.Model.CurrentPage);
+        Assert.Empty(transition.Effects);
+    }
+
     /// <summary>Prüft AutoLoginCompleted: vom Server-Setup kommend → stoppt den Prüfindikator.</summary>
     [Fact]
     public void AutoLoginCompleted_FromServerSetup_StopsCheckIndicator()

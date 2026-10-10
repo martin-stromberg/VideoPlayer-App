@@ -14,6 +14,7 @@ public partial class ServerSetupPage : ContentPage
 {
     private readonly MvuHost mvuHost;
     private string? lastBootstrapError;
+    private bool usernamePrefilled;
 
     /// <summary>Initialisiert eine neue Instanz der <see cref="ServerSetupPage"/>-Klasse.</summary>
     /// <param name="mvuHost">MVU-Host; liefert den Einrichtungszustand und nimmt die Benutzer-Nachrichten entgegen.</param>
@@ -93,9 +94,18 @@ public partial class ServerSetupPage : ContentPage
         ErrorLabel.Text = model.ServerSetupError;
         ErrorLabel.IsVisible = model.ServerSetupError is not null;
 
-        // Pairing-Abschnitt: nur sichtbar, wenn der Server ein
-        // Geräte-Pairing verlangt; Fehler laufen in einem eigenen
-        // Feld (getrennt von Adress-/Erreichbarkeitsfehlern).
+        // Stufenlogik: Stufe 1 (Adresswahl) solange kein verbundener
+        // Server auf eine Anmeldung wartet; Stufe 2 (Kurzcode oder
+        // Zugangsdaten), sobald der geprüfte Server einen Nutzer-
+        // Anmeldedurchgang oder ein Geräte-Pairing erwartet.
+        var authChoice = model.ConnectionState == ConnectionState.NeedsLogin
+            || model.IsPairingRequired;
+        AddressStage.IsVisible = !authChoice;
+        AuthStage.IsVisible = authChoice;
+
+        // Pairing-Subsektion der Zugangsdaten-Kachel: nur sichtbar, wenn
+        // der Server ein Geräte-Pairing verlangt — erst danach erscheint
+        // die eigentliche Anmeldung im selben Kachel-Bereich.
         PairingSection.IsVisible = model.IsPairingRequired;
         PairingIndicator.IsRunning = model.IsPairingRunning;
         PairingIndicator.IsVisible = model.IsPairingRunning;
@@ -105,9 +115,39 @@ public partial class ServerSetupPage : ContentPage
         PairingErrorLabel.Text = model.PairingError;
         PairingErrorLabel.IsVisible = model.PairingError is not null;
 
-        // Kopplungs-Abschnitt (QR-/Ticket-Onboarding): immer sichtbar —
-        // die Ticket-Adresse trägt den Server selbst; während einer
-        // Serverprüfung oder des Bootstraps bleibt die Eingabe gesperrt.
+        CredentialsBlock.IsVisible = !model.IsPairingRequired;
+        LoginIndicator.IsRunning = model.IsLoginRunning;
+        LoginIndicator.IsVisible = model.IsLoginRunning;
+        var loginEnabled = !model.IsLoginRunning && !model.IsBootstrapRunning;
+        LoginButton.IsEnabled = loginEnabled;
+        LoginUsernameEntry.IsEnabled = loginEnabled;
+        LoginPasswordEntry.IsEnabled = loginEnabled;
+        LoginErrorLabel.Text = model.LoginError;
+        LoginErrorLabel.IsVisible = model.LoginError is not null;
+
+        // Der bekannte Benutzername wird nur einmalig vorbefüllt, damit
+        // spätere Model-Updates die Eingabe nicht überschreiben
+        // (Muster: LoginPage).
+        if (!usernamePrefilled && !string.IsNullOrEmpty(model.LoginUsername))
+        {
+            LoginUsernameEntry.Text = model.LoginUsername;
+            usernamePrefilled = true;
+        }
+
+        // Stufe 2 — Kurzcode: laufender Bootstrap sperrt beide Wege —
+        // Anmeldung und Kopplung konkurrieren um dieselbe Session.
+        var shortCodeBusy = model.IsBootstrapRunning || model.IsLoginRunning;
+        ShortCodeIndicator.IsRunning = model.IsBootstrapRunning;
+        ShortCodeIndicator.IsVisible = model.IsBootstrapRunning;
+        ShortCodeRunningLabel.IsVisible = model.IsBootstrapRunning;
+        SetupShortCodeButton.IsEnabled = !shortCodeBusy;
+        SetupShortCodeEntry.IsEnabled = !shortCodeBusy;
+        ShortCodeErrorLabel.Text = model.BootstrapError;
+        ShortCodeErrorLabel.IsVisible = model.BootstrapError is not null;
+
+        // Kopplungs-Kachel der Stufe 1 (QR-/Ticket-Onboarding): während
+        // einer Serverprüfung oder des Bootstraps bleibt die Eingabe
+        // gesperrt.
         var bootstrapBusy = model.IsBootstrapRunning || model.IsServerCheckRunning;
         BootstrapIndicator.IsRunning = model.IsBootstrapRunning;
         BootstrapIndicator.IsVisible = model.IsBootstrapRunning;
@@ -141,6 +181,18 @@ public partial class ServerSetupPage : ContentPage
     private void OnPairClicked(object? sender, EventArgs e)
     {
         _ = mvuHost.DispatchAsync(new PairingCodeSubmittedMessage(PairingCodeEntry.Text ?? string.Empty));
+    }
+
+    private void OnShortCodeClicked(object? sender, EventArgs e)
+    {
+        _ = mvuHost.DispatchAsync(new BootstrapTicketSubmittedMessage(SetupShortCodeEntry.Text ?? string.Empty));
+    }
+
+    private void OnSetupLoginClicked(object? sender, EventArgs e)
+    {
+        _ = mvuHost.DispatchAsync(new LoginSubmittedMessage(
+            LoginUsernameEntry.Text ?? string.Empty,
+            LoginPasswordEntry.Text ?? string.Empty));
     }
 
     private void OnBootstrapClicked(object? sender, EventArgs e)

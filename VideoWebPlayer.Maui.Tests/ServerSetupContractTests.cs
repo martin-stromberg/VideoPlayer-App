@@ -58,11 +58,46 @@ public class ServerSetupContractTests
             // Erweiterung der gepinnten Menge, kein Pin wurde entfernt.
             "ActiveServerCard", "ServerHealthLabel",
             "DiscoveryRunningLabel", "ConnectCard", "CheckStatusLabel",
-            "PairingSection", "PairingRunningLabel"
+            "PairingSection", "PairingRunningLabel",
+            // Zweistufiger Verbindungsfluss: Stufe 1 (QR | Adresse),
+            // Stufe 2 (Kurzcode | Zugangsdaten).
+            "AddressStage", "AuthStage", "ShortCodeSection",
+            "CredentialsSection", "SetupShortCodeEntry",
+            "SetupShortCodeButton", "LoginUsernameEntry",
+            "LoginPasswordEntry", "LoginButton"
         })
         {
             Assert.Contains(id, automationIds);
         }
+    }
+
+    /// <summary>
+    /// Prüft ServerSetupPage: der Verbindungsfluss ist zweistufig —
+    /// Stufe 1 bietet QR-Code und manuelle Adresse als zwei Kacheln
+    /// nebeneinander; nach erfolgreichem Servercheck zeigt Stufe 2
+    /// Kurzcode und Zugangsdaten als zwei Optionen nebeneinander.
+    /// </summary>
+    [Fact]
+    public void ServerSetupPage_TwoStageTileLayout()
+    {
+        var page = System.Xml.Linq.XDocument.Load(
+            Path.Combine(Root, "VideoPlayer.Maui", "Pages", "ServerSetupPage.xaml"));
+        var mauiNs = (System.Xml.Linq.XNamespace)"http://schemas.microsoft.com/dotnet/2021/maui";
+        var xNs = (System.Xml.Linq.XNamespace)"http://schemas.microsoft.com/winfx/2009/xaml";
+
+        var stage = page.Descendants(mauiNs + "Grid")
+            .Single(e => (string?)e.Attribute(xNs + "Name") == "AddressStage");
+        Assert.Equal("*,*", (string?)stage.Attribute("ColumnDefinitions"));
+
+        var auth = page.Descendants(mauiNs + "Grid")
+            .Single(e => (string?)e.Attribute(xNs + "Name") == "AuthStage");
+        Assert.Equal("*,*", (string?)auth.Attribute("ColumnDefinitions"));
+
+        var code = MauiFile("Pages", "ServerSetupPage.xaml.cs");
+        // Stufe 2 erscheint erst bei anstehender Anmeldung/Kopplung —
+        // das MVU-Model steuert die Sichtbarkeit.
+        Assert.Contains("ConnectionState.NeedsLogin", code, StringComparison.Ordinal);
+        Assert.Contains("AuthStage.IsVisible", code, StringComparison.Ordinal);
     }
 
     /// <summary>Prüft ServerSetupPage: die Modernisierung nutzt Karten und Vp*-Tokens.</summary>

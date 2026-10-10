@@ -783,6 +783,10 @@ public static class AppUpdate
         }
 
         // Fehlende oder fehlgeschlagene Zugangsdaten → Anmeldemaske.
+        // Steht die Servereinrichtung im Fokus (der Nutzer hat gerade
+        // verbunden), bleibt der Fluss auf derselben Seite — sie bietet
+        // als zweite Stufe die Wahl zwischen Kurzcode und Zugangsdaten.
+        var stayOnSetup = model.CurrentPage == AppPage.ServerSetup;
         var updated = model with
         {
             IsStartupRunning = false,
@@ -794,9 +798,9 @@ public static class AppUpdate
             // erhalten einen erklärenden Hinweis statt eines Fehlers.
             LoginError = LoginErrorFor(message.Status) ?? ReloginRequiredNotice,
             ConnectionState = ConnectionState.NeedsLogin,
-            CurrentPage = AppPage.Login
+            CurrentPage = stayOnSetup ? AppPage.ServerSetup : AppPage.Login
         };
-        return model.CurrentPage == AppPage.Login
+        return model.CurrentPage == AppPage.Login || stayOnSetup
             ? new AppTransition(updated, [])
             : new AppTransition(updated, [new NavigateToPageEffect(AppPage.Login)]);
     }
