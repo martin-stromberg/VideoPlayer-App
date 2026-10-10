@@ -25,10 +25,12 @@ zum Ziel:
   erscheinen als auswählbare Liste; ein Tipp auf einen Eintrag übernimmt
   ihn. Liefert die Suche keinen Treffer, weist ein Hinweis auf die
   manuelle Eingabe hin.
-- **Adresse manuell eingeben** — die Serveradresse kann direkt eingegeben
+- **Adresse selbst eingeben** — die Serveradresse kann direkt eingegeben
   werden (z. B. `http://server/videoplayer/`; ein fehlendes Schema wird
   automatisch als `http://` ergänzt). „Verbinden" prüft die Eingabe.
 
+Die zwei Wege liegen als Kacheln nebeneinander auf der Seite: links
+„Mit QR-Code verbinden" (siehe unten), rechts „Adresse selbst eingeben".
 In beiden Fällen wird die Verbindung zunächst geprüft (`GET api/health`);
 nur ein erreichbarer Server wird gespeichert und übernommen. Ungültige
 Adressen oder nicht erreichbare Server erzeugen einen Inline-Hinweis —
@@ -66,12 +68,16 @@ Fehler erscheinen inline in der Karte und zusätzlich als Dialog:
 unlesbare Eingabe, Server nicht erreichbar (wird dann nicht übernommen),
 Ticket ungültig oder abgelaufen, zu viele Versuche, Server ohne
 Bootstrap-Endpunkt.
-Alle übrigen Wege (Adresseingabe, Einmal-Code-Pairing, Anmeldemaske)
-bleiben als Fallback unverändert verfügbar. Auf Windows gibt es keinen
-Kamera-Scan — dort steht die manuelle Eingabe zur Verfügung. Der
-Kurzcode liegt zusätzlich auf der Anmeldemaske selbst — er wird gegen
-den bereits verbundenen Server eingelöst, ohne dass ein Rückweg über
-„Anderen Server einrichten" nötig ist.
+Klappt die Verbindung, wechselt die Seite nicht zur Anmeldemaske —
+sie zeigt stattdessen zwei Möglichkeiten nebeneinander: den
+**Kurzcode** (wird gegen den verbundenen Server eingelöst) und die
+**Anmeldung mit Zugangsdaten** (Benutzername/Passwort). Verlangt der
+Server ein Geräte-Pairing, liegt der Einmal-Code-Austausch zuerst in
+der Zugangsdaten-Kachel; danach erscheinen dort die Anmeldefelder.
+Die klassische Anmeldemaske bleibt für die übrigen Fälle bestehen
+(Sitzung abgelaufen, gespeicherter Server beim App-Start); auch dort
+steht der Kurzcode-Abschnitt zur Verfügung. Auf Windows gibt es keinen
+Kamera-Scan — dort steht die manuelle Eingabe zur Verfügung.
 
 Die Sitzung erneuert sich anschließend selbst: der Refresh-Token wird
 bei Bedarf über `POST api/auth/refresh` rotiert (der alte ist ab da

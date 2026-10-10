@@ -72,10 +72,12 @@ public abstract class E2ETestBase
     {
         app.Ui.EnterText("PairingCodeEntry", server.PairingCode);
         app.Ui.ClickButton("PairButton");
+        // Nach dem Pairing bleibt der Fluss auf der Einrichtungsseite —
+        // die Zugangsdaten-Kachel erscheint dort als zweite Stufe.
         await app.DevApi.WaitForModelAsync(
-            m => m.CurrentPage == "Login",
+            m => m.ConnectionState == "NeedsLogin",
             TimeSpan.FromSeconds(30),
-            "Pairing erfolgreich → Anmeldemaske",
+            "Pairing erfolgreich → Anmelde-Wahl",
             Ct);
     }
 

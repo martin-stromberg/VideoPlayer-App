@@ -59,8 +59,10 @@ public sealed class BootstrapTests : E2ETestBase
         using var app = await StartAppAsync();
         await ConnectToPairingRequiredAsync(app, server);
 
-        app.Ui.EnterText("BootstrapTicketEntry", server.BootstrapShortCode);
-        app.Ui.ClickButton("BootstrapButton");
+        // Nach dem Verbinden zeigt die zweite Stufe die Kurzcode-Kachel —
+        // der Kurzcode löst sich gegen den verbundenen Server ein.
+        app.Ui.EnterText("SetupShortCodeEntry", server.BootstrapShortCode);
+        app.Ui.ClickButton("SetupShortCodeButton");
 
         var model = await app.DevApi.WaitForModelAsync(
             m => m.CurrentPage == "Home" && m.ConnectionState == "Connected",
