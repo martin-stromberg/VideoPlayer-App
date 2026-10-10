@@ -72,7 +72,11 @@ Nach erfolgreicher Rückkehr ins Netz läuft automatisch:
 2. vollständige Synchronisation inklusive Nachsenden der
    Fortschritts-Warteschlange,
 3. Aktualisierung der Startseiten-Listen,
-4. Wiederaufnahme unterbrochener Downloads.
+4. Wiederaufnahme unterbrochener Downloads,
+5. Nachladen des Kopfbereichs-Bilds einer bereits geöffneten
+   Detailseite — im Offline-Snapshot fehlte die Verbindung zum
+   Bildabruf; liegt keine Bildquelle vor (Film-/Serien-Snapshot ohne
+   Banner-Id) bleibt der Kopfbereich bei Gradienten und Texten.
 
 ## Beschädigte lokale Daten
 

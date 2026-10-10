@@ -895,6 +895,11 @@ public static class AppUpdate
         // aktiviert ist und noch kein Bild vorliegt.
         updated = WithHeroLoad(updated, effects);
 
+        // Eine im Offline-Modus geöffnete Detailseite hatte keine
+        // Bildquelle zum Abruf — mit der Verbindung wird das Kopfbild
+        // nachgeladen, sofern noch keins vorliegt.
+        updated = WithDetailsHeaderLoad(updated, effects);
+
         if (IsWorkflowPage(model.CurrentPage))
         {
             updated = updated with { CurrentPage = AppPage.Home };
@@ -1540,9 +1545,11 @@ public static class AppUpdate
 
     /// <summary>
     /// Stößt das Laden des Kopfbereichs-Bilds an, wenn die geladenen
-    /// Details eine Bildquelle benennen (Episoden-Still oder Bild-Id) und
-    /// die Verbindung steht. Ohne Quelle bzw. offline bleibt der
-    /// Kopfbereich bei Gradienten und Texten (Web-Verhalten).
+    /// Details eine Bildquelle benennen (Episoden-Still oder Bild-Id),
+    /// die Verbindung steht und weder ein Ladevorgang läuft noch ein
+    /// Bild vorliegt. Ohne Quelle bzw. offline bleibt der Kopfbereich
+    /// bei Gradienten und Texten (Web-Verhalten); nach einem Fehlschlag
+    /// greift die Bedingung beim nächsten Verbindungsaufbau erneut.
     /// </summary>
     /// <param name="model">Aktuelles App-Model.</param>
     /// <param name="effects">Effektliste des Übergangs, an die der Ladeeffekt angehängt wird.</param>
@@ -1554,7 +1561,8 @@ public static class AppUpdate
         if (model.ConnectionState != ConnectionState.Connected
             || details is null
             || (details.HeaderEpisodeId is not > 0 && details.HeaderPictureId is not > 0)
-            || state.IsHeaderImageLoading)
+            || state.IsHeaderImageLoading
+            || state.HasHeaderImage)
         {
             return model;
         }

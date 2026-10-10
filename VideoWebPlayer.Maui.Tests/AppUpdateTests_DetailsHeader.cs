@@ -420,4 +420,118 @@ public class AppUpdateTests_DetailsHeader
         Assert.Equal([9], transition.Model.MediaDetails.HeaderImageBytes);
         Assert.Empty(transition.Effects);
     }
+
+    // --- Nachladen bei Wiederverbindung ---
+
+    private const string Server = "http://nas/videoplayer/";
+
+    private static AppTransition ReconnectFrom(AppModel model)
+    {
+        var reconnect = AppUpdate.Update(
+            model with { IsOnline = true },
+            new NetworkAvailabilityChangedMessage(true));
+        var health = AppUpdate.Update(
+            reconnect.Model,
+            new ServerHealthCheckCompletedMessage(true, false));
+        return AppUpdate.Update(
+            health.Model,
+            new AutoLoginCompletedMessage(AuthAttemptStatus.Succeeded, "martin"));
+    }
+
+    /// <summary>Prüft EnterConnected: lädt den Episoden-Still der offline geöffneten Detailseite nach.</summary>
+    [Fact]
+    public void Reconnect_OfflineEpisodeDetails_EmitsHeaderEffect()
+    {
+        var details = ShowDetails() with
+        {
+            MediaType = "tvshowepisode",
+            MediaId = 31,
+            SelectedEpisodeId = 31,
+            IsOfflineSnapshot = true
+        };
+        var model = WithDetails(details, connection: ConnectionState.Offline) with
+        {
+            ActiveServerAddress = Server
+        };
+
+        var connected = ReconnectFrom(model);
+
+        Assert.Equal(ConnectionState.Connected, connected.Model.ConnectionState);
+        Assert.True(connected.Model.MediaDetails.IsHeaderImageLoading);
+        var effect = Assert.IsType<LoadMediaDetailsHeaderEffect>(
+            Assert.Single(connected.Effects, e => e is LoadMediaDetailsHeaderEffect));
+        Assert.Equal("tvshowepisode", effect.MediaType);
+        Assert.Equal(31, effect.MediaId);
+        Assert.Equal(31, effect.HeaderEpisodeId);
+        Assert.Null(effect.HeaderPictureId);
+    }
+
+    /// <summary>Prüft EnterConnected: Offline-Details ohne Bildquelle lösen keinen Ladeeffekt aus.</summary>
+    [Fact]
+    public void Reconnect_OfflineDetailsWithoutHeaderSource_NoHeaderEffect()
+    {
+        var details = new MediaDetailsView
+        {
+            MediaType = "movie",
+            MediaId = 42,
+            Title = "Film",
+            IsOfflineSnapshot = true
+        };
+        var model = WithDetails(details, connection: ConnectionState.Offline) with
+        {
+            ActiveServerAddress = Server
+        };
+
+        var connected = ReconnectFrom(model);
+
+        Assert.DoesNotContain(connected.Effects, e => e is LoadMediaDetailsHeaderEffect);
+        Assert.False(connected.Model.MediaDetails.IsHeaderImageLoading);
+    }
+
+    /// <summary>Prüft EnterConnected: ein bereits geladenes Bild wird nicht erneut abgerufen.</summary>
+    [Fact]
+    public void Reconnect_ExistingHeaderImage_NoReload()
+    {
+        var model = WithDetails(ShowDetails(), headerImageBytes: [9], connection: ConnectionState.Offline) with
+        {
+            ActiveServerAddress = Server
+        };
+
+        var connected = ReconnectFrom(model);
+
+        Assert.DoesNotContain(connected.Effects, e => e is LoadMediaDetailsHeaderEffect);
+        Assert.Equal([9], connected.Model.MediaDetails.HeaderImageBytes);
+    }
+
+    /// <summary>Prüft EnterConnected: ohne geladene Details gibt es nichts nachzuladen.</summary>
+    [Fact]
+    public void Reconnect_NoDetails_NoHeaderEffect()
+    {
+        var model = new AppModel
+        {
+            ConnectionState = ConnectionState.Offline,
+            ActiveServerAddress = Server,
+            CurrentPage = AppPage.Home,
+            IsStartupRunning = false
+        };
+
+        var connected = ReconnectFrom(model);
+
+        Assert.DoesNotContain(connected.Effects, e => e is LoadMediaDetailsHeaderEffect);
+    }
+
+    /// <summary>Prüft MediaDetailsLoaded: bei bereits vorhandenem Bild → kein erneuter Ladeeffekt.</summary>
+    [Fact]
+    public void MediaDetailsLoaded_ExistingHeaderImage_NoReload()
+    {
+        var model = WithDetails(ShowDetails(), headerImageBytes: [9]);
+
+        var transition = AppUpdate.Update(
+            model,
+            new MediaDetailsLoadedMessage("tvshow", 11, ShowDetails(), null));
+
+        Assert.Empty(transition.Effects);
+        Assert.False(transition.Model.MediaDetails.IsHeaderImageLoading);
+        Assert.Equal([9], transition.Model.MediaDetails.HeaderImageBytes);
+    }
 }

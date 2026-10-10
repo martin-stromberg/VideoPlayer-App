@@ -1,5 +1,12 @@
 # Änderungsprotokoll
 
+## 2026-10-10 — Header-Bild der Offline-Detailseite wird beim Reconnect nachgeladen (Issue 12)
+
+- **Reconnect-Nachladung des Detail-Kopfbilds:** `EnterConnected` (`VideoPlayer.Mvu/AppUpdate.cs`) ruft jetzt neben `WithHeroLoad` auch `WithDetailsHeaderLoad` auf — eine aus dem Offline-Snapshot geöffnete Detailseite lädt ihr Kopfbereichs-Bild mit der zurückkehrenden Verbindung nach, ohne dass die Seite erneut geöffnet werden muss.
+- **Guard-Erweiterung analog Hero:** Das Gate in `WithDetailsHeaderLoad` prüft zusätzlich `MediaDetailsState.HasHeaderImage` — ein bereits angezeigtes Bild wird beim Reconnect nicht erneut abgerufen; nach einem Fehlschlag greift die Bedingung beim nächsten Verbindungsaufbau erneut.
+- **Tests:** Fünf neue MVU-Übergangstests in `AppUpdateTests_DetailsHeader` (Reconnect mit/ohne Bildquelle, vorhandenes Bild, leere Details, Guard-Konsistenz auf dem Detail-Ladepfad). Volle Suite 1037/1037 grün.
+- **Doku:** `docs/help/offline-wiederherstellung.md` (Wiederverbindungs-Schritte) und `docs/help/quellen-browsing-details.md` (Kopfbereich + Lade-Trigger) ergänzt.
+
 ## 2026-10-10 — `ModelChanged`-Abonnements aller Seiten an den Sichtbarkeits-Lebenszyklus gebunden (Issue 11)
 
 - **Lebenszyklus-Leck geschlossen:** `HomePage`, `MediaDetailsPage`, `DownloadsPage`, `FavoritesPage`, `SourceOverviewPage` und `ProfilePage` abonnierten `MvuHost.ModelChanged` im Konstruktor ohne Abmeldung — verlassene Seiten-Instanzen blieben am `MvuHost` hängen (Speicherleck) und führten weiter `UpdateUi` aus. Alle sechs Seiten nutzen jetzt das `PlayerPage`-/`SettingsPage`-Muster: Abo in `OnAppearing` (mit `-=` vor `+=`), Abmeldung in `OnDisappearing` sowie ein `subscribed`-Guard, der bereits gemarshallte `UpdateUi`-Rückrufe losgelöster Seiten verwirft.
