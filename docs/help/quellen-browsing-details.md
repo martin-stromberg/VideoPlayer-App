@@ -84,7 +84,11 @@ Höhe folgt der Fensterbreite (mindestens 360, höchstens 620).
   Webanwendung.
 - **Ohne Bild** (fehlende Grafik, Fehlschlag oder Offline) bleibt der
   Kopfbereich mit Gradienten und Texten stabil — kein Layoutbruch,
-  kein Fehlerzustand.
+  kein Fehlerzustand. War die Detailseite im Offline-Modus aus dem
+  Snapshot geöffnet, wird das Bild mit der zurückkehrenden
+  Verbindung automatisch nachgeladen, sofern der Snapshot eine
+  Bildquelle nennt (z. B. der Episoden-Still) — ohne dass die Seite
+  erneut geöffnet werden muss.
 
 ### Angesehen-Symbol in der Episodenliste
 
@@ -139,7 +143,13 @@ markierte Episode ein **rundes Angesehen-Badge** nach Web-Vorbild
   `byte[]` im `MediaDetailsState`): Episoden über den Still-Endpunkt
   `api/episodes/{id}/background-image`, sonst `api/pictures/{id}`;
   verspätete Antworten abgelöster Bildquellen (z. B. nach einem
-  Staffelwechsel) werden am Identitätsabgleich verworfen.
+  Staffelwechsel) werden am Identitätsabgleich verworfen. Der
+  Lade-Trigger (`WithDetailsHeaderLoad`) läuft nach der
+  Detail-Ladung, bei geänderter Bildquelle durch eine Staffelwahl
+  und beim Übergang in `ConnectionState.Connected`
+  (`EnterConnected` — Reconnect-Nachladung analog `WithHeroLoad`);
+  das Gate überspringt den Abruf offline, ohne Details, ohne
+  Bildquelle, bei laufendem Laden und bei bereits vorhandenem Bild.
 - Quellen-Icons und Poster nutzen die lokale Vorschaubild-Ablage
   (`previews/`, nicht backup-pflichtig) über `PosterImageService`
   (Menüeinträge) bzw. das Control `CachedPosterImage`.

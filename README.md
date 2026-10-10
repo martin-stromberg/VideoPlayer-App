@@ -9,7 +9,7 @@ Die App koppelt sich beim Erststart über einen vom Server erzeugten Einmal-QR-C
 - **QR-/Kurzcode-Onboarding** — Kopplung über den QR-Code der Server-Verwaltung oder 8-stelligen Kurzcode; alternativ klassisches Pairing per Einmal-Code. Erzeugt Geräte-, Anmelde- und Refresh-Token in einem Schritt.
 - **Server-Entdeckung** — automatische Erkennung der Server im lokalen Netz (UDP-Broadcast, mDNS).
 - **Wiedergabe** — Server-Stream oder lokale Datei mit Fortsetzungsposition, „angesehen"-Markierung, automatischem Fortsetzen und Picture-in-Picture (Windows: kompaktes Overlay-Fenster; iOS: nativer PiP der Transportsteuerung).
-- **Offline-Betrieb** — Downloads mit GB-Kontingent und WLAN-Bedingung; die Startseite, Serienstruktur und Detail-Snapshots bleiben ohne Serververbindung nutzbar.
+- **Offline-Betrieb** — Downloads mit GB-Kontingent und WLAN-Bedingung; die Startseite, Serienstruktur und Detail-Snapshots bleiben ohne Serververbindung nutzbar, fehlende Kopfbereichs-Bilder der Detailseite werden nach der Wiederverbindung automatisch nachgeladen.
 - **Startseite** — „Weiterschauen", „Favoriten" und „Neu im Programm" mit Hero-Kopfbereich im Erscheinungsbild der Web-Oberfläche.
 - **Verbindungs-Workflow** — Anmelde- und Servermaske mit Offline-Modus, automatischer Wiederverbindung und SignalR-Ereignisverbindung.
 
