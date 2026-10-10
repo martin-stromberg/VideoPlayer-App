@@ -1,4 +1,3 @@
-#Requires -Version 7.2
 <#
 .SYNOPSIS
     Setzt die iOS-Signatur-Secrets fuer die GitHub-Actions-Pipeline (package-ios).
@@ -28,10 +27,10 @@
       Variable IOS_SIGNING_ENABLED=true
 
 .EXAMPLE
-    pwsh scripts/Set-IosSigningSecrets.ps1 -P12Password '<export-passwort>'
+    .\scripts\Set-IosSigningSecrets.ps1 -P12Password '<export-passwort>'
 
 .EXAMPLE
-    pwsh scripts/Set-IosSigningSecrets.ps1 -P12Password '<pw>' -DryRun
+    .\scripts\Set-IosSigningSecrets.ps1 -P12Password '<pw>' -DryRun
 #>
 param(
     # Repository im Format owner/name.
@@ -108,21 +107,28 @@ if (-not $P12Path) {
 }
 $P12Path = Resolve-FirstExisting @($P12Path)
 
+$apiKeyP8 = $null
+if ($ApiKeyPath) { $apiKeyP8 = (Get-Content -LiteralPath $ApiKeyPath -Raw).Trim() }
+$p12Base64 = $null
+if ($P12Path) { $p12Base64 = [Convert]::ToBase64String([IO.File]::ReadAllBytes($P12Path)) }
+$profileBase64 = $null
+if ($ProvisioningProfilePath) { $profileBase64 = [Convert]::ToBase64String([IO.File]::ReadAllBytes($ProvisioningProfilePath)) }
+
 $secrets = [ordered]@{
     IOS_CODESIGN_KEY                 = $codesignKey
     IOS_PROVISIONING_PROFILE         = $profileName
     IOS_API_KEY_ID                   = $apiKeyId
     IOS_API_ISSUER_ID                = $apiIssuerId
-    IOS_API_KEY_P8                   = if ($ApiKeyPath) { (Get-Content -LiteralPath $ApiKeyPath -Raw).Trim() }
-    IOS_CERTIFICATE_P12_BASE64       = if ($P12Path) { [Convert]::ToBase64String([IO.File]::ReadAllBytes($P12Path)) }
+    IOS_API_KEY_P8                   = $apiKeyP8
+    IOS_CERTIFICATE_P12_BASE64       = $p12Base64
     IOS_CERTIFICATE_P12_PASSWORD     = $P12Password
-    IOS_PROVISIONING_PROFILE_BASE64  = if ($ProvisioningProfilePath) { [Convert]::ToBase64String([IO.File]::ReadAllBytes($ProvisioningProfilePath)) }
+    IOS_PROVISIONING_PROFILE_BASE64  = $profileBase64
 }
 
 Write-Host "Quelldateien:"
-Write-Host "  .p8  API-Key        : $($ApiKeyPath ?? 'nicht gefunden')"
-Write-Host "  .p12 Zertifikat     : $($P12Path ?? 'nicht gefunden')"
-Write-Host "  .mobileprovision    : $($ProvisioningProfilePath ?? 'nicht gefunden')"
+Write-Host "  .p8  API-Key        : $(if ($ApiKeyPath) { $ApiKeyPath } else { 'nicht gefunden' })"
+Write-Host "  .p12 Zertifikat     : $(if ($P12Path) { $P12Path } else { 'nicht gefunden' })"
+Write-Host "  .mobileprovision    : $(if ($ProvisioningProfilePath) { $ProvisioningProfilePath } else { 'nicht gefunden' })"
 Write-Host ""
 
 $missing = @()
