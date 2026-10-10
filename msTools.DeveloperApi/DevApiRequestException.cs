@@ -1,5 +1,5 @@
 #if DEBUG || DEV_API
-namespace VideoPlayer.Mvu.DevApi;
+namespace msTools.DeveloperApi;
 
 /// <summary>
 /// Signalisiert eine syntaktisch ungültige HTTP-Anfrage; der Server

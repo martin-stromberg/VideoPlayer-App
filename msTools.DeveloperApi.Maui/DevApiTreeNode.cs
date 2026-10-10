@@ -1,5 +1,5 @@
 #if DEBUG || DEV_API
-namespace VideoPlayer.Maui.DevApi;
+namespace msTools.DeveloperApi.Maui;
 
 /// <summary>
 /// Ein Knoten des logischen Elementbaums für <c>GET /tree</c>

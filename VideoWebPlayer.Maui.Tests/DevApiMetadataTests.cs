@@ -3,7 +3,7 @@
 #if DEBUG || DEV_API
 #pragma warning disable xUnit1051 // Kurzlebige Unit-Tests: TestContext-CancellationToken nicht erforderlich
 using System.Text.Json;
-using VideoPlayer.Mvu.DevApi;
+using msTools.DeveloperApi;
 
 namespace VideoWebPlayer.Maui.Tests;
 

@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using VideoWebPlayer.Maui.Tests.Stubs;
 
 namespace VideoWebPlayer.Maui.Tests;
@@ -6,8 +7,9 @@ namespace VideoWebPlayer.Maui.Tests;
 /// Contract-Tests der Developer-API: Da das Testprojekt die MAUI-Targets
 /// nicht referenzieren kann, werden der Compile-Time-Ausschluss
 /// (<c>#if DEBUG || DEV_API</c>), die genau vier Endpunkte (kein
-/// <c>dispatch</c>), die Loopback-Bindung und die Metadaten-Ablage über
-/// die Quelldateien geprüft (Muster: <see cref="PairingContractTests"/>).
+/// <c>dispatch</c>), die Loopback-Bindung, die Metadaten-Ablage und die
+/// Bibliotheks-Grenzen (Kern ohne MAUI-Abhängigkeit) über die
+/// Quelldateien geprüft (Muster: <see cref="PairingContractTests"/>).
 /// </summary>
 public class DevApiContractTests
 {
@@ -15,9 +17,15 @@ public class DevApiContractTests
 
     private static IEnumerable<string> DevApiFiles()
     {
-        foreach (var dir in new[] { "VideoPlayer.Mvu", "VideoPlayer.Maui" })
+        foreach (var dir in new[]
         {
-            var path = Path.Combine(Root, dir, "DevApi");
+            "msTools.DeveloperApi",
+            "msTools.DeveloperApi.Maui",
+            Path.Combine("VideoPlayer.Mvu", "DevApi"),
+            Path.Combine("VideoPlayer.Maui", "DevApi")
+        })
+        {
+            var path = Path.Combine(Root, dir);
             foreach (var file in Directory.GetFiles(path, "*.cs"))
             {
                 yield return file;
@@ -25,12 +33,13 @@ public class DevApiContractTests
         }
     }
 
-    /// <summary>Es existieren Dev-Api-Quelldateien in beiden Projekten.</summary>
+    /// <summary>Es existieren Dev-Api-Quelldateien in Kern, MAUI-Bibliothek und App.</summary>
     [Fact]
-    public void DevApiFiles_ExistInBothProjects()
+    public void DevApiFiles_ExistInLibrariesAndApp()
     {
-        Assert.Contains(DevApiFiles(), f => f.Contains("VideoPlayer.Mvu", StringComparison.Ordinal));
-        Assert.Contains(DevApiFiles(), f => f.Contains("VideoPlayer.Maui", StringComparison.Ordinal));
+        Assert.Contains(DevApiFiles(), f => f.Contains("msTools.DeveloperApi.Maui", StringComparison.Ordinal));
+        Assert.Contains(DevApiFiles(), f => f.Contains(Path.Combine("msTools.DeveloperApi", "DevApi"), StringComparison.Ordinal));
+        Assert.Contains(DevApiFiles(), f => f.Contains(Path.Combine("VideoPlayer.Maui", "DevApi"), StringComparison.Ordinal));
     }
 
     /// <summary>
@@ -84,23 +93,26 @@ public class DevApiContractTests
     /// <c>dispatch</c>-Endpunkt existiert nicht (Projekt-Entscheid OP-5).
     /// </summary>
     [Fact]
-    public void DevApiService_MapsExactlyTheFourEndpoints()
+    public void MauiDevApiService_MapsExactlyTheFourEndpoints()
     {
-        var source = File.ReadAllText(Path.Combine(Root, "VideoPlayer.Maui", "DevApi", "DevApiService.cs"));
+        var source = File.ReadAllText(Path.Combine(Root, "msTools.DeveloperApi.Maui", "MauiDevApiService.cs"));
 
-        Assert.Equal(4, CountOccurrences(source, "router.Map("));
-        Assert.Contains("\"GET\", \"/model\"", source, StringComparison.Ordinal);
+        Assert.Equal(4, CountOccurrences(source, "Map(") + CountOccurrences(source, "MapModel("));
+        Assert.Contains("MapModel(", source, StringComparison.Ordinal);
         Assert.Contains("\"GET\", \"/tree\"", source, StringComparison.Ordinal);
         Assert.Contains("\"POST\", \"/invoke\"", source, StringComparison.Ordinal);
         Assert.Contains("\"POST\", \"/set-text\"", source, StringComparison.Ordinal);
-        Assert.DoesNotContain("dispatch", source, StringComparison.OrdinalIgnoreCase);
+        foreach (var file in DevApiFiles())
+        {
+            Assert.DoesNotContain("dispatch", File.ReadAllText(file), StringComparison.OrdinalIgnoreCase);
+        }
     }
 
     /// <summary>Der HTTP-Server bindet ausschließlich an den Loopback.</summary>
     [Fact]
     public void DevApiHttpServer_BindsLoopbackOnly()
     {
-        var source = File.ReadAllText(Path.Combine(Root, "VideoPlayer.Mvu", "DevApi", "DevApiHttpServer.cs"));
+        var source = File.ReadAllText(Path.Combine(Root, "msTools.DeveloperApi", "DevApiHttpServer.cs"));
 
         Assert.Contains("IPAddress.Loopback", source, StringComparison.Ordinal);
         Assert.DoesNotContain("IPAddress.Any", source, StringComparison.Ordinal);
@@ -111,13 +123,16 @@ public class DevApiContractTests
     /// abgelegt und alle UI-Endpunkte marshallen auf den UI-Thread.
     /// </summary>
     [Fact]
-    public void DevApiService_WritesMetadataAndMarshallsToUiThread()
+    public void MauiDevApiService_WritesMetadataAndMarshallsToUiThread()
     {
-        var source = File.ReadAllText(Path.Combine(Root, "VideoPlayer.Maui", "DevApi", "DevApiService.cs"));
+        var source = File.ReadAllText(Path.Combine(Root, "msTools.DeveloperApi.Maui", "MauiDevApiService.cs"));
 
         Assert.Contains("AppContext.BaseDirectory", source, StringComparison.Ordinal);
-        Assert.Contains("\"devapi.json\"", source, StringComparison.Ordinal);
+        Assert.Contains("FileSystem.AppDataDirectory", source, StringComparison.Ordinal);
         Assert.True(CountOccurrences(source, "MainThread.InvokeOnMainThreadAsync") >= 3);
+
+        var serverSource = File.ReadAllText(Path.Combine(Root, "msTools.DeveloperApi", "DevApiServer.cs"));
+        Assert.Contains("\"devapi.json\"", serverSource, StringComparison.Ordinal);
     }
 
     /// <summary>
@@ -127,11 +142,71 @@ public class DevApiContractTests
     [Fact]
     public void DevApiVisualTree_UsesPlatformInvokeEquivalents()
     {
-        var source = File.ReadAllText(Path.Combine(Root, "VideoPlayer.Maui", "DevApi", "DevApiVisualTree.cs"));
+        var source = File.ReadAllText(Path.Combine(Root, "msTools.DeveloperApi.Maui", "DevApiVisualTree.cs"));
 
         Assert.Contains("SendClicked()", source, StringComparison.Ordinal);
         Assert.Contains("InputView", source, StringComparison.Ordinal);
         Assert.Contains("ItemsSource", source, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// Der Kern <c>msTools.DeveloperApi</c> bleibt frei von MAUI-
+    /// Abhängigkeiten und öffnet keine Internals für Fremdassemblies.
+    /// </summary>
+    [Fact]
+    public void MsToolsDeveloperApi_HasNoMauiDependency()
+    {
+        var csproj = File.ReadAllText(Path.Combine(Root, "msTools.DeveloperApi", "msTools.DeveloperApi.csproj"));
+
+        Assert.DoesNotContain("UseMaui", csproj, StringComparison.Ordinal);
+        Assert.DoesNotContain("Microsoft.Maui", csproj, StringComparison.Ordinal);
+        Assert.DoesNotContain("InternalsVisibleTo", csproj, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// In den Bibliotheksquellen existiert kein generischer
+    /// <c>dispatch</c>-Endpunkt und keine Dispatch-Benennung.
+    /// </summary>
+    [Fact]
+    public void MsToolsDeveloperApi_HasNoDispatchEndpoint()
+    {
+        foreach (var dir in new[] { "msTools.DeveloperApi", "msTools.DeveloperApi.Maui" })
+        {
+            foreach (var file in Directory.GetFiles(Path.Combine(Root, dir), "*.cs"))
+            {
+                Assert.DoesNotContain("dispatch", File.ReadAllText(file), StringComparison.OrdinalIgnoreCase);
+            }
+        }
+    }
+
+    /// <summary>Die MAUI-Bibliothek baut auf dem Kern auf.</summary>
+    [Fact]
+    public void MsToolsDeveloperApiMaui_ReferencesCore()
+    {
+        var csproj = File.ReadAllText(Path.Combine(Root, "msTools.DeveloperApi.Maui", "msTools.DeveloperApi.Maui.csproj"));
+
+        Assert.Contains("msTools.DeveloperApi.csproj", csproj, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// Die Bibliotheken enthalten keine geheimhaltungsbedürftigen
+    /// Bezeichner (prüfbare Namenskonvention: kein token/password/secret
+    /// als eigenes Wort — <c>CancellationToken</c>/<c>.Token</c> zählen
+    /// nicht).
+    /// </summary>
+    [Fact]
+    public void MsToolsDeveloperApi_HasNoSecretSurface()
+    {
+        foreach (var dir in new[] { "msTools.DeveloperApi", "msTools.DeveloperApi.Maui" })
+        {
+            foreach (var file in Directory.GetFiles(Path.Combine(Root, dir), "*.cs"))
+            {
+                var source = File.ReadAllText(file);
+                Assert.DoesNotMatch(
+                    new Regex(@"(?<!\.)\b(token|password|secret)\b", RegexOptions.IgnoreCase),
+                    source);
+            }
+        }
     }
 
     private static int CountOccurrences(string haystack, string needle)

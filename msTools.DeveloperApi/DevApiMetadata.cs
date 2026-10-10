@@ -1,7 +1,7 @@
 #if DEBUG || DEV_API
 using System.Text.Json;
 
-namespace VideoPlayer.Mvu.DevApi;
+namespace msTools.DeveloperApi;
 
 /// <summary>
 /// Metadaten der laufenden Developer-API-Instanz, die als

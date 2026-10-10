@@ -1,7 +1,7 @@
 #if DEBUG || DEV_API
 using System.Text.Json;
 
-namespace VideoPlayer.Mvu.DevApi;
+namespace msTools.DeveloperApi;
 
 /// <summary>
 /// Eine eingehende Anfrage an die Developer-API (bereits zerlegt in

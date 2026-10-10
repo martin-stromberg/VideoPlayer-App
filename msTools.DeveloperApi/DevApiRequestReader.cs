@@ -1,7 +1,7 @@
 #if DEBUG || DEV_API
 using System.Text;
 
-namespace VideoPlayer.Mvu.DevApi;
+namespace msTools.DeveloperApi;
 
 /// <summary>
 /// Liest eine einzelne HTTP/1.x-Anfrage von einem Stream: Request-Line,
