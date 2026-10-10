@@ -34,7 +34,9 @@ public sealed class LoginTests : E2ETestBase
             TimeSpan.FromSeconds(30),
             "Anmeldung abgelehnt → Fehlermeldung", Ct);
         Assert.Contains("Anmeldung fehlgeschlagen", model.LoginError);
-        Assert.Equal("Login", model.CurrentPage);
+        // Der Einrichtungsfluss bleibt auf der ServerSetup-Seite —
+        // die Zugangsdaten-Kachel ist dort die zweite Stufe.
+        Assert.Equal("ServerSetup", model.CurrentPage);
     }
 
     /// <summary>

@@ -63,11 +63,11 @@ public sealed class PairingTests : E2ETestBase
 
     /// <summary>
     /// Gültiger Code: der ECDH/AES-GCM-Austausch liefert das
-    /// Geräte-Token; ohne gespeicherte Zugangsdaten landet die App auf
-    /// der Anmeldemaske.
+    /// Geräte-Token; ohne gespeicherte Zugangsdaten zeigt die
+    /// Einrichtungsseite die Anmelde-Kachel als zweite Stufe.
     /// </summary>
     [Fact]
-    public async Task ValidCode_ShowsLoginPage()
+    public async Task ValidCode_ShowsCredentialsOption()
     {
         using var server = new MockVideoServer("E2ETEST", "e2e-device-a", "e2e@example.test", "e2e-pass");
         using var app = await StartAppAsync();
