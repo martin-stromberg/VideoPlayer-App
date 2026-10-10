@@ -16,6 +16,7 @@ public partial class SourceOverviewPage : ContentPage
     private readonly MvuHost mvuHost;
     private long sourceId;
     private string? sourceName;
+    private bool subscribed;
 
     /// <summary>Initialisiert eine neue Instanz der <see cref="SourceOverviewPage"/>-Klasse.</summary>
     /// <param name="mvuHost">MVU-Host; dient als <see cref="BindableObject.BindingContext"/> und Dispatch-Ziel der Browser-Nachrichten.</param>
@@ -24,7 +25,6 @@ public partial class SourceOverviewPage : ContentPage
         InitializeComponent();
         this.mvuHost = mvuHost;
         BindingContext = mvuHost;
-        mvuHost.ModelChanged += OnModelChanged;
         UpdateUi(mvuHost.Model);
     }
 
@@ -48,6 +48,13 @@ public partial class SourceOverviewPage : ContentPage
     protected override void OnAppearing()
     {
         base.OnAppearing();
+        // Das ModelChanged-Abo gilt nur, solange die Seite sichtbar ist
+        // (Muster: SettingsPage) — verlassene Instanzen dürfen nicht
+        // weiter am MvuHost hängen.
+        subscribed = true;
+        mvuHost.ModelChanged -= OnModelChanged;
+        mvuHost.ModelChanged += OnModelChanged;
+        UpdateUi(mvuHost.Model);
         // Beim ersten Öffnen (oder erneutem Aufruf einer anderen Quelle)
         // werden Genres + erste Seite geladen; im Offlinebetrieb ist die
         // Seite über die Quellenliste gar nicht erreichbar — ein
@@ -58,10 +65,24 @@ public partial class SourceOverviewPage : ContentPage
         }
     }
 
+    /// <inheritdoc/>
+    protected override void OnDisappearing()
+    {
+        subscribed = false;
+        mvuHost.ModelChanged -= OnModelChanged;
+        base.OnDisappearing();
+    }
+
     private void OnModelChanged(object? sender, EventArgs e)
     {
         var model = mvuHost.Model;
-        MainThread.BeginInvokeOnMainThread(() => UpdateUi(model));
+        MainThread.BeginInvokeOnMainThread(() =>
+        {
+            if (subscribed)
+            {
+                UpdateUi(model);
+            }
+        });
     }
 
     private void UpdateUi(AppModel model)

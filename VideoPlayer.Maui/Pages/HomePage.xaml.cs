@@ -13,6 +13,7 @@ public partial class HomePage : ContentPage
 {
     private readonly MvuHost mvuHost;
     private byte[]? appliedHeroBytes;
+    private bool subscribed;
 
     /// <summary>Initialisiert eine neue Instanz der <see cref="HomePage"/>-Klasse.</summary>
     /// <param name="mvuHost">MVU-Host; dient als <see cref="BindableObject.BindingContext"/> und Dispatch-Ziel der Auswahl-Nachrichten.</param>
@@ -21,10 +22,31 @@ public partial class HomePage : ContentPage
         InitializeComponent();
         this.mvuHost = mvuHost;
         BindingContext = mvuHost;
-        mvuHost.ModelChanged += OnModelChanged;
         SizeChanged += OnSizeChanged;
         UpdateBanners(mvuHost.Model);
         UpdateHero(mvuHost.Model);
+    }
+
+    /// <inheritdoc/>
+    protected override void OnAppearing()
+    {
+        base.OnAppearing();
+        // Das ModelChanged-Abo gilt nur, solange die Seite sichtbar ist
+        // (Muster: SettingsPage) — verlassene Instanzen dürfen nicht
+        // weiter am MvuHost hängen.
+        subscribed = true;
+        mvuHost.ModelChanged -= OnModelChanged;
+        mvuHost.ModelChanged += OnModelChanged;
+        UpdateBanners(mvuHost.Model);
+        UpdateHero(mvuHost.Model);
+    }
+
+    /// <inheritdoc/>
+    protected override void OnDisappearing()
+    {
+        subscribed = false;
+        mvuHost.ModelChanged -= OnModelChanged;
+        base.OnDisappearing();
     }
 
     private void OnModelChanged(object? sender, EventArgs e)
@@ -34,8 +56,11 @@ public partial class HomePage : ContentPage
         var model = mvuHost.Model;
         MainThread.BeginInvokeOnMainThread(() =>
         {
-            UpdateBanners(model);
-            UpdateHero(model);
+            if (subscribed)
+            {
+                UpdateBanners(model);
+                UpdateHero(model);
+            }
         });
     }
 

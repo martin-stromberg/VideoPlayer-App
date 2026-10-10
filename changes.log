@@ -1,5 +1,11 @@
 # Änderungsprotokoll
 
+## 2026-10-10 — `ModelChanged`-Abonnements aller Seiten an den Sichtbarkeits-Lebenszyklus gebunden (Issue 11)
+
+- **Lebenszyklus-Leck geschlossen:** `HomePage`, `MediaDetailsPage`, `DownloadsPage`, `FavoritesPage`, `SourceOverviewPage` und `ProfilePage` abonnierten `MvuHost.ModelChanged` im Konstruktor ohne Abmeldung — verlassene Seiten-Instanzen blieben am `MvuHost` hängen (Speicherleck) und führten weiter `UpdateUi` aus. Alle sechs Seiten nutzen jetzt das `PlayerPage`-/`SettingsPage`-Muster: Abo in `OnAppearing` (mit `-=` vor `+=`), Abmeldung in `OnDisappearing` sowie ein `subscribed`-Guard, der bereits gemarshallte `UpdateUi`-Rückrufe losgelöster Seiten verwirft.
+- **Keine Verhaltensänderung:** Die `OnAppearing`-Fachlogik (Seiten-Lade-Messages, `requested`-Guard der `MediaDetailsPage`) bleibt unverändert; `UpdateUi` beim Erscheinen stellt den aktuellen Modellstand wieder her. `AppShell` (lebenslang gültig) und die `SizeChanged`-Abos bleiben bewusst unverändert.
+- **Tests:** Neue `PageLifecycleContractTests` pinnen je Seite die Abmeldung in `OnDisappearing`, das Abo in `OnAppearing` statt im Konstruktor und den `subscribed`-Guard (12 Contract-Tests, Negativprobe auf dem Ist-Stand rot). Volle Suite 1032/1032 grün.
+
 ## 2026-09-24 — Modernisierte Serververbindungs-UI `ServerSetupPage` (Issue 17, Schritt 4)
 
 - **Kartenbasierte Oberfläche:** Die Serverseite (Erststart-Einrichtung und „Server wechseln" aus den Einstellungen) ist jetzt wie der Rest der App in Karten gegliedert — Kopfbereich mit Kicker-Badge „SERVERVERBINDUNG", Titel und Hinweissatz, Aktiver-Server-Karte (`ActiveServerCard`, `RoundRectangle 8`, `VpSurfaceHigh`/`VpBorderStrong`), bekannte und im Netzwerk gefundene Server als abgerundete Karten mit Name, Adresse und Statuszeile („Zuletzt verwendet …" bzw. „Im Netzwerk gefunden"), Karte „Neuen Server verbinden" (`ConnectCard`) und hervorgehobene Pairing-Karte (`PairingSection`, `VpSecondary`-Rand, Badge „NÄCHSTER SCHRITT") mit Führungstext zur Server-Verwaltung. Ausschließlich `Vp*`-Design-Tokens, Dark-only, keine harten Farben.

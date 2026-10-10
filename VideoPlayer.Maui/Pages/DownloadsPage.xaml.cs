@@ -20,6 +20,7 @@ public partial class DownloadsPage : ContentPage
     // in-place (PropertyChanged am Eintrag), statt den CollectionView
     // pro Tick über eine neue Listeninstanz zurückzusetzen (Flackern).
     private readonly ObservableCollection<DownloadItemViewModel> downloadItems = [];
+    private bool subscribed;
 
     /// <summary>Initialisiert eine neue Instanz der <see cref="DownloadsPage"/>-Klasse.</summary>
     /// <param name="mvuHost">MVU-Host; dient als <see cref="BindableObject.BindingContext"/> und Dispatch-Ziel der Download-Nachrichten.</param>
@@ -29,7 +30,6 @@ public partial class DownloadsPage : ContentPage
         this.mvuHost = mvuHost;
         BindingContext = mvuHost;
         DownloadsCollection.ItemsSource = downloadItems;
-        mvuHost.ModelChanged += OnModelChanged;
         UpdateUi(mvuHost.Model);
     }
 
@@ -37,15 +37,36 @@ public partial class DownloadsPage : ContentPage
     protected override void OnAppearing()
     {
         base.OnAppearing();
+        // Das ModelChanged-Abo gilt nur, solange die Seite sichtbar ist
+        // (Muster: SettingsPage) — verlassene Instanzen dürfen nicht
+        // weiter am MvuHost hängen.
+        subscribed = true;
+        mvuHost.ModelChanged -= OnModelChanged;
+        mvuHost.ModelChanged += OnModelChanged;
+        UpdateUi(mvuHost.Model);
         // Beim Öffnen den Manifest-Stand (neu) laden — lokale Daten,
         // ohne Serverkontakt.
         _ = mvuHost.DispatchAsync(new DownloadsPageOpenedMessage());
     }
 
+    /// <inheritdoc/>
+    protected override void OnDisappearing()
+    {
+        subscribed = false;
+        mvuHost.ModelChanged -= OnModelChanged;
+        base.OnDisappearing();
+    }
+
     private void OnModelChanged(object? sender, EventArgs e)
     {
         var model = mvuHost.Model;
-        MainThread.BeginInvokeOnMainThread(() => UpdateUi(model));
+        MainThread.BeginInvokeOnMainThread(() =>
+        {
+            if (subscribed)
+            {
+                UpdateUi(model);
+            }
+        });
     }
 
     private void UpdateUi(AppModel model)

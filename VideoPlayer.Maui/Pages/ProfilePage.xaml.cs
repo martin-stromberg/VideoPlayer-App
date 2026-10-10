@@ -13,6 +13,7 @@ namespace VideoPlayer.Maui.Pages;
 public partial class ProfilePage : ContentPage
 {
     private readonly MvuHost mvuHost;
+    private bool subscribed;
 
     /// <summary>Initialisiert eine neue Instanz der <see cref="ProfilePage"/>-Klasse.</summary>
     /// <param name="mvuHost">MVU-Host; dient als <see cref="BindableObject.BindingContext"/> und Dispatch-Ziel der Profil-Nachrichten.</param>
@@ -21,7 +22,6 @@ public partial class ProfilePage : ContentPage
         InitializeComponent();
         this.mvuHost = mvuHost;
         BindingContext = mvuHost;
-        mvuHost.ModelChanged += OnModelChanged;
         UpdateUi(mvuHost.Model);
     }
 
@@ -29,15 +29,36 @@ public partial class ProfilePage : ContentPage
     protected override void OnAppearing()
     {
         base.OnAppearing();
+        // Das ModelChanged-Abo gilt nur, solange die Seite sichtbar ist
+        // (Muster: SettingsPage) — verlassene Instanzen dürfen nicht
+        // weiter am MvuHost hängen.
+        subscribed = true;
+        mvuHost.ModelChanged -= OnModelChanged;
+        mvuHost.ModelChanged += OnModelChanged;
+        UpdateUi(mvuHost.Model);
         // Beim Öffnen die Profilinformationen (erneut) ermitteln —
         // offline greift die Einschränkung des MVU-Updates.
         _ = mvuHost.DispatchAsync(new ProfilePageOpenedMessage());
     }
 
+    /// <inheritdoc/>
+    protected override void OnDisappearing()
+    {
+        subscribed = false;
+        mvuHost.ModelChanged -= OnModelChanged;
+        base.OnDisappearing();
+    }
+
     private void OnModelChanged(object? sender, EventArgs e)
     {
         var model = mvuHost.Model;
-        MainThread.BeginInvokeOnMainThread(() => UpdateUi(model));
+        MainThread.BeginInvokeOnMainThread(() =>
+        {
+            if (subscribed)
+            {
+                UpdateUi(model);
+            }
+        });
     }
 
     private void UpdateUi(AppModel model)

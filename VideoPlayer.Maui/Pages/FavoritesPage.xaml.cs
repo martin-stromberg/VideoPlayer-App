@@ -14,6 +14,7 @@ namespace VideoPlayer.Maui.Pages;
 public partial class FavoritesPage : ContentPage
 {
     private readonly MvuHost mvuHost;
+    private bool subscribed;
 
     /// <summary>Initialisiert eine neue Instanz der <see cref="FavoritesPage"/>-Klasse.</summary>
     /// <param name="mvuHost">MVU-Host; dient als <see cref="BindableObject.BindingContext"/> und Dispatch-Ziel der Favoriten-Nachrichten.</param>
@@ -22,7 +23,6 @@ public partial class FavoritesPage : ContentPage
         InitializeComponent();
         this.mvuHost = mvuHost;
         BindingContext = mvuHost;
-        mvuHost.ModelChanged += OnModelChanged;
         UpdateUi(mvuHost.Model);
     }
 
@@ -30,15 +30,36 @@ public partial class FavoritesPage : ContentPage
     protected override void OnAppearing()
     {
         base.OnAppearing();
+        // Das ModelChanged-Abo gilt nur, solange die Seite sichtbar ist
+        // (Muster: SettingsPage) — verlassene Instanzen dürfen nicht
+        // weiter am MvuHost hängen.
+        subscribed = true;
+        mvuHost.ModelChanged -= OnModelChanged;
+        mvuHost.ModelChanged += OnModelChanged;
+        UpdateUi(mvuHost.Model);
         // Beim Öffnen (neu) laden: online wird die lokale Kopie zuerst
         // vom Serverstand erneuert, offline der Cache-Stand gezeigt.
         _ = mvuHost.DispatchAsync(new FavoritesPageOpenedMessage());
     }
 
+    /// <inheritdoc/>
+    protected override void OnDisappearing()
+    {
+        subscribed = false;
+        mvuHost.ModelChanged -= OnModelChanged;
+        base.OnDisappearing();
+    }
+
     private void OnModelChanged(object? sender, EventArgs e)
     {
         var model = mvuHost.Model;
-        MainThread.BeginInvokeOnMainThread(() => UpdateUi(model));
+        MainThread.BeginInvokeOnMainThread(() =>
+        {
+            if (subscribed)
+            {
+                UpdateUi(model);
+            }
+        });
     }
 
     private void UpdateUi(AppModel model)

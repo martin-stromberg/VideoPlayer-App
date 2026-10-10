@@ -27,6 +27,7 @@ public partial class MediaDetailsPage : ContentPage
     private bool requested;
     private bool updatingSeasonPicker;
     private byte[]? appliedHeaderBytes;
+    private bool subscribed;
 
     /// <summary>Initialisiert eine neue Instanz der <see cref="MediaDetailsPage"/>-Klasse.</summary>
     /// <param name="mvuHost">MVU-Host; liefert den Detail-Zustand und nimmt die Benutzer-Nachrichten entgegen.</param>
@@ -35,7 +36,6 @@ public partial class MediaDetailsPage : ContentPage
         InitializeComponent();
         this.mvuHost = mvuHost;
         BindingContext = mvuHost;
-        mvuHost.ModelChanged += OnModelChanged;
         SizeChanged += OnSizeChanged;
         UpdateUi(mvuHost.Model);
     }
@@ -80,6 +80,13 @@ public partial class MediaDetailsPage : ContentPage
     protected override void OnAppearing()
     {
         base.OnAppearing();
+        // Das ModelChanged-Abo gilt nur, solange die Seite sichtbar ist
+        // (Muster: SettingsPage) — verlassene Instanzen dürfen nicht
+        // weiter am MvuHost hängen.
+        subscribed = true;
+        mvuHost.ModelChanged -= OnModelChanged;
+        mvuHost.ModelChanged += OnModelChanged;
+        UpdateUi(mvuHost.Model);
         // Nur einmal pro Seiteninstanz anfragen — Details laden bei jeder
         // Rückkehr neu anzufordern würde Staffel-Vorwahl und Favoriten-
         // Anzeige zurücksetzen.
@@ -91,10 +98,24 @@ public partial class MediaDetailsPage : ContentPage
         }
     }
 
+    /// <inheritdoc/>
+    protected override void OnDisappearing()
+    {
+        subscribed = false;
+        mvuHost.ModelChanged -= OnModelChanged;
+        base.OnDisappearing();
+    }
+
     private void OnModelChanged(object? sender, EventArgs e)
     {
         var model = mvuHost.Model;
-        MainThread.BeginInvokeOnMainThread(() => UpdateUi(model));
+        MainThread.BeginInvokeOnMainThread(() =>
+        {
+            if (subscribed)
+            {
+                UpdateUi(model);
+            }
+        });
     }
 
     private void UpdateUi(AppModel model)
