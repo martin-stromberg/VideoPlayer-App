@@ -1,94 +1,86 @@
-# VideoWebPlayer MAUI App
+# VideoPlayer-App („Heimkino")
 
-Dieses Repository enthält die ausgelagerte .NET-MAUI-App und ihre Tests.
+Die mobile und Desktop-App für den selbst gehosteten [VideoPlayer-Server](https://github.com/martin-stromberg/VideoPlayer) — eine .NET-MAUI-Anwendung zum Streamen und Offline-Speichern persönlicher Medienbibliotheken.
 
-## Inhalt
+Die App koppelt sich beim Erststart über einen vom Server erzeugten Einmal-QR-Code (oder Kurzcode) mit dem Server und speichert ein gerätegebundenes Token im Secure Storage — kein statischer API-Schlüssel in der verteilten App.
 
-- `VideoWebPlayer.Maui/` - bisherige mobile App (Altbestand, wird schrittweise durch `VideoPlayer.Maui` abgelöst).
-- `VideoWebPlayer.Maui.Tests/` - tests ohne Rückreferenz auf das Webprojekt.
-- `VideoWebPlayer.Client/` - kopierte Übergabeschnittstelle aus dem Web-Repository (Altbestand, wird im Rahmen der Neugestaltung entfernt).
-- `VideoPlayer.ApiClient/` - neu implementierter, plattformneutraler Zugriff auf die öffentliche Server-API, Geräte-Pairing und -Onboarding (`DevicePairingClient` für die öffentlichen Endpunkte `api/pairing/exchange` und `api/pairing/bootstrap`, `PairingCrypto` für den ECDH-nistP256-Schlüsselaustausch und die AES-256-GCM-Entschlüsselung; `RefreshSessionAsync`/`LogoutSessionAsync` für `api/auth/refresh`/`api/auth/logout`) sowie Netzwerk-Erkennung von Servern (mDNS/UDP, Namespace `Discovery`; Dokumentation: `docs/help/api-client/`).
-- `VideoPlayer.Mvu/` - plattformneutrale MVU-Schicht der neuen App (Modell, Messages, Update, Effekte; eigener schlanker MVU-Kreislauf ohne externes Framework) inklusive `AuthSessionService` (Anmeldung, stille Token-Erneuerung, Verbindungszustände), `ServerEventsService`/`ServerSyncService`/`ProgressReportService` (Ereignisverbindung, Synchronisation, Fortschrittsmeldung), `INetworkStatusMonitor`-Abstraktion, `HomeListService` (Startseiten-Listen aus der Cache-Ablage) sowie `SourceBrowserService`/`MediaDetailsService`/`FavoritesService` (Quellen-Browsing, Medien-Details, Favoriten-Umschaltung und -Entfernung), `ProfileInfoService` (Benutzer-/Profil-Anzeige aus gespeicherter Kennung, Token-Claims und `VIDEOPLAYER_PROFILE`) und `PlaybackSourceService` (Wiedergabequelle: fertiger Download aus dem Manifest oder Server-Stream samt Fortsetzungsposition, im Offline-Modus ohne Serverzugriff), `DownloadService`/`AutoDownloadService` (persistente Download-Aufträge im Manifest, parallele Transfers mit GB-Kontingent und WLAN-Bedingung, automatische Wiederaufnahme, Weiterschauen-Vorlauf) sowie `OfflineContinueWatchingService`/`ShowDetailsCache` (Offline-„Weiterschauen" ausschließlich aus abgeschlossenen Downloads mit vorhandener Datei, Platzhalter fehlender Folge-Episoden, gecachte Serienstruktur, Offline-Snapshots der Detailseiten) sowie `DeviceTokenService` (gerätegebundene Pairing-Tokens: Laden aus der sicheren Ablage, Einbindung als Quelle in `ClientGate`, Gate-Probe und Widerruf-Erkennung mit Re-Pairing-Fluss).
-- `VideoPlayer.Storage/` - plattformneutrale lokale Datenhaltung der neuen App (Einstellungsmodell und -dienst, Geheimnis-Ablage für Zugangsdaten, Anmelde-, Refresh- und gerätegebundene Pairing-Tokens, Profil-Isolation, Backup-/NoBackup-Ablageorte, SQLite-Datenbanken, Serververwaltung `KnownServersService`, Offline-Daten-Prüfung, persistente Fortschritts-Warteschlange `PendingProgressSyncService`, wiederherstellende Initialisierung beschädigter Datenbanken mit Quarantäne der Altdateien).
-- `VideoPlayer.Maui/` - neue MAUI-App auf MVU-Basis (Seitenmenü-Navigation, ausgebaute Einstellungsseite, Serververwaltung mit Erststart-Einrichtung, QR-/Ticket-Onboarding per `api/pairing/bootstrap` (Kamera-Scan unter iOS/Android, Ticket-Adresse oder Kurzcode manuell) und Geräte-Pairing per Einmal-Code auf der Serverseite, Verbindungs-Workflow mit Anmeldemaske und Offline-Modus, Netzwerkstatus-Erkennung mit automatischer Wiederverbindung und SignalR-Ereignisverbindung zum Server, Startseite mit den gecachten Medienlisten „Weiterschauen"/„Favoriten"/„Neu im Programm" und dem Hero-Kopfbereich mit servergeneriertem Hintergrundbild nach Web-Vorbild (ausblendbar über die positiv formulierte, standardmäßig aktivierte Einstellung „Kopfbereich anzeigen"), Quellen als dynamische Menüeinträge je freigegebener Quelle mit Icon unter der Sektionsüberschrift „Quellen" direkt im Seitenmenü (Statuszeilen für Laden und leere Freigabe, Neuversuch-Eintrag bei Ladefehlern, offline ausgeblendet; die Auswahl öffnet direkt die Titelübersicht der Quelle), Quellen-Browsing mit Genre-Filter/Suche/seitenweisem Nachladen, Medien-Detailseiten für Filme, Kollektionen und Serien mit Staffeln/Episoden inklusive Favoriten-Markierung und vollbreitem Kopfbereich mit Hintergrundgrafik nach Web-Vorbild (Episoden-Still bzw. Banner/Fanart/Poster, geschichtete Dunkelgradienten, Titel/Meta/Handlung unten links, Wechsel auf das Still der gewählten Episode) sowie dem Angesehen-Symbol — rundes Augen-Badge auf den Stills gesehener Episoden nach Web-Vorbild, in der Sitzung sofort aktualisiert, auch im Offline-Snapshot, Favoriten-Seite des Server-Benutzers mit Entfernen-Aktion und Offline-Cache sowie Profil-Seite mit Benutzeranzeige und Abmeldung, Wiedergabeseite (`MediaElement`, Server-Stream/lokale Datei, Fortsetzungsposition, „angesehen"-Schwelle, Auto-Fortsetzung, Fehler-Rückfall auf die nächste Episode, native Transportsteuerung in der Vollansicht unmittelbar bedienbar, Wiedergabeseite beliebig oft hintereinander ohne Absturz startbar — Modell-Abo nur solange sichtbar, native Elementzugriffe auf dem UI-Thread) mit Picture-in-Picture — Windows über kompaktes Overlay-Fenster, iOS über den nativen PiP der Transportsteuerung — sowie die Downloads-Seite (Auftragsliste mit Status/Fortschritt, Abbrechen/Wiederholen/Löschen, Kontingent-Anzeige, offline nutzbar, flüssige Fortschrittsanzeige über granularen In-place-Abgleich ohne Neuaufbau der Liste) und den vollständigen Offlinebetrieb (Startseite aus lokalen Downloads mit Platzhaltern fehlender Episoden, lokale Wiedergabe, Offline-Snapshots, Re-Anmeldung nach Backup-Wiederherstellung, Wiederherstellung beschädigter lokaler Ablagen mit Hinweisbanner); das Erscheinungsbild folgt zentralen Design-Tokens der Webanwendung (dunkles Schema, `Vp*`-Ressourcen in `Resources/Styles/`); Dokumentation: `docs/help/app-grundgeruest.md`, `docs/help/einstellungen-datenhaltung.md`, `docs/help/serververwaltung-erststart.md`, `docs/help/verbindung-anmeldung.md`, `docs/help/netzwerk-synchronisation.md`, `docs/help/startseite-medienlisten.md`, `docs/help/quellen-browsing-details.md`, `docs/help/favoriten-profil.md`, `docs/help/wiedergabe-pip.md`, `docs/help/downloads.md`, `docs/help/offline-wiederherstellung.md`, `docs/help/erscheinungsbild.md`).
-- `VideoPlayer.E2E.Tests/` - Windows-End-to-End-Tests (xUnit + FlaUI.UIA3): startet die echte `VideoPlayer.Maui.exe` (Debug) mit isoliertem Profil, steuert die Oberfläche über UI-Automation und prüft den App-Zustand über die Developer-API; Backend ist ein lokaler Mock-Server (Health/Pairing/Bootstrap/Login/Refresh/Logout/Listen). Doku: `docs/help/e2e-tests.md`.
-- `VideoPlayer.App.sln` - eigene Solution dieses Repositorys.
-- `LICENSE` - PolyForm Noncommercial License 1.0.0.
+## Funktionen
+
+- **QR-/Kurzcode-Onboarding** — Kopplung über den QR-Code der Server-Verwaltung oder 8-stelligen Kurzcode; alternativ klassisches Pairing per Einmal-Code. Erzeugt Geräte-, Anmelde- und Refresh-Token in einem Schritt.
+- **Server-Entdeckung** — automatische Erkennung der Server im lokalen Netz (UDP-Broadcast, mDNS).
+- **Wiedergabe** — Server-Stream oder lokale Datei mit Fortsetzungsposition, „angesehen"-Markierung, automatischem Fortsetzen und Picture-in-Picture (Windows: kompaktes Overlay-Fenster; iOS: nativer PiP der Transportsteuerung).
+- **Offline-Betrieb** — Downloads mit GB-Kontingent und WLAN-Bedingung; die Startseite, Serienstruktur und Detail-Snapshots bleiben ohne Serververbindung nutzbar.
+- **Startseite** — „Weiterschauen", „Favoriten" und „Neu im Programm" mit Hero-Kopfbereich im Erscheinungsbild der Web-Oberfläche.
+- **Verbindungs-Workflow** — Anmelde- und Servermaske mit Offline-Modus, automatischer Wiederverbindung und SignalR-Ereignisverbindung.
+
+## Plattformen
+
+| Plattform | Status |
+|-----------|--------|
+| Windows | Unterstützt (primäres Entwicklungsziel, E2E-getestet) |
+| iOS | Unterstützt (Geräte-Deployment via Pair-to-Mac) |
+| MacCatalyst | Baubar, nicht aktiv gepflegt |
+| Android | Build möglich, **nicht offiziell unterstützt** — kein Test-/CI-Gate |
 
 ## Voraussetzungen
 
-- .NET 10 SDK.
-- Für mobile Builds: passende .NET-MAUI-Workload.
-- Windows-Ziel: Windows App SDK/Windows-Zielplattform.
-- Android-Ziel: Android SDK.
-- iOS/MacCatalyst: macOS mit Xcode.
+- [.NET 10 SDK](https://dotnet.microsoft.com/download) und die MAUI-Workload: `dotnet workload install maui`
+- Windows-Ziel: Windows App SDK
+- iOS/MacCatalyst: macOS mit Xcode (lokales Deployment über `scripts/iOS-Deployment.ps1` und Pair-to-Mac)
+- Ein laufender [VideoPlayer-Server](https://github.com/martin-stromberg/VideoPlayer) mit der öffentlichen API
 
-Linux kann das Testprojekt und das gemeinsame Client-Projekt bauen, aber keine iOS-, MacCatalyst- oder Windows-MAUI-Ziele.
-
-## Restore, Build und Tests
+## Bauen und Testen
 
 ```bash
 dotnet restore VideoPlayer.App.sln
 dotnet test VideoWebPlayer.Maui.Tests/VideoWebPlayer.Maui.Tests.csproj
 ```
 
-## Branching und CI/CD
-
-- `staging` ist der Integrationsbranch. Pull Requests gegen `staging` müssen Tests und Linter bestehen.
-- `main` darf ausschließlich von `staging` über Pull Requests aktualisiert werden.
-- Nach einem Merge auf `staging` entsteht ein Draft-PR gegen `main` und ein Prerelease mit RC-Version.
-- Nach einem Merge auf `main` entsteht ein Semantic-Release sowie ein Back-Merge-PR auf `staging`.
-- Details befinden sich in `docs/help/staging-branch.md`.
-
-Windows:
+Windows-App:
 
 ```powershell
-dotnet build .\VideoWebPlayer.Maui\VideoWebPlayer.Maui.csproj -f net10.0-windows10.0.19041.0
 dotnet build .\VideoPlayer.Maui\VideoPlayer.Maui.csproj -f net10.0-windows10.0.19041.0
 ```
 
-Android:
+## Projektstruktur
 
-```bash
-dotnet build VideoWebPlayer.Maui/VideoWebPlayer.Maui.csproj -f net10.0-android
-dotnet build VideoPlayer.Maui/VideoPlayer.Maui.csproj -f net10.0-android
-```
-
-## Developer-API (nur Debug/Opt-in)
-
-Der Debug-Build von `VideoPlayer.Maui` startet einen lokalen Mini-HTTP-Server auf `127.0.0.1` mit systemvergebenem Port (`devapi.json` im Programmverzeichnis): `GET /model` (App-Zustand), `GET /tree` (Elementbaum inkl. CollectionView-Items), `POST /invoke` (inkl. `itemIndex` zur koordinatenfreien CollectionView-Auswahl) und `POST /set-text` zur UI-Automatisierung. Release-Builds enthalten die API nicht; Opt-in über das Define `DEV_API`. Details: `docs/help/developer-api.md`.
-
-## Windows-E2E-Tests (FlaUI)
-
-`dotnet test VideoPlayer.E2E.Tests/VideoPlayer.E2E.Tests.csproj` — nur unter Windows mit Desktop-Session; baut die App als Debug, startet je Test einen eigenen Exe-Prozess mit isoliertem `VIDEOPLAYER_PROFILE` und spielt Server-Einrichtung, Pairing, QR-/Ticket-Bootstrap, Anmeldung, Sitzungserneuerung/-persistenz und Serverwechsel gegen einen lokalen Mock-Server durch (17 Tests). Details: `docs/help/e2e-tests.md`.
-
-## Web-API-Vertrag
-
-Das Web-Repository besitzt die verbindliche API-Dokumentation unter `docs/API.md`. Für produktive Änderungen an Endpunkten, DTOs oder Authentifizierung muss das Web-Repository zuerst den Vertrag aktualisieren und testen.
+| Projekt | Zweck |
+|---------|-------|
+| `VideoPlayer.Maui` | Die App (MVU-Architektur): Seitenmenü, Serververwaltung, Startseite, Quellen-Browsing, Detailseiten, Wiedergabe/PiP, Downloads, Offline-Modus |
+| `VideoPlayer.Mvu` | Plattformneutrale MVU-Schicht: Modell, Update, Effekte; Authentifizierung, Synchronisation, Ereignisverbindung, Pairing-Flows |
+| `VideoPlayer.ApiClient` | Zugriff auf die öffentliche Server-API: Pairing/Bootstrap (ECDH-nistP256 + AES-256-GCM), Refresh/Logout, Server-Discovery |
+| `VideoPlayer.Storage` | Lokale Datenhaltung: SQLite-Cache, Einstellungen, Geheimnis-Ablage (`SecureStorage`), Download-Manifest |
+| `VideoWebPlayer.Maui` | Altbestand der bisherigen App — wird schrittweise durch `VideoPlayer.Maui` abgelöst |
+| `VideoWebPlayer.Maui.Tests` | Testprojekt (Contract-Tests der MAUI-Oberfläche, MVU-Verhalten, API-Client) |
+| `VideoPlayer.E2E.Tests` | Windows-End-to-End-Tests (FlaUI/UI-Automation gegen die echte App + lokalen Mock-Server) |
+| `scripts/` | Deployment-Skripte (u. a. `iOS-Deployment.ps1` für Simulator-, Geräte- und Store-Builds) |
 
 ## Secrets und Client-Gate
 
-Der Server schützt die Client-API über ein Client-Gate (`X-API-Key`-Header, Scope `MauiOnly`). Das komfortabelste Verfahren ist das **QR-/Ticket-Onboarding**: Die App löst ein Ticket aus dem Kopplungs-QR-Code der Server-Verwaltung (oder den 8-stelligen Kurzcode) über den öffentlichen Endpunkt `POST api/pairing/bootstrap` ein und erhält dabei in einem Schritt Geräte-Token, Anmelde-Token und Refresh-Token — keine Anmeldemaske nötig; die Sitzung erneuert sich anschließend per `POST api/auth/refresh` (Rotierung) und das Abmelden widerruft den Refresh-Token über `POST api/auth/logout`. Alternativ bleibt das **Geräte-Pairing per Einmal-Code** verfügbar: Die App tauscht einen in der Server-Verwaltung (Bereich „Geräte") erzeugten Einmal-Code über den öffentlichen, ratenbegrenzten Endpunkt `POST api/pairing/exchange` gegen ein AES-256-GCM-verschlüsseltes Geräte-Token (Schlüsselaustausch per flüchtigem ECDH-Schlüsselpaar nistP256). Das entschlüsselte Token liegt profil- und serveradress-spezifisch in der sicheren Plattformablage (`SecureStorage` über `ISecretStore`, `AppSecretsService`) — nicht in `Preferences` und nicht im Geräte-Backup. Die App meldet beim Pairing den Gerätenamen (`deviceName`), damit das Gerät in der Server-Verwaltung identifizierbar und widerrufbar ist. Lehnt das Gate ein Geräte-Token ab (widerrufen/abgelaufen), verwirft die App es und fordert auf der Serverseite erneut zum Pairing auf; ein konfigurierter statischer Schlüssel wird dabei einmalig als Fallback geprüft. Details: `docs/help/serververwaltung-erststart.md`, `docs/help/verbindung-anmeldung.md`.
+Der Server schützt die Client-API über ein Client-Gate (`X-API-Key`, Scope `MauiOnly`). Die App löst den Schlüssel zur Laufzeit auf — in dieser Reihenfolge:
 
-Der statische Gate-Schlüssel bleibt als Übergangs-/Fallback-Mechanismus konfigurierbar. `ClientGate.Resolve()` löst den Schlüssel plattformneutral in dieser Reihenfolge auf — Werte, die dem Platzhalter entsprechen, gelten als nicht konfiguriert:
-
-1. Geräte-Token des aktiven Servers (`ClientGate.DeviceTokenProvider`, gepflegt vom `DeviceTokenService`)
+1. **Geräte-Token** des gekoppelten Geräts (empfohlen; via QR-/Kurzcode oder Pairing-Code)
 2. Umgebungsvariable `VIDEOWEBPLAYER_MAUI_API_TOKEN`
-3. MSBuild-Eigenschaft `VideoPlayerApiToken` beim Build/Publish (Assembly-Metadata `VideoPlayer.ApiClient.ApiToken`), z. B. `dotnet publish VideoPlayer.Maui/VideoPlayer.Maui.csproj -p:VideoPlayerApiToken="<MAUI_CLIENT_API_TOKEN>"` oder `scripts/iOS-Deployment.ps1 -VideoPlayerApiToken "<MAUI_CLIENT_API_TOKEN>"` (das Skript lehnt Werte mit Anführungszeichen, Raute oder Zeilenumbruch mit verständlicher Meldung ab — der Token darf diese Zeichen nicht enthalten)
-4. Token-Datei `client-api-token.txt` im lokalen Anwendungsdatenverzeichnis (`%LocalAppData%/VideoPlayer` bzw. Plattformäquivalent; bei gesetztem `VIDEOPLAYER_PROFILE` unterhalb des Profil-Verzeichnisses, z. B. `%LocalAppData%/VideoPlayer/<profil>`)
-5. Platzhalter `<MAUI_CLIENT_API_TOKEN>` — oder explizit pro Client über `VideoPlayerApiClientOptions.ApiKey`
+3. MSBuild-Eigenschaft `VideoPlayerApiToken` beim Build (`-p:VideoPlayerApiToken="…"`)
+4. Datei `client-api-token.txt` im lokalen Anwendungsdatenverzeichnis (`%LocalAppData%/VideoPlayer`)
+5. Platzhalter `<MAUI_CLIENT_API_TOKEN>` (kein produktiv verwendbarer Wert)
 
-Der Platzhalter `<MAUI_CLIENT_API_TOKEN>` im Client ist kein produktiv verwendbarer Wert. Er markiert den Client-Gate-Wert für initiale Health- und Login-Aufrufe. Dieser Wert ist kein Ersatz für Benutzer-Authentifizierung und kann in einem ausgelieferten Client grundsätzlich ausgelesen werden; der korrespondierende Backendwert ist dennoch als sensibler Konfigurationswert zu schützen. Die eigentliche Benutzerautorisierung erfolgt über JWTs nach erfolgreicher Anmeldung.
+Der statische Schlüssel bleibt als Übergangs-Mechanismus konfigurierbar, gilt aber nicht als ausreichende Absicherung in einer verteilten App — Geräte-Tokens sind der primäre Weg. Echte JWT-Schlüssel, Benutzerpasswörter und produktive API-Tokens gehören nicht in dieses Repository.
 
-In der Alt-App `VideoWebPlayer.Maui` werden produktive Werte zentral über `VideoWebPlayer.Maui/Services/MauiClientConfiguration.cs` gelesen. Unterstützte Quellen sind:
+## Developer-API (nur Debug/Opt-in)
 
-- MSBuild: `dotnet build VideoWebPlayer.Maui/VideoWebPlayer.Maui.csproj -p:MauiClientApiToken="<MAUI_CLIENT_API_TOKEN>"`
-- Runtime-Umgebung: `VIDEOWEBPLAYER_MAUI_API_TOKEN`
+Der Debug-Build startet einen lokalen Mini-HTTP-Server auf `127.0.0.1` (`GET /model`, `GET /tree`, `POST /invoke`, `POST /set-text`) für UI-Automatisierung und E2E-Tests. Release-Builds enthalten die API nicht. Details: `docs/help/developer-api.md`.
 
-Der statische Wert muss backendseitig zu `Jwt:ApiToken:Maui` passen. Echte JWT-Schlüssel, Benutzerpasswörter und produktive API-Tokens gehören nicht in dieses Repository. Benutzerpasswörter und Geräte-Tokens werden im Client über `SecureStorage` abgelegt; `Preferences` enthält nur nicht geheime App-Einstellungen wie Serveradresse und Benutzername.
+## Branching und CI
+
+- `staging` ist der Integrationsbranch; Pull Requests gegen `staging` laufen durch Build-, Test- und Lint-Prüfungen.
+- `main` wird ausschließlich aus `staging` über PRs aktualisiert. Nach dem Merge entsteht ein Prerelease bzw. Semantic Release.
+- Details: `docs/help/staging-branch.md`.
+
+## Dokumentation
+
+Ausführliche fachliche Dokumentation liegt unter `docs/help/` — u. a. zu [Serververwaltung & Erststart](docs/help/serververwaltung-erststart.md), [Verbindung & Anmeldung](docs/help/verbindung-anmeldung.md), [Wiedergabe & PiP](docs/help/wiedergabe-pip.md), [Downloads](docs/help/downloads.md), [Offline-Betrieb](docs/help/offline-wiederherstellung.md) und [E2E-Tests](docs/help/e2e-tests.md).
 
 ## Lizenz
 
-Dieses Repository steht unter der **PolyForm Noncommercial License 1.0.0**. Kommerzielle Nutzung erfordert eine vorherige schriftliche Zustimmung.
-
-Kontakt für kommerzielle Lizenzanfragen: mstromberg84+videoplayer@gmail.com
+[PolyForm Noncommercial License 1.0.0](LICENSE) — Nutzung, Veränderung und Weitergabe für nicht-kommerzielle Zwecke erlaubt. Kommerzielle Nutzung erfordert eine separate Lizenz; Anfragen an mstromberg84+videoplayer@gmail.com.
