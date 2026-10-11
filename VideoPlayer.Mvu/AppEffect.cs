@@ -355,6 +355,59 @@ public sealed record LoadPlaylistEntriesEffect(
     bool Append) : AppEffect;
 
 /// <summary>
+/// Serverseitigen Wiedergabestart einer Playlist ausführen —
+/// <c>POST api/playlists/{id}/play</c> ab dem angegebenen Eintrag bzw.
+/// ab dem ersten abspielbaren und zugänglichen Eintrag (Ergebnis:
+/// <c>PlaylistPlaybackStartedMessage</c>). Online-Pfad.
+/// </summary>
+/// <param name="PlaylistId">Id der Playlist.</param>
+/// <param name="EntryId">Id des Starteintrags; <c>null</c> = erster abspielbarer und zugänglicher Eintrag.</param>
+/// <returns>Effekt-Datensatz für den Wiedergabestart.</returns>
+public sealed record StartPlaylistPlaybackEffect(
+    long PlaylistId,
+    long? EntryId) : AppEffect;
+
+/// <summary>
+/// Nächsten abspielbaren Eintrag der laufenden Playlist-Wiedergabe
+/// ermitteln — <c>POST api/playlists/{id}/play/next</c> (Ergebnis:
+/// <c>PlaylistNavigationCompletedMessage</c>). Manuelle
+/// Vorwärts-Navigation.
+/// </summary>
+/// <param name="PlaylistId">Id der Playlist.</param>
+/// <param name="CurrentEntryId">Id des aktuell gespielten Eintrags.</param>
+/// <returns>Effekt-Datensatz für die Vorwärts-Navigation.</returns>
+public sealed record LoadNextPlaylistEntryEffect(
+    long PlaylistId,
+    long CurrentEntryId) : AppEffect;
+
+/// <summary>
+/// Vorherigen abspielbaren Eintrag der laufenden Playlist-Wiedergabe
+/// ermitteln — <c>POST api/playlists/{id}/play/previous</c> (Ergebnis:
+/// <c>PlaylistNavigationCompletedMessage</c>). Manuelle
+/// Rückwärts-Navigation.
+/// </summary>
+/// <param name="PlaylistId">Id der Playlist.</param>
+/// <param name="CurrentEntryId">Id des aktuell gespielten Eintrags.</param>
+/// <returns>Effekt-Datensatz für die Rückwärts-Navigation.</returns>
+public sealed record LoadPreviousPlaylistEntryEffect(
+    long PlaylistId,
+    long CurrentEntryId) : AppEffect;
+
+/// <summary>
+/// Folgeeintrag für das automatische Weiterschalten der laufenden
+/// Playlist-Wiedergabe ermitteln —
+/// <c>POST api/playlists/{id}/play/advance</c> (Ergebnis:
+/// <c>PlaylistNavigationCompletedMessage</c>). Auto-Fortsetzung und
+/// Fehler-Rückfall.
+/// </summary>
+/// <param name="PlaylistId">Id der Playlist.</param>
+/// <param name="CurrentEntryId">Id des zu Ende bzw. fehlgeschlagen gespielten Eintrags.</param>
+/// <returns>Effekt-Datensatz für das automatische Weiterschalten.</returns>
+public sealed record AdvancePlaylistEntryEffect(
+    long PlaylistId,
+    long CurrentEntryId) : AppEffect;
+
+/// <summary>
 /// Profilinformationen der Profil-Seite ermitteln — Benutzername/E-Mail
 /// aus den Claims des gespeicherten Anmelde-Tokens bzw. dem gespeicherten
 /// Anmelde-Benutzernamen plus aktives lokales Profil (Ergebnis:
@@ -384,10 +437,16 @@ public sealed record NavigateToPlayerEffect : AppEffect;
 /// </summary>
 /// <param name="MediaType">Medientyp (normalisiert, CLR-Konvention).</param>
 /// <param name="MediaId">Id des Mediums.</param>
+/// <param name="StartPositionSeconds">
+/// Bereits bekannte Fortsetzungsposition in Sekunden (aus der
+/// Playlist-Start-/Navigationsantwort); <c>null</c> = der Dienst
+/// ermittelt den Stand selbst aus der Weiterschauen-Liste.
+/// </param>
 /// <returns>Effekt-Datensatz für die Quellauflösung.</returns>
 public sealed record ResolvePlaybackSourceEffect(
     string MediaType,
-    long MediaId) : AppEffect;
+    long MediaId,
+    long? StartPositionSeconds = null) : AppEffect;
 
 /// <summary>
 /// Serienkontext einer direkt aus der Weiterschauen-Liste gestarteten

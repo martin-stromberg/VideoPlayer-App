@@ -1,10 +1,11 @@
-# Playlists-Übersicht und -Detailansicht (Issue 43, Entwicklungsschritt 4)
+# Playlists-Übersicht, -Detailansicht und -Wiedergabe (Issue 43, Entwicklungsschritte 4 + 5)
 
 Die Menüseite **„Playlists"** der neuen VideoPlayer-App bindet die
 Playlist-Funktionalität des Servers an: eigene und öffentliche
 Playlists in einer Übersicht sowie eine Detailansicht mit den
 Playlist-Einträgen in der Server-Reihenfolge — vollständig über den
-MVU-Kreislauf.
+MVU-Kreislauf. Seit Schritt 5 sind die Einträge direkt abspielbar und
+die Wiedergabe folgt der Playlist-Reihenfolge.
 
 ## Übersicht „Playlists"
 
@@ -45,10 +46,18 @@ und Medientyp-Bezeichnung. Beim Erreichen des Listenendes wird die
 nächste Seite automatisch nachgeladen; fehlschlagende Folgeseiten
 lassen die Liste stehen und können erneut angefragt werden.
 
-- Der **Tippen auf einen Eintrag** öffnet die Medien-Detailseite —
-  bei Episoden mit dem bekannten Serienkontext als Hint. Die
-  Wiedergabe aus der Playlist heraus ist Folgeschritt 5 und hier
-  nicht Bestandteil.
+- Der **Tippen auf einen abspielbaren Eintrag** (Film oder Episode,
+  mit Zugriffsrecht) startet die Wiedergabe **ab genau diesem
+  Eintrag** (`POST api/playlists/{id}/play?entryId=…`) — siehe
+  „Wiedergabe" unten. Einträge, die nicht direkt abspielbar sind
+  (Serien, Staffeln, Kollektionen, nicht zugängliche Medien), öffnen
+  weiterhin die Medien-Detailseite — bei Episoden mit dem bekannten
+  Serienkontext als Hint.
+- Die Schaltfläche **„Abspielen"** im Kopfbereich startet die
+  Wiedergabe ohne Startvorgabe (`POST api/playlists/{id}/play` ohne
+  `entryId`) — der Server beginnt beim ersten abspielbaren und
+  zugänglichen Eintrag; sie ist nur sichtbar, wenn die Playlist
+  Einträge enthält.
 - **Wiederherstellung:** Wird die Seite ohne bekannten Zustand
   geöffnet, lädt ein nicht-fataler Nachschlag die Kopfdaten nach
   (`GET api/playlists/{id}`); schlägt er fehl, bleibt der Name aus
@@ -56,6 +65,49 @@ lassen die Liste stehen und können erneut angefragt werden.
 - **Fehlerzustand des Erstladens** zeigt Fehlermeldung plus „Erneut
   versuchen"; der Leerzustand meldet „Diese Playlist enthält keine
   Einträge."
+
+## Wiedergabe aus einer Playlist
+
+Die Playlist-Wiedergabe nutzt die serverseitigen Wiedergabe-Endpunkte —
+die Reihenfolge entscheidet allein der Server (aktiver Sortiermodus),
+die App sortiert nichts um:
+
+- **Start:** `POST api/playlists/{id}/play` — optional mit `entryId`
+  (gewählter Eintrag) oder ohne (erster abspielbarer und zugänglicher
+  Eintrag). Die Antwort liefert den aufgelösten Eintrag samt Position,
+  Medientyp/-id und der Fortsetzungsposition des Mediums.
+- **Manuelle Navigation:** im Player stehen bei laufender
+  Playlist-Wiedergabe die Schaltflächen **„Zurück"** und **„Weiter"**
+  bereit (`POST …/play/previous` bzw. `…/play/next`) — der Server
+  überspringt dabei nicht abspielbare oder nicht zugängliche Einträge.
+  Eine Kontextzeile unter dem Titel zeigt „„Playlist-Name" · Eintrag
+  n/m".
+- **Automatische Fortsetzung:** am Titelende — wie bei Serien nur bei
+  aktivierter Einstellung und laufender Wiedergabe — holt der Player
+  den Folge-Eintrag über `POST …/play/advance`; ebenso setzt der
+  Fehler-Rückfall (nicht verfügbare Quelle, Abspielfehler) über denselben
+  Endpunkt beim nächsten Eintrag fort.
+- **Quelle und Fortsetzungsposition:** die Wiedergabequelle wird wie
+  üblich aufgelöst (lokale Datei vor Server-Stream); die mit der
+  Play-Antwort gelieferte Fortsetzungsposition (`startPositionSeconds`)
+  gilt verbindlich — auch wenn das gleiche Medium in anderen Kontexten
+  einen eigenen Weiterschauen-Stand hätte.
+- Meldet der Server keinen Folgeeintrag (204), endet die Wiedergabe —
+  bei Rückwärts-Navigation am Listenanfang passiert nichts.
+- Die Playlist-Wiedergabe ist ein Online-Feature (wie die Anzeige);
+  offline startet keine Playlist-Wiedergabe.
+
+## Weiterschauen mit Playlist-Bezug
+
+Weiterschauen-Einträge, die aus einer Playlist-Wiedergabe entstanden
+sind, tragen den Playlist-Bezug (`playlistId`, `playlistName`,
+`playlistEntryId` des Server-DTOs) bis in die Startseiten-Liste. Ein
+Tap auf einen solchen Eintrag startet die Wiedergabe über den
+Playlist-Kontext (`POST api/playlists/{id}/play?entryId=…`) — das
+Folgevideo kommt aus der **Playlist-Reihenfolge**, nicht aus der
+Serienreihenfolge des Mediums. Ist das Medium inzwischen nicht mehr
+Teil der Playlist (`playlistEntryId` fehlt), gilt wie bisher der
+detailseiten-unabhängige Serienkontext.
 
 ## MVU-Anbindung
 
@@ -68,11 +120,31 @@ Sektionsüberschriften und Playlist-Karten) und `PlaylistDetailsState`
 Wiederherstellungspfad), `PlaylistEntriesLoaded` (Replace/Append mit
 Verwerfen veralteter Anhänge-Antworten), `PlaylistEntriesNextPageRequested`,
 `PlaylistEntriesRetryRequested` und `PlaylistEntrySelected` →
-`NavigateToMediaDetails`. Der `PlaylistService` nutzt den
-angemeldeten Client der `AuthSessionService`; Cover-Bilder werden
-über `PosterImageService.GetPlaylistCoverSourceAsync` in die
+`StartPlaylistPlayback` (abspielbar) bzw. `NavigateToMediaDetails`.
+Der `PlaylistService` nutzt den angemeldeten Client der
+`AuthSessionService`; Cover-Bilder werden über
+`PosterImageService.GetPlaylistCoverSourceAsync` in die
 Vorschaubild-Ablage geschrieben (`{id}.playlistcover`, nicht
 backup-pflichtig) und ohne Cover bewusst nicht negativ gecacht.
+
+Der Wiedergabepfad (Schritt 5): `PlaylistPlaybackStartRequested` und
+die Eintragsauswahl erzeugen `StartPlaylistPlaybackEffect` → der
+Effekt-Handler ruft `PlaylistService.StartPlaybackAsync` →
+`PlaylistPlaybackStartedMessage` belegt `PlayerState` mit dem
+Playlist-Kontext (`PlaylistId`, `PlaylistName`, `PlaylistEntryId`,
+`PlaylistPosition`, `PlaylistTotalCount`) und startet die
+Quellauflösung mit der serverseitigen Fortsetzungsposition
+(`ResolvePlaybackSourceEffect.StartPositionSeconds` →
+`PlaybackSourceService.ResolveAsync`-Override). Manuelle Navigation:
+`PlaylistNextRequested`/`PlaylistPreviousRequested` →
+`LoadNextPlaylistEntryEffect`/`LoadPreviousPlaylistEntryEffect` →
+`PlaylistNavigationCompletedMessage` (Identitätswache, 204-Erschöpfung
+über `PlaylistNextExhausted`); Auto-Fortsetzung und Fehler-Rückfall
+nutzen `AdvancePlaylistEntryEffect` (`play/advance`) — alle drei
+Navigationspfade laufen über `NavigatePlaylistEntryAsync` im
+Effekt-Handler. Der Weiterschauen-Bezug wandert vom DTO
+(`ContinueWatchingEntry.Playlist*`) über `HomeMediaItem` in den
+Auswahl-Guard von `UpdateContinueWatchingItemSelected`.
 
 ## Testabdeckung
 
@@ -84,3 +156,12 @@ Vier E2E-Szenarien (`PlaylistsTests`) fahren die echte App gegen den
 `MockVideoServer`: Menüeintrag und beide Sektionen, Detailansicht in
 Server-Reihenfolge, Cover-Abruf mit Fallback sowie die Fehleranzeige
 mit Neuversuch.
+
+Der Wiedergabepfad wird durch `AppUpdateTests_PlaylistPlayback`
+(Übergänge: Start, Eintragsauswahl, Weiterschauen-Guard, Navigation,
+Erschöpfung, Auto-Fortsetzung, Fehler-Rückfall, Serienpfad-Regression),
+die Service-Tests der Play-Endpunkte (Mapping, `entryId`-/`currentEntryId`-Query,
+204) und sechs E2E-Szenarien (`PlaylistPlaybackTests`: Button-Start mit
+Überspringen nicht abspielbarer Einträge, Eintrag-Start, Vor-/Rückwärts-Navigation,
+Auto-Fortsetzung, Fehler-Rückfall sowie der playlist-gebundene
+Weiterschauen-Eintrag ohne Serienaufruf) abgesichert.

@@ -547,10 +547,78 @@ public sealed record PlaylistEntriesNextPageRequestedMessage : AppMessage;
 /// <summary>Der letzte fehlgeschlagene Lauf der Playlist-Detailseite soll wiederholt werden.</summary>
 public sealed record PlaylistEntriesRetryRequestedMessage : AppMessage;
 
-/// <summary>Ein Playlist-Eintrag wurde ausgewählt — die Medien-Detailseite wird geöffnet (Wiedergabe gehört zum Folgeschritt).</summary>
+/// <summary>Ein Playlist-Eintrag wurde ausgewählt — abspielbare und zugängliche Einträge starten die Wiedergabe ab diesem Eintrag, alle übrigen öffnen die Medien-Detailseite.</summary>
 /// <param name="Item">Der ausgewählte Eintrag.</param>
 /// <returns>Nachricht für die Eintragsauswahl.</returns>
 public sealed record PlaylistEntrySelectedMessage(PlaylistEntryItem Item) : AppMessage;
+
+/// <summary>
+/// Der Anwender fordert die Wiedergabe einer Playlist an („Abspielen"
+/// auf der Playlist-Detailseite) — der serverseitige Wiedergabestart
+/// (<c>POST api/playlists/{id}/play</c>) löst den Starteintrag auf:
+/// ab <paramref name="EntryId"/> oder ab dem ersten abspielbaren und
+/// zugänglichen Eintrag ohne Startvorgabe (Ergebnis:
+/// <c>PlaylistPlaybackStartedMessage</c>).
+/// </summary>
+/// <param name="PlaylistId">Id der Playlist.</param>
+/// <param name="EntryId">Id des Starteintrags; <c>null</c> = erster abspielbarer und zugänglicher Eintrag.</param>
+/// <returns>Nachricht für die Wiedergabe-Anforderung.</returns>
+public sealed record PlaylistPlaybackStartRequestedMessage(
+    long PlaylistId,
+    long? EntryId) : AppMessage;
+
+/// <summary>
+/// Ergebnis des serverseitigen Playlist-Wiedergabestarts: bei Erfolg
+/// trägt die Nachricht den aufgelösten Starteintrag
+/// (<paramref name="Start"/>), bei Fehlschlag <paramref name="Error"/>
+/// — der Player zeigt dann den Fehlerzustand.
+/// </summary>
+/// <param name="PlaylistId">Id der angefragten Playlist.</param>
+/// <param name="Start">Der aufgelöste Starteintrag; <c>null</c> bei Fehlschlag.</param>
+/// <param name="Error">Fehlertext bei Fehlschlag; <c>null</c> bei Erfolg.</param>
+/// <returns>Nachricht mit dem Ergebnis des Wiedergabestarts.</returns>
+public sealed record PlaylistPlaybackStartedMessage(
+    long PlaylistId,
+    PlaylistPlaybackStartInfo? Start,
+    string? Error) : AppMessage;
+
+/// <summary>
+/// Der Anwender fordert den nächsten Eintrag der laufenden
+/// Playlist-Wiedergabe an („Weiter" im Player) —
+/// <c>POST api/playlists/{id}/play/next</c> (Ergebnis:
+/// <c>PlaylistNavigationCompletedMessage</c>).
+/// </summary>
+public sealed record PlaylistNextRequestedMessage : AppMessage;
+
+/// <summary>
+/// Der Anwender fordert den vorherigen Eintrag der laufenden
+/// Playlist-Wiedergabe an („Zurück" im Player) —
+/// <c>POST api/playlists/{id}/play/previous</c> (Ergebnis:
+/// <c>PlaylistNavigationCompletedMessage</c>).
+/// </summary>
+public sealed record PlaylistPreviousRequestedMessage : AppMessage;
+
+/// <summary>
+/// Ergebnis einer Playlist-Navigation (manuell next/previous oder
+/// automatisches advance): bei Erfolg trägt die Nachricht den
+/// aufgelösten Zieleintrag (<paramref name="Result"/>); ein leeres
+/// Ergebnis (<c>null</c>) meldet „kein Eintrag in dieser Richtung"
+/// (Server-204). Die Identität (<paramref name="PlaylistId"/>,
+/// <paramref name="CurrentEntryId"/>) bindet die Antwort an den
+/// auslösenden Stand — abgelöste Antworten werden verworfen.
+/// </summary>
+/// <param name="PlaylistId">Id der Playlist der auslösenden Anfrage.</param>
+/// <param name="CurrentEntryId">Id des Eintrags, von dem aus navigiert wurde.</param>
+/// <param name="Result">Der aufgelöste Zieleintrag; <c>null</c> = kein Eintrag (204) oder Fehlschlag.</param>
+/// <param name="Forward"><c>true</c> = Vorwärtsrichtung (next/advance); <c>false</c> = Rückwärts (previous).</param>
+/// <param name="Error">Fehlertext bei Fehlschlag; <c>null</c> bei Erfolg oder leerem Ergebnis.</param>
+/// <returns>Nachricht mit dem Ergebnis der Navigation.</returns>
+public sealed record PlaylistNavigationCompletedMessage(
+    long PlaylistId,
+    long CurrentEntryId,
+    PlaylistNavigationItem? Result,
+    bool Forward,
+    string? Error) : AppMessage;
 
 /// <summary>Die Profil-Seite wurde geöffnet — die Profilinformationen werden (erneut) ermittelt.</summary>
 public sealed record ProfilePageOpenedMessage : AppMessage;

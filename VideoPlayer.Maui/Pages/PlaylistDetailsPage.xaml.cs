@@ -100,6 +100,13 @@ public partial class PlaylistDetailsPage : ContentPage
         }
     }
 
+    private void OnPlayClicked(object? sender, EventArgs e)
+    {
+        // „Abspielen" ohne Startvorgabe: der Server beginnt beim ersten
+        // abspielbaren und zugänglichen Eintrag.
+        _ = mvuHost.DispatchAsync(new PlaylistPlaybackStartRequestedMessage(playlistId, null));
+    }
+
     private void OnEntrySelected(object? sender, SelectionChangedEventArgs e)
     {
         if (e.CurrentSelection.FirstOrDefault() is PlaylistEntryItem item)

@@ -180,6 +180,19 @@ public sealed class MockVideoServer : IDisposable
     /// <summary>Anzeigetitel des nicht abspielbaren Weiterschauen-Serieneintrags.</summary>
     public string ContinueWatchingShowTitle { get; set; } = "E2E-Serie";
 
+    /// <summary>
+    /// Opt-in Playlist-Bezug der Weiterschauen-Einträge (Film und
+    /// Episode): Id der Playlist, aus deren Kontext der Eintrag
+    /// entstand; <c>null</c> = kein Playlist-Bezug (Serienpfad).
+    /// </summary>
+    public long? ContinueWatchingPlaylistId { get; set; }
+
+    /// <summary>Name der Playlist des Weiterschauen-Bezugs; <c>null</c> = kein Bezug.</summary>
+    public string? ContinueWatchingPlaylistName { get; set; }
+
+    /// <summary>Id des Playlist-Eintrags des Weiterschauen-Bezugs; <c>null</c> = kein Bezug.</summary>
+    public long? ContinueWatchingPlaylistEntryId { get; set; }
+
     /// <summary>Alle empfangenen Anfragepfade in Reihenfolge (Diagnose: Detail- vs. Wiedergabeaufrufe).</summary>
     public List<string> RequestedPaths { get; } = [];
 
@@ -455,9 +468,11 @@ public sealed class MockVideoServer : IDisposable
         }
 
         // Opt-in Playlistfluss: eigene + öffentliche Playlists, Detail,
-        // Einträge (unpaginiert/paginiert) und Cover — authentifiziert
-        // wie die übrigen Listen-Endpunkte.
-        if (method == "GET" && path.StartsWith("/api/playlists", StringComparison.OrdinalIgnoreCase))
+        // Einträge (unpaginiert/paginiert), Cover sowie die
+        // Wiedergabe-Endpunkte (POST …/play, …/play/next,
+        // …/play/previous, …/play/advance) — authentifiziert wie die
+        // übrigen Listen-Endpunkte.
+        if ((method == "GET" || method == "POST") && path.StartsWith("/api/playlists", StringComparison.OrdinalIgnoreCase))
         {
             if (!IsGateValid(request))
             {
@@ -551,7 +566,10 @@ public sealed class MockVideoServer : IDisposable
                     },
                     positionSeconds = PlaybackResumePositionSeconds.Value,
                     durationSeconds = 20L,
-                    title = PlaybackMovieTitle
+                    title = PlaybackMovieTitle,
+                    playlistId = ContinueWatchingPlaylistId,
+                    playlistName = ContinueWatchingPlaylistName,
+                    playlistEntryId = ContinueWatchingPlaylistEntryId
                 });
             }
 
@@ -585,7 +603,10 @@ public sealed class MockVideoServer : IDisposable
                     },
                     positionSeconds = PlaybackEpisodeResumePositionSeconds ?? 0L,
                     durationSeconds = 20L,
-                    title = PlaybackEpisodeTitle
+                    title = PlaybackEpisodeTitle,
+                    playlistId = ContinueWatchingPlaylistId,
+                    playlistName = ContinueWatchingPlaylistName,
+                    playlistEntryId = ContinueWatchingPlaylistEntryId
                 });
             }
 
@@ -657,6 +678,12 @@ public sealed class MockVideoServer : IDisposable
             return (200, "application/json", JsonBody(PlaylistJson(playlist)));
         }
 
+        if (segments.Length >= 4
+            && segments[3].Equals("play", StringComparison.OrdinalIgnoreCase))
+        {
+            return HandlePlaylistPlay(segments, playlist, rawPath);
+        }
+
         if (segments.Length == 4
             && segments[3].Equals("cover", StringComparison.OrdinalIgnoreCase))
         {
@@ -704,6 +731,99 @@ public sealed class MockVideoServer : IDisposable
         }
 
         return (404, "application/json", JsonBody(new { error = "not found" }));
+    }
+
+    /// <summary>
+    /// Antwortet die Playlist-Wiedergabe-Endpunkte
+    /// (<c>POST /api/playlists/{id}/play</c> sowie
+    /// <c>…/play/next|previous|advance</c>): <c>play</c> löst
+    /// <paramref name="rawPath"/>s <c>entryId</c>-Parameter bzw. ohne
+    /// Vorgabe den ersten abspielbaren und zugänglichen Eintrag der
+    /// Server-Reihenfolge auf; die Navigations-Endpunkte liefern den
+    /// nächsten/vorigen abspielbaren und zugänglichen Eintrag relativ
+    /// zu <c>currentEntryId</c> — „kein Eintrag" geht als 204
+    /// (Server-Konvention), ein unbekannter Eintrag als 404.
+    /// Abspielbar sind Einträge vom Typ <c>Movie</c>/
+    /// <c>TVShowEpisode</c> mit <see cref="MockPlaylistEntry.IsAccessible"/>.
+    /// </summary>
+    /// <param name="segments">Pfadsegmente des Requests.</param>
+    /// <param name="playlist">Die aufgelöste Playlist.</param>
+    /// <param name="rawPath">Der angefragte Pfad inkl. Query-String.</param>
+    /// <returns>Die Mock-Antwort des Wiedergabe-Endpunkts.</returns>
+    private MockResponse HandlePlaylistPlay(string[] segments, MockPlaylist playlist, string rawPath)
+    {
+        static bool IsPlayable(MockPlaylistEntry entry) =>
+            entry.IsAccessible
+            && (entry.MediaType.Equals("Movie", StringComparison.OrdinalIgnoreCase)
+                || entry.MediaType.Equals("TVShowEpisode", StringComparison.OrdinalIgnoreCase));
+
+        static string StreamMediaType(MockPlaylistEntry entry) =>
+            entry.MediaType.Equals("Movie", StringComparison.OrdinalIgnoreCase)
+                ? "movie"
+                : "tvshowepisode";
+
+        if (segments.Length == 4)
+        {
+            // POST /play — Start ab entryId bzw. erstem abspielbaren Eintrag.
+            var entryId = long.TryParse(QueryValue(rawPath, "entryId"), out var eid) ? eid : (long?)null;
+            var start = entryId is { } requestedId
+                ? playlist.Entries.FirstOrDefault(e => e.Id == requestedId)
+                : playlist.Entries.FirstOrDefault(IsPlayable);
+            if (start is null || !IsPlayable(start))
+            {
+                return (404, "application/json", JsonBody(new { error = "not found" }));
+            }
+
+            return (200, "application/json", JsonBody(new
+            {
+                playlistId = playlist.Id,
+                playlistName = playlist.Name,
+                totalCount = playlist.Entries.Count,
+                currentPosition = playlist.Entries.IndexOf(start) + 1,
+                currentEntryId = start.Id,
+                currentEntry = EntryJson(start, playlist.Id),
+                streamUrl = $"/api/items/{StreamMediaType(start)}/{start.MediaId}/stream",
+                mediaType = StreamMediaType(start),
+                mediaId = start.MediaId,
+                startPositionSeconds = start.ResumePositionSeconds ?? 0L
+            }));
+        }
+
+        if (segments.Length != 5)
+        {
+            return (404, "application/json", JsonBody(new { error = "not found" }));
+        }
+
+        var forward = segments[4].Equals("next", StringComparison.OrdinalIgnoreCase)
+            || segments[4].Equals("advance", StringComparison.OrdinalIgnoreCase);
+        if (!forward && !segments[4].Equals("previous", StringComparison.OrdinalIgnoreCase))
+        {
+            return (404, "application/json", JsonBody(new { error = "not found" }));
+        }
+
+        // next/previous/advance — nächster/voriger abspielbarer Eintrag
+        // relativ zu currentEntryId in Server-Reihenfolge.
+        var currentEntryId = long.TryParse(QueryValue(rawPath, "currentEntryId"), out var cid) ? cid : 0L;
+        var currentIndex = playlist.Entries.FindIndex(e => e.Id == currentEntryId);
+        if (currentIndex < 0)
+        {
+            return (404, "application/json", JsonBody(new { error = "not found" }));
+        }
+
+        var target = forward
+            ? playlist.Entries.Skip(currentIndex + 1).FirstOrDefault(IsPlayable)
+            : playlist.Entries.Take(currentIndex).LastOrDefault(IsPlayable);
+        if (target is null)
+        {
+            return (204, "application/json", Array.Empty<byte>());
+        }
+
+        return (200, "application/json", JsonBody(new
+        {
+            entry = EntryJson(target, playlist.Id),
+            position = playlist.Entries.IndexOf(target) + 1,
+            startPositionSeconds = target.ResumePositionSeconds ?? 0L
+        }));
     }
 
     /// <summary>JSON-Repräsentation einer Playlist mit den DTO-Feldnamen.</summary>
@@ -852,17 +972,12 @@ public sealed class MockVideoServer : IDisposable
         string path,
         (string Method, string Path, Dictionary<string, string> Headers, string Body) request)
     {
-        if (PlaybackMovieId is not { } movieId)
-        {
-            return (404, "application/json", JsonBody(new { error = "not found" }));
-        }
-
         var rest = path["/api/items/movie/".Length..];
         if (rest.EndsWith("/stream", StringComparison.OrdinalIgnoreCase))
         {
             var idPart = rest[..^"/stream".Length];
             if (!long.TryParse(idPart, out var streamId)
-                || streamId != movieId
+                || (streamId != PlaybackMovieId && !IsPlaylistStreamMedia("Movie", streamId))
                 || PlaybackStreamFails
                 || PlaybackVideoPath is null
                 || !File.Exists(PlaybackVideoPath))
@@ -873,7 +988,9 @@ public sealed class MockVideoServer : IDisposable
             return ServeVideo(request, File.ReadAllBytes(PlaybackVideoPath));
         }
 
-        if (!long.TryParse(rest, out var id) || id != movieId)
+        if (PlaybackMovieId is not { } movieId
+            || !long.TryParse(rest, out var id)
+            || id != movieId)
         {
             return (404, "application/json", JsonBody(new { error = "not found" }));
         }
@@ -885,6 +1002,21 @@ public sealed class MockVideoServer : IDisposable
             MediaSourceId = 1
         }));
     }
+
+    /// <summary>
+    /// Prüft, ob eine Medien-Id als abspielbarer Eintrag einer
+    /// <see cref="MockPlaylist"/> streambar ist (Stream-Bedienung der
+    /// Playlist-Wiedergabe ohne eigenes Opt-in — außer der Eintrag ist
+    /// mit <see cref="MockPlaylistEntry.StreamUnavailable"/> markiert).
+    /// </summary>
+    /// <param name="serverMediaType">Der Server-Medientyp (<c>Movie</c>/<c>TVShowEpisode</c>).</param>
+    /// <param name="mediaId">Die Medien-Id.</param>
+    /// <returns><c>true</c>, wenn die Id als Playlist-Medium streambar ist.</returns>
+    private bool IsPlaylistStreamMedia(string serverMediaType, long mediaId) =>
+        Playlists.SelectMany(p => p.Entries).Any(e =>
+            e.MediaId == mediaId
+            && !e.StreamUnavailable
+            && e.MediaType.Equals(serverMediaType, StringComparison.OrdinalIgnoreCase));
 
     /// <summary>
     /// <c>GET api/items/tvshow/{id}</c>: liefert die Opt-in-Serie mit
@@ -975,7 +1107,8 @@ public sealed class MockVideoServer : IDisposable
         {
             var idPart = rest[..^"/stream".Length];
             if (!long.TryParse(idPart, out var streamId)
-                || (streamId != PlaybackEpisodeId && streamId != PlaybackNextEpisodeId)
+                || (streamId != PlaybackEpisodeId && streamId != PlaybackNextEpisodeId
+                    && !IsPlaylistStreamMedia("TVShowEpisode", streamId))
                 || PlaybackStreamFails
                 || PlaybackVideoPath is null
                 || !File.Exists(PlaybackVideoPath))
@@ -1536,4 +1669,19 @@ public sealed class MockPlaylistEntry
 
     /// <summary>Der Benutzer hat Zugriff auf das Medium.</summary>
     public bool IsAccessible { get; set; } = true;
+
+    /// <summary>
+    /// Fortsetzungsposition des Eintrags in Sekunden
+    /// (<c>startPositionSeconds</c> der Wiedergabe-Antworten);
+    /// <c>null</c>/0 = Start am Anfang.
+    /// </summary>
+    public long? ResumePositionSeconds { get; set; }
+
+    /// <summary>
+    /// Simuliert einen fehlgeschlagenen Stream-Abruf des Mediums
+    /// (<c>api/items/{typ}/{id}/stream</c> → 404) — das Medium bleibt
+    /// dabei serverseitig ein abspielbarer Playlist-Eintrag; Grundlage
+    /// des Fehler-Rückfall-Szenarios.
+    /// </summary>
+    public bool StreamUnavailable { get; set; }
 }

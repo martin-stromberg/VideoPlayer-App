@@ -220,6 +220,21 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
             case LoadPlaylistEntriesEffect entries:
                 await LoadPlaylistEntriesAsync(entries, cancellationToken);
                 break;
+            case StartPlaylistPlaybackEffect start:
+                await StartPlaylistPlaybackAsync(start, cancellationToken);
+                break;
+            case LoadNextPlaylistEntryEffect next:
+                await NavigatePlaylistEntryAsync(
+                    next.PlaylistId, next.CurrentEntryId, forward: true, advance: false, cancellationToken);
+                break;
+            case LoadPreviousPlaylistEntryEffect previous:
+                await NavigatePlaylistEntryAsync(
+                    previous.PlaylistId, previous.CurrentEntryId, forward: false, advance: false, cancellationToken);
+                break;
+            case AdvancePlaylistEntryEffect advance:
+                await NavigatePlaylistEntryAsync(
+                    advance.PlaylistId, advance.CurrentEntryId, forward: true, advance: true, cancellationToken);
+                break;
             case LoadProfileInfoEffect:
                 await LoadProfileInfoAsync(cancellationToken);
                 break;
@@ -364,7 +379,8 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
             var allowServerStream = !services.GetRequiredService<MvuHost>().Model.IsOffline;
             source = await services.GetRequiredService<PlaybackSourceService>()
                 .ResolveAsync(resolve.MediaType, resolve.MediaId, cancellationToken,
-                    allowServerStream: allowServerStream);
+                    allowServerStream: allowServerStream,
+                    resumePositionSecondsOverride: resolve.StartPositionSeconds);
             if (source is null)
             {
                 error = AppUpdate.PlaybackUnavailableError;
@@ -986,6 +1002,74 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
 
         await DispatchMessageAsync(new PlaylistEntriesLoadedMessage(
             entries.PlaylistId, page.Page, page.Items, page.HasMore, page.TotalCount, entries.Append, error));
+    }
+
+    /// <summary>
+    /// Serverseitigen Wiedergabestart einer Playlist ausführen
+    /// (<c>POST api/playlists/{id}/play</c>) und den aufgelösten
+    /// Starteintrag in den MVU-Zyklus melden — ein Fehlschlag ergibt
+    /// eine Fehler-Nachricht, die der Player als Fehlerzustand zeigt.
+    /// </summary>
+    /// <param name="start">Der Effekt mit Playlist- und optionaler Eintrags-Id.</param>
+    /// <param name="cancellationToken">Bricht den Aufruf ab.</param>
+    /// <returns>Eine abgeschlossene Aufgabe nach dem Melden des Ergebnisses.</returns>
+    private async Task StartPlaylistPlaybackAsync(StartPlaylistPlaybackEffect start, CancellationToken cancellationToken)
+    {
+        PlaylistPlaybackStartInfo? info = null;
+        string? error = null;
+        try
+        {
+            info = await services.GetRequiredService<PlaylistService>()
+                .StartPlaybackAsync(start.PlaylistId, start.EntryId, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Playlist-Wiedergabestart fehlgeschlagen");
+            error = AppUpdate.PlaybackUnavailableError;
+        }
+
+        await DispatchMessageAsync(new PlaylistPlaybackStartedMessage(start.PlaylistId, info, error));
+    }
+
+    /// <summary>
+    /// Eine Playlist-Navigation ausführen — manuell next/previous oder
+    /// automatisches advance (<c>POST api/playlists/{id}/play/…</c>) —
+    /// und das aufgelöste Ergebnis in den MVU-Zyklus melden. „Kein
+    /// Eintrag" (Server-204) geht als <c>null</c>-Ergebnis, ein
+    /// Fehlschlag als Fehlertext in die Nachricht.
+    /// </summary>
+    /// <param name="playlistId">Id der Playlist.</param>
+    /// <param name="currentEntryId">Id des Eintrags, von dem aus navigiert wird.</param>
+    /// <param name="forward"><c>true</c> = Vorwärtsrichtung (next/advance); <c>false</c> = Rückwärts (previous).</param>
+    /// <param name="advance"><c>true</c> = automatisches Weiterschalten (<c>play/advance</c>) statt manuellem <c>play/next</c>.</param>
+    /// <param name="cancellationToken">Bricht den Aufruf ab.</param>
+    /// <returns>Eine abgeschlossene Aufgabe nach dem Melden des Ergebnisses.</returns>
+    private async Task NavigatePlaylistEntryAsync(
+        long playlistId,
+        long currentEntryId,
+        bool forward,
+        bool advance,
+        CancellationToken cancellationToken)
+    {
+        PlaylistNavigationItem? result = null;
+        string? error = null;
+        try
+        {
+            var service = services.GetRequiredService<PlaylistService>();
+            result = advance
+                ? await service.AdvanceAsync(playlistId, currentEntryId, cancellationToken)
+                : forward
+                    ? await service.GetNextEntryAsync(playlistId, currentEntryId, cancellationToken)
+                    : await service.GetPreviousEntryAsync(playlistId, currentEntryId, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Playlist-Navigation fehlgeschlagen");
+            error = AppUpdate.PlaybackUnavailableError;
+        }
+
+        await DispatchMessageAsync(new PlaylistNavigationCompletedMessage(
+            playlistId, currentEntryId, result, forward, error));
     }
 
     private async Task LoadProfileInfoAsync(CancellationToken cancellationToken)

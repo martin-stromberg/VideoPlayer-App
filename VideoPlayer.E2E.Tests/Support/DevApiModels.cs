@@ -116,6 +116,15 @@ public sealed class DevApiModel
     /// <summary>Zuletzt gemeldete Wiedergabeposition in Sekunden.</summary>
     [JsonPropertyName("playerPositionSeconds")] public double PlayerPositionSeconds { get; set; }
 
+    /// <summary>Id der Playlist der laufenden Playlist-Wiedergabe (0 = kein Kontext).</summary>
+    [JsonPropertyName("playerPlaylistId")] public long PlayerPlaylistId { get; set; }
+
+    /// <summary>Id des aktuell gespielten Playlist-Eintrags (0 = kein Kontext).</summary>
+    [JsonPropertyName("playerPlaylistEntryId")] public long PlayerPlaylistEntryId { get; set; }
+
+    /// <summary>1-basierte Position des aktuellen Eintrags in der Playlist (0 = unbekannt).</summary>
+    [JsonPropertyName("playerPlaylistPosition")] public int PlayerPlaylistPosition { get; set; }
+
     /// <summary>Fehlertext der letzten Wiedergabe-Störung.</summary>
     [JsonPropertyName("playerError")] public string? PlayerError { get; set; }
 

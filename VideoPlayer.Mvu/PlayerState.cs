@@ -61,6 +61,50 @@ public sealed record PlayerState
     /// <summary>Eine Folge-Episode steht für Fortsetzung/Rückfall bereit.</summary>
     public bool HasNextEpisode => UpcomingEpisodes.Count > 0;
 
+    /// <summary>
+    /// Id der Playlist, in deren Kontext die Wiedergabe läuft;
+    /// <c>null</c> = keine Playlist-Wiedergabe (Serien-/Einzelkontext).
+    /// </summary>
+    public long? PlaylistId { get; init; }
+
+    /// <summary>Name der wiedergegebenen Playlist; <c>null</c> ohne Playlist-Kontext.</summary>
+    public string? PlaylistName { get; init; }
+
+    /// <summary>Id des aktuell gespielten Playlist-Eintrags; 0 ohne Playlist-Kontext.</summary>
+    public long PlaylistEntryId { get; init; }
+
+    /// <summary>1-basierte Position des aktuellen Eintrags in der Playlist-Reihenfolge; 0 ohne Playlist-Kontext.</summary>
+    public int PlaylistPosition { get; init; }
+
+    /// <summary>Gesamtzahl der Playlist-Einträge laut Server; 0 ohne Playlist-Kontext.</summary>
+    public int PlaylistTotalCount { get; init; }
+
+    /// <summary>
+    /// Der Server meldete keinen Folgeeintrag (204 auf Vorwärts-Navigation/
+    /// Advance) — unterdrückt weitere Vorwärts-Versuche bis zum nächsten
+    /// Medienwechsel.
+    /// </summary>
+    public bool PlaylistNextExhausted { get; init; }
+
+    /// <summary>Die Wiedergabe läuft im Playlist-Kontext (Folgevideo aus der Playlist-Reihenfolge).</summary>
+    public bool IsPlaylistPlayback => PlaylistId is > 0 && PlaylistEntryId > 0;
+
+    /// <summary>Manuelle Vorwärts-Navigation ist sinnvoll möglich (Heuristik aus Position/Gesamtzahl).</summary>
+    public bool CanNavigateNext =>
+        IsPlaylistPlayback && !PlaylistNextExhausted && PlaylistPosition < PlaylistTotalCount;
+
+    /// <summary>Manuelle Rückwärts-Navigation ist sinnvoll möglich.</summary>
+    public bool CanNavigatePrevious => IsPlaylistPlayback && PlaylistPosition > 1;
+
+    /// <summary>
+    /// Kontextzeile der Playlist-Wiedergabe („„Name" · Eintrag n/m" —
+    /// ohne Positionsdaten nur der Name).
+    /// </summary>
+    public string PlaylistLabel =>
+        PlaylistPosition > 0 && PlaylistTotalCount > 0
+            ? $"„{PlaylistName}“ · Eintrag {PlaylistPosition}/{PlaylistTotalCount}"
+            : $"„{PlaylistName}“";
+
     /// <summary>Fehlertext der letzten Quell-/Wiedergabe-Störung; <c>null</c> = kein Fehler.</summary>
     public string? Error { get; init; }
 

@@ -261,7 +261,10 @@ public sealed class HomeListService
                 : null,
             ShowId = showId,
             SeasonId = seasonId,
-            EpisodeId = episodeId
+            EpisodeId = episodeId,
+            PlaylistId = entry.PlaylistId,
+            PlaylistName = entry.PlaylistName,
+            PlaylistEntryId = entry.PlaylistEntryId
         };
     }
 

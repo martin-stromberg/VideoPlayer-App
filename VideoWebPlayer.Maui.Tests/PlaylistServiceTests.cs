@@ -138,6 +138,110 @@ public class PlaylistServiceTests
         await Assert.ThrowsAsync<InvalidOperationException>(() => service.LoadPlaylistsAsync());
         await Assert.ThrowsAsync<InvalidOperationException>(() => service.LoadPlaylistAsync(7));
         await Assert.ThrowsAsync<InvalidOperationException>(() => service.LoadEntriesAsync(7, 1));
+        await Assert.ThrowsAsync<InvalidOperationException>(() => service.StartPlaybackAsync(7));
+        await Assert.ThrowsAsync<InvalidOperationException>(() => service.GetNextEntryAsync(7, 1));
+        await Assert.ThrowsAsync<InvalidOperationException>(() => service.GetPreviousEntryAsync(7, 1));
+        await Assert.ThrowsAsync<InvalidOperationException>(() => service.AdvanceAsync(7, 1));
         Assert.Empty(handler.Requests);
+    }
+
+    // --- Playlist-Wiedergabe (Schritt 5) ---
+
+    /// <summary>Prüft StartPlaybackAsync: ohne entryId wird <c>POST /play</c> ohne Query aufgerufen und die Antwort gemappt.</summary>
+    [Fact]
+    public async Task StartPlaybackAsync_MapsDto_AndPostsWithoutEntryId()
+    {
+        await LoginAsync();
+        handler.Enqueue(HttpStatusCode.OK, """
+            {"PlaylistId":7,"PlaylistName":"Abend","TotalCount":3,
+             "CurrentPosition":2,"CurrentEntryId":5,
+             "CurrentEntry":{"Id":5,"MediaType":"TVShowEpisode","MediaId":55,"MediaTitle":"Folge 4","IsAccessible":true},
+             "StreamUrl":"/api/items/tvshowepisode/55/stream",
+             "MediaType":"TVShowEpisode","MediaId":55,"StartPositionSeconds":42}
+            """);
+
+        var start = await CreateService().StartPlaybackAsync(7);
+
+        var request = Assert.Single(handler.Requests);
+        Assert.Equal(HttpMethod.Post, request.Method);
+        Assert.EndsWith("/api/playlists/7/play", request.PathAndQuery);
+
+        Assert.Equal(7, start.PlaylistId);
+        Assert.Equal("Abend", start.PlaylistName);
+        Assert.Equal(3, start.TotalCount);
+        Assert.Equal(2, start.CurrentPosition);
+        Assert.Equal(5, start.CurrentEntryId);
+        Assert.Equal("tvshowepisode", start.MediaType);
+        Assert.Equal(55, start.MediaId);
+        Assert.Equal("Folge 4", start.Title);
+        Assert.Equal(42, start.StartPositionSeconds);
+    }
+
+    /// <summary>Prüft StartPlaybackAsync: mit entryId geht die Id als Query-Parameter mit.</summary>
+    [Fact]
+    public async Task StartPlaybackAsync_WithEntryId_SendsQueryParameter()
+    {
+        await LoginAsync();
+        handler.Enqueue(HttpStatusCode.OK, """
+            {"PlaylistId":7,"PlaylistName":"Abend","TotalCount":3,
+             "CurrentPosition":3,"CurrentEntryId":8,
+             "CurrentEntry":{"Id":8,"MediaType":"Movie","MediaId":60,"MediaTitle":"Film","IsAccessible":true},
+             "StreamUrl":"/api/items/movie/60/stream",
+             "MediaType":"Movie","MediaId":60,"StartPositionSeconds":0}
+            """);
+
+        var start = await CreateService().StartPlaybackAsync(7, 8);
+
+        Assert.EndsWith("/api/playlists/7/play?entryId=8",
+            Assert.Single(handler.Requests).PathAndQuery);
+        Assert.Equal(60, start.MediaId);
+        Assert.Equal("movie", start.MediaType);
+    }
+
+    /// <summary>Prüft die Navigations-Methoden: rufen die richtigen Endpunkte mit currentEntryId auf und mappen das Ergebnis.</summary>
+    /// <param name="endpoint">Navigations-Endpunkt („next“, „previous“ oder „advance“).</param>
+    [Theory]
+    [InlineData("next")]
+    [InlineData("previous")]
+    [InlineData("advance")]
+    public async Task Navigation_CallsEndpoint_AndMapsResult(string endpoint)
+    {
+        await LoginAsync();
+        handler.Enqueue(HttpStatusCode.OK, """
+            {"Entry":{"Id":6,"MediaType":"TVShowEpisode","MediaId":56,"MediaTitle":"Folge 5","IsAccessible":true},
+             "Position":3,"StartPositionSeconds":15}
+            """);
+
+        var service = CreateService();
+        var result = endpoint switch
+        {
+            "next" => await service.GetNextEntryAsync(7, 5),
+            "previous" => await service.GetPreviousEntryAsync(7, 5),
+            _ => await service.AdvanceAsync(7, 5)
+        };
+
+        var request = Assert.Single(handler.Requests);
+        Assert.Equal(HttpMethod.Post, request.Method);
+        Assert.EndsWith($"/api/playlists/7/play/{endpoint}?currentEntryId=5", request.PathAndQuery);
+
+        Assert.NotNull(result);
+        Assert.Equal(6, result.EntryId);
+        Assert.Equal(3, result.Position);
+        Assert.Equal("tvshowepisode", result.MediaType);
+        Assert.Equal(56, result.MediaId);
+        Assert.Equal("Folge 5", result.Title);
+        Assert.Equal(15, result.StartPositionSeconds);
+    }
+
+    /// <summary>Prüft die Navigations-Methoden: HTTP 204 („kein Folgeeintrag") ergibt <c>null</c>.</summary>
+    [Fact]
+    public async Task Navigation_NoContent_ReturnsNull()
+    {
+        await LoginAsync();
+        handler.Enqueue(HttpStatusCode.NoContent, "");
+
+        var result = await CreateService().GetNextEntryAsync(7, 5);
+
+        Assert.Null(result);
     }
 }

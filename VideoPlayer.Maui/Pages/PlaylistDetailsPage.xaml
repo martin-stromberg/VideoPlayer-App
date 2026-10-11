@@ -54,6 +54,12 @@
                        IsVisible="{Binding Model.PlaylistDetails.HasDescription}" />
                 <Label Text="{Binding Model.PlaylistDetails.SummaryText}"
                        Style="{StaticResource Caption}" />
+                <Button x:Name="PlayButton"
+                        AutomationId="PlaylistDetailsPlayButton"
+                        Text="Abspielen"
+                        Clicked="OnPlayClicked"
+                        HorizontalOptions="Start"
+                        IsVisible="{Binding Model.PlaylistDetails.HasItems}" />
             </VerticalStackLayout>
         </Grid>
 

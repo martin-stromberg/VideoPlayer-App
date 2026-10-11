@@ -251,7 +251,32 @@ public class PlaybackSourceServiceTests : IDisposable
         Assert.Empty(handler.Requests);
     }
 
-    /// <summary>PrÃ¼ft ResolveAsync: weder Datei noch Server â†’ keine Quelle.</summary>
+    /// <summary>Prüft ResolveAsync: ein Fortsetzungs-Override (Playlist-Antwort) ersetzt die Weiterschauen-Auflösung ohne Server-Abruf — auch bei 0 Sekunden.</summary>
+    [Fact]
+    public async Task ResolveAsync_ResumeOverride_SkipsContinueWatchingLookup()
+    {
+        await LoginAsync();
+
+        var source = await CreateService().ResolveAsync(
+            "movie", 42, TestContext.Current.CancellationToken,
+            resumePositionSecondsOverride: 90);
+
+        Assert.NotNull(source);
+        Assert.Equal(PlaybackSourceKind.ServerStream, source.Kind);
+        Assert.Equal(TimeSpan.FromSeconds(90), source.ResumePosition);
+        // Die Weiterschauen-Liste wurde nicht abgefragt.
+        Assert.Empty(handler.Requests);
+
+        // Auch 0 Sekunden ist ein verbindlicher Wert (Beginn am Anfang).
+        var fromStart = await CreateService().ResolveAsync(
+            "movie", 42, TestContext.Current.CancellationToken,
+            resumePositionSecondsOverride: 0);
+
+        Assert.NotNull(fromStart);
+        Assert.Equal(TimeSpan.Zero, fromStart.ResumePosition);
+    }
+
+    /// <summary>Prüft ResolveAsync: weder Datei noch Server → keine Quelle.</summary>
     [Fact]
     public async Task ResolveAsync_NoSource_ReturnsNull()
     {

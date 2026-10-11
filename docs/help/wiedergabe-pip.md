@@ -12,6 +12,11 @@ läuft vollständig über den MVU-Kreislauf.
   wird der Episodentitel (statt des Seriennamens) übernommen.
 - **Episodenliste:** jede Episode trägt rechts eine ▶-Schaltfläche —
   direkter Start ohne Umweg über die Episoden-Detailseite.
+- **Playlists:** auf der Playlist-Detailseite startet die Schaltfläche
+  **„Abspielen"** den ersten abspielbaren Eintrag; der Tippen auf
+  einen abspielbaren Eintrag startet die Wiedergabe ab genau diesem
+  Eintrag — jeweils über den serverseitigen Wiedergabestart
+  (`POST api/playlists/{id}/play`).
 - Serien, Staffeln und Filmkollektionen haben keinen eigenen
   Abspielen-Schalter — dort wird über die enthaltenen Einträge
   gestartet.
@@ -78,12 +83,29 @@ staffelübergreifend, in Episodenreihenfolge). Pausiert der Anwender,
 wird nicht weitergeschaltet — die Fortsetzung greift nur bei
 laufender Wiedergabe. Ausgeschaltet bleibt das Verhalten wie bisher.
 
+**Playlist-Kontext:** läuft die Wiedergabe aus einer Playlist, holt
+die Fortsetzung den Folge-Eintrag über den serverseitigen
+`advance`-Endpunkt in der Playlist-Reihenfolge (nicht die
+Serienreihenfolge); meldet der Server keinen Folgeeintrag, endet die
+Wiedergabe.
+
+## Playlist-Navigation
+
+Bei Playlist-Wiedergabe zeigt der Player die Schaltflächen **„Zurück"**
+und **„Weiter"** (serverseitige `previous`-/`next`-Endpunkte) sowie
+unter dem Titel eine Kontextzeile „„Playlist-Name" · Eintrag n/m".
+Die Schaltflächen erscheinen nur im Playlist-Kontext und werden am
+Listenrand deaktiviert; im Mini-Player sind sie wie das Kopfband
+ausgeblendet.
+
 ## Fehlerfall
 
 Ist eine Quelle nicht verfügbar oder bricht die Wiedergabe ab,
 erscheint eine verständliche Meldung; bei Serien fällt der Player
-automatisch auf die nächste Episode zurück. Ohne Folge-Episode bleibt
-der Fehlerhinweis stehen und die Seite lässt sich normal verlassen.
+automatisch auf die nächste Episode zurück, bei Playlist-Wiedergabe
+über den `advance`-Endpunkt auf den nächsten Playlist-Eintrag. Ohne
+Folge-Eintrag bleibt der Fehlerhinweis stehen und die Seite lässt sich
+normal verlassen.
 Fehler beim Wiedergabestart — etwa eine ungültige Quell-Adresse oder
 ein fehlgeschlagener Positions-Sprung — landen ebenfalls in diesem
 Fehlerhinweis; die Anwendung wird dadurch nicht beendet.
@@ -157,10 +179,15 @@ Medium, aufgelöste Quelle (`PlaybackSource` mit
 `PlaybackSourceKind.ServerStream`/`LocalFile`), Position/Dauer,
 Lauf-/Pufferzustand, „angesehen"-Markierung, PiP-Status,
 Fortsetzungsliste (`UpcomingEpisodes` aus dem Serienkontext der
-Detailseite) und Fehlertext. Die Seite dispatcht ausschließlich
-Messages (`PlayRequested`, `PlaybackProgress`, `PlaybackEnded`,
+Detailseite), Playlist-Kontext (`PlaylistId`, `PlaylistName`,
+`PlaylistEntryId`, `PlaylistPosition`, `PlaylistTotalCount`,
+`PlaylistNextExhausted`) und Fehlertext. Die Seite dispatcht
+ausschließlich Messages (`PlayRequested`, `PlaylistNextRequested`,
+`PlaylistPreviousRequested`, `PlaybackProgress`, `PlaybackEnded`,
 `PlaybackFailed`, `PictureInPictureRequested`, `PlayerClosed` u. a.);
 die Effekte `NavigateToPlayer`, `ResolvePlaybackSource`,
+`StartPlaylistPlayback`, `LoadNextPlaylistEntry`,
+`LoadPreviousPlaylistEntry`, `AdvancePlaylistEntry`,
 `ReportPlaybackProgress` und `TogglePictureInPicture` laufen im
 `ShellAppEffectHandler` am App-Rand — Fortschritte gehen über den
 bestehenden `ProgressReportService`, es gibt kein zweites
