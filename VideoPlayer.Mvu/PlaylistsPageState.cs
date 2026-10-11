@@ -38,6 +38,15 @@ public sealed record PlaylistListItem
     /// <summary>Der angemeldete Benutzer ist Besitzer der Playlist.</summary>
     public bool IsOwner { get; init; }
 
+    /// <summary>
+    /// Alle serverseitig wirksamen Genre-Ids der Playlist (manuell
+    /// gesetzte plus berechnete) — Vorauswahl des Genre-Editors.
+    /// </summary>
+    public IReadOnlyList<long> AllGenreIds { get; init; } = [];
+
+    /// <summary>Die Anzeige-Genres wurden manuell gesetzt (Rücksetzen möglich).</summary>
+    public bool GenresManuallyOverridden { get; init; }
+
     /// <summary>Ein Cover kann geladen werden.</summary>
     public bool HasCover => CoverPictureId is > 0;
 

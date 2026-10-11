@@ -143,6 +143,72 @@ public sealed record DevApiModelSnapshot
     /// <summary>Fehlertext der Playlist-Detailseite; <c>null</c> = kein Fehler.</summary>
     public string? PlaylistDetailsError { get; init; }
 
+    /// <summary>Anzeigetitel der in der Playlist-Detailansicht geladenen Einträge (Anzeigereihenfolge).</summary>
+    public IReadOnlyList<string> PlaylistEntryTitles { get; init; } = [];
+
+    /// <summary>Eintrags-Ids der Playlist-Detailansicht in Anzeigereihenfolge (Nachweis von Verschiebungen).</summary>
+    public IReadOnlyList<long> PlaylistEntryIds { get; init; } = [];
+
+    /// <summary>Verwaltungsaktionen der geöffneten Playlist sind sichtbar (eigene Playlist).</summary>
+    public bool CanManagePlaylist { get; init; }
+
+    /// <summary>Der angemeldete Benutzer ist Besitzer der geöffneten Playlist.</summary>
+    public bool PlaylistIsOwner { get; init; }
+
+    /// <summary>Das gespeicherte Anmelde-Token trägt den Administrator-Claim (Voraussetzung des Öffentlich-Schalters).</summary>
+    public bool PlaylistIsAdmin { get; init; }
+
+    /// <summary>Die geöffnete Playlist ist öffentlich geschaltet.</summary>
+    public bool PlaylistIsPublic { get; init; }
+
+    /// <summary>Sortiermodus der geöffneten Playlist (<c>PlaylistSortModeValues</c>).</summary>
+    public string PlaylistSortMode { get; init; } = string.Empty;
+
+    /// <summary>Kommaseparierte Anzeige-Genres der geöffneten Playlist.</summary>
+    public string PlaylistGenreText { get; init; } = string.Empty;
+
+    /// <summary>Genres der geöffneten Playlist wurden manuell gesetzt.</summary>
+    public bool PlaylistGenresManuallyOverridden { get; init; }
+
+    /// <summary>Hinweistext der letzten Verwaltungsoperation der Playlist-Detailseite; <c>null</c> = kein Hinweis.</summary>
+    public string? PlaylistManageNotice { get; init; }
+
+    /// <summary><c>true</c>, wenn <see cref="PlaylistManageNotice"/> einen Fehler beschreibt.</summary>
+    public bool PlaylistManageNoticeIsError { get; init; }
+
+    /// <summary>Id des Eintrags mit ausstehender Weiterschauen-Bestätigung (HTTP 409); <c>null</c> = kein Konflikt.</summary>
+    public long? PendingRemoveConflictEntryId { get; init; }
+
+    /// <summary>Angeforderter Sortiermodus mit ausstehender Verlust-Bestätigung (HTTP 409); <c>null</c> = kein Konflikt.</summary>
+    public string? PendingSortModeConflict { get; init; }
+
+    /// <summary>Das Playlist-Formular (Anlage/Bearbeitung) ist geöffnet.</summary>
+    public bool PlaylistFormOpen { get; init; }
+
+    /// <summary>Das Playlist-Formular speichert gerade.</summary>
+    public bool PlaylistFormSaving { get; init; }
+
+    /// <summary>Fehlertext des Playlist-Formulars; <c>null</c> = kein Fehler.</summary>
+    public string? PlaylistFormError { get; init; }
+
+    /// <summary>Der Genre-Editor ist geöffnet.</summary>
+    public bool PlaylistGenreEditorOpen { get; init; }
+
+    /// <summary>Genres des Editors: Id, Name und Auswahlzustand in Anzeigereihenfolge.</summary>
+    public IReadOnlyList<DevApiGenreOption> PlaylistGenreOptions { get; init; } = [];
+
+    /// <summary>Namen der wählbaren Ziel-Playlists der Medien-Detailseite; <c>null</c> = noch nicht geladen.</summary>
+    public IReadOnlyList<string>? PlaylistTargets { get; init; }
+
+    /// <summary>Die Playlist-Auswahl der Medien-Detailseite soll geöffnet sein.</summary>
+    public bool PlaylistPickerPending { get; init; }
+
+    /// <summary>Hinweistext der Playlist-Hinzufügung der Medien-Detailseite; <c>null</c> = kein Hinweis.</summary>
+    public string? AddToPlaylistNotice { get; init; }
+
+    /// <summary><c>true</c>, wenn <see cref="AddToPlaylistNotice"/> einen Fehler beschreibt.</summary>
+    public bool AddToPlaylistNoticeIsError { get; init; }
+
     /// <summary>Erzeugt den Snapshot aus dem aktuellen Modell.</summary>
     /// <param name="model">Das unveränderliche App-Modell.</param>
     /// <returns>Der serialisierbare Auszug.</returns>
@@ -211,9 +277,51 @@ public sealed record DevApiModelSnapshot
             PlaylistsPageError = model.PlaylistsPage.Error,
             PlaylistDetailsId = model.PlaylistDetails.PlaylistId,
             PlaylistDetailsEntryCount = model.PlaylistDetails.Entries.Count,
-            PlaylistDetailsError = model.PlaylistDetails.Error
+            PlaylistDetailsError = model.PlaylistDetails.Error,
+            PlaylistEntryTitles = model.PlaylistDetails.Entries.Select(e => e.Title).ToList(),
+            PlaylistEntryIds = model.PlaylistDetails.Entries.Select(e => e.EntryId).ToList(),
+            CanManagePlaylist = model.PlaylistDetails.CanManage,
+            PlaylistIsOwner = model.PlaylistDetails.IsOwner,
+            PlaylistIsAdmin = model.PlaylistDetails.IsAdmin,
+            PlaylistIsPublic = model.PlaylistDetails.IsPublic,
+            PlaylistSortMode = model.PlaylistDetails.SortMode,
+            PlaylistGenreText = model.PlaylistDetails.GenreText,
+            PlaylistGenresManuallyOverridden = model.PlaylistDetails.GenresManuallyOverridden,
+            PlaylistManageNotice = model.PlaylistDetails.ManageNotice,
+            PlaylistManageNoticeIsError = model.PlaylistDetails.ManageNoticeIsError,
+            PendingRemoveConflictEntryId = model.PlaylistDetails.PendingRemoveConflict?.EntryId,
+            PendingSortModeConflict = model.PlaylistDetails.PendingSortModeConflict,
+            PlaylistFormOpen = model.PlaylistForm.IsOpen,
+            PlaylistFormSaving = model.PlaylistForm.IsSaving,
+            PlaylistFormError = model.PlaylistForm.Error,
+            PlaylistGenreEditorOpen = model.PlaylistGenreEditor.IsOpen,
+            PlaylistGenreOptions = model.PlaylistGenreEditor.Options
+                .Select(o => new DevApiGenreOption
+                {
+                    Id = o.Id,
+                    Name = o.Name,
+                    IsSelected = o.IsSelected
+                })
+                .ToList(),
+            PlaylistTargets = model.MediaDetails.PlaylistTargets?.Select(p => p.Name).ToList(),
+            PlaylistPickerPending = model.MediaDetails.PlaylistPickerPending,
+            AddToPlaylistNotice = model.MediaDetails.AddToPlaylistNotice,
+            AddToPlaylistNoticeIsError = model.MediaDetails.AddToPlaylistNoticeIsError
         };
     }
+}
+
+/// <summary>Serialisierbarer Auszug einer Genre-Option des Playlist-Genre-Editors.</summary>
+public sealed record DevApiGenreOption
+{
+    /// <summary>Id des Genres.</summary>
+    public long Id { get; init; }
+
+    /// <summary>Anzeigename des Genres.</summary>
+    public string Name { get; init; } = string.Empty;
+
+    /// <summary>Das Genre ist gewählt.</summary>
+    public bool IsSelected { get; init; }
 }
 
 /// <summary>Serialisierbarer Auszug eines bekannten Servers.</summary>

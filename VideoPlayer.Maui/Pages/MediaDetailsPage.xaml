@@ -108,6 +108,13 @@
                                 HeightRequest="44"
                                 IsVisible="False"
                                 Clicked="OnDownloadClicked" />
+                        <Button x:Name="AddToPlaylistButton"
+                                AutomationId="AddToPlaylistButton"
+                                Text="Zu Playlist"
+                                FontSize="14"
+                                HeightRequest="44"
+                                IsVisible="False"
+                                Clicked="OnAddToPlaylistClicked" />
                         <Button x:Name="PlayButton"
                                 AutomationId="PlayButton"
                                 Text="Abspielen"
@@ -144,6 +151,12 @@
                     <!-- Hinweis der letzten Download-Anforderung
                          (eingeplant/bereits vorhanden/Fehler). -->
                     <Label x:Name="DownloadNoticeLabel"
+                           FontSize="12"
+                           IsVisible="False" />
+
+                    <!-- Hinweis der Playlist-Hinzufügung (Erfolg/Fehler). -->
+                    <Label x:Name="AddToPlaylistNoticeLabel"
+                           AutomationId="AddToPlaylistNoticeLabel"
                            FontSize="12"
                            IsVisible="False" />
 

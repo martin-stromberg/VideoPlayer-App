@@ -193,6 +193,12 @@ public sealed record AppModel
     /// <summary>Zustand der Playlist-Detailseite (Shell-Route „playlistdetails").</summary>
     public PlaylistDetailsState PlaylistDetails { get; init; } = PlaylistDetailsState.Empty;
 
+    /// <summary>Zustand des Playlist-Formulars (Anlage/Bearbeitung als Overlay-Panel).</summary>
+    public PlaylistFormState PlaylistForm { get; init; } = PlaylistFormState.Closed;
+
+    /// <summary>Zustand des Playlist-Genre-Editors (Overlay-Panel der Detailseite).</summary>
+    public PlaylistGenreEditorState PlaylistGenreEditor { get; init; } = PlaylistGenreEditorState.Closed;
+
     /// <summary>Zustand der Downloads-Seite (Menüseite „Downloads").</summary>
     public DownloadsPageState Downloads { get; init; } = DownloadsPageState.Initial;
 

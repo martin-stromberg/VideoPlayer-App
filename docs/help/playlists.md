@@ -1,11 +1,14 @@
-# Playlists-Übersicht, -Detailansicht und -Wiedergabe (Issue 43, Entwicklungsschritte 4 + 5)
+# Playlists-Übersicht, -Detailansicht, -Wiedergabe und -Verwaltung (Issue 43, Entwicklungsschritte 4–6)
 
 Die Menüseite **„Playlists"** der neuen VideoPlayer-App bindet die
 Playlist-Funktionalität des Servers an: eigene und öffentliche
 Playlists in einer Übersicht sowie eine Detailansicht mit den
 Playlist-Einträgen in der Server-Reihenfolge — vollständig über den
 MVU-Kreislauf. Seit Schritt 5 sind die Einträge direkt abspielbar und
-die Wiedergabe folgt der Playlist-Reihenfolge.
+die Wiedergabe folgt der Playlist-Reihenfolge. Seit Schritt 6 lassen
+sich eigene Playlists auf dem Gerät verwalten (Anlage, Bearbeitung,
+Löschung, Einträge, Reihenfolge, Sortiermodus, Genres,
+Öffentlich-Schalter).
 
 ## Übersicht „Playlists"
 
@@ -97,6 +100,56 @@ die App sortiert nichts um:
 - Die Playlist-Wiedergabe ist ein Online-Feature (wie die Anzeige);
   offline startet keine Playlist-Wiedergabe.
 
+## Verwaltung (Schritt 6)
+
+Eigene Playlists lassen sich direkt auf dem Gerät pflegen — alle
+Operationen sind wie die Anzeige reine Online-Features und laufen über
+die Verwaltungs-Endpunkte des Servers:
+
+- **„Neue Playlist"** auf der Übersichtsseite öffnet ein Dialog-Panel
+  mit Name (Pflichtfeld mit Inline-Fehltext), Beschreibung und
+  Sortiermodus-Auswahl (`POST api/playlists`).
+- **„Verwalten"** im Kopf der Detailseite (nur bei eigenen Playlists)
+  bündelt die Operationen: **„Bearbeiten"** (Name/Beschreibung,
+  `PUT api/playlists/{id}`), **„Playlist löschen"** nach Bestätigung
+  (`DELETE api/playlists/{id}`, danach zurück zur Übersicht),
+  **Sortiermodus-Wechsel**, **„Genres bearbeiten"** sowie der
+  Öffentlich-Punkt.
+- **„Zu Playlist"** auf der Medien-Detailseite (nur online) listet die
+  eigenen Playlists; die Wahl legt das Medium über
+  `POST api/playlists/{id}/entries` an — Duplikate meldet der Server
+  mit Hinweistext statt Fehler.
+- **Eintrags-Kontextmenü (⋮)** je Eintrag: „Aus Playlist entfernen"
+  (`DELETE …/entries/{type}/{id}`) und im manuellen Sortiermodus die
+  Verschiebe-Aktionen „An den Anfang" (`…/move-to-beginning`),
+  „Ans Ende" (`GET …/entries/max-sort-order` → `PUT …/entries/{entryId}/order`
+  mit max+1) sowie „Eins nach vorn/hinten" (`…/move-between` mit der
+  Ziel-SortOrder).
+- **Weiterschauen-Konflikt:** Antwortet das Entfernen mit HTTP 409
+  (`IsContinueWatchingConfirmationRequired`), fragt ein Dialog „Aus
+  Weiterschauen entfernen?" nach — „Entfernen" wiederholt den Aufruf
+  mit `confirmContinueWatchingRemoval=true`, „Abbrechen" lässt alles
+  unverändert.
+- **Sortiermodus-Wechsel** („Nach Erscheinungsdatum sortieren" bzw.
+  „Manuell sortieren", `PATCH …/sort-mode`): verwirft der Wechsel die
+  manuelle Reihenfolge (409 mit `IsLossOfDataConfirmationRequired`),
+  bestätigt der Dialog „Sortiermodus ändern?" den Verlust
+  (`confirmLossOfManualOrder=true`).
+- **Genre-Editor:** „Genres bearbeiten" öffnet die Auswahl aller
+  Server-Genres (`GET api/items/genres`) mit Vorauswahl der
+  Playlist-Genres; „Speichern" schreibt die Ids (`PUT …/genres`),
+  „Zurücksetzen" stellt die berechneten Genres wieder her
+  (`POST …/genres/reset`).
+- **Öffentlich/Privat:** „Öffentlich schalten" bzw. „Privat schalten"
+  (`PUT …/public`) steht nur Administrator:innen offen — der Punkt
+  erscheint ausschließlich, wenn das Anmelde-Token den
+  `IsAdmin`-Claim trägt; der Server prüft die Berechtigung unabhängig
+  davon erneut.
+- **Schreibschutz:** Fremde öffentliche Playlists zeigen weder
+  „Verwalten" noch die ⋮-Menüs — die Detailansicht bleibt lesend.
+- Playlist-Cover bleiben Anzeige-Feature (Schritt 4) — eine
+  Cover-Verwaltung ist nicht Teil dieses Schritts.
+
 ## Weiterschauen mit Playlist-Bezug
 
 Weiterschauen-Einträge, die aus einer Playlist-Wiedergabe entstanden
@@ -149,13 +202,24 @@ Auswahl-Guard von `UpdateContinueWatchingItemSelected`.
 ## Testabdeckung
 
 Unit-/Contract-Tests für Endpunkt-URLs und DTO-Mapping
-(`VideoPlayerApiClientTests_Playlists`), Service-Mapping und
-Fehlerpfade (`PlaylistServiceTests`), alle MVU-Übergänge
-(`AppUpdateTests_Playlists`) sowie Menü-/Routen-/Lebenszyklus-Verträge.
+(`VideoPlayerApiClientTests_Playlists`, `VideoPlayerApiClientTests_PlaylistAdmin`),
+Service-Mapping und Fehlerpfade (`PlaylistServiceTests`,
+`PlaylistServiceTests_Management`), alle MVU-Übergänge
+(`AppUpdateTests_Playlists`, `AppUpdateTests_PlaylistManagement`) sowie
+Menü-/Routen-/Lebenszyklus-Verträge.
 Vier E2E-Szenarien (`PlaylistsTests`) fahren die echte App gegen den
 `MockVideoServer`: Menüeintrag und beide Sektionen, Detailansicht in
 Server-Reihenfolge, Cover-Abruf mit Fallback sowie die Fehleranzeige
 mit Neuversuch.
+
+Die Verwaltung (Schritt 6) ist durch elf E2E-Szenarien
+(`PlaylistManagementTests`) abgesichert: Anlage über das Formular,
+Bearbeiten und Löschen über das Verwaltungsmenü, „Zu Playlist hinzufügen"
+der Medien-Detailseite, Entfernen ohne und mit Weiterschauen-Konflikt
+(Bestätigung und Abbruch), die drei Verschiebe-Aktionen, Sortiermodus-
+Wechsel mit Verlust-Bestätigung, Genres setzen und zurücksetzen, der
+Öffentlich-Schalter des Administrator-Tokens sowie die
+schreibgeschützte Ansicht fremder öffentlicher Playlists.
 
 Der Wiedergabepfad wird durch `AppUpdateTests_PlaylistPlayback`
 (Übergänge: Start, Eintragsauswahl, Weiterschauen-Guard, Navigation,

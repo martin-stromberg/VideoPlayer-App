@@ -146,9 +146,11 @@ public class AppUpdateTests_Playlists
         Assert.Equal("Beschreibung", details.Description);
         Assert.Equal(44, details.CoverPictureId);
         Assert.True(details.IsLoading);
-        Assert.Equal(2, effects.Count);
+        Assert.Equal(3, effects.Count);
         Assert.IsType<NavigateToPlaylistDetailsEffect>(effects[0]);
-        var load = Assert.IsType<LoadPlaylistEntriesEffect>(effects[1]);
+        var headerLoad = Assert.IsType<LoadPlaylistDetailsEffect>(effects[1]);
+        Assert.Equal(7, headerLoad.PlaylistId);
+        var load = Assert.IsType<LoadPlaylistEntriesEffect>(effects[2]);
         Assert.Equal(7, load.PlaylistId);
         Assert.Equal(1, load.Page);
         Assert.False(load.Append);

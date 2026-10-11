@@ -180,8 +180,19 @@ public partial class MediaDetailsPage : ContentPage
             ? (Color)resources["VpDanger"]
             : (Color)resources["VpSecondary"];
 
+        // „Zu Playlist" ist ein Online-Feature — im Offline-Snapshot
+        // entfällt der Schalter wie der Download-Schalter.
+        AddToPlaylistButton.IsVisible = !details.IsOfflineSnapshot;
+        AddToPlaylistButton.IsEnabled = !state.IsAddingToPlaylist;
+        AddToPlaylistNoticeLabel.IsVisible = isRequested && state.AddToPlaylistNotice is not null;
+        AddToPlaylistNoticeLabel.Text = state.AddToPlaylistNotice;
+        AddToPlaylistNoticeLabel.TextColor = state.AddToPlaylistNoticeIsError
+            ? (Color)resources["VpDanger"]
+            : (Color)resources["VpSecondary"];
+
         UpdateSeasonSection(details);
         UpdateCollectionSection(details);
+        MaybeShowPlaylistPicker(state);
     }
 
     /// <summary>
@@ -312,6 +323,78 @@ public partial class MediaDetailsPage : ContentPage
     private void OnFavoriteClicked(object? sender, EventArgs e)
     {
         _ = mvuHost.DispatchAsync(new FavoriteToggleRequestedMessage());
+    }
+
+    /// <summary>
+    /// Die Playlist-Auswahl öffnen („Zu Playlist"): lädt die eigenen
+    /// Playlists als Auswahlziele und klappt das Aktionsblatt auf —
+    /// die Playlist-Wahl erfolgt per Klartextname, niemals per Id-
+    /// Eingabe.
+    /// </summary>
+    /// <param name="sender">Der auslösende Schalter.</param>
+    /// <param name="e">Die Ereignisdaten.</param>
+    private void OnAddToPlaylistClicked(object? sender, EventArgs e)
+    {
+        _ = mvuHost.DispatchAsync(new PlaylistAddTargetsRequestedMessage());
+    }
+
+    /// <summary>Bereits geöffnetes Auswahlblatt (einmalig je Auswahl-Zustand).</summary>
+    private bool playlistPickerShowing;
+
+    /// <summary>
+    /// Öffnet das Playlist-Auswahlblatt, sobald die Ziele vorliegen:
+    /// Klartext-Namen der eigenen Playlists im Aktionsblatt — die Wahl
+    /// läuft als <see cref="PlaylistPickerDismissedMessage"/> zurück in
+    /// den MVU-Kreislauf (Abbruch mit <c>null</c>). Ohne eigene
+    /// Playlist weist ein Hinweisdialog auf die Anlage hin.
+    /// </summary>
+    /// <param name="state">Zustand der Detailseite.</param>
+    private void MaybeShowPlaylistPicker(MediaDetailsState state)
+    {
+        if (!state.PlaylistPickerPending
+            || state.IsLoadingPlaylistTargets
+            || state.PlaylistTargets is null
+            || playlistPickerShowing)
+        {
+            return;
+        }
+
+        playlistPickerShowing = true;
+        _ = ShowPlaylistPickerAsync(state.PlaylistTargets);
+    }
+
+    /// <summary>
+    /// Zeigt das Aktionsblatt mit den Playlist-Namen und meldet die
+    /// Entscheidung dem MVU-Kreislauf.
+    /// </summary>
+    /// <param name="targets">Die eigenen Playlists des Benutzers.</param>
+    /// <returns>Eine abgeschlossene Aufgabe nach der Auswahl.</returns>
+    private async Task ShowPlaylistPickerAsync(IReadOnlyList<PlaylistListItem> targets)
+    {
+        try
+        {
+            if (targets.Count == 0)
+            {
+                await DisplayAlertAsync(
+                    "Zu Playlist hinzufügen",
+                    AppUpdate.PlaylistNoTargetsNotice,
+                    "OK");
+                _ = mvuHost.DispatchAsync(new PlaylistPickerDismissedMessage(null));
+                return;
+            }
+
+            var names = targets.Select(t => t.Name).ToArray();
+            var choice = await DisplayActionSheetAsync(
+                "Zu Playlist hinzufügen", "Abbrechen", null, names);
+            var target = choice is null || choice == "Abbrechen"
+                ? null
+                : targets.FirstOrDefault(t => t.Name == choice);
+            _ = mvuHost.DispatchAsync(new PlaylistPickerDismissedMessage(target?.PlaylistId));
+        }
+        finally
+        {
+            playlistPickerShowing = false;
+        }
     }
 
     private void OnPlayClicked(object? sender, EventArgs e)

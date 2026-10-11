@@ -45,6 +45,16 @@ public sealed record PlaylistEntryItem
     /// <summary>Erscheinungsdatum des Mediums; <c>null</c> = unbekannt.</summary>
     public DateTime? ReleaseDate { get; init; }
 
+    /// <summary>
+    /// Serverseitige Sortierreihenfolge des Eintrags (manueller
+    /// Sortiermodus) — Zielwert des „Eins nach vorn/hinten"-Verschiebens
+    /// über <c>move-between</c>; <c>null</c> = nicht zugewiesen.
+    /// </summary>
+    public long? SortOrder { get; init; }
+
+    /// <summary>Eindeutige AutomationId des Eintrags-Kontextschalters (DevApi-/UIA-Adressierung je Eintrag).</summary>
+    public string EntryMenuAutomationId => $"EntryMenu_{EntryId}";
+
     /// <summary>Ein Poster kann geladen werden.</summary>
     public bool HasPoster => ResolvedPictureId is > 0;
 
@@ -132,6 +142,51 @@ public sealed record PlaylistDetailsState
     /// <summary>Fehlertext des letzten Ladeversuchs; <c>null</c> = kein Fehler.</summary>
     public string? Error { get; init; }
 
+    /// <summary>Der angemeldete Benutzer ist Besitzer der Playlist (Schreibzugriff).</summary>
+    public bool IsOwner { get; init; }
+
+    /// <summary>Die Playlist ist öffentlich geschaltet.</summary>
+    public bool IsPublic { get; init; }
+
+    /// <summary>
+    /// Der angemeldete Benutzer trägt den <c>IsAdmin</c>-Claim des
+    /// Anmelde-Tokens (Sichtbarkeit des Öffentlich-Schalters — die
+    /// serverseitige Prüfung bleibt führend).
+    /// </summary>
+    public bool IsAdmin { get; init; }
+
+    /// <summary>Die Anzeige-Genres wurden manuell gesetzt (Rücksetzen möglich).</summary>
+    public bool GenresManuallyOverridden { get; init; }
+
+    /// <summary>Alle serverseitig wirksamen Genre-Ids (Vorauswahl des Genre-Editors).</summary>
+    public IReadOnlyList<long> AllGenreIds { get; init; } = [];
+
+    /// <summary>Kommaseparierte Anzeige-Genres; leer = keine.</summary>
+    public string GenreText { get; init; } = string.Empty;
+
+    /// <summary>Eine Verwaltungsoperation läuft gerade (Aktionen gesperrt).</summary>
+    public bool IsManaging { get; init; }
+
+    /// <summary>Hinweistext der letzten Verwaltungsoperation (Erfolg oder Fehler); <c>null</c> = kein Hinweis.</summary>
+    public string? ManageNotice { get; init; }
+
+    /// <summary><c>true</c>, wenn <see cref="ManageNotice"/> einen Fehler beschreibt.</summary>
+    public bool ManageNoticeIsError { get; init; }
+
+    /// <summary>
+    /// Ausstehende Weiterschauen-Bestätigung eines Entfernens
+    /// (HTTP 409): der betroffene Eintrag; <c>null</c> = kein
+    /// ausstehender Konflikt. Die Seite öffnet dafür einmalig den
+    /// Bestätigungsdialog.
+    /// </summary>
+    public PlaylistEntryItem? PendingRemoveConflict { get; init; }
+
+    /// <summary>
+    /// Ausstehende Sortiermodus-Bestätigung (HTTP 409): der angeforderte
+    /// Ziel-Sortiermodus; <c>null</c> = kein ausstehender Konflikt.
+    /// </summary>
+    public string? PendingSortModeConflict { get; init; }
+
     /// <summary>Ein Detail-Kontext ist aktiv (Playlist geöffnet).</summary>
     public bool IsActive => PlaylistId > 0;
 
@@ -166,4 +221,61 @@ public sealed record PlaylistDetailsState
         TotalCount > 0
             ? $"{TotalCount} {(TotalCount == 1 ? "Eintrag" : "Einträge")} · {SortModeText}"
             : SortModeText;
+
+    /// <summary>Verwaltungsaktionen sind erlaubt (eigene Playlist, aktiver Kontext).</summary>
+    public bool CanManage => IsActive && IsOwner;
+
+    /// <summary>Verschiebe-Aktionen sind erlaubt (eigene Playlist im manuellen Sortiermodus).</summary>
+    public bool CanReorder =>
+        CanManage && SortMode == ApiClient.Models.PlaylistSortModeValues.Manual;
+
+    /// <summary>Das Öffentlich-Flag darf gepflegt werden (eigene Playlist + Administrator-Claim).</summary>
+    public bool CanSetPublic => IsOwner && IsAdmin;
+
+    /// <summary>Anzeige-Genres liegen vor.</summary>
+    public bool HasGenreText => GenreText.Length > 0;
+
+    /// <summary>
+    /// Ermittelt die Ziel-SortOrder für das „Eins nach vorn/hinten"-
+    /// Verschieben (<c>move-between</c>): die SortOrder des direkten
+    /// Listen-Nachbarn in der gewählten Richtung.
+    /// </summary>
+    /// <param name="entry">Der zu verschiebende Eintrag.</param>
+    /// <param name="forward"><c>true</c> = nach hinten (höhere Position); <c>false</c> = nach vorn.</param>
+    /// <returns>Die Ziel-SortOrder des Nachbarn bzw. <c>null</c>, wenn in der Richtung kein Nachbar existiert.</returns>
+    public long? NeighborSortOrder(PlaylistEntryItem entry, bool forward)
+    {
+        var index = IndexOfEntry(entry);
+        var neighbor = forward
+            ? (index >= 0 && index < Entries.Count - 1 ? Entries[index + 1] : null)
+            : (index > 0 ? Entries[index - 1] : null);
+        return neighbor?.SortOrder;
+    }
+
+    /// <summary>Der Eintrag ist der erste der geladenen Liste.</summary>
+    /// <param name="entry">Der zu prüfende Eintrag.</param>
+    /// <returns><c>true</c>, wenn kein Vorgänger existiert.</returns>
+    public bool IsFirstEntry(PlaylistEntryItem entry) => IndexOfEntry(entry) == 0;
+
+    /// <summary>Der Eintrag ist der letzte der geladenen Liste.</summary>
+    /// <param name="entry">Der zu prüfende Eintrag.</param>
+    /// <returns><c>true</c>, wenn kein Nachfolger existiert.</returns>
+    public bool IsLastEntry(PlaylistEntryItem entry) =>
+        Entries.Count > 0 && IndexOfEntry(entry) == Entries.Count - 1;
+
+    /// <summary>Position eines Eintrags anhand seiner Eintrags-Id; -1 = nicht in der Liste.</summary>
+    /// <param name="entry">Der gesuchte Eintrag.</param>
+    /// <returns>Der nullbasierte Listenindex.</returns>
+    public int IndexOfEntry(PlaylistEntryItem entry)
+    {
+        for (var i = 0; i < Entries.Count; i++)
+        {
+            if (Entries[i].EntryId == entry.EntryId)
+            {
+                return i;
+            }
+        }
+
+        return -1;
+    }
 }
