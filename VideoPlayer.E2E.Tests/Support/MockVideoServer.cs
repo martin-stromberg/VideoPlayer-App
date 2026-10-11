@@ -20,6 +20,10 @@ public sealed class MockVideoServer : IDisposable
     private readonly TcpListener listener;
     private readonly CancellationTokenSource cancellation = new();
     private readonly Task acceptLoop;
+    private readonly string plainAuthToken;
+    private readonly string adminAuthToken;
+    private long nextPlaylistId = 900_000;
+    private long nextEntryId = 910_000;
 
     /// <summary>Erstellt und startet den Mock-Server.</summary>
     /// <param name="pairingCode">Der gültige Einmal-Pairing-Code.</param>
@@ -42,7 +46,8 @@ public sealed class MockVideoServer : IDisposable
         Password = password;
         BootstrapTicket = bootstrapTicket ?? $"e2e-ticket-{Guid.NewGuid():N}";
         BootstrapShortCode = bootstrapShortCode ?? "E2ETICK1";
-        AuthToken = $"e2e-auth-{Guid.NewGuid():N}";
+        plainAuthToken = $"e2e-auth-{Guid.NewGuid():N}";
+        adminAuthToken = BuildAdminToken();
         RefreshToken = $"e2e-refresh-{Guid.NewGuid():N}";
 
         listener = new TcpListener(IPAddress.Loopback, 0);
@@ -70,8 +75,16 @@ public sealed class MockVideoServer : IDisposable
     /// <summary>Gültiges Anmelde-Passwort.</summary>
     public string Password { get; }
 
-    /// <summary>Das ausgestellte Anmelde-Token.</summary>
-    public string AuthToken { get; }
+    /// <summary>Das ausgestellte Anmelde-Token — bei <see cref="LoginIsAdmin"/> ein JWT-artiger Token mit <c>IsAdmin</c>-Claim (die App dekodiert die Payload ohne Signaturprüfung).</summary>
+    public string AuthToken => LoginIsAdmin ? adminAuthToken : plainAuthToken;
+
+    /// <summary>
+    /// Opt-in Administrator-Token: <c>true</c> stellt ein Token mit
+    /// <c>IsAdmin = "True"</c>-Claim aus — die App blendet den
+    /// Öffentlich-Schalter der Playlist ein; <c>false</c> (Standard)
+    /// der bisherige opake Token ohne Claims.
+    /// </summary>
+    public bool LoginIsAdmin { get; set; }
 
     /// <summary>Das gültige Bootstrap-Ticket (langer, opaker Wert aus dem QR-Code).</summary>
     public string BootstrapTicket { get; }
@@ -167,8 +180,58 @@ public sealed class MockVideoServer : IDisposable
     /// </summary>
     public List<MockPlaylist> Playlists { get; } = [];
 
+    /// <summary>
+    /// Opt-in Genre-Optionen (<c>GET api/items/genres</c>) — die
+    /// wählbaren Genres des Playlist-Genre-Editors.
+    /// </summary>
+    public List<MockGenreOption> GenreOptions { get; } = [];
+
+    /// <summary>
+    /// Bekannte Medientitel des „Zu Playlist hinzufügen"-Flusses
+    /// (Schlüssel <c>"{mediaType}:{mediaId}"</c>) — Titel des neu
+    /// angelegten Playlist-Eintrags; unbekannte Medien heißen
+    /// <c>"Medium {id}"</c>.
+    /// </summary>
+    public List<MockKnownMedia> KnownMedia { get; } = [];
+
     /// <summary><c>true</c> = alle Playlist-Endpunkte antworten mit 404 (Fehlerpfad der Playlists-Anzeige).</summary>
     public bool PlaylistsUnavailable { get; set; }
+
+    /// <summary>Namen der angelegten Playlists in Reihenfolge (POST /api/playlists, Diagnose).</summary>
+    public List<string> CreatedPlaylistNames { get; } = [];
+
+    /// <summary>Anzahl eingegangener Playlist-Aktualisierungen (PUT /api/playlists/{id}, Diagnose).</summary>
+    public int UpdatedPlaylistCount { get; private set; }
+
+    /// <summary>Anzahl eingegangener Playlist-Löschungen (DELETE /api/playlists/{id}, Diagnose).</summary>
+    public int DeletedPlaylistCount { get; private set; }
+
+    /// <summary>Hinzugefügte Einträge im Format <c>"{playlistId}:{mediaType}:{mediaId}"</c> (Diagnose).</summary>
+    public List<string> AddedPlaylistEntries { get; } = [];
+
+    /// <summary>Bestätigungsflagge je Entfernen-Aufruf (DELETE …/entries/{type}/{id}) in Reihenfolge — Nachweis der 409-Wiederholung.</summary>
+    public List<bool> RemoveEntryConfirmFlags { get; } = [];
+
+    /// <summary>Angeforderte Sortiermodus-Wechsel im Format <c>"{newSortMode}|{confirmed}"</c> (PATCH …/sort-mode, Diagnose).</summary>
+    public List<string> SortModeRequests { get; } = [];
+
+    /// <summary>Gesetzte Genre-Ids je PUT …/genres-Aufruf in Reihenfolge (Diagnose).</summary>
+    public List<long[]> GenresSetRequests { get; } = [];
+
+    /// <summary>Anzahl eingegangener Genre-Rücksetzungen (POST …/genres/reset, Diagnose).</summary>
+    public int GenresResetCount { get; private set; }
+
+    /// <summary>Gesetzte Öffentlich-Werte je PUT …/public-Aufruf in Reihenfolge (Diagnose).</summary>
+    public List<bool> PublicFlagRequests { get; } = [];
+
+    /// <summary>Eintrags-Ids der „An den Anfang"-Aufrufe in Reihenfolge (Diagnose).</summary>
+    public List<long> MoveToBeginningRequests { get; } = [];
+
+    /// <summary>Eintrags-Ids der „Zwischenposition"-Aufrufe in Reihenfolge (POST …/move-between, Diagnose).</summary>
+    public List<long> MoveBetweenRequests { get; } = [];
+
+    /// <summary>Anzahl eingegangener direkter SortOrder-Setzungen (PUT …/order, Diagnose).</summary>
+    public int ReorderEntryCount { get; private set; }
 
     /// <summary>
     /// Opt-in nicht abspielbarer Weiterschauen-Eintrag: Id eines
@@ -467,12 +530,8 @@ public sealed class MockVideoServer : IDisposable
             return HandleEpisodeItem(path, request);
         }
 
-        // Opt-in Playlistfluss: eigene + öffentliche Playlists, Detail,
-        // Einträge (unpaginiert/paginiert), Cover sowie die
-        // Wiedergabe-Endpunkte (POST …/play, …/play/next,
-        // …/play/previous, …/play/advance) — authentifiziert wie die
-        // übrigen Listen-Endpunkte.
-        if ((method == "GET" || method == "POST") && path.StartsWith("/api/playlists", StringComparison.OrdinalIgnoreCase))
+        // Opt-in Genre-Optionen des Playlist-Genre-Editors.
+        if (method == "GET" && path.Equals("/api/items/genres", StringComparison.OrdinalIgnoreCase))
         {
             if (!IsGateValid(request))
             {
@@ -484,7 +543,28 @@ public sealed class MockVideoServer : IDisposable
                 return (401, "text/plain", Encoding.UTF8.GetBytes("unauthorized"));
             }
 
-            return HandlePlaylistRequest(path, request.Path);
+            return (200, "application/json", JsonBody(
+                GenreOptions.Select(g => new { id = g.Id, name = g.Name })));
+        }
+
+        // Opt-in Playlistfluss: eigene + öffentliche Playlists, Detail,
+        // Einträge (unpaginiert/paginiert), Cover, Wiedergabe-Endpunkte
+        // sowie die Verwaltungs-Endpunkte (Anlage/Bearbeitung/Löschung,
+        // Eintrags-Mutationen, Sortiermodus, Genres, Öffentlich-Flag) —
+        // authentifiziert wie die übrigen Listen-Endpunkte.
+        if (path.StartsWith("/api/playlists", StringComparison.OrdinalIgnoreCase))
+        {
+            if (!IsGateValid(request))
+            {
+                return GateRejected();
+            }
+
+            if (!IsBearerValid(request))
+            {
+                return (401, "text/plain", Encoding.UTF8.GetBytes("unauthorized"));
+            }
+
+            return HandlePlaylistRequest(path, request.Path, method, request.Body);
         }
 
         // Authentifizierte Listen-Endpunkte: Gate + Bearer prüfen,
@@ -639,14 +719,21 @@ public sealed class MockVideoServer : IDisposable
     /// Listen (<c>/api/playlists</c>, <c>/api/playlists/public</c>),
     /// Einzel-Playlist (<c>/api/playlists/{id}</c>), Einträge
     /// (<c>/entries</c> und <c>/entries/paged</c>, letzteres in
-    /// Server-Reihenfolge und 1-basiert) sowie Cover (<c>/cover</c>).
+    /// Server-Reihenfolge und 1-basiert), Cover (<c>/cover</c>),
+    /// Wiedergabe (<c>/play…</c>) sowie die Verwaltungs-Endpunkte
+    /// (POST/PUT/DELETE der Playlist, Eintrags-Mutationen mit
+    /// Weiterschauen-Konflikt, Sortiermodus mit Verlust-Konflikt,
+    /// Genres, Öffentlich-Flag). Die Server-Reihenfolge der Einträge
+    /// ist ihr Listenindex — zugleich ihre <c>sortOrder</c>.
     /// <see cref="PlaylistsUnavailable"/> simuliert einen ausgefallenen
     /// Playlist-Bereich (404 auf allen Playlist-Routen).
     /// </summary>
     /// <param name="path">Der angefragte Pfad ohne Query-String.</param>
     /// <param name="rawPath">Der angefragte Pfad inkl. Query-String.</param>
+    /// <param name="method">Die HTTP-Methode der Anfrage.</param>
+    /// <param name="body">Der Anfragekörper (JSON bei Mutationen).</param>
     /// <returns>Die Mock-Antwort des Playlist-Endpunkts.</returns>
-    private MockResponse HandlePlaylistRequest(string path, string rawPath)
+    private MockResponse HandlePlaylistRequest(string path, string rawPath, string method, string body)
     {
         if (PlaylistsUnavailable)
         {
@@ -655,6 +742,28 @@ public sealed class MockVideoServer : IDisposable
 
         if (path.Equals("/api/playlists", StringComparison.OrdinalIgnoreCase))
         {
+            // POST /api/playlists — Anlage einer eigenen Playlist.
+            if (method.Equals("POST", StringComparison.OrdinalIgnoreCase))
+            {
+                var (name, description, sortMode) = ReadPlaylistBody(body);
+                if (string.IsNullOrWhiteSpace(name))
+                {
+                    return (400, "application/json", JsonBody(new { error = "name required" }));
+                }
+
+                var created = new MockPlaylist
+                {
+                    Id = nextPlaylistId++,
+                    Name = name,
+                    Description = description,
+                    SortMode = string.IsNullOrWhiteSpace(sortMode) ? "Manual" : sortMode,
+                    IsOwner = true
+                };
+                Playlists.Add(created);
+                CreatedPlaylistNames.Add(name);
+                return (200, "application/json", JsonBody(PlaylistJson(created)));
+            }
+
             return (200, "application/json", JsonBody(
                 Playlists.Where(p => p.IsOwner).Select(PlaylistJson)));
         }
@@ -675,6 +784,37 @@ public sealed class MockVideoServer : IDisposable
 
         if (segments.Length == 3)
         {
+            if (method.Equals("PUT", StringComparison.OrdinalIgnoreCase))
+            {
+                if (!playlist.IsOwner)
+                {
+                    return (403, "application/json", JsonBody(new { error = "forbidden" }));
+                }
+
+                var (name, description, _) = ReadPlaylistBody(body);
+                if (string.IsNullOrWhiteSpace(name))
+                {
+                    return (400, "application/json", JsonBody(new { error = "name required" }));
+                }
+
+                playlist.Name = name;
+                playlist.Description = description;
+                UpdatedPlaylistCount++;
+                return (200, "application/json", JsonBody(PlaylistJson(playlist)));
+            }
+
+            if (method.Equals("DELETE", StringComparison.OrdinalIgnoreCase))
+            {
+                if (!playlist.IsOwner)
+                {
+                    return (403, "application/json", JsonBody(new { error = "forbidden" }));
+                }
+
+                Playlists.Remove(playlist);
+                DeletedPlaylistCount++;
+                return (204, "text/plain", Array.Empty<byte>());
+            }
+
             return (200, "application/json", JsonBody(PlaylistJson(playlist)));
         }
 
@@ -692,22 +832,247 @@ public sealed class MockVideoServer : IDisposable
                 : (404, "application/json", JsonBody(new { error = "no cover" }));
         }
 
-        if (segments.Length >= 4 && segments.Length <= 5
-            && segments[3].Equals("entries", StringComparison.OrdinalIgnoreCase))
+        // PATCH /api/playlists/{id}/sort-mode — Wechsel mit
+        // Verlust-Bestätigung, wenn die manuelle Reihenfolge verworfen wird.
+        if (segments.Length == 4
+            && segments[3].Equals("sort-mode", StringComparison.OrdinalIgnoreCase)
+            && method.Equals("PATCH", StringComparison.OrdinalIgnoreCase))
         {
-            if (segments.Length == 4)
+            if (!playlist.IsOwner)
             {
-                return (200, "application/json", JsonBody(
-                    playlist.Entries.Select(e => EntryJson(e, playlist.Id))));
+                return (403, "application/json", JsonBody(new { error = "forbidden" }));
             }
 
-            if (!segments[4].Equals("paged", StringComparison.OrdinalIgnoreCase))
+            var newSortMode = ReadStringProperty(ParseBody(body), "newSortMode");
+            var confirmed = ReadBoolProperty(ParseBody(body), "confirmLossOfManualOrder");
+            SortModeRequests.Add($"{newSortMode}|{(confirmed ? "confirmed" : "unconfirmed")}");
+            if (string.IsNullOrWhiteSpace(newSortMode))
+            {
+                return (400, "application/json", JsonBody(new { error = "sort mode required" }));
+            }
+
+            if (playlist.SortMode.Equals("Manual", StringComparison.OrdinalIgnoreCase)
+                && !newSortMode.Equals("Manual", StringComparison.OrdinalIgnoreCase)
+                && playlist.Entries.Count > 0
+                && !confirmed)
+            {
+                return Conflict(lossOfData: true);
+            }
+
+            playlist.SortMode = newSortMode;
+            return (200, "application/json", JsonBody(PlaylistJson(playlist)));
+        }
+
+        if (segments.Length >= 4
+            && segments[3].Equals("genres", StringComparison.OrdinalIgnoreCase))
+        {
+            if (!playlist.IsOwner)
+            {
+                return (403, "application/json", JsonBody(new { error = "forbidden" }));
+            }
+
+            // POST …/genres/reset — zurück auf die berechneten Genres.
+            if (segments.Length == 5
+                && segments[4].Equals("reset", StringComparison.OrdinalIgnoreCase)
+                && method.Equals("POST", StringComparison.OrdinalIgnoreCase))
+            {
+                playlist.GenresManuallyOverridden = false;
+                GenresResetCount++;
+                return (200, "application/json", JsonBody(PlaylistJson(playlist)));
+            }
+
+            // PUT …/genres — Anzeige-Genres setzen (markiert manuell).
+            if (segments.Length == 4
+                && method.Equals("PUT", StringComparison.OrdinalIgnoreCase))
+            {
+                var ids = ReadLongArrayProperty(ParseBody(body), "genreIds");
+                GenresSetRequests.Add(ids);
+                playlist.GenreIds.Clear();
+                playlist.GenreIds.AddRange(ids);
+                playlist.Genres = ids
+                    .Select(id => GenreOptions.FirstOrDefault(g => g.Id == id)?.Name ?? $"Genre {id}")
+                    .ToArray();
+                playlist.GenresManuallyOverridden = true;
+                return (200, "application/json", JsonBody(PlaylistJson(playlist)));
+            }
+        }
+
+        // PUT /api/playlists/{id}/public — nur Administrator:innen
+        // (sonst 403 wie der echte Server).
+        if (segments.Length == 4
+            && segments[3].Equals("public", StringComparison.OrdinalIgnoreCase)
+            && method.Equals("PUT", StringComparison.OrdinalIgnoreCase))
+        {
+            if (!playlist.IsOwner || !LoginIsAdmin)
+            {
+                return (403, "application/json", JsonBody(new { error = "forbidden" }));
+            }
+
+            var isPublic = ReadBoolProperty(ParseBody(body), "isPublic");
+            PublicFlagRequests.Add(isPublic);
+            playlist.IsPublic = isPublic;
+            return (200, "application/json", JsonBody(PlaylistJson(playlist)));
+        }
+
+        if (segments.Length >= 4
+            && segments[3].Equals("entries", StringComparison.OrdinalIgnoreCase))
+        {
+            return HandlePlaylistEntries(segments, playlist, rawPath, method, body);
+        }
+
+        return (404, "application/json", JsonBody(new { error = "not found" }));
+    }
+
+    /// <summary>
+    /// Antwortet die Eintrags-Endpunkte einer Playlist: GET-Listen
+    /// (unpaginiert/paginiert/max-sort-order), POST-Anlage,
+    /// DELETE-Entfernen (mit Weiterschauen-Konflikt) sowie die
+    /// Verschiebe-Endpunkte (move-to-beginning/move-between/order).
+    /// </summary>
+    /// <param name="segments">Pfadsegmente des Requests.</param>
+    /// <param name="playlist">Die aufgelöste Playlist.</param>
+    /// <param name="rawPath">Der angefragte Pfad inkl. Query-String.</param>
+    /// <param name="method">Die HTTP-Methode der Anfrage.</param>
+    /// <param name="body">Der Anfragekörper (JSON bei Mutationen).</param>
+    /// <returns>Die Mock-Antwort des Eintrags-Endpunkts.</returns>
+    private MockResponse HandlePlaylistEntries(
+        string[] segments, MockPlaylist playlist, string rawPath, string method, string body)
+    {
+        // POST /api/playlists/{id}/entries — Medium hinzufügen.
+        if (segments.Length == 4 && method.Equals("POST", StringComparison.OrdinalIgnoreCase))
+        {
+            if (!playlist.IsOwner)
+            {
+                return (403, "application/json", JsonBody(new { error = "forbidden" }));
+            }
+
+            var mediaType = ReadStringProperty(ParseBody(body), "mediaType");
+            var mediaId = ReadLongProperty(ParseBody(body), "mediaId");
+            if (playlist.Entries.Any(e => e.MediaId == mediaId
+                && e.MediaType.Equals(mediaType, StringComparison.OrdinalIgnoreCase)))
+            {
+                return (200, "application/json", JsonBody(new
+                {
+                    addedCount = 0,
+                    skippedCount = 1,
+                    message = "Das Medium ist bereits in der Playlist."
+                }));
+            }
+
+            playlist.Entries.Add(new MockPlaylistEntry
+            {
+                Id = nextEntryId++,
+                MediaType = mediaType,
+                MediaId = mediaId,
+                Title = ResolveMediaTitle(mediaType, mediaId),
+                IsAccessible = true
+            });
+            AddedPlaylistEntries.Add($"{playlist.Id}:{mediaType}:{mediaId}");
+            return (200, "application/json", JsonBody(new
+            {
+                addedCount = 1,
+                skippedCount = 0,
+                message = (string?)null
+            }));
+        }
+
+        // DELETE /api/playlists/{id}/entries/{mediaType}/{mediaId} —
+        // Entfernen; Einträge mit Weiterschauen-Bezug liefern ohne
+        // Bestätigungsflagge die 409-Konfliktantwort.
+        if (segments.Length == 6 && method.Equals("DELETE", StringComparison.OrdinalIgnoreCase))
+        {
+            if (!playlist.IsOwner)
+            {
+                return (403, "application/json", JsonBody(new { error = "forbidden" }));
+            }
+
+            var removeTarget = playlist.Entries.FirstOrDefault(e =>
+                e.MediaType.Equals(segments[4], StringComparison.OrdinalIgnoreCase)
+                && long.TryParse(segments[5], out var mid) && e.MediaId == mid);
+            if (removeTarget is null)
             {
                 return (404, "application/json", JsonBody(new { error = "not found" }));
             }
 
-            // 1-basiertes Paging wie der Server (pageNumber >= 1,
-            // sonst 400).
+            var confirmed = string.Equals(
+                QueryValue(rawPath, "confirmContinueWatchingRemoval"), "true", StringComparison.OrdinalIgnoreCase);
+            RemoveEntryConfirmFlags.Add(confirmed);
+            if (removeTarget.RequiresContinueWatchingRemovalConfirmation && !confirmed)
+            {
+                return Conflict(continueWatching: true);
+            }
+
+            playlist.Entries.Remove(removeTarget);
+            return (204, "text/plain", Array.Empty<byte>());
+        }
+
+        // Aktionen eines Eintrags: …/entries/{entryId}/{aktion}.
+        if (segments.Length == 6
+            && long.TryParse(segments[4], out var entryId)
+            && playlist.Entries.FirstOrDefault(e => e.Id == entryId) is { } entry)
+        {
+            if (!playlist.IsOwner)
+            {
+                return (403, "application/json", JsonBody(new { error = "forbidden" }));
+            }
+
+            // POST …/move-to-beginning — an den Listenanfang.
+            if (method.Equals("POST", StringComparison.OrdinalIgnoreCase)
+                && segments[5].Equals("move-to-beginning", StringComparison.OrdinalIgnoreCase))
+            {
+                MoveToBeginningRequests.Add(entryId);
+                playlist.Entries.Remove(entry);
+                playlist.Entries.Insert(0, entry);
+                return (200, "application/json", JsonBody(EntryJson(playlist, entry)));
+            }
+
+            // POST …/move-between — auf die Position der Ziel-SortOrder
+            // (Listenindex); der Ziel-Eintrag rückt eine Position nach hinten.
+            if (method.Equals("POST", StringComparison.OrdinalIgnoreCase)
+                && segments[5].Equals("move-between", StringComparison.OrdinalIgnoreCase))
+            {
+                var target = ReadLongProperty(ParseBody(body), "newSortOrder");
+                MoveBetweenRequests.Add(entryId);
+                MoveEntryToIndex(playlist, entry, target);
+                return (204, "text/plain", Array.Empty<byte>());
+            }
+
+            // PUT …/order — direkte SortOrder-Setzung (Ans-Ende-Muster:
+            // max + 1 landet am Listenende).
+            if (method.Equals("PUT", StringComparison.OrdinalIgnoreCase)
+                && segments[5].Equals("order", StringComparison.OrdinalIgnoreCase))
+            {
+                var target = ReadLongProperty(ParseBody(body), "newSortOrder");
+                ReorderEntryCount++;
+                MoveEntryToIndex(playlist, entry, target);
+                return (204, "text/plain", Array.Empty<byte>());
+            }
+
+            return (404, "application/json", JsonBody(new { error = "not found" }));
+        }
+
+        if (segments.Length == 4 && method.Equals("GET", StringComparison.OrdinalIgnoreCase))
+        {
+            return (200, "application/json", JsonBody(
+                playlist.Entries.Select(e => EntryJson(playlist, e))));
+        }
+
+        // GET …/entries/max-sort-order — Listenindex des letzten Eintrags.
+        if (segments.Length == 5
+            && segments[4].Equals("max-sort-order", StringComparison.OrdinalIgnoreCase)
+            && method.Equals("GET", StringComparison.OrdinalIgnoreCase))
+        {
+            return (200, "application/json", JsonBody(new
+            {
+                maxSortOrder = playlist.Entries.Count > 0 ? (long?)playlist.Entries.Count - 1 : null
+            }));
+        }
+
+        // GET …/entries/paged — 1-basiertes Paging in Server-Reihenfolge.
+        if (segments.Length == 5
+            && segments[4].Equals("paged", StringComparison.OrdinalIgnoreCase)
+            && method.Equals("GET", StringComparison.OrdinalIgnoreCase))
+        {
             var pageNumber = int.TryParse(QueryValue(rawPath, "pageNumber"), out var pn) ? pn : 1;
             var pageSize = int.TryParse(QueryValue(rawPath, "pageSize"), out var ps) ? ps : 20;
             if (pageNumber < 1 || pageSize < 1)
@@ -718,7 +1083,7 @@ public sealed class MockVideoServer : IDisposable
             var slice = playlist.Entries
                 .Skip((pageNumber - 1) * pageSize)
                 .Take(pageSize)
-                .Select(e => EntryJson(e, playlist.Id))
+                .Select(e => EntryJson(playlist, e))
                 .ToList();
             return (200, "application/json", JsonBody(new
             {
@@ -731,6 +1096,113 @@ public sealed class MockVideoServer : IDisposable
         }
 
         return (404, "application/json", JsonBody(new { error = "not found" }));
+    }
+
+    /// <summary>
+    /// Verschiebt einen Eintrag an die Ziel-Position (Listenindex =
+    /// SortOrder); der Eintrag an der Ziel-Position rückt eine
+    /// Position nach hinten.
+    /// </summary>
+    /// <param name="playlist">Die Playlist.</param>
+    /// <param name="entry">Der zu verschiebende Eintrag.</param>
+    /// <param name="targetSortOrder">Die Ziel-SortOrder (Listenindex).</param>
+    private static void MoveEntryToIndex(MockPlaylist playlist, MockPlaylistEntry entry, long targetSortOrder)
+    {
+        playlist.Entries.Remove(entry);
+        var index = (int)Math.Clamp(targetSortOrder, 0, playlist.Entries.Count);
+        playlist.Entries.Insert(index, entry);
+    }
+
+    /// <summary>
+    /// Konflikt-Antwort (HTTP 409) playlistbezogener Mutationen in der
+    /// Feldform des Servers (ein gemeinsames Antwort-Schema).
+    /// </summary>
+    /// <param name="continueWatching"><c>true</c> = Weiterschauen-Bestätigung erforderlich.</param>
+    /// <param name="lossOfData"><c>true</c> = Verlust-Bestätigung (manuelle Reihenfolge) erforderlich.</param>
+    /// <param name="coverDeletion"><c>true</c> = Cover-Lösch-Bestätigung erforderlich (Vollständigkeit der Feldform).</param>
+    /// <returns>Die 409-Antwort mit den Konflikt-Flaggen.</returns>
+    private static MockResponse Conflict(
+        bool continueWatching = false,
+        bool lossOfData = false,
+        bool coverDeletion = false) =>
+        new(409, "application/json", JsonBody(new
+        {
+            isContinueWatchingConfirmationRequired = continueWatching,
+            isLossOfDataConfirmationRequired = lossOfData,
+            isCoverDeletionConfirmationRequired = coverDeletion
+        }));
+
+    /// <summary>
+    /// Löst den Anzeigetitel eines Mediums für neu angelegte
+    /// Playlist-Einträge auf: <see cref="KnownMedia"/> hat Vorrang,
+    /// dann die bekannten Opt-in-Medien des Wiedergabeflusses,
+    /// sonst <c>"Medium {id}"</c>.
+    /// </summary>
+    /// <param name="mediaType">Der Server-Medientyp.</param>
+    /// <param name="mediaId">Die Medien-Id.</param>
+    /// <returns>Der Anzeigetitel.</returns>
+    private string ResolveMediaTitle(string mediaType, long mediaId)
+    {
+        var known = KnownMedia.FirstOrDefault(k =>
+            k.MediaType.Equals(mediaType, StringComparison.OrdinalIgnoreCase) && k.MediaId == mediaId);
+        if (known is not null)
+        {
+            return known.Title;
+        }
+
+        if (mediaId == PlaybackMovieId && mediaType.Equals("Movie", StringComparison.OrdinalIgnoreCase))
+        {
+            return PlaybackMovieTitle;
+        }
+
+        if (mediaId == PlaybackEpisodeId || mediaId == PlaybackNextEpisodeId)
+        {
+            return mediaId == PlaybackEpisodeId ? PlaybackEpisodeTitle : PlaybackNextEpisodeTitle;
+        }
+
+        if (mediaId == PlaybackShowId && mediaType.Equals("TVShow", StringComparison.OrdinalIgnoreCase))
+        {
+            return PlaybackShowTitle;
+        }
+
+        return $"Medium {mediaId}";
+    }
+
+    /// <summary>
+    /// Liest den JSON-Anfragekörper eines Mutationsaufrufs; unlesbare
+    /// Körper liefern ein leeres Objekt (Feld-Leser antworten dann
+    /// mit Standardwerten).
+    /// </summary>
+    /// <param name="body">Der rohe Anfragekörper.</param>
+    /// <returns>Das JSON-Wurzelelement.</returns>
+    private static JsonElement ParseBody(string body)
+    {
+        try
+        {
+            using var doc = JsonDocument.Parse(
+                string.IsNullOrWhiteSpace(body) ? "{}" : body);
+            return doc.RootElement.Clone();
+        }
+        catch (JsonException)
+        {
+            using var doc = JsonDocument.Parse("{}");
+            return doc.RootElement.Clone();
+        }
+    }
+
+    /// <summary>
+    /// Liest Name, Beschreibung und Sortiermodus eines
+    /// Playlist-Anlage/-Bearbeitungs-Körpers.
+    /// </summary>
+    /// <param name="body">Der rohe Anfragekörper.</param>
+    /// <returns>Tupel (name, description, sortMode).</returns>
+    private static (string, string?, string) ReadPlaylistBody(string body)
+    {
+        var root = ParseBody(body);
+        return (
+            ReadStringProperty(root, "name"),
+            ReadStringProperty(root, "description") is { Length: > 0 } d ? d : null,
+            ReadStringProperty(root, "sortMode"));
     }
 
     /// <summary>
@@ -781,7 +1253,7 @@ public sealed class MockVideoServer : IDisposable
                 totalCount = playlist.Entries.Count,
                 currentPosition = playlist.Entries.IndexOf(start) + 1,
                 currentEntryId = start.Id,
-                currentEntry = EntryJson(start, playlist.Id),
+                currentEntry = EntryJson(playlist, start),
                 streamUrl = $"/api/items/{StreamMediaType(start)}/{start.MediaId}/stream",
                 mediaType = StreamMediaType(start),
                 mediaId = start.MediaId,
@@ -820,40 +1292,50 @@ public sealed class MockVideoServer : IDisposable
 
         return (200, "application/json", JsonBody(new
         {
-            entry = EntryJson(target, playlist.Id),
+            entry = EntryJson(playlist, target),
             position = playlist.Entries.IndexOf(target) + 1,
             startPositionSeconds = target.ResumePositionSeconds ?? 0L
         }));
     }
 
-    /// <summary>JSON-Repräsentation einer Playlist mit den DTO-Feldnamen.</summary>
+    /// <summary>
+    /// JSON-Repräsentation einer Playlist mit den DTO-Feldnamen;
+    /// <c>allGenreIds</c> trägt die gesetzten Genre-Ids bzw. — solange
+    /// die Testdaten keine zuordnen — abgeleitete Ids (100 + Index).
+    /// </summary>
     /// <param name="playlist">Die Playlist.</param>
     /// <returns>Das serialisierbare Anonym-Objekt.</returns>
-    private static object PlaylistJson(MockPlaylist playlist) => new
+    private static object PlaylistJson(MockPlaylist playlist)
     {
-        id = playlist.Id,
-        name = playlist.Name,
-        description = playlist.Description,
-        sortMode = playlist.SortMode,
-        createdAt = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc),
-        updatedAt = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc),
-        genres = playlist.Genres.Select((name, i) => new { id = (long)(100 + i), name }),
-        allGenreIds = playlist.Genres.Select((_, i) => (long)(100 + i)),
-        genresManuallyOverridden = false,
-        coverPictureId = playlist.CoverPictureId,
-        coverPictureIsUserUploaded = false,
-        isPublic = playlist.IsPublic,
-        isOwner = playlist.IsOwner
-    };
+        var genreIds = playlist.GenreIds.Count == playlist.Genres.Length
+            ? playlist.GenreIds.ToArray()
+            : playlist.Genres.Select((_, i) => (long)(100 + i)).ToArray();
+        return new
+        {
+            id = playlist.Id,
+            name = playlist.Name,
+            description = playlist.Description,
+            sortMode = playlist.SortMode,
+            createdAt = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc),
+            updatedAt = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc),
+            genres = playlist.Genres.Select((name, i) => new { id = genreIds[i], name }),
+            allGenreIds = genreIds,
+            genresManuallyOverridden = playlist.GenresManuallyOverridden,
+            coverPictureId = playlist.CoverPictureId,
+            coverPictureIsUserUploaded = false,
+            isPublic = playlist.IsPublic,
+            isOwner = playlist.IsOwner
+        };
+    }
 
-    /// <summary>JSON-Repräsentation eines Playlist-Eintrags mit den DTO-Feldnamen.</summary>
+    /// <summary>JSON-Repräsentation eines Playlist-Eintrags mit den DTO-Feldnamen; <c>sortOrder</c> ist der Listenindex (Server-Reihenfolge des Mocks).</summary>
+    /// <param name="playlist">Die zugehörige Playlist (Positionsbestimmung).</param>
     /// <param name="entry">Der Eintrag.</param>
-    /// <param name="playlistId">Id der zugehörigen Playlist.</param>
     /// <returns>Das serialisierbare Anonym-Objekt.</returns>
-    private static object EntryJson(MockPlaylistEntry entry, long playlistId) => new
+    private static object EntryJson(MockPlaylist playlist, MockPlaylistEntry entry) => new
     {
         id = entry.Id,
-        playlistId,
+        playlistId = playlist.Id,
         mediaType = entry.MediaType,
         mediaId = entry.MediaId,
         mediaTitle = entry.Title,
@@ -863,7 +1345,7 @@ public sealed class MockVideoServer : IDisposable
         addedAt = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc),
         resolvedPictureId = entry.ResolvedPictureId,
         isAccessible = entry.IsAccessible,
-        sortOrder = (long?)entry.Id,
+        sortOrder = (long)playlist.Entries.IndexOf(entry),
         releaseDate = (DateTime?)null,
         plot = (string?)null,
         episodeNumber = entry.EpisodeNumber
@@ -924,6 +1406,60 @@ public sealed class MockVideoServer : IDisposable
         }
 
         return 0;
+    }
+
+    /// <summary>Liest eine boolesche Eigenschaft case-insensitiv.</summary>
+    /// <param name="root">Das JSON-Wurzelelement.</param>
+    /// <param name="name">Der gesuchte Eigenschaftsname.</param>
+    /// <returns>Der Wert oder <c>false</c>.</returns>
+    private static bool ReadBoolProperty(JsonElement root, string name)
+    {
+        foreach (var property in root.EnumerateObject())
+        {
+            if (string.Equals(property.Name, name, StringComparison.OrdinalIgnoreCase)
+                && property.Value.ValueKind is JsonValueKind.True or JsonValueKind.False)
+            {
+                return property.Value.GetBoolean();
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>Liest ein Zahlen-Array case-insensitiv.</summary>
+    /// <param name="root">Das JSON-Wurzelelement.</param>
+    /// <param name="name">Der gesuchte Eigenschaftsname.</param>
+    /// <returns>Die Zahlen des Arrays bzw. ein leeres Array.</returns>
+    private static long[] ReadLongArrayProperty(JsonElement root, string name)
+    {
+        foreach (var property in root.EnumerateObject())
+        {
+            if (string.Equals(property.Name, name, StringComparison.OrdinalIgnoreCase)
+                && property.Value.ValueKind == JsonValueKind.Array)
+            {
+                return property.Value.EnumerateArray()
+                    .Where(v => v.ValueKind == JsonValueKind.Number && v.TryGetInt64(out _))
+                    .Select(v => v.GetInt64())
+                    .ToArray();
+            }
+        }
+
+        return [];
+    }
+
+    /// <summary>
+    /// Baut den JWT-artigen Administrator-Token (<see cref="LoginIsAdmin"/>):
+    /// drei Base64Url-Abschnitte mit <c>IsAdmin = "True"</c>-Claim in
+    /// der Payload — die App dekodiert die Payload ohne Signaturprüfung.
+    /// </summary>
+    /// <returns>Der Token im JWT-Format.</returns>
+    private static string BuildAdminToken()
+    {
+        static string B64(string json) =>
+            Convert.ToBase64String(Encoding.UTF8.GetBytes(json))
+                .TrimEnd('=').Replace('+', '-').Replace('/', '_');
+        var payload = B64("{\"sub\":\"1\",\"unique_name\":\"e2e\",\"email\":\"e2e@example.test\",\"IsAdmin\":\"True\"}");
+        return $"{B64("{\"alg\":\"none\",\"typ\":\"JWT\"}")}.{payload}.e2e-signatur";
     }
 
     /// <summary>
@@ -1633,7 +2169,18 @@ public sealed class MockPlaylist
     /// <summary>Die Playlist erscheint in <c>GET /api/playlists/public</c>.</summary>
     public bool IsPublic { get; set; }
 
-    /// <summary>Einträge der Playlist — die Server-Reihenfolge (wird nicht sortiert).</summary>
+    /// <summary>
+    /// Genre-Ids zu <see cref="Genres"/> (Index-Parallelität) — tragen
+    /// <c>allGenreIds</c> der JSON-Antwort, solange sie der
+    /// <see cref="Genres"/>-Länge entsprechen; bei Abweichung werden
+    /// abgeleitete Ids (100 + Index) ausgegeben.
+    /// </summary>
+    public List<long> GenreIds { get; } = [];
+
+    /// <summary>Die Anzeige-Genres wurden manuell gesetzt (<c>genresManuallyOverridden</c> der Antwort).</summary>
+    public bool GenresManuallyOverridden { get; set; }
+
+    /// <summary>Einträge der Playlist — die Server-Reihenfolge (Listenindex = <c>sortOrder</c>).</summary>
     public List<MockPlaylistEntry> Entries { get; } = [];
 }
 
@@ -1684,4 +2231,35 @@ public sealed class MockPlaylistEntry
     /// des Fehler-Rückfall-Szenarios.
     /// </summary>
     public bool StreamUnavailable { get; set; }
+
+    /// <summary>
+    /// <c>true</c> = das Entfernen dieses Eintrags meldet ohne
+    /// <c>confirmContinueWatchingRemoval</c>-Flagge den
+    /// Weiterschauen-Konflikt (HTTP 409) — Nachbild der Server-Wache
+    /// des Schritt-6-Flusses.
+    /// </summary>
+    public bool RequiresContinueWatchingRemovalConfirmation { get; set; }
+}
+
+/// <summary>Opt-in Genre-Option des Mock-Servers (<c>GET api/items/genres</c>).</summary>
+public sealed class MockGenreOption
+{
+    /// <summary>Id des Genres.</summary>
+    public long Id { get; set; }
+
+    /// <summary>Anzeigename des Genres.</summary>
+    public string Name { get; set; } = string.Empty;
+}
+
+/// <summary>Bekanntes Medium des Mock-Servers — Titel-Auflösung neu angelegter Playlist-Einträge.</summary>
+public sealed class MockKnownMedia
+{
+    /// <summary>Medientyp (Server-Konvention, z. B. <c>Movie</c>).</summary>
+    public string MediaType { get; set; } = "Movie";
+
+    /// <summary>Id des Mediums.</summary>
+    public long MediaId { get; set; }
+
+    /// <summary>Anzeigetitel des Mediums.</summary>
+    public string Title { get; set; } = string.Empty;
 }

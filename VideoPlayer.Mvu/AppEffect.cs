@@ -407,6 +407,180 @@ public sealed record AdvancePlaylistEntryEffect(
     long PlaylistId,
     long CurrentEntryId) : AppEffect;
 
+// --- Playlist-Verwaltung (Schritt 6) ---
+
+/// <summary>
+/// Eine Playlist speichern: <c>POST api/playlists</c> bei Neuanlage
+/// (<paramref name="EditingPlaylistId"/> = <c>null</c>) bzw.
+/// <c>PUT api/playlists/{id}</c> bei Bearbeitung (Ergebnis:
+/// <c>PlaylistFormCompletedMessage</c>). Online-Pfad.
+/// </summary>
+/// <param name="EditingPlaylistId">Id der bearbeiteten Playlist; <c>null</c> = Neuanlage.</param>
+/// <param name="Name">Name der Playlist.</param>
+/// <param name="Description">Beschreibung; <c>null</c> = keine.</param>
+/// <param name="SortMode">Sortiermodus (nur bei Neuanlage wirksam).</param>
+/// <returns>Effekt-Datensatz für das Speichern.</returns>
+public sealed record SavePlaylistEffect(
+    long? EditingPlaylistId,
+    string Name,
+    string? Description,
+    string SortMode) : AppEffect;
+
+/// <summary>
+/// Eine Playlist löschen — <c>DELETE api/playlists/{id}</c>
+/// (Ergebnis: <c>PlaylistDeletedMessage</c>). Online-Pfad.
+/// </summary>
+/// <param name="PlaylistId">Id der zu löschenden Playlist.</param>
+/// <returns>Effekt-Datensatz für das Löschen.</returns>
+public sealed record DeletePlaylistEffect(long PlaylistId) : AppEffect;
+
+/// <summary>
+/// Einen Eintrag aus einer Playlist entfernen —
+/// <c>DELETE api/playlists/{id}/entries/{mediaType}/{mediaId}</c>
+/// (Ergebnis: <c>PlaylistEntryRemoveCompletedMessage</c>). Bei
+/// <paramref name="ConfirmContinueWatchingRemoval"/> wird die
+/// serverseitige Weiterschauen-Bestätigungsflagge mitgesendet
+/// (Wiederholung nach 409-Konflikt).
+/// </summary>
+/// <param name="PlaylistId">Id der Playlist.</param>
+/// <param name="Entry">Der zu entfernende Eintrag (trägt Medientyp/-Id für den Pfad).</param>
+/// <param name="ConfirmContinueWatchingRemoval"><c>true</c> = Bestätigungsflagge mitsenden.</param>
+/// <returns>Effekt-Datensatz für das Entfernen.</returns>
+public sealed record RemovePlaylistEntryEffect(
+    long PlaylistId,
+    PlaylistEntryItem Entry,
+    bool ConfirmContinueWatchingRemoval) : AppEffect;
+
+/// <summary>
+/// Einen Playlist-Eintrag an den Anfang verschieben —
+/// <c>POST api/playlists/{id}/entries/{entryId}/move-to-beginning</c>
+/// (Ergebnis: <c>PlaylistEntryMoveCompletedMessage</c>). Nur manueller
+/// Sortiermodus.
+/// </summary>
+/// <param name="PlaylistId">Id der Playlist.</param>
+/// <param name="Entry">Der zu verschiebende Eintrag.</param>
+/// <returns>Effekt-Datensatz für das Verschieben.</returns>
+public sealed record MovePlaylistEntryToBeginningEffect(
+    long PlaylistId,
+    PlaylistEntryItem Entry) : AppEffect;
+
+/// <summary>
+/// Einen Playlist-Eintrag ans Ende verschieben —
+/// <c>GET api/playlists/{id}/entries/max-sort-order</c> +
+/// <c>PUT …/entries/{entryId}/order</c> mit <c>max + 1</c> (Ergebnis:
+/// <c>PlaylistEntryMoveCompletedMessage</c>). Nur manueller Sortiermodus.
+/// </summary>
+/// <param name="PlaylistId">Id der Playlist.</param>
+/// <param name="Entry">Der zu verschiebende Eintrag.</param>
+/// <returns>Effekt-Datensatz für das Verschieben.</returns>
+public sealed record MovePlaylistEntryToEndEffect(
+    long PlaylistId,
+    PlaylistEntryItem Entry) : AppEffect;
+
+/// <summary>
+/// Einen Playlist-Eintrag zwischen Positionen verschieben —
+/// <c>POST api/playlists/{id}/entries/{entryId}/move-between</c> mit
+/// der SortOrder des Ziel-Nachbarn (Ergebnis:
+/// <c>PlaylistEntryMoveCompletedMessage</c>). Nur manueller Sortiermodus.
+/// </summary>
+/// <param name="PlaylistId">Id der Playlist.</param>
+/// <param name="Entry">Der zu verschiebende Eintrag.</param>
+/// <param name="NewSortOrder">Ziel-Sortierreihenfolge (SortOrder des Nachbarn).</param>
+/// <returns>Effekt-Datensatz für das Verschieben.</returns>
+public sealed record MovePlaylistEntryBetweenEffect(
+    long PlaylistId,
+    PlaylistEntryItem Entry,
+    long NewSortOrder) : AppEffect;
+
+/// <summary>
+/// Den Sortiermodus einer Playlist umschalten —
+/// <c>PATCH api/playlists/{id}/sort-mode</c> (Ergebnis:
+/// <c>PlaylistSortModeCompletedMessage</c>). Bei
+/// <paramref name="ConfirmLossOfManualOrder"/> wird die
+/// Verlust-Bestätigung mitgesendet (Wiederholung nach 409-Konflikt).
+/// </summary>
+/// <param name="PlaylistId">Id der Playlist.</param>
+/// <param name="NewSortMode">Ziel-Sortiermodus.</param>
+/// <param name="ConfirmLossOfManualOrder"><c>true</c> = Verlust der manuellen Reihenfolge bestätigen.</param>
+/// <returns>Effekt-Datensatz für den Wechsel.</returns>
+public sealed record ChangePlaylistSortModeEffect(
+    long PlaylistId,
+    string NewSortMode,
+    bool ConfirmLossOfManualOrder) : AppEffect;
+
+/// <summary>
+/// Die Genre-Optionen des Servers für den Genre-Editor laden —
+/// <c>api/items/genres</c> mit der Vorauswahl der Playlist-Genres
+/// (Ergebnis: <c>PlaylistGenreOptionsLoadedMessage</c>).
+/// </summary>
+/// <param name="PlaylistId">Id der Playlist (Vorauswahl aus ihrem Zustand).</param>
+/// <returns>Effekt-Datensatz für das Laden der Optionen.</returns>
+public sealed record LoadGenreOptionsEffect(long PlaylistId) : AppEffect;
+
+/// <summary>
+/// Die Anzeige-Genres einer Playlist setzen —
+/// <c>PUT api/playlists/{id}/genres</c> (Ergebnis:
+/// <c>PlaylistGenresCompletedMessage</c>).
+/// </summary>
+/// <param name="PlaylistId">Id der Playlist.</param>
+/// <param name="GenreIds">Ids der gewählten Genres.</param>
+/// <returns>Effekt-Datensatz für das Setzen.</returns>
+public sealed record SetPlaylistGenresEffect(
+    long PlaylistId,
+    IReadOnlyList<long> GenreIds) : AppEffect;
+
+/// <summary>
+/// Die Genres einer Playlist auf die berechneten Werte zurücksetzen —
+/// <c>POST api/playlists/{id}/genres/reset</c> (Ergebnis:
+/// <c>PlaylistGenresCompletedMessage</c>).
+/// </summary>
+/// <param name="PlaylistId">Id der Playlist.</param>
+/// <returns>Effekt-Datensatz für das Zurücksetzen.</returns>
+public sealed record ResetPlaylistGenresEffect(long PlaylistId) : AppEffect;
+
+/// <summary>
+/// Das Öffentlich-Flag einer Playlist setzen —
+/// <c>PUT api/playlists/{id}/public</c> (Ergebnis:
+/// <c>PlaylistPublicCompletedMessage</c>). Nur Administrator:innen
+/// mit eigener Playlist (sonst HTTP 403).
+/// </summary>
+/// <param name="PlaylistId">Id der Playlist.</param>
+/// <param name="IsPublic">Der neue Öffentlich-Zustand.</param>
+/// <returns>Effekt-Datensatz für das Umschalten.</returns>
+public sealed record SetPlaylistPublicEffect(
+    long PlaylistId,
+    bool IsPublic) : AppEffect;
+
+/// <summary>
+/// Die eigenen Playlists als Zielauswahl der Aktion
+/// „Zu Playlist hinzufügen" laden — <c>api/playlists</c>
+/// (Ergebnis: <c>PlaylistTargetsLoadedMessage</c>).
+/// </summary>
+public sealed record LoadPlaylistTargetsEffect : AppEffect;
+
+/// <summary>
+/// Ein Medium zu einer Playlist hinzufügen —
+/// <c>POST api/playlists/{id}/entries</c> (Ergebnis:
+/// <c>PlaylistEntryAddedMessage</c>).
+/// </summary>
+/// <param name="PlaylistId">Id der Ziel-Playlist.</param>
+/// <param name="PlaylistName">Name der Ziel-Playlist (für den Hinweistext).</param>
+/// <param name="MediaType">Medientyp (beliebige Konvention; wird serverseitig abgebildet).</param>
+/// <param name="MediaId">Id des Mediums.</param>
+/// <returns>Effekt-Datensatz für das Hinzufügen.</returns>
+public sealed record AddPlaylistEntryEffect(
+    long PlaylistId,
+    string PlaylistName,
+    string MediaType,
+    long MediaId) : AppEffect;
+
+/// <summary>
+/// Zur vorherigen Seite des Navigationsstacks zurückkehren
+/// (Shell <c>..</c>) — nach dem Löschen einer Playlist aus ihrer
+/// Detailansicht.
+/// </summary>
+public sealed record NavigateBackEffect : AppEffect;
+
 /// <summary>
 /// Profilinformationen der Profil-Seite ermitteln — Benutzername/E-Mail
 /// aus den Claims des gespeicherten Anmelde-Tokens bzw. dem gespeicherten

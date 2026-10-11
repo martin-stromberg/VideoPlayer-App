@@ -9,18 +9,25 @@
              x:DataType="mvu:MvuHost">
 
     <Grid Padding="24"
-          RowDefinitions="Auto,Auto,*"
+          RowDefinitions="Auto,Auto,Auto,*"
           RowSpacing="14">
+
+        <Button x:Name="CreatePlaylistButton"
+                AutomationId="CreatePlaylistButton"
+                Grid.Row="0"
+                Text="Neue Playlist"
+                Clicked="OnCreatePlaylistClicked"
+                HorizontalOptions="End" />
 
         <ActivityIndicator x:Name="LoadingIndicator"
                            AutomationId="PlaylistsLoadingIndicator"
-                           Grid.Row="0"
+                           Grid.Row="1"
                            IsRunning="{Binding Model.PlaylistsPage.IsLoading}"
                            IsVisible="{Binding Model.PlaylistsPage.IsLoading}"
                            Color="{StaticResource VpPrimary}" />
 
         <VerticalStackLayout x:Name="ErrorPanel"
-                             Grid.Row="0"
+                             Grid.Row="1"
                              Spacing="10"
                              IsVisible="False">
             <Label x:Name="ErrorLabel"
@@ -36,7 +43,7 @@
 
         <Label x:Name="EmptyLabel"
                AutomationId="PlaylistsEmptyLabel"
-               Grid.Row="0"
+               Grid.Row="1"
                Text="Keine Playlists vorhanden."
                Style="{StaticResource Caption}"
                FontSize="14"
@@ -47,7 +54,7 @@
              einzige scrollbare Liste statt zweier getrennter. -->
         <CollectionView x:Name="PlaylistsCollection"
                         AutomationId="PlaylistsCollection"
-                        Grid.Row="2"
+                        Grid.Row="3"
                         ItemsSource="{Binding Model.PlaylistsPage.Items}"
                         SelectionMode="Single"
                         SelectionChanged="OnPlaylistSelected">
@@ -113,6 +120,12 @@
                 </DataTemplate>
             </CollectionView.ItemTemplate>
         </CollectionView>
+
+        <!-- Dialog-Panel der Playlist-Anlage (überlagert den Inhalt) -->
+        <controls:PlaylistFormPanel x:Name="PlaylistFormPanel"
+                                    Grid.Row="0"
+                                    Grid.RowSpan="4"
+                                    Margin="-24" />
     </Grid>
 
 </ContentPage>

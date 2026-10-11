@@ -54,12 +54,28 @@
                        IsVisible="{Binding Model.PlaylistDetails.HasDescription}" />
                 <Label Text="{Binding Model.PlaylistDetails.SummaryText}"
                        Style="{StaticResource Caption}" />
-                <Button x:Name="PlayButton"
-                        AutomationId="PlaylistDetailsPlayButton"
-                        Text="Abspielen"
-                        Clicked="OnPlayClicked"
-                        HorizontalOptions="Start"
-                        IsVisible="{Binding Model.PlaylistDetails.HasItems}" />
+                <Label Text="{Binding Model.PlaylistDetails.GenreText}"
+                       AutomationId="PlaylistGenreTextLabel"
+                       Style="{StaticResource Caption}"
+                       IsVisible="{Binding Model.PlaylistDetails.HasGenreText}" />
+                <HorizontalStackLayout Spacing="10">
+                    <Button x:Name="PlayButton"
+                            AutomationId="PlaylistDetailsPlayButton"
+                            Text="Abspielen"
+                            Clicked="OnPlayClicked"
+                            IsVisible="{Binding Model.PlaylistDetails.HasItems}" />
+                    <Button x:Name="ManageButton"
+                            AutomationId="PlaylistManageButton"
+                            Text="Verwalten"
+                            Style="{StaticResource SecondaryButton}"
+                            Clicked="OnManageClicked"
+                            IsVisible="{Binding Model.PlaylistDetails.CanManage}" />
+                </HorizontalStackLayout>
+                <Label x:Name="ManageNoticeLabel"
+                       AutomationId="PlaylistManageNoticeLabel"
+                       Style="{StaticResource Caption}"
+                       FontSize="12"
+                       IsVisible="False" />
             </VerticalStackLayout>
         </Grid>
 
@@ -109,7 +125,7 @@
                     <Border Style="{StaticResource Card}"
                             Padding="12"
                             Margin="0,0,0,12">
-                        <Grid ColumnDefinitions="64,*"
+                        <Grid ColumnDefinitions="64,*,Auto"
                               ColumnSpacing="16">
                             <Border Grid.Column="0"
                                     WidthRequest="64"
@@ -147,6 +163,19 @@
                                        Style="{StaticResource Caption}"
                                        IsVisible="{Binding HasParentTitle}" />
                             </VerticalStackLayout>
+                            <!-- Kontextschalter des Eintrags (eindeutige
+                                 AutomationId je Eintrag — die UIA-Sicht
+                                 der CollectionView-Elemente ist lückenhaft,
+                                 die Schalter adressiert die DevApi). -->
+                            <Button Grid.Column="2"
+                                    Text="⋮"
+                                    FontSize="20"
+                                    AutomationId="{Binding EntryMenuAutomationId}"
+                                    BindingContext="{Binding .}"
+                                    Clicked="OnEntryMenuClicked"
+                                    VerticalOptions="Start"
+                                    WidthRequest="44"
+                                    IsVisible="{Binding Source={x:Reference RootPage}, Path=BindingContext.Model.PlaylistDetails.CanManage}" />
                         </Grid>
                     </Border>
                 </DataTemplate>
@@ -172,6 +201,16 @@
                 </Grid>
             </CollectionView.Footer>
         </CollectionView>
+
+        <!-- Dialog-Panels der Playlist-Verwaltung (überlagern den Inhalt) -->
+        <controls:PlaylistFormPanel x:Name="PlaylistFormPanel"
+                                    Grid.Row="0"
+                                    Grid.RowSpan="5"
+                                    Margin="-16" />
+        <controls:PlaylistGenreEditorPanel x:Name="PlaylistGenreEditorPanel"
+                                           Grid.Row="0"
+                                           Grid.RowSpan="5"
+                                           Margin="-16" />
     </Grid>
 
 </ContentPage>

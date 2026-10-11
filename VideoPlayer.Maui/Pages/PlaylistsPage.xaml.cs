@@ -69,6 +69,12 @@ public partial class PlaylistsPage : ContentPage
         ErrorLabel.Text = page.Error;
         EmptyLabel.IsVisible = page.ShowEmpty;
         PlaylistsCollection.IsVisible = page.HasItems;
+        PlaylistFormPanel.ApplyModel(model);
+    }
+
+    private void OnCreatePlaylistClicked(object? sender, EventArgs e)
+    {
+        _ = mvuHost.DispatchAsync(new PlaylistCreateRequestedMessage());
     }
 
     private void OnPlaylistSelected(object? sender, SelectionChangedEventArgs e)

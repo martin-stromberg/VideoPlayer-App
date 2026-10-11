@@ -89,6 +89,57 @@ public static class AppUpdate
     /// <summary>Fehlertext der Playlist-Detailseite bei fehlgeschlagenem Eintragsabruf.</summary>
     public const string PlaylistEntriesLoadError = "Die Einträge konnten nicht geladen werden.";
 
+    /// <summary>Validierungstext des Playlist-Formulars bei leerem Namen.</summary>
+    public const string PlaylistNameRequiredError = "Bitte einen Namen für die Playlist eingeben.";
+
+    /// <summary>Fehlertext des Playlist-Formulars bei fehlgeschlagenem Speichern.</summary>
+    public const string PlaylistSaveError = "Die Playlist konnte nicht gespeichert werden.";
+
+    /// <summary>Fehlertext der Detailseite bei fehlgeschlagenem Löschen der Playlist.</summary>
+    public const string PlaylistDeleteError = "Die Playlist konnte nicht gelöscht werden.";
+
+    /// <summary>Fehlertext der Detailseite bei fehlgeschlagenem Entfernen eines Eintrags.</summary>
+    public const string PlaylistEntryRemoveError = "Der Eintrag konnte nicht entfernt werden.";
+
+    /// <summary>Fehlertext der Detailseite bei fehlgeschlagenem Verschieben eines Eintrags.</summary>
+    public const string PlaylistEntryMoveError = "Der Eintrag konnte nicht verschoben werden.";
+
+    /// <summary>Fehlertext der Detailseite bei fehlgeschlagenem Sortiermodus-Wechsel.</summary>
+    public const string PlaylistSortModeError = "Der Sortiermodus konnte nicht geändert werden.";
+
+    /// <summary>Fehlertext des Genre-Editors bei fehlgeschlagenem Laden oder Speichern.</summary>
+    public const string PlaylistGenresError = "Die Genres konnten nicht gespeichert werden.";
+
+    /// <summary>Fehlertext des Genre-Editors bei fehlgeschlagenem Optionsabruf.</summary>
+    public const string PlaylistGenreOptionsLoadError = "Die Genres konnten nicht geladen werden.";
+
+    /// <summary>Fehlertext der Detailseite bei fehlgeschlagener Öffentlich-Umschaltung (z. B. fehlende Administrator-Rechte).</summary>
+    public const string PlaylistPublicError = "Das Öffentlich-Flag konnte nicht geändert werden.";
+
+    /// <summary>Fehlertext der Medien-Detailseite bei fehlgeschlagenem Laden der Playlist-Auswahl.</summary>
+    public const string PlaylistTargetsLoadError = "Die Playlists konnten nicht geladen werden.";
+
+    /// <summary>Fehlertext der Medien-Detailseite bei fehlgeschlagenem Hinzufügen zu einer Playlist.</summary>
+    public const string PlaylistEntryAddError = "Das Medium konnte nicht zur Playlist hinzugefügt werden.";
+
+    /// <summary>Erfolgstext der Eintrags-Entfernung (Hinweiszeile der Detailseite).</summary>
+    public const string PlaylistEntryRemovedNotice = "Der Eintrag wurde entfernt.";
+
+    /// <summary>Erfolgstext eines Eintrags-Verschiebens (Hinweiszeile der Detailseite).</summary>
+    public const string PlaylistEntryMovedNotice = "Der Eintrag wurde verschoben.";
+
+    /// <summary>Erfolgstext der Genre-Aktualisierung (Hinweiszeile der Detailseite).</summary>
+    public const string PlaylistGenresSavedNotice = "Die Genres wurden aktualisiert.";
+
+    /// <summary>Erfolgstext der Öffentlich-Umschaltung (Hinweiszeile der Detailseite).</summary>
+    public const string PlaylistPublicSavedNotice = "Die Sichtbarkeit wurde geändert.";
+
+    /// <summary>Erfolgstext des Sortiermodus-Wechsels (Hinweiszeile der Detailseite).</summary>
+    public const string PlaylistSortModeSavedNotice = "Der Sortiermodus wurde geändert.";
+
+    /// <summary>Hinweistext der Playlist-Auswahl ohne eigene Playlist (Klartext-Alternative zur Auswahl).</summary>
+    public const string PlaylistNoTargetsNotice = "Es gibt noch keine eigene Playlist — lege sie zuerst im Bereich „Playlists“ an.";
+
     /// <summary>
     /// Wendet eine Nachricht auf das übergebene Model an und liefert den
     /// Übergang: das neue Model plus die daraus resultierenden Effekte.
@@ -178,6 +229,39 @@ public static class AppUpdate
             PlaylistNextRequestedMessage => UpdatePlaylistNextRequested(model),
             PlaylistPreviousRequestedMessage => UpdatePlaylistPreviousRequested(model),
             PlaylistNavigationCompletedMessage completed => UpdatePlaylistNavigationCompleted(model, completed),
+            PlaylistCreateRequestedMessage => UpdatePlaylistCreateRequested(model),
+            PlaylistEditRequestedMessage => UpdatePlaylistEditRequested(model),
+            PlaylistFormNameChangedMessage changed => UpdatePlaylistFormNameChanged(model, changed),
+            PlaylistFormDescriptionChangedMessage changed => UpdatePlaylistFormDescriptionChanged(model, changed),
+            PlaylistFormSortModeSelectedMessage selected => UpdatePlaylistFormSortModeSelected(model, selected),
+            PlaylistFormCancelMessage => UpdatePlaylistFormCancel(model),
+            PlaylistFormSaveRequestedMessage => UpdatePlaylistFormSaveRequested(model),
+            PlaylistFormCompletedMessage completed => UpdatePlaylistFormCompleted(model, completed),
+            PlaylistDeleteConfirmedMessage confirmed => UpdatePlaylistDeleteConfirmed(model, confirmed),
+            PlaylistDeletedMessage deleted => UpdatePlaylistDeleted(model, deleted),
+            PlaylistEntryRemoveRequestedMessage requested => UpdatePlaylistEntryRemoveRequested(model, requested),
+            PlaylistEntryRemoveCompletedMessage completed => UpdatePlaylistEntryRemoveCompleted(model, completed),
+            PlaylistEntryRemoveConfirmedMessage confirmed => UpdatePlaylistEntryRemoveConfirmed(model, confirmed),
+            PlaylistEntryMoveToBeginningRequestedMessage requested => UpdatePlaylistEntryMoveToBeginningRequested(model, requested),
+            PlaylistEntryMoveToEndRequestedMessage requested => UpdatePlaylistEntryMoveToEndRequested(model, requested),
+            PlaylistEntryMoveBetweenRequestedMessage requested => UpdatePlaylistEntryMoveBetweenRequested(model, requested),
+            PlaylistEntryMoveCompletedMessage completed => UpdatePlaylistEntryMoveCompleted(model, completed),
+            PlaylistSortModeRequestedMessage requested => UpdatePlaylistSortModeRequested(model, requested),
+            PlaylistSortModeCompletedMessage completed => UpdatePlaylistSortModeCompleted(model, completed),
+            PlaylistSortModeConfirmedMessage confirmed => UpdatePlaylistSortModeConfirmed(model, confirmed),
+            PlaylistGenreEditorRequestedMessage => UpdatePlaylistGenreEditorRequested(model),
+            PlaylistGenreOptionsLoadedMessage loaded => UpdatePlaylistGenreOptionsLoaded(model, loaded),
+            PlaylistGenreToggledMessage toggled => UpdatePlaylistGenreToggled(model, toggled),
+            PlaylistGenresSaveRequestedMessage => UpdatePlaylistGenresSaveRequested(model),
+            PlaylistGenresResetRequestedMessage => UpdatePlaylistGenresResetRequested(model),
+            PlaylistGenresCompletedMessage completed => UpdatePlaylistGenresCompleted(model, completed),
+            PlaylistGenreEditorCancelMessage => UpdatePlaylistGenreEditorCancel(model),
+            PlaylistPublicToggledMessage toggled => UpdatePlaylistPublicToggled(model, toggled),
+            PlaylistPublicCompletedMessage completed => UpdatePlaylistPublicCompleted(model, completed),
+            PlaylistAddTargetsRequestedMessage => UpdatePlaylistAddTargetsRequested(model),
+            PlaylistTargetsLoadedMessage loaded => UpdatePlaylistTargetsLoaded(model, loaded),
+            PlaylistPickerDismissedMessage dismissed => UpdatePlaylistPickerDismissed(model, dismissed),
+            PlaylistEntryAddedMessage added => UpdatePlaylistEntryAdded(model, added),
             ProfilePageOpenedMessage => UpdateProfilePageOpened(model),
             ProfileInfoLoadedMessage loaded => UpdateProfileInfoLoaded(model, loaded),
             PlayRequestedMessage play => UpdatePlayRequested(model, play),
@@ -2061,6 +2145,11 @@ public static class AppUpdate
         Description = item.Description,
         SortMode = item.SortMode,
         CoverPictureId = item.CoverPictureId,
+        IsOwner = item.IsOwner,
+        IsPublic = item.IsPublic,
+        GenresManuallyOverridden = item.GenresManuallyOverridden,
+        AllGenreIds = item.AllGenreIds,
+        GenreText = item.GenreText,
         IsLoading = true,
         HasMore = true
     };
@@ -2080,10 +2169,14 @@ public static class AppUpdate
             return AppTransition.Unchanged(model);
         }
 
+        // Der Kopf-Nachschlag läuft mit: er frischt Besitzer-/Genre-/
+        // Öffentlich-Felder auf und liefert den IsAdmin-Claim — Grundlage
+        // der Verwaltungs-Schalter.
         return new AppTransition(
             model with { PlaylistDetails = NewPlaylistDetails(item) },
             [
                 new NavigateToPlaylistDetailsEffect(item.PlaylistId, item.Name),
+                new LoadPlaylistDetailsEffect(item.PlaylistId),
                 new LoadPlaylistEntriesEffect(item.PlaylistId, 1, Append: false)
             ]);
     }
@@ -2127,9 +2220,18 @@ public static class AppUpdate
     private static AppTransition UpdatePlaylistDetailsLoaded(AppModel model, PlaylistDetailsLoadedMessage message)
     {
         var details = model.PlaylistDetails;
-        if (!details.IsActive || details.PlaylistId != message.PlaylistId || message.Info is null)
+        if (!details.IsActive || details.PlaylistId != message.PlaylistId)
         {
             return AppTransition.Unchanged(model);
+        }
+
+        // Der Admin-Claim gehört zur Nachricht auch ohne Kopfdaten —
+        // er steuert die Sichtbarkeit des Öffentlich-Schalters.
+        if (message.Info is null)
+        {
+            return new AppTransition(
+                model with { PlaylistDetails = details with { IsAdmin = message.IsAdmin } },
+                []);
         }
 
         return new AppTransition(
@@ -2140,7 +2242,13 @@ public static class AppUpdate
                     Name = message.Info.Name,
                     Description = message.Info.Description,
                     SortMode = message.Info.SortMode,
-                    CoverPictureId = message.Info.CoverPictureId
+                    CoverPictureId = message.Info.CoverPictureId,
+                    IsOwner = message.Info.IsOwner,
+                    IsPublic = message.Info.IsPublic,
+                    IsAdmin = message.IsAdmin,
+                    GenresManuallyOverridden = message.Info.GenresManuallyOverridden,
+                    AllGenreIds = message.Info.AllGenreIds,
+                    GenreText = message.Info.GenreText
                 }
             },
             []);
@@ -2484,6 +2592,867 @@ public static class AppUpdate
                 }
             },
             [new AdvancePlaylistEntryEffect(player.PlaylistId!.Value, player.PlaylistEntryId)]);
+    }
+
+    // --- Playlist-Verwaltung (Schritt 6) ---
+
+    private static AppTransition UpdatePlaylistCreateRequested(AppModel model)
+    {
+        if (model.ConnectionState != ConnectionState.Connected || model.PlaylistForm.IsSaving)
+        {
+            return AppTransition.Unchanged(model);
+        }
+
+        return new AppTransition(
+            model with
+            {
+                PlaylistForm = new PlaylistFormState
+                {
+                    IsOpen = true,
+                    EditingPlaylistId = null,
+                    Name = string.Empty,
+                    Description = null,
+                    SortMode = ApiClient.Models.PlaylistSortModeValues.Manual
+                }
+            },
+            []);
+    }
+
+    private static AppTransition UpdatePlaylistEditRequested(AppModel model)
+    {
+        var details = model.PlaylistDetails;
+        if (!details.CanManage || model.PlaylistForm.IsSaving)
+        {
+            return AppTransition.Unchanged(model);
+        }
+
+        return new AppTransition(
+            model with
+            {
+                PlaylistForm = new PlaylistFormState
+                {
+                    IsOpen = true,
+                    EditingPlaylistId = details.PlaylistId,
+                    Name = details.Name,
+                    Description = details.Description,
+                    SortMode = details.SortMode
+                }
+            },
+            []);
+    }
+
+    private static AppTransition UpdatePlaylistFormNameChanged(AppModel model, PlaylistFormNameChangedMessage message)
+    {
+        if (!model.PlaylistForm.IsOpen)
+        {
+            return AppTransition.Unchanged(model);
+        }
+
+        return new AppTransition(
+            model with { PlaylistForm = model.PlaylistForm with { Name = message.Name, Error = null } },
+            []);
+    }
+
+    private static AppTransition UpdatePlaylistFormDescriptionChanged(AppModel model, PlaylistFormDescriptionChangedMessage message)
+    {
+        if (!model.PlaylistForm.IsOpen)
+        {
+            return AppTransition.Unchanged(model);
+        }
+
+        return new AppTransition(
+            model with { PlaylistForm = model.PlaylistForm with { Description = message.Description } },
+            []);
+    }
+
+    private static AppTransition UpdatePlaylistFormSortModeSelected(AppModel model, PlaylistFormSortModeSelectedMessage message)
+    {
+        var form = model.PlaylistForm;
+        // Der Sortiermodus ist wie in der Server-UI nur bei Neuanlage wählbar.
+        if (!form.IsOpen || form.IsEditing || form.IsSaving)
+        {
+            return AppTransition.Unchanged(model);
+        }
+
+        return new AppTransition(
+            model with { PlaylistForm = form with { SortMode = message.SortMode } },
+            []);
+    }
+
+    private static AppTransition UpdatePlaylistFormCancel(AppModel model)
+    {
+        if (!model.PlaylistForm.IsOpen || model.PlaylistForm.IsSaving)
+        {
+            return AppTransition.Unchanged(model);
+        }
+
+        return new AppTransition(
+            model with { PlaylistForm = PlaylistFormState.Closed },
+            []);
+    }
+
+    private static AppTransition UpdatePlaylistFormSaveRequested(AppModel model)
+    {
+        var form = model.PlaylistForm;
+        if (!form.IsOpen || form.IsSaving)
+        {
+            return AppTransition.Unchanged(model);
+        }
+
+        // Name ist serverseitig Pflicht — leere Eingaben bleiben mit
+        // Inline-Text im Formular (keine Serveranfrage).
+        if (string.IsNullOrWhiteSpace(form.Name))
+        {
+            return new AppTransition(
+                model with { PlaylistForm = form with { Error = PlaylistNameRequiredError } },
+                []);
+        }
+
+        if (model.ConnectionState != ConnectionState.Connected)
+        {
+            return new AppTransition(
+                model with { PlaylistForm = form with { Error = PlaylistsOfflineError } },
+                []);
+        }
+
+        return new AppTransition(
+            model with { PlaylistForm = form with { IsSaving = true, Error = null } },
+            [new SavePlaylistEffect(
+                form.EditingPlaylistId,
+                form.Name.Trim(),
+                string.IsNullOrWhiteSpace(form.Description) ? null : form.Description.Trim(),
+                form.SortMode)]);
+    }
+
+    private static AppTransition UpdatePlaylistFormCompleted(AppModel model, PlaylistFormCompletedMessage message)
+    {
+        if (message.Saved is not { } saved)
+        {
+            // Fehlschlag: das Formular bleibt mit dem Fehlertext geöffnet.
+            return new AppTransition(
+                model with
+                {
+                    PlaylistForm = model.PlaylistForm with
+                    {
+                        IsSaving = false,
+                        Error = message.Error ?? PlaylistSaveError
+                    }
+                },
+                []);
+        }
+
+        var effects = new List<AppEffect>();
+        var details = model.PlaylistDetails;
+        // Nach dem Speichern den aktuellen Kontext auffrischen: Übersicht
+        // neu laden (Anlage erscheint in der Liste) und — wenn die
+        // bearbeitete Playlist offen ist — ihre Kopfdaten übernehmen.
+        effects.Add(new LoadPlaylistsEffect());
+        if (details.IsActive && details.PlaylistId == saved.PlaylistId)
+        {
+            details = details with
+            {
+                Name = saved.Name,
+                Description = saved.Description,
+                SortMode = saved.SortMode,
+                GenresManuallyOverridden = saved.GenresManuallyOverridden,
+                AllGenreIds = saved.AllGenreIds,
+                GenreText = saved.GenreText,
+                ManageNotice = null,
+                ManageNoticeIsError = false
+            };
+        }
+
+        return new AppTransition(
+            model with
+            {
+                PlaylistForm = PlaylistFormState.Closed,
+                PlaylistDetails = details
+            },
+            effects);
+    }
+
+    private static AppTransition UpdatePlaylistDeleteConfirmed(AppModel model, PlaylistDeleteConfirmedMessage message)
+    {
+        var details = model.PlaylistDetails;
+        if (!details.CanManage
+            || details.PlaylistId != message.PlaylistId
+            || details.IsManaging)
+        {
+            return AppTransition.Unchanged(model);
+        }
+
+        return new AppTransition(
+            model with { PlaylistDetails = details with { IsManaging = true } },
+            [new DeletePlaylistEffect(message.PlaylistId)]);
+    }
+
+    private static AppTransition UpdatePlaylistDeleted(AppModel model, PlaylistDeletedMessage message)
+    {
+        var details = model.PlaylistDetails;
+        if (details.PlaylistId != message.PlaylistId)
+        {
+            return AppTransition.Unchanged(model);
+        }
+
+        if (message.Error is { } error)
+        {
+            return new AppTransition(
+                model with
+                {
+                    PlaylistDetails = details with
+                    {
+                        IsManaging = false,
+                        ManageNotice = error,
+                        ManageNoticeIsError = true
+                    }
+                },
+                []);
+        }
+
+        // Die Playlist existiert nicht mehr: Detail-Kontext leeren, zur
+        // Übersicht zurückkehren und ihre Liste auffrischen.
+        return new AppTransition(
+            model with { PlaylistDetails = PlaylistDetailsState.Empty },
+            [new NavigateBackEffect(), new LoadPlaylistsEffect()]);
+    }
+
+    /// <summary>Gemeinsame Wache der Eintrags-Verwaltung (Entfernen/Verschieben): eigene, aktive Playlist ohne laufende Operation.</summary>
+    /// <param name="model">Aktuelles App-Model.</param>
+    /// <param name="entry">Der betroffene Eintrag.</param>
+    /// <returns><c>true</c>, wenn die Aktion erlaubt ist.</returns>
+    private static bool CanManageEntry(AppModel model, PlaylistEntryItem entry)
+    {
+        var details = model.PlaylistDetails;
+        return details.CanManage
+            && !details.IsManaging
+            && entry.EntryId > 0;
+    }
+
+    private static AppTransition UpdatePlaylistEntryRemoveRequested(AppModel model, PlaylistEntryRemoveRequestedMessage message)
+    {
+        var details = model.PlaylistDetails;
+        if (!CanManageEntry(model, message.Entry) || details.IndexOfEntry(message.Entry) < 0)
+        {
+            return AppTransition.Unchanged(model);
+        }
+
+        return new AppTransition(
+            model with { PlaylistDetails = details with { IsManaging = true } },
+            [new RemovePlaylistEntryEffect(details.PlaylistId, message.Entry, ConfirmContinueWatchingRemoval: false)]);
+    }
+
+    private static AppTransition UpdatePlaylistEntryRemoveCompleted(AppModel model, PlaylistEntryRemoveCompletedMessage message)
+    {
+        var details = model.PlaylistDetails;
+        if (!details.IsActive)
+        {
+            return AppTransition.Unchanged(model);
+        }
+
+        if (message.RequiresConfirmation)
+        {
+            // Weiterschauen-Konflikt (409): der Eintrag bleibt vorerst —
+            // die Seite öffnet einmalig den Bestätigungsdialog.
+            return new AppTransition(
+                model with
+                {
+                    PlaylistDetails = details with
+                    {
+                        IsManaging = false,
+                        PendingRemoveConflict = message.Entry
+                    }
+                },
+                []);
+        }
+
+        if (message.Error is { } error)
+        {
+            return new AppTransition(
+                model with
+                {
+                    PlaylistDetails = details with
+                    {
+                        IsManaging = false,
+                        ManageNotice = error,
+                        ManageNoticeIsError = true
+                    }
+                },
+                []);
+        }
+
+        return new AppTransition(
+            model with
+            {
+                PlaylistDetails = details with
+                {
+                    IsManaging = false,
+                    PendingRemoveConflict = null,
+                    ManageNotice = PlaylistEntryRemovedNotice,
+                    ManageNoticeIsError = false,
+                    IsLoading = true
+                }
+            },
+            [new LoadPlaylistEntriesEffect(details.PlaylistId, 1, Append: false)]);
+    }
+
+    private static AppTransition UpdatePlaylistEntryRemoveConfirmed(AppModel model, PlaylistEntryRemoveConfirmedMessage message)
+    {
+        var details = model.PlaylistDetails;
+        var pending = details.PendingRemoveConflict;
+        if (!details.IsActive || pending is null)
+        {
+            return AppTransition.Unchanged(model);
+        }
+
+        if (!message.Confirmed)
+        {
+            // Abbruch: der Konflikt löst sich ohne Serveraufruf auf.
+            return new AppTransition(
+                model with
+                {
+                    PlaylistDetails = details with { PendingRemoveConflict = null }
+                },
+                []);
+        }
+
+        return new AppTransition(
+            model with
+            {
+                PlaylistDetails = details with
+                {
+                    IsManaging = true,
+                    PendingRemoveConflict = null
+                }
+            },
+            [new RemovePlaylistEntryEffect(details.PlaylistId, pending, ConfirmContinueWatchingRemoval: true)]);
+    }
+
+    private static AppTransition UpdatePlaylistEntryMoveToBeginningRequested(AppModel model, PlaylistEntryMoveToBeginningRequestedMessage message)
+    {
+        var details = model.PlaylistDetails;
+        if (!details.CanReorder || details.IsManaging || details.IsFirstEntry(message.Entry))
+        {
+            return AppTransition.Unchanged(model);
+        }
+
+        return new AppTransition(
+            model with { PlaylistDetails = details with { IsManaging = true } },
+            [new MovePlaylistEntryToBeginningEffect(details.PlaylistId, message.Entry)]);
+    }
+
+    private static AppTransition UpdatePlaylistEntryMoveToEndRequested(AppModel model, PlaylistEntryMoveToEndRequestedMessage message)
+    {
+        var details = model.PlaylistDetails;
+        if (!details.CanReorder || details.IsManaging || details.IsLastEntry(message.Entry))
+        {
+            return AppTransition.Unchanged(model);
+        }
+
+        return new AppTransition(
+            model with { PlaylistDetails = details with { IsManaging = true } },
+            [new MovePlaylistEntryToEndEffect(details.PlaylistId, message.Entry)]);
+    }
+
+    private static AppTransition UpdatePlaylistEntryMoveBetweenRequested(AppModel model, PlaylistEntryMoveBetweenRequestedMessage message)
+    {
+        var details = model.PlaylistDetails;
+        if (!details.CanReorder || details.IsManaging || details.IndexOfEntry(message.Entry) < 0)
+        {
+            return AppTransition.Unchanged(model);
+        }
+
+        return new AppTransition(
+            model with { PlaylistDetails = details with { IsManaging = true } },
+            [new MovePlaylistEntryBetweenEffect(details.PlaylistId, message.Entry, message.NewSortOrder)]);
+    }
+
+    private static AppTransition UpdatePlaylistEntryMoveCompleted(AppModel model, PlaylistEntryMoveCompletedMessage message)
+    {
+        var details = model.PlaylistDetails;
+        if (!details.IsActive)
+        {
+            return AppTransition.Unchanged(model);
+        }
+
+        if (message.Error is { } error)
+        {
+            return new AppTransition(
+                model with
+                {
+                    PlaylistDetails = details with
+                    {
+                        IsManaging = false,
+                        ManageNotice = error,
+                        ManageNoticeIsError = true
+                    }
+                },
+                []);
+        }
+
+        return new AppTransition(
+            model with
+            {
+                PlaylistDetails = details with
+                {
+                    IsManaging = false,
+                    ManageNotice = PlaylistEntryMovedNotice,
+                    ManageNoticeIsError = false,
+                    IsLoading = true
+                }
+            },
+            [new LoadPlaylistEntriesEffect(details.PlaylistId, 1, Append: false)]);
+    }
+
+    private static AppTransition UpdatePlaylistSortModeRequested(AppModel model, PlaylistSortModeRequestedMessage message)
+    {
+        var details = model.PlaylistDetails;
+        if (!details.CanManage
+            || details.IsManaging
+            || string.IsNullOrWhiteSpace(message.NewSortMode)
+            || message.NewSortMode == details.SortMode)
+        {
+            return AppTransition.Unchanged(model);
+        }
+
+        return new AppTransition(
+            model with { PlaylistDetails = details with { IsManaging = true } },
+            [new ChangePlaylistSortModeEffect(
+                details.PlaylistId, message.NewSortMode, ConfirmLossOfManualOrder: false)]);
+    }
+
+    private static AppTransition UpdatePlaylistSortModeCompleted(AppModel model, PlaylistSortModeCompletedMessage message)
+    {
+        var details = model.PlaylistDetails;
+        if (!details.IsActive)
+        {
+            return AppTransition.Unchanged(model);
+        }
+
+        if (message.RequiresConfirmation)
+        {
+            // Verlust-Konflikt (409): die Seite öffnet einmalig den
+            // Bestätigungsdialog zum Verwerfen der manuellen Reihenfolge.
+            return new AppTransition(
+                model with
+                {
+                    PlaylistDetails = details with
+                    {
+                        IsManaging = false,
+                        PendingSortModeConflict = message.NewSortMode
+                    }
+                },
+                []);
+        }
+
+        if (message.Error is { } error)
+        {
+            return new AppTransition(
+                model with
+                {
+                    PlaylistDetails = details with
+                    {
+                        IsManaging = false,
+                        ManageNotice = error,
+                        ManageNoticeIsError = true
+                    }
+                },
+                []);
+        }
+
+        if (message.Updated is null)
+        {
+            return AppTransition.Unchanged(model);
+        }
+
+        // Der Wechsel kann die Eintragsreihenfolge serverseitig ändern —
+        // Kopf übernehmen und die Liste neu laden.
+        return new AppTransition(
+            model with
+            {
+                PlaylistDetails = details with
+                {
+                    IsManaging = false,
+                    IsLoading = true,
+                    SortMode = message.Updated.SortMode,
+                    ManageNotice = PlaylistSortModeSavedNotice,
+                    ManageNoticeIsError = false
+                }
+            },
+            [new LoadPlaylistEntriesEffect(details.PlaylistId, 1, Append: false)]);
+    }
+
+    private static AppTransition UpdatePlaylistSortModeConfirmed(AppModel model, PlaylistSortModeConfirmedMessage message)
+    {
+        var details = model.PlaylistDetails;
+        var pending = details.PendingSortModeConflict;
+        if (!details.IsActive || pending is null)
+        {
+            return AppTransition.Unchanged(model);
+        }
+
+        if (!message.Confirmed)
+        {
+            return new AppTransition(
+                model with
+                {
+                    PlaylistDetails = details with { PendingSortModeConflict = null }
+                },
+                []);
+        }
+
+        return new AppTransition(
+            model with
+            {
+                PlaylistDetails = details with
+                {
+                    IsManaging = true,
+                    PendingSortModeConflict = null
+                }
+            },
+            [new ChangePlaylistSortModeEffect(
+                details.PlaylistId, pending, ConfirmLossOfManualOrder: true)]);
+    }
+
+    private static AppTransition UpdatePlaylistGenreEditorRequested(AppModel model)
+    {
+        var details = model.PlaylistDetails;
+        if (!details.CanManage || details.IsManaging || model.PlaylistGenreEditor.IsOpen)
+        {
+            return AppTransition.Unchanged(model);
+        }
+
+        return new AppTransition(
+            model with
+            {
+                PlaylistGenreEditor = new PlaylistGenreEditorState
+                {
+                    IsOpen = true,
+                    PlaylistId = details.PlaylistId,
+                    IsLoading = true
+                }
+            },
+            [new LoadGenreOptionsEffect(details.PlaylistId)]);
+    }
+
+    private static AppTransition UpdatePlaylistGenreOptionsLoaded(AppModel model, PlaylistGenreOptionsLoadedMessage message)
+    {
+        var editor = model.PlaylistGenreEditor;
+        if (!editor.IsOpen)
+        {
+            return AppTransition.Unchanged(model);
+        }
+
+        // Vorauswahl = aktuelle serverseitige Genre-Ids der Playlist.
+        var selected = model.PlaylistDetails.AllGenreIds.ToHashSet();
+        var options = message.Options
+            .Select(o => o with { IsSelected = selected.Contains(o.Id) })
+            .ToList();
+
+        return new AppTransition(
+            model with
+            {
+                PlaylistGenreEditor = editor with
+                {
+                    Options = options,
+                    IsLoading = false,
+                    Error = message.Error
+                }
+            },
+            []);
+    }
+
+    private static AppTransition UpdatePlaylistGenreToggled(AppModel model, PlaylistGenreToggledMessage message)
+    {
+        var editor = model.PlaylistGenreEditor;
+        if (!editor.IsOpen || editor.IsSaving)
+        {
+            return AppTransition.Unchanged(model);
+        }
+
+        var options = editor.Options
+            .Select(o => o.Id == message.GenreId ? o with { IsSelected = !o.IsSelected } : o)
+            .ToList();
+
+        return new AppTransition(
+            model with { PlaylistGenreEditor = editor with { Options = options } },
+            []);
+    }
+
+    private static AppTransition UpdatePlaylistGenresSaveRequested(AppModel model)
+    {
+        var editor = model.PlaylistGenreEditor;
+        var details = model.PlaylistDetails;
+        if (!editor.IsOpen || editor.IsLoading || editor.IsSaving
+            || !details.CanManage || details.IsManaging)
+        {
+            return AppTransition.Unchanged(model);
+        }
+
+        return new AppTransition(
+            model with
+            {
+                PlaylistGenreEditor = editor with { IsSaving = true, Error = null }
+            },
+            [new SetPlaylistGenresEffect(editor.PlaylistId, editor.SelectedIds)]);
+    }
+
+    private static AppTransition UpdatePlaylistGenresResetRequested(AppModel model)
+    {
+        var editor = model.PlaylistGenreEditor;
+        var details = model.PlaylistDetails;
+        if (!editor.IsOpen || editor.IsLoading || editor.IsSaving
+            || !details.CanManage || details.IsManaging
+            || !details.GenresManuallyOverridden)
+        {
+            return AppTransition.Unchanged(model);
+        }
+
+        return new AppTransition(
+            model with
+            {
+                PlaylistGenreEditor = editor with { IsSaving = true, Error = null }
+            },
+            [new ResetPlaylistGenresEffect(editor.PlaylistId)]);
+    }
+
+    private static AppTransition UpdatePlaylistGenresCompleted(AppModel model, PlaylistGenresCompletedMessage message)
+    {
+        var editor = model.PlaylistGenreEditor;
+        var details = model.PlaylistDetails;
+        if (!editor.IsOpen)
+        {
+            return AppTransition.Unchanged(model);
+        }
+
+        if (message.Updated is not { } updated)
+        {
+            return new AppTransition(
+                model with
+                {
+                    PlaylistGenreEditor = editor with
+                    {
+                        IsSaving = false,
+                        Error = message.Error ?? PlaylistGenresError
+                    }
+                },
+                []);
+        }
+
+        // Erfolg: Editor schließen und die Kopfdaten der Detailseite
+        // mit den neuen Genre-Feldern aktualisieren.
+        return new AppTransition(
+            model with
+            {
+                PlaylistGenreEditor = PlaylistGenreEditorState.Closed,
+                PlaylistDetails = details with
+                {
+                    GenresManuallyOverridden = updated.GenresManuallyOverridden,
+                    AllGenreIds = updated.AllGenreIds,
+                    GenreText = updated.GenreText,
+                    ManageNotice = PlaylistGenresSavedNotice,
+                    ManageNoticeIsError = false
+                }
+            },
+            []);
+    }
+
+    private static AppTransition UpdatePlaylistGenreEditorCancel(AppModel model)
+    {
+        if (!model.PlaylistGenreEditor.IsOpen || model.PlaylistGenreEditor.IsSaving)
+        {
+            return AppTransition.Unchanged(model);
+        }
+
+        return new AppTransition(
+            model with { PlaylistGenreEditor = PlaylistGenreEditorState.Closed },
+            []);
+    }
+
+    private static AppTransition UpdatePlaylistPublicToggled(AppModel model, PlaylistPublicToggledMessage message)
+    {
+        var details = model.PlaylistDetails;
+        if (!details.CanManage || !details.CanSetPublic || details.IsManaging
+            || message.IsPublic == details.IsPublic)
+        {
+            return AppTransition.Unchanged(model);
+        }
+
+        return new AppTransition(
+            model with { PlaylistDetails = details with { IsManaging = true } },
+            [new SetPlaylistPublicEffect(details.PlaylistId, message.IsPublic)]);
+    }
+
+    private static AppTransition UpdatePlaylistPublicCompleted(AppModel model, PlaylistPublicCompletedMessage message)
+    {
+        var details = model.PlaylistDetails;
+        if (!details.IsActive)
+        {
+            return AppTransition.Unchanged(model);
+        }
+
+        if (message.Updated is not { } updated)
+        {
+            return new AppTransition(
+                model with
+                {
+                    PlaylistDetails = details with
+                    {
+                        IsManaging = false,
+                        ManageNotice = message.Error ?? PlaylistPublicError,
+                        ManageNoticeIsError = true
+                    }
+                },
+                []);
+        }
+
+        return new AppTransition(
+            model with
+            {
+                PlaylistDetails = details with
+                {
+                    IsManaging = false,
+                    IsPublic = updated.IsPublic,
+                    ManageNotice = PlaylistPublicSavedNotice,
+                    ManageNoticeIsError = false
+                }
+            },
+            []);
+    }
+
+    private static AppTransition UpdatePlaylistAddTargetsRequested(AppModel model)
+    {
+        var details = model.MediaDetails;
+        if (details.Details is null
+            || details.IsLoadingPlaylistTargets
+            || details.IsAddingToPlaylist
+            || model.ConnectionState != ConnectionState.Connected)
+        {
+            return AppTransition.Unchanged(model);
+        }
+
+        // Die Ziele werden nur beim ersten Öffnen geladen — ein
+        // befüllter Stand wird wiederverwendet (eigene Playlists
+        // ändern sich selten zwischen zwei Öffnungen).
+        if (details.PlaylistTargets is not null)
+        {
+            return new AppTransition(
+                model with
+                {
+                    MediaDetails = details with { PlaylistPickerPending = true }
+                },
+                []);
+        }
+
+        return new AppTransition(
+            model with
+            {
+                MediaDetails = details with
+                {
+                    PlaylistPickerPending = true,
+                    IsLoadingPlaylistTargets = true,
+                    AddToPlaylistNotice = null,
+                    AddToPlaylistNoticeIsError = false
+                }
+            },
+            [new LoadPlaylistTargetsEffect()]);
+    }
+
+    private static AppTransition UpdatePlaylistTargetsLoaded(AppModel model, PlaylistTargetsLoadedMessage message)
+    {
+        var details = model.MediaDetails;
+        if (!details.IsLoadingPlaylistTargets)
+        {
+            return AppTransition.Unchanged(model);
+        }
+
+        if (message.Error is { } error)
+        {
+            return new AppTransition(
+                model with
+                {
+                    MediaDetails = details with
+                    {
+                        IsLoadingPlaylistTargets = false,
+                        PlaylistPickerPending = false,
+                        AddToPlaylistNotice = error,
+                        AddToPlaylistNoticeIsError = true
+                    }
+                },
+                []);
+        }
+
+        return new AppTransition(
+            model with
+            {
+                MediaDetails = details with
+                {
+                    IsLoadingPlaylistTargets = false,
+                    PlaylistTargets = message.Targets ?? []
+                }
+            },
+            []);
+    }
+
+    private static AppTransition UpdatePlaylistPickerDismissed(AppModel model, PlaylistPickerDismissedMessage message)
+    {
+        var details = model.MediaDetails;
+        if (!details.PlaylistPickerPending)
+        {
+            return AppTransition.Unchanged(model);
+        }
+
+        var target = details.PlaylistTargets
+            ?.FirstOrDefault(p => p.PlaylistId == message.PlaylistId);
+        var media = details.Details;
+        if (target is null || media is null || media.MediaId <= 0)
+        {
+            // Abbruch oder ungültige Wahl: die Auswahl löst sich auf.
+            return new AppTransition(
+                model with
+                {
+                    MediaDetails = details with { PlaylistPickerPending = false }
+                },
+                []);
+        }
+
+        return new AppTransition(
+            model with
+            {
+                MediaDetails = details with
+                {
+                    PlaylistPickerPending = false,
+                    IsAddingToPlaylist = true,
+                    AddToPlaylistNotice = null,
+                    AddToPlaylistNoticeIsError = false
+                }
+            },
+            [new AddPlaylistEntryEffect(
+                target.PlaylistId, target.Name, media.MediaType, media.MediaId)]);
+    }
+
+    private static AppTransition UpdatePlaylistEntryAdded(AppModel model, PlaylistEntryAddedMessage message)
+    {
+        var details = model.MediaDetails;
+        if (!details.IsAddingToPlaylist)
+        {
+            return AppTransition.Unchanged(model);
+        }
+
+        var notice = message.Error
+            ?? message.ResultMessage
+            ?? $"„{message.PlaylistName}“ wurde ergänzt.";
+
+        return new AppTransition(
+            model with
+            {
+                MediaDetails = details with
+                {
+                    IsAddingToPlaylist = false,
+                    AddToPlaylistNotice = notice,
+                    AddToPlaylistNoticeIsError = message.Error is not null
+                }
+            },
+            []);
     }
 
     private static AppTransition UpdateProfilePageOpened(AppModel model)

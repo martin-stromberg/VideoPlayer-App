@@ -235,6 +235,48 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
                 await NavigatePlaylistEntryAsync(
                     advance.PlaylistId, advance.CurrentEntryId, forward: true, advance: true, cancellationToken);
                 break;
+            case SavePlaylistEffect save:
+                await SavePlaylistAsync(save, cancellationToken);
+                break;
+            case DeletePlaylistEffect delete:
+                await DeletePlaylistAsync(delete.PlaylistId, cancellationToken);
+                break;
+            case RemovePlaylistEntryEffect remove:
+                await RemovePlaylistEntryAsync(remove, cancellationToken);
+                break;
+            case MovePlaylistEntryToBeginningEffect move:
+                await MovePlaylistEntryToBeginningAsync(move, cancellationToken);
+                break;
+            case MovePlaylistEntryToEndEffect move:
+                await MovePlaylistEntryToEndAsync(move, cancellationToken);
+                break;
+            case MovePlaylistEntryBetweenEffect move:
+                await MovePlaylistEntryBetweenAsync(move, cancellationToken);
+                break;
+            case ChangePlaylistSortModeEffect sortMode:
+                await ChangePlaylistSortModeAsync(sortMode, cancellationToken);
+                break;
+            case LoadGenreOptionsEffect options:
+                await LoadGenreOptionsAsync(options, cancellationToken);
+                break;
+            case SetPlaylistGenresEffect genres:
+                await SetPlaylistGenresAsync(genres, cancellationToken);
+                break;
+            case ResetPlaylistGenresEffect reset:
+                await ResetPlaylistGenresAsync(reset, cancellationToken);
+                break;
+            case SetPlaylistPublicEffect publish:
+                await SetPlaylistPublicAsync(publish, cancellationToken);
+                break;
+            case LoadPlaylistTargetsEffect:
+                await LoadPlaylistTargetsAsync(cancellationToken);
+                break;
+            case AddPlaylistEntryEffect add:
+                await AddPlaylistEntryAsync(add, cancellationToken);
+                break;
+            case NavigateBackEffect:
+                await MainThread.InvokeOnMainThreadAsync(NavigateBackAsync);
+                break;
             case LoadProfileInfoEffect:
                 await LoadProfileInfoAsync(cancellationToken);
                 break;
@@ -969,10 +1011,15 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
     private async Task LoadPlaylistDetailsAsync(LoadPlaylistDetailsEffect details, CancellationToken cancellationToken)
     {
         PlaylistListItem? info = null;
+        var isAdmin = false;
         try
         {
-            info = await services.GetRequiredService<PlaylistService>()
-                .LoadPlaylistAsync(details.PlaylistId, cancellationToken);
+            var service = services.GetRequiredService<PlaylistService>();
+            info = await service.LoadPlaylistAsync(details.PlaylistId, cancellationToken);
+            // Der IsAdmin-Claim steuert die Sichtbarkeit des
+            // Öffentlich-Schalters; er ist nicht fatal — bei Fehlschlag
+            // bleibt er ausgeblendet.
+            isAdmin = await service.IsCurrentUserAdminAsync();
         }
         catch (Exception ex)
         {
@@ -981,7 +1028,7 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
             logger.LogError(ex, "Playlist-Kopfdaten laden fehlgeschlagen");
         }
 
-        await DispatchMessageAsync(new PlaylistDetailsLoadedMessage(details.PlaylistId, info));
+        await DispatchMessageAsync(new PlaylistDetailsLoadedMessage(details.PlaylistId, info, isAdmin));
     }
 
     private async Task LoadPlaylistEntriesAsync(LoadPlaylistEntriesEffect entries, CancellationToken cancellationToken)
@@ -1002,6 +1049,276 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
 
         await DispatchMessageAsync(new PlaylistEntriesLoadedMessage(
             entries.PlaylistId, page.Page, page.Items, page.HasMore, page.TotalCount, entries.Append, error));
+    }
+
+    // --- Playlist-Verwaltung (Schritt 6) ---
+
+    private async Task SavePlaylistAsync(SavePlaylistEffect save, CancellationToken cancellationToken)
+    {
+        PlaylistListItem? saved = null;
+        string? error = null;
+        try
+        {
+            var service = services.GetRequiredService<PlaylistService>();
+            saved = save.EditingPlaylistId is { } playlistId
+                ? await service.UpdatePlaylistAsync(
+                    playlistId, save.Name, save.Description, cancellationToken)
+                : await service.CreatePlaylistAsync(
+                    save.Name, save.Description, save.SortMode, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Playlist speichern fehlgeschlagen");
+            error = AppUpdate.PlaylistSaveError;
+        }
+
+        await DispatchMessageAsync(new PlaylistFormCompletedMessage(saved, error));
+    }
+
+    private async Task DeletePlaylistAsync(long playlistId, CancellationToken cancellationToken)
+    {
+        string? error = null;
+        try
+        {
+            await services.GetRequiredService<PlaylistService>()
+                .DeletePlaylistAsync(playlistId, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Playlist löschen fehlgeschlagen");
+            error = AppUpdate.PlaylistDeleteError;
+        }
+
+        await DispatchMessageAsync(new PlaylistDeletedMessage(playlistId, error));
+    }
+
+    private async Task RemovePlaylistEntryAsync(RemovePlaylistEntryEffect remove, CancellationToken cancellationToken)
+    {
+        var removed = false;
+        var requiresConfirmation = false;
+        string? error = null;
+        try
+        {
+            var outcome = await services.GetRequiredService<PlaylistService>()
+                .RemoveEntryAsync(
+                    remove.PlaylistId,
+                    remove.Entry.MediaType,
+                    remove.Entry.MediaId,
+                    remove.ConfirmContinueWatchingRemoval,
+                    cancellationToken);
+            removed = outcome.Succeeded;
+            requiresConfirmation = outcome.RequiresConfirmation;
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Playlist-Eintrag entfernen fehlgeschlagen");
+            error = AppUpdate.PlaylistEntryRemoveError;
+        }
+
+        await DispatchMessageAsync(new PlaylistEntryRemoveCompletedMessage(
+            remove.Entry, removed, requiresConfirmation, error));
+    }
+
+    private async Task MovePlaylistEntryToBeginningAsync(
+        MovePlaylistEntryToBeginningEffect move, CancellationToken cancellationToken)
+    {
+        string? error = null;
+        try
+        {
+            await services.GetRequiredService<PlaylistService>()
+                .MoveEntryToBeginningAsync(move.PlaylistId, move.Entry.EntryId, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Playlist-Eintrag an den Anfang verschieben fehlgeschlagen");
+            error = AppUpdate.PlaylistEntryMoveError;
+        }
+
+        await DispatchMessageAsync(new PlaylistEntryMoveCompletedMessage(move.Entry, error));
+    }
+
+    private async Task MovePlaylistEntryToEndAsync(
+        MovePlaylistEntryToEndEffect move, CancellationToken cancellationToken)
+    {
+        string? error = null;
+        try
+        {
+            await services.GetRequiredService<PlaylistService>()
+                .MoveEntryToEndAsync(move.PlaylistId, move.Entry.EntryId, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Playlist-Eintrag ans Ende verschieben fehlgeschlagen");
+            error = AppUpdate.PlaylistEntryMoveError;
+        }
+
+        await DispatchMessageAsync(new PlaylistEntryMoveCompletedMessage(move.Entry, error));
+    }
+
+    private async Task MovePlaylistEntryBetweenAsync(
+        MovePlaylistEntryBetweenEffect move, CancellationToken cancellationToken)
+    {
+        string? error = null;
+        try
+        {
+            await services.GetRequiredService<PlaylistService>()
+                .MoveEntryBetweenAsync(move.PlaylistId, move.Entry.EntryId, move.NewSortOrder, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Playlist-Eintrag verschieben fehlgeschlagen");
+            error = AppUpdate.PlaylistEntryMoveError;
+        }
+
+        await DispatchMessageAsync(new PlaylistEntryMoveCompletedMessage(move.Entry, error));
+    }
+
+    private async Task ChangePlaylistSortModeAsync(
+        ChangePlaylistSortModeEffect sortMode, CancellationToken cancellationToken)
+    {
+        PlaylistListItem? updated = null;
+        var requiresConfirmation = false;
+        string? error = null;
+        try
+        {
+            var result = await services.GetRequiredService<PlaylistService>()
+                .ChangeSortModeAsync(
+                    sortMode.PlaylistId,
+                    sortMode.NewSortMode,
+                    sortMode.ConfirmLossOfManualOrder,
+                    cancellationToken);
+            updated = result.Playlist;
+            requiresConfirmation = result.RequiresConfirmation;
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Playlist-Sortiermodus wechseln fehlgeschlagen");
+            error = AppUpdate.PlaylistSortModeError;
+        }
+
+        await DispatchMessageAsync(new PlaylistSortModeCompletedMessage(
+            sortMode.NewSortMode, updated, requiresConfirmation, error));
+    }
+
+    private async Task LoadGenreOptionsAsync(LoadGenreOptionsEffect options, CancellationToken cancellationToken)
+    {
+        IReadOnlyList<PlaylistGenreOptionItem> genreOptions = [];
+        string? error = null;
+        try
+        {
+            genreOptions = await services.GetRequiredService<PlaylistService>()
+                .LoadGenreOptionsAsync(cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Genre-Optionen laden fehlgeschlagen");
+            error = AppUpdate.PlaylistGenreOptionsLoadError;
+        }
+
+        await DispatchMessageAsync(new PlaylistGenreOptionsLoadedMessage(genreOptions, error));
+    }
+
+    private async Task SetPlaylistGenresAsync(SetPlaylistGenresEffect genres, CancellationToken cancellationToken)
+    {
+        PlaylistListItem? updated = null;
+        string? error = null;
+        try
+        {
+            updated = await services.GetRequiredService<PlaylistService>()
+                .SetGenresAsync(genres.PlaylistId, genres.GenreIds, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Playlist-Genres setzen fehlgeschlagen");
+            error = AppUpdate.PlaylistGenresError;
+        }
+
+        await DispatchMessageAsync(new PlaylistGenresCompletedMessage(updated, error));
+    }
+
+    private async Task ResetPlaylistGenresAsync(ResetPlaylistGenresEffect reset, CancellationToken cancellationToken)
+    {
+        PlaylistListItem? updated = null;
+        string? error = null;
+        try
+        {
+            updated = await services.GetRequiredService<PlaylistService>()
+                .ResetGenresAsync(reset.PlaylistId, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Playlist-Genres zurücksetzen fehlgeschlagen");
+            error = AppUpdate.PlaylistGenresError;
+        }
+
+        await DispatchMessageAsync(new PlaylistGenresCompletedMessage(updated, error));
+    }
+
+    private async Task SetPlaylistPublicAsync(SetPlaylistPublicEffect publish, CancellationToken cancellationToken)
+    {
+        PlaylistListItem? updated = null;
+        string? error = null;
+        try
+        {
+            updated = await services.GetRequiredService<PlaylistService>()
+                .SetPublicAsync(publish.PlaylistId, publish.IsPublic, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Playlist-Öffentlich-Flag setzen fehlgeschlagen");
+            error = AppUpdate.PlaylistPublicError;
+        }
+
+        await DispatchMessageAsync(new PlaylistPublicCompletedMessage(updated, error));
+    }
+
+    private async Task LoadPlaylistTargetsAsync(CancellationToken cancellationToken)
+    {
+        IReadOnlyList<PlaylistListItem>? targets = null;
+        string? error = null;
+        try
+        {
+            targets = await services.GetRequiredService<PlaylistService>()
+                .LoadOwnPlaylistsAsync(cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Playlist-Auswahlziele laden fehlgeschlagen");
+            error = AppUpdate.PlaylistTargetsLoadError;
+        }
+
+        await DispatchMessageAsync(new PlaylistTargetsLoadedMessage(targets, error));
+    }
+
+    private async Task AddPlaylistEntryAsync(AddPlaylistEntryEffect add, CancellationToken cancellationToken)
+    {
+        string? resultMessage = null;
+        string? error = null;
+        try
+        {
+            resultMessage = await services.GetRequiredService<PlaylistService>()
+                .AddMediaToPlaylistAsync(add.PlaylistId, add.MediaType, add.MediaId, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Medium zur Playlist hinzufügen fehlgeschlagen");
+            error = AppUpdate.PlaylistEntryAddError;
+        }
+
+        await DispatchMessageAsync(new PlaylistEntryAddedMessage(
+            add.PlaylistName, resultMessage, error));
+    }
+
+    /// <summary>
+    /// Zur vorherigen Shell-Route zurückkehren („..") — nach dem
+    /// Löschen einer Playlist aus ihrer Detailansicht.
+    /// </summary>
+    private async Task NavigateBackAsync()
+    {
+        if (Shell.Current is { } shell)
+        {
+            await shell.GoToAsync("..");
+        }
     }
 
     /// <summary>
