@@ -187,6 +187,12 @@ public sealed record AppModel
     /// <summary>Zustand der Favoriten-Seite (Menüseite „Favoriten").</summary>
     public FavoritesPageState FavoritesPage { get; init; } = FavoritesPageState.Initial;
 
+    /// <summary>Zustand der Playlists-Übersichtsseite (Menüseite „Playlists").</summary>
+    public PlaylistsPageState PlaylistsPage { get; init; } = PlaylistsPageState.Initial;
+
+    /// <summary>Zustand der Playlist-Detailseite (Shell-Route „playlistdetails").</summary>
+    public PlaylistDetailsState PlaylistDetails { get; init; } = PlaylistDetailsState.Empty;
+
     /// <summary>Zustand der Downloads-Seite (Menüseite „Downloads").</summary>
     public DownloadsPageState Downloads { get; init; } = DownloadsPageState.Initial;
 

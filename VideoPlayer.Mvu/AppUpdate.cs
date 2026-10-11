@@ -80,6 +80,15 @@ public static class AppUpdate
     /// <summary>Fehlertext des Protokollversands, wenn weder ein Mailentwurf geöffnet noch die Datei geteilt werden kann.</summary>
     public const string LogSendFailedError = "Der Protokollversand ist auf diesem Gerät nicht möglich — es konnte weder ein E-Mail-Entwurf geöffnet noch die Datei geteilt werden.";
 
+    /// <summary>Fehlertext der Playlists-Seite ohne Serververbindung (reines Online-Feature, kein Cache-Stand).</summary>
+    public const string PlaylistsOfflineError = "Playlists stehen nur bei bestehender Serververbindung zur Verfügung.";
+
+    /// <summary>Fehlertext der Playlists-Seite bei fehlgeschlagenem Serverabruf.</summary>
+    public const string PlaylistsLoadError = "Die Playlists konnten nicht geladen werden.";
+
+    /// <summary>Fehlertext der Playlist-Detailseite bei fehlgeschlagenem Eintragsabruf.</summary>
+    public const string PlaylistEntriesLoadError = "Die Einträge konnten nicht geladen werden.";
+
     /// <summary>
     /// Wendet eine Nachricht auf das übergebene Model an und liefert den
     /// Übergang: das neue Model plus die daraus resultierenden Effekte.
@@ -155,6 +164,15 @@ public static class AppUpdate
             FavoritesPageLoadedMessage loaded => UpdateFavoritesPageLoaded(model, loaded),
             FavoriteRemoveRequestedMessage requested => UpdateFavoriteRemoveRequested(model, requested),
             FavoriteRemoveCompletedMessage completed => UpdateFavoriteRemoveCompleted(model, completed),
+            PlaylistsPageOpenedMessage => UpdatePlaylistsPageOpened(model),
+            PlaylistsLoadedMessage loaded => UpdatePlaylistsLoaded(model, loaded),
+            PlaylistSelectedMessage selected => UpdatePlaylistSelected(model, selected),
+            PlaylistDetailsOpenedMessage opened => UpdatePlaylistDetailsOpened(model, opened),
+            PlaylistDetailsLoadedMessage loaded => UpdatePlaylistDetailsLoaded(model, loaded),
+            PlaylistEntriesLoadedMessage loaded => UpdatePlaylistEntriesLoaded(model, loaded),
+            PlaylistEntriesNextPageRequestedMessage => UpdatePlaylistEntriesNextPageRequested(model),
+            PlaylistEntriesRetryRequestedMessage => UpdatePlaylistEntriesRetryRequested(model),
+            PlaylistEntrySelectedMessage selected => UpdatePlaylistEntrySelected(model, selected),
             ProfilePageOpenedMessage => UpdateProfilePageOpened(model),
             ProfileInfoLoadedMessage loaded => UpdateProfileInfoLoaded(model, loaded),
             PlayRequestedMessage play => UpdatePlayRequested(model, play),
@@ -1964,6 +1982,271 @@ public static class AppUpdate
                 }
             },
             []);
+    }
+
+    private static AppTransition UpdatePlaylistsPageOpened(AppModel model)
+    {
+        var state = model.PlaylistsPage;
+        if (state.IsLoading)
+        {
+            return AppTransition.Unchanged(model);
+        }
+
+        // Reines Online-Feature: ohne Serververbindung gibt es keinen
+        // anzeigbaren Stand — die Seite bekommt eine verständliche
+        // Fehleranzeige (kein Cache, keine veraltete Liste).
+        if (model.ConnectionState != ConnectionState.Connected)
+        {
+            return new AppTransition(
+                model with
+                {
+                    PlaylistsPage = state with
+                    {
+                        Attempted = true,
+                        Error = PlaylistsOfflineError
+                    }
+                },
+                []);
+        }
+
+        return new AppTransition(
+            model with
+            {
+                PlaylistsPage = state with
+                {
+                    IsLoading = true,
+                    Attempted = true,
+                    Error = null
+                }
+            },
+            [new LoadPlaylistsEffect()]);
+    }
+
+    private static AppTransition UpdatePlaylistsLoaded(AppModel model, PlaylistsLoadedMessage message)
+    {
+        return new AppTransition(
+            model with
+            {
+                PlaylistsPage = model.PlaylistsPage with
+                {
+                    Items = message.Error is null
+                        ? PlaylistsPageState.BuildItems(message.Own, message.Public)
+                        : model.PlaylistsPage.Items,
+                    IsLoading = false,
+                    Error = message.Error
+                }
+            },
+            []);
+    }
+
+    private static PlaylistDetailsState NewPlaylistDetails(PlaylistListItem item) => new()
+    {
+        PlaylistId = item.PlaylistId,
+        Name = item.Name,
+        Description = item.Description,
+        SortMode = item.SortMode,
+        CoverPictureId = item.CoverPictureId,
+        IsLoading = true,
+        HasMore = true
+    };
+
+    private static AppTransition UpdatePlaylistSelected(AppModel model, PlaylistSelectedMessage message)
+    {
+        var item = message.Item;
+        if (item.PlaylistId <= 0)
+        {
+            return AppTransition.Unchanged(model);
+        }
+
+        // Die Auswahl ist nur online wirksam — ohne Verbindung würde die
+        // Detailseite sofort im Fehlerzustand landen.
+        if (model.ConnectionState != ConnectionState.Connected)
+        {
+            return AppTransition.Unchanged(model);
+        }
+
+        return new AppTransition(
+            model with { PlaylistDetails = NewPlaylistDetails(item) },
+            [
+                new NavigateToPlaylistDetailsEffect(item.PlaylistId, item.Name),
+                new LoadPlaylistEntriesEffect(item.PlaylistId, 1, Append: false)
+            ]);
+    }
+
+    private static AppTransition UpdatePlaylistDetailsOpened(AppModel model, PlaylistDetailsOpenedMessage message)
+    {
+        if (message.PlaylistId <= 0)
+        {
+            return AppTransition.Unchanged(model);
+        }
+
+        // Rückkehr auf die bereits geöffnete Playlist (z. B. zurück von
+        // der Medien-Detailseite): Zustand und Listenposition bleiben
+        // erhalten.
+        if (model.PlaylistDetails.PlaylistId == message.PlaylistId)
+        {
+            return AppTransition.Unchanged(model);
+        }
+
+        // Wiederherstellungspfad: Seite ohne passenden Zustand geöffnet →
+        // Kopfdaten und erste Eintragsseite laden (ohne erneute
+        // Navigation). Der Kopf-Nachschlag ist nicht fatal — schlägt er
+        // fehl, bleibt der Pfad-Name als Titel stehen.
+        return new AppTransition(
+            model with
+            {
+                PlaylistDetails = new PlaylistDetailsState
+                {
+                    PlaylistId = message.PlaylistId,
+                    Name = message.Name,
+                    IsLoading = true,
+                    HasMore = true
+                }
+            },
+            [
+                new LoadPlaylistDetailsEffect(message.PlaylistId),
+                new LoadPlaylistEntriesEffect(message.PlaylistId, 1, Append: false)
+            ]);
+    }
+
+    private static AppTransition UpdatePlaylistDetailsLoaded(AppModel model, PlaylistDetailsLoadedMessage message)
+    {
+        var details = model.PlaylistDetails;
+        if (!details.IsActive || details.PlaylistId != message.PlaylistId || message.Info is null)
+        {
+            return AppTransition.Unchanged(model);
+        }
+
+        return new AppTransition(
+            model with
+            {
+                PlaylistDetails = details with
+                {
+                    Name = message.Info.Name,
+                    Description = message.Info.Description,
+                    SortMode = message.Info.SortMode,
+                    CoverPictureId = message.Info.CoverPictureId
+                }
+            },
+            []);
+    }
+
+    private static AppTransition UpdatePlaylistEntriesLoaded(AppModel model, PlaylistEntriesLoadedMessage message)
+    {
+        var details = model.PlaylistDetails;
+        if (!details.IsActive || details.PlaylistId != message.PlaylistId)
+        {
+            // Antwort einer inzwischen verlassenen Playlist verwerfen.
+            return AppTransition.Unchanged(model);
+        }
+
+        if (message.Error is not null)
+        {
+            // Fehler beim Anhängen lassen die bestehende Liste stehen
+            // (HasMore bleibt — der nächste Scroll versucht es erneut);
+            // Fehler des Ersetz-Laufs werden als Fehlerzustand gezeigt.
+            var failed = details with
+            {
+                IsLoading = false,
+                IsLoadingMore = false,
+                Attempted = true
+            };
+            return new AppTransition(
+                model with
+                {
+                    PlaylistDetails = message.Append ? failed : failed with { Error = message.Error }
+                },
+                []);
+        }
+
+        if (message.Append && message.Page != details.NextPage)
+        {
+            // Veraltete Anhänge-Antwort — nicht an die Liste hängen.
+            return AppTransition.Unchanged(model);
+        }
+
+        var entries = message.Append
+            ? details.Entries.Concat(message.Items).ToList()
+            : (IReadOnlyList<PlaylistEntryItem>)message.Items;
+
+        return new AppTransition(
+            model with
+            {
+                PlaylistDetails = details with
+                {
+                    Entries = entries,
+                    NextPage = message.Page + 1,
+                    HasMore = message.HasMore,
+                    TotalCount = message.TotalCount,
+                    IsLoading = false,
+                    IsLoadingMore = false,
+                    Attempted = true,
+                    Error = null
+                }
+            },
+            []);
+    }
+
+    private static AppTransition UpdatePlaylistEntriesNextPageRequested(AppModel model)
+    {
+        var details = model.PlaylistDetails;
+        if (!details.IsActive || !details.HasMore || details.IsLoading || details.IsLoadingMore)
+        {
+            return AppTransition.Unchanged(model);
+        }
+
+        return new AppTransition(
+            model with { PlaylistDetails = details with { IsLoadingMore = true } },
+            [new LoadPlaylistEntriesEffect(details.PlaylistId, details.NextPage, Append: true)]);
+    }
+
+    private static AppTransition UpdatePlaylistEntriesRetryRequested(AppModel model)
+    {
+        var details = model.PlaylistDetails;
+        if (!details.IsActive || details.IsLoading || details.IsLoadingMore)
+        {
+            return AppTransition.Unchanged(model);
+        }
+
+        // Fehlerzustand einer leeren Liste → kompletter Neu-Lauf;
+        // sonst die ausstehende Folgeseite erneut versuchen.
+        if (details.HasItems)
+        {
+            return UpdatePlaylistEntriesNextPageRequested(model);
+        }
+
+        return new AppTransition(
+            model with
+            {
+                PlaylistDetails = details with
+                {
+                    NextPage = 1,
+                    HasMore = true,
+                    IsLoading = true,
+                    Error = null
+                }
+            },
+            [new LoadPlaylistEntriesEffect(details.PlaylistId, 1, Append: false)]);
+    }
+
+    private static AppTransition UpdatePlaylistEntrySelected(AppModel model, PlaylistEntrySelectedMessage message)
+    {
+        var item = message.Item;
+        if (item.MediaId <= 0 || string.IsNullOrWhiteSpace(item.MediaType))
+        {
+            return AppTransition.Unchanged(model);
+        }
+
+        // Der Elternkontext wird als Show-/Season-Hint an die
+        // Medien-Detailseite weitergereicht (Episode → Staffel bzw.
+        // Serie, Staffel → Serie).
+        var showId = item.ParentMediaType == "tvshow" ? item.ParentMediaId : null;
+        var seasonId = item.ParentMediaType == "tvshowseason" ? item.ParentMediaId : null;
+        return new AppTransition(
+            model,
+            [new NavigateToMediaDetailsEffect(
+                item.MediaType, item.MediaId, item.Title,
+                ShowId: showId, SeasonId: seasonId)]);
     }
 
     private static AppTransition UpdateProfilePageOpened(AppModel model)

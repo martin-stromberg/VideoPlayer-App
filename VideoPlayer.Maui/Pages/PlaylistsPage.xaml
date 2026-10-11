@@ -1,0 +1,118 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:controls="clr-namespace:VideoPlayer.Maui.Controls"
+             xmlns:mvu="clr-namespace:VideoPlayer.Mvu;assembly=VideoPlayer.Mvu"
+             x:Class="VideoPlayer.Maui.Pages.PlaylistsPage"
+             x:Name="RootPage"
+             Title="Playlists"
+             x:DataType="mvu:MvuHost">
+
+    <Grid Padding="24"
+          RowDefinitions="Auto,Auto,*"
+          RowSpacing="14">
+
+        <ActivityIndicator x:Name="LoadingIndicator"
+                           AutomationId="PlaylistsLoadingIndicator"
+                           Grid.Row="0"
+                           IsRunning="{Binding Model.PlaylistsPage.IsLoading}"
+                           IsVisible="{Binding Model.PlaylistsPage.IsLoading}"
+                           Color="{StaticResource VpPrimary}" />
+
+        <VerticalStackLayout x:Name="ErrorPanel"
+                             Grid.Row="0"
+                             Spacing="10"
+                             IsVisible="False">
+            <Label x:Name="ErrorLabel"
+                   AutomationId="PlaylistsErrorLabel"
+                   Style="{StaticResource ErrorText}" />
+            <Button x:Name="RetryButton"
+                    AutomationId="PlaylistsRetryButton"
+                    Text="Erneut laden"
+                    Style="{StaticResource SecondaryButton}"
+                    Clicked="OnRetryClicked"
+                    HorizontalOptions="Start" />
+        </VerticalStackLayout>
+
+        <Label x:Name="EmptyLabel"
+               AutomationId="PlaylistsEmptyLabel"
+               Grid.Row="0"
+               Text="Keine Playlists vorhanden."
+               Style="{StaticResource Caption}"
+               FontSize="14"
+               IsVisible="False" />
+
+        <!-- Flache Liste beider Sektionen: Überschriftenzeilen und
+             Playlist-Karten (Cover, Name, Genres/Sortierung) — eine
+             einzige scrollbare Liste statt zweier getrennter. -->
+        <CollectionView x:Name="PlaylistsCollection"
+                        AutomationId="PlaylistsCollection"
+                        Grid.Row="2"
+                        ItemsSource="{Binding Model.PlaylistsPage.Items}"
+                        SelectionMode="Single"
+                        SelectionChanged="OnPlaylistSelected">
+            <CollectionView.ItemTemplate>
+                <DataTemplate x:DataType="mvu:PlaylistOverviewItem">
+                    <Grid>
+                        <!-- Sektionsüberschrift -->
+                        <Label Text="{Binding Title}"
+                               IsVisible="{Binding IsHeader}"
+                               FontFamily="InterSemiBold"
+                               FontSize="11"
+                               CharacterSpacing="1.4"
+                               Margin="0,10,0,8"
+                               TextColor="{StaticResource VpTextMuted}" />
+                        <!-- Playlist-Karte -->
+                        <Border Style="{StaticResource Card}"
+                                Padding="12"
+                                Margin="0,0,0,12"
+                                IsVisible="{Binding IsEntry}">
+                            <Grid ColumnDefinitions="84,*"
+                                  ColumnSpacing="16">
+                                <Border Grid.Column="0"
+                                        WidthRequest="84"
+                                        HeightRequest="84"
+                                        Padding="0"
+                                        StrokeThickness="0"
+                                        BackgroundColor="{StaticResource VpSurfaceLow}"
+                                        StrokeShape="RoundRectangle 10">
+                                    <Grid>
+                                        <!-- Namens-Fallback: liegt unter dem Cover und bleibt sichtbar,
+                                             solange kein Cover geladen ist. -->
+                                        <Label Text="{Binding Playlist.Name}"
+                                               TextColor="{StaticResource VpText}"
+                                               FontSize="11"
+                                               Padding="6"
+                                               HorizontalTextAlignment="Center"
+                                               VerticalOptions="Center"
+                                               MaxLines="4"
+                                               LineBreakMode="WordWrap" />
+                                        <controls:CachedPlaylistCoverImage PlaylistId="{Binding Playlist.CoverPlaylistId}"
+                                                                           Aspect="AspectFill"
+                                                                           IsVisible="{Binding Playlist.HasCover}" />
+                                    </Grid>
+                                </Border>
+                                <VerticalStackLayout Grid.Column="1"
+                                                     Spacing="5"
+                                                     VerticalOptions="Center">
+                                    <Label Text="{Binding Playlist.Name}"
+                                           FontSize="16"
+                                           FontFamily="InterSemiBold"
+                                           TextColor="{StaticResource VpText}"
+                                           MaxLines="2"
+                                           LineBreakMode="TailTruncation" />
+                                    <Label Text="{Binding Playlist.SortModeText}"
+                                           Style="{StaticResource Caption}" />
+                                    <Label Text="{Binding Playlist.GenreText}"
+                                           Style="{StaticResource Caption}"
+                                           IsVisible="{Binding Playlist.HasGenreText}" />
+                                </VerticalStackLayout>
+                            </Grid>
+                        </Border>
+                    </Grid>
+                </DataTemplate>
+            </CollectionView.ItemTemplate>
+        </CollectionView>
+    </Grid>
+
+</ContentPage>

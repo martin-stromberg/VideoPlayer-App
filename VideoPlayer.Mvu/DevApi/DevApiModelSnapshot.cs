@@ -119,6 +119,21 @@ public sealed record DevApiModelSnapshot
     /// <summary>Fehlertext der letzten Wiedergabe-Störung; <c>null</c> = kein Fehler.</summary>
     public string? PlayerError { get; init; }
 
+    /// <summary>Anzahl der Playlist-Eintragszeilen der Übersichtsseite (ohne Sektionsüberschriften).</summary>
+    public int PlaylistsPageItemCount { get; init; }
+
+    /// <summary>Fehlertext der Playlists-Übersichtsseite; <c>null</c> = kein Fehler.</summary>
+    public string? PlaylistsPageError { get; init; }
+
+    /// <summary>Playlist-Id der geöffneten Playlist-Detailseite (0 = keine).</summary>
+    public long PlaylistDetailsId { get; init; }
+
+    /// <summary>Anzahl der geladenen Einträge der Playlist-Detailseite.</summary>
+    public int PlaylistDetailsEntryCount { get; init; }
+
+    /// <summary>Fehlertext der Playlist-Detailseite; <c>null</c> = kein Fehler.</summary>
+    public string? PlaylistDetailsError { get; init; }
+
     /// <summary>Erzeugt den Snapshot aus dem aktuellen Modell.</summary>
     /// <param name="model">Das unveränderliche App-Modell.</param>
     /// <returns>Der serialisierbare Auszug.</returns>
@@ -179,7 +194,12 @@ public sealed record DevApiModelSnapshot
             PlayerUpcomingEpisodeCount = model.Player.UpcomingEpisodes.Count,
             PlayerIsPlaying = model.Player.IsPlaying,
             PlayerPositionSeconds = model.Player.Position.TotalSeconds,
-            PlayerError = model.Player.Error
+            PlayerError = model.Player.Error,
+            PlaylistsPageItemCount = model.PlaylistsPage.Items.Count(i => !i.IsHeader),
+            PlaylistsPageError = model.PlaylistsPage.Error,
+            PlaylistDetailsId = model.PlaylistDetails.PlaylistId,
+            PlaylistDetailsEntryCount = model.PlaylistDetails.Entries.Count,
+            PlaylistDetailsError = model.PlaylistDetails.Error
         };
     }
 }

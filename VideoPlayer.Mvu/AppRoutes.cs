@@ -12,6 +12,7 @@ public static class AppRoutes
         {
             [AppPage.Home] = "home",
             [AppPage.Favorites] = "favorites",
+            [AppPage.Playlists] = "playlists",
             [AppPage.Downloads] = "downloads",
             [AppPage.Profile] = "profile",
             [AppPage.Settings] = "settings"
@@ -34,6 +35,7 @@ public static class AppRoutes
     [
         AppPage.Home,
         AppPage.Favorites,
+        AppPage.Playlists,
         AppPage.Downloads,
         AppPage.Profile,
         AppPage.Settings

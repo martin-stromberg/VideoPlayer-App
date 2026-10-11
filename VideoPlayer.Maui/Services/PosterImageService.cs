@@ -16,6 +16,7 @@ public sealed class PosterImageService
     private readonly AppStorageLayout layout;
     private readonly System.Collections.Concurrent.ConcurrentDictionary<long, ImageSource> memoryCache = new();
     private readonly System.Collections.Concurrent.ConcurrentDictionary<long, ImageSource> iconMemoryCache = new();
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<long, ImageSource> playlistCoverMemoryCache = new();
 
     /// <summary>Initialisiert eine neue Instanz der <see cref="PosterImageService"/>-Klasse.</summary>
     /// <param name="authSession">Sitzungsdienst; liefert den angemeldeten API-Client für Bildabrufe.</param>
@@ -137,6 +138,69 @@ public sealed class PosterImageService
             // Fehlende Icons sind kein Fehlerzustand — der Quellenname
             // bleibt als Fallback sichtbar.
             System.Diagnostics.Debug.WriteLine($"[PosterImageService] Quellen-Icon {pictureId} nicht ladbar: {ex.Message}");
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Liefert die Bildquelle zum Cover einer Playlist
+    /// (<c>api/playlists/{id}/cover</c>) — gleiche Cache-Konvention wie
+    /// <see cref="GetImageSourceAsync"/> (Datei <c>{id}.playlistcover</c>
+    /// im nicht backup-pflichtigen <see cref="AppStorageLayout.PreviewsDirectory"/>).
+    /// <c>null</c>, wenn die Playlist kein Cover hat (der Server
+    /// antwortet 404) oder kein Bild verfügbar ist.
+    /// </summary>
+    /// <param name="playlistId">Id der Playlist (<c>api/playlists/{id}/cover</c>).</param>
+    /// <param name="cancellationToken">Bricht den Bildabruf ab.</param>
+    /// <returns>Die Bildquelle oder <c>null</c>, wenn kein Cover verfügbar ist.</returns>
+    public async Task<ImageSource?> GetPlaylistCoverSourceAsync(long playlistId, CancellationToken cancellationToken = default)
+    {
+        if (playlistId <= 0)
+        {
+            return null;
+        }
+
+        if (playlistCoverMemoryCache.TryGetValue(playlistId, out var cached))
+        {
+            return cached;
+        }
+
+        var path = Path.Combine(layout.PreviewsDirectory, $"{playlistId}.playlistcover");
+        try
+        {
+            if (File.Exists(path))
+            {
+                var fileSource = ImageSource.FromFile(path);
+                playlistCoverMemoryCache[playlistId] = fileSource;
+                return fileSource;
+            }
+
+            var client = authSession.Client;
+            if (client is null)
+            {
+                return null;
+            }
+
+            var bytes = await client.GetPlaylistCoverAsync(playlistId, cancellationToken);
+            if (bytes is null || bytes.Length == 0)
+            {
+                // Kein Cover gesetzt (Server antwortet 404) — die Karte
+                // zeigt den Titel als Fallback; absichtlich nichts
+                // zwischengespeichert, damit ein später gesetztes Cover
+                // ohne Neustart erscheint.
+                return null;
+            }
+
+            await File.WriteAllBytesAsync(path, bytes, cancellationToken);
+            var source = ImageSource.FromStream(() => new MemoryStream(bytes));
+            playlistCoverMemoryCache[playlistId] = source;
+            return source;
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            // Fehlende Cover sind kein Fehlerzustand — der Playlist-Name
+            // bleibt als Fallback sichtbar.
+            System.Diagnostics.Debug.WriteLine($"[PosterImageService] Playlist-Cover {playlistId} nicht ladbar: {ex.Message}");
             return null;
         }
     }

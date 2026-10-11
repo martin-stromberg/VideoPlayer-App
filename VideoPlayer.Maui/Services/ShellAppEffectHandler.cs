@@ -208,6 +208,18 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
             case RemoveFavoriteEffect remove:
                 await RemoveFavoriteAsync(remove.FavoriteId, cancellationToken);
                 break;
+            case LoadPlaylistsEffect:
+                await LoadPlaylistsAsync(cancellationToken);
+                break;
+            case NavigateToPlaylistDetailsEffect details:
+                await MainThread.InvokeOnMainThreadAsync(() => NavigateToPlaylistDetailsAsync(details));
+                break;
+            case LoadPlaylistDetailsEffect details:
+                await LoadPlaylistDetailsAsync(details, cancellationToken);
+                break;
+            case LoadPlaylistEntriesEffect entries:
+                await LoadPlaylistEntriesAsync(entries, cancellationToken);
+                break;
             case LoadProfileInfoEffect:
                 await LoadProfileInfoAsync(cancellationToken);
                 break;
@@ -647,7 +659,18 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
     /// <summary>Prüft, ob die oberste Shell-Route bereits die Quellenübersicht der angegebenen Quelle ist.</summary>
     /// <param name="sourceId">Die Quellen-Id des anzusteuernden Ziels.</param>
     /// <returns><c>true</c>, wenn oben bereits „sourceoverview" mit derselben <c>id</c> liegt.</returns>
-    private static bool IsTopmostSourceOverview(long sourceId)
+    private static bool IsTopmostSourceOverview(long sourceId) =>
+        IsTopmostRouteWithId("sourceoverview", sourceId);
+
+    /// <summary>
+    /// Prüft, ob die oberste Shell-Route eine geschobene Seite der Form
+    /// <c>{route}?id={expectedId}</c> ist — Duplikat-Guard der
+    /// Detailnavigationen (<c>sourceoverview</c>, <c>playlistdetails</c>).
+    /// </summary>
+    /// <param name="route">Der Routenname der geschobenen Seite.</param>
+    /// <param name="expectedId">Der erwartete Wert des <c>id</c>-Parameters.</param>
+    /// <returns><c>true</c>, wenn oben bereits die Route mit derselben <c>id</c> liegt.</returns>
+    private static bool IsTopmostRouteWithId(string route, long expectedId)
     {
         var location = Shell.Current?.CurrentState?.Location?.OriginalString;
         if (string.IsNullOrEmpty(location))
@@ -661,7 +684,7 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
         var queryIndex = location.IndexOf('?', StringComparison.Ordinal);
         var path = queryIndex >= 0 ? location[..queryIndex] : location;
         var topmost = path.Split('/', StringSplitOptions.RemoveEmptyEntries).LastOrDefault();
-        if (!string.Equals(topmost, "sourceoverview", StringComparison.OrdinalIgnoreCase)
+        if (!string.Equals(topmost, route, StringComparison.OrdinalIgnoreCase)
             || queryIndex < 0)
         {
             return false;
@@ -674,7 +697,7 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
                 && string.Equals(parts[0], "id", StringComparison.OrdinalIgnoreCase))
             {
                 return long.TryParse(Uri.UnescapeDataString(parts[1]), out var id)
-                    && id == sourceId;
+                    && id == expectedId;
             }
         }
 
@@ -871,6 +894,98 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
             // manuelle Aktualisierung nach.
             await DispatchMessageAsync(new CachedListsChangedMessage());
         }
+    }
+
+    private async Task NavigateToPlaylistDetailsAsync(NavigateToPlaylistDetailsEffect details)
+    {
+        if (Shell.Current is null)
+        {
+            return;
+        }
+
+        try
+        {
+            if (IsTopmostPlaylistDetails(details.PlaylistId))
+            {
+                // Die Detailseite dieser Playlist liegt bereits oben auf
+                // dem Stack — ein erneuter Push würde eine identische
+                // Seite schieben.
+                return;
+            }
+
+            var route = $"playlistdetails?id={details.PlaylistId}" +
+                $"&name={Uri.EscapeDataString(details.Name ?? string.Empty)}";
+            await Shell.Current.GoToAsync(route);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Playlist-Navigation fehlgeschlagen");
+        }
+    }
+
+    /// <summary>Prüft, ob die oberste Shell-Route bereits die Playlist-Detailseite der angegebenen Playlist ist.</summary>
+    /// <param name="playlistId">Die Playlist-Id des anzusteuernden Ziels.</param>
+    /// <returns><c>true</c>, wenn oben bereits „playlistdetails" mit derselben <c>id</c> liegt.</returns>
+    private static bool IsTopmostPlaylistDetails(long playlistId) =>
+        IsTopmostRouteWithId("playlistdetails", playlistId);
+
+    private async Task LoadPlaylistsAsync(CancellationToken cancellationToken)
+    {
+        IReadOnlyList<PlaylistListItem> own = [];
+        IReadOnlyList<PlaylistListItem> publicPlaylists = [];
+        string? error = null;
+        try
+        {
+            var overview = await services.GetRequiredService<PlaylistService>()
+                .LoadPlaylistsAsync(cancellationToken);
+            own = overview.Own;
+            publicPlaylists = overview.Public;
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Playlists laden fehlgeschlagen");
+            error = AppUpdate.PlaylistsLoadError;
+        }
+
+        await DispatchMessageAsync(new PlaylistsLoadedMessage(own, publicPlaylists, error));
+    }
+
+    private async Task LoadPlaylistDetailsAsync(LoadPlaylistDetailsEffect details, CancellationToken cancellationToken)
+    {
+        PlaylistListItem? info = null;
+        try
+        {
+            info = await services.GetRequiredService<PlaylistService>()
+                .LoadPlaylistAsync(details.PlaylistId, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            // Kopf-Nachschlag ist nicht fatal — die Detailseite zeigt
+            // dann die Felder der Listenauswahl bzw. den Pfad-Namen.
+            logger.LogError(ex, "Playlist-Kopfdaten laden fehlgeschlagen");
+        }
+
+        await DispatchMessageAsync(new PlaylistDetailsLoadedMessage(details.PlaylistId, info));
+    }
+
+    private async Task LoadPlaylistEntriesAsync(LoadPlaylistEntriesEffect entries, CancellationToken cancellationToken)
+    {
+        PlaylistEntriesPage page;
+        string? error = null;
+        try
+        {
+            page = await services.GetRequiredService<PlaylistService>()
+                .LoadEntriesAsync(entries.PlaylistId, entries.Page, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Playlist-Einträge laden fehlgeschlagen");
+            page = new PlaylistEntriesPage(entries.Page, [], HasMore: false, TotalCount: 0);
+            error = AppUpdate.PlaylistEntriesLoadError;
+        }
+
+        await DispatchMessageAsync(new PlaylistEntriesLoadedMessage(
+            entries.PlaylistId, page.Page, page.Items, page.HasMore, page.TotalCount, entries.Append, error));
     }
 
     private async Task LoadProfileInfoAsync(CancellationToken cancellationToken)
