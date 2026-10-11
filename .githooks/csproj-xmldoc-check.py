@@ -46,6 +46,13 @@ HTTP_METHOD_ATTR_RE = re.compile(
     r'\[(?:Http(?:Get|Post|Put|Delete|Patch|Head|Options)|Route)\b', re.IGNORECASE
 )
 PRODUCES_RESPONSE_ATTR_RE = re.compile(r'\[ProducesResponseType\b', re.IGNORECASE)
+# String-/Zeichenliterale der Deklaration (z. B. in Konstanten oder
+# Defaultwerten) enthalten keinen Deklarationscode — sie werden vor der
+# Analyse entfernt, damit Klammern im Text keine Schein-Methoden erzeugen.
+STRING_LITERAL_RE = re.compile(
+    r'(?:@?\$?|\$@?)"(?:[^"\\]|\\.)*"'  # "…", @"…", $"…", $@"…"
+    r"|'(?:[^'\\]|\\.)*'"               # 'x', '(', '\\'
+)
 MODIFIER_RE = re.compile(
     r'\b(?:public|private|protected|internal|static|virtual|override|'
     r'abstract|async|sealed|extern|partial|new|readonly)\s+'
@@ -175,18 +182,90 @@ def _simplify_generics(text):
     return text
 
 
+def _params_group(decl):
+    """Returns the parameter list contents of the declaration.
+
+    Finds the first `(` that is preceded by the member name — a leading
+    tuple return type `(T1, T2) Name(...)` has only modifiers before it
+    and is skipped — and returns the text up to the balancing `)`.
+    """
+    simplified = _simplify_generics(decl)
+    angle = 0
+    for idx, ch in enumerate(simplified):
+        if ch == '<':
+            angle += 1
+            continue
+        if ch == '>':
+            angle -= 1
+            continue
+        if ch != '(':
+            continue
+        # Klammern innerhalb generischer Argumente (z. B. Task<(Tupel)>)
+        # oder ein führendes Tupel-Rückgabe-Tupel gehören nicht zur
+        # Parameterliste des Members.
+        if angle > 0 or MODIFIER_RE.sub('', simplified[:idx]).strip() == '':
+            continue
+        depth = 1
+        for j in range(idx + 1, len(simplified)):
+            c = simplified[j]
+            if c == '(':
+                depth += 1
+            elif c == ')':
+                depth -= 1
+                if depth == 0:
+                    return simplified[idx + 1:j]
+        return ''
+    return ''
+
+
+def _split_top_level(text):
+    """Splits on commas at nesting depth zero (parens/angle brackets)."""
+    parts = []
+    buf = []
+    depth = 0
+    for ch in text:
+        if ch in '(<':
+            depth += 1
+        elif ch in ')>':
+            depth -= 1
+        if ch == ',' and depth == 0:
+            parts.append(''.join(buf))
+            buf = []
+        else:
+            buf.append(ch)
+    parts.append(''.join(buf))
+    return parts
+
+
+def _strip_leading_tuple(decl):
+    """Removes a leading tuple return type `(T1, T2) Name(...)`."""
+    m = re.search(r'\(', decl)
+    if not m:
+        return decl
+    if MODIFIER_RE.sub('', decl[:m.start()]).strip() != '':
+        return decl
+    depth = 0
+    for idx in range(m.start(), len(decl)):
+        ch = decl[idx]
+        if ch == '(':
+            depth += 1
+        elif ch == ')':
+            depth -= 1
+            if depth == 0:
+                return decl[idx + 1:].strip()
+    return decl
+
+
 def extract_param_names(decl):
     """Extracts parameter names from a method or constructor declaration."""
-    simplified = _simplify_generics(decl)
-    m = re.search(r'\((.+)\)', simplified, re.DOTALL)
-    if not m:
+    params_str = _params_group(decl)
+    if not params_str:
         return []
-    params_str = m.group(1)
     params_str = re.sub(r'\[[^\]]*\]', '', params_str)
     params_str = _simplify_generics(params_str)
 
     names = []
-    for part in params_str.split(','):
+    for part in _split_top_level(params_str):
         part = part.strip()
         if not part:
             continue
@@ -246,7 +325,7 @@ def is_non_void_return(decl):
 
 def member_display_name(decl):
     """Short, readable member name derived from the declaration."""
-    m = re.search(r'(\w+)\s*(?:<[^>]*>)?\s*\(', decl)
+    m = re.search(r'(\w+)\s*(?:<[^>]*>)?\s*\(', _strip_leading_tuple(decl))
     if m:
         return m.group(1)
     words = decl.split()
@@ -325,7 +404,7 @@ def parse_documented_members(content):
         i = j
 
         if doc_lines and decl_lines:
-            decl_text = ' '.join(decl_lines)
+            decl_text = STRING_LITERAL_RE.sub('""', ' '.join(decl_lines))
             members.append({
                 'doc': '\n'.join(doc_lines),
                 'attrs': attr_lines,

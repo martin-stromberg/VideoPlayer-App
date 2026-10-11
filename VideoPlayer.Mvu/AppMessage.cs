@@ -247,6 +247,29 @@ public sealed record CachedListsChangedMessage : AppMessage;
 /// <returns>Nachricht für die Auswahl.</returns>
 public sealed record MediaItemSelectedMessage(HomeMediaItem Item) : AppMessage;
 
+/// <summary>
+/// Ein Eintrag der Weiterschauen-Liste der Startseite wurde ausgewählt:
+/// abspielbare Medientypen (<c>movie</c>/<c>episode</c>) starten direkt
+/// die Wiedergabe ab der Fortsetzungsposition, alle übrigen Einträge
+/// öffnen weiterhin die Detailseite des Mediums.
+/// </summary>
+/// <param name="Item">Der ausgewählte Weiterschauen-Eintrag.</param>
+/// <returns>Nachricht für die Auswahl.</returns>
+public sealed record ContinueWatchingItemSelectedMessage(HomeMediaItem Item) : AppMessage;
+
+/// <summary>
+/// Die Folge-Episoden eines direkt aus der Weiterschauen-Liste
+/// gestarteten Mediums wurden geladen (Serienkontext ohne
+/// Detailseiten-Navigation); das Update übernimmt sie nur, wenn der
+/// Player noch dieselbe Episode spielt.
+/// </summary>
+/// <param name="MediaId">Id der gestarteten Episode, zu der die Liste gehört.</param>
+/// <param name="Episodes">Die geordneten Folge-Episoden (leer, wenn keine bekannt sind).</param>
+/// <returns>Nachricht mit der geladenen Fortsetzungsliste.</returns>
+public sealed record UpcomingEpisodesLoadedMessage(
+    long MediaId,
+    IReadOnlyList<PlayerEpisodeRef> Episodes) : AppMessage;
+
 /// <summary>Die Quellenliste wurde geladen (<paramref name="Error"/> bei Fehlschlag).</summary>
 /// <param name="Sources">Die geladenen Quellen.</param>
 /// <param name="Error">Fehlertext bei Fehlschlag; <c>null</c> bei Erfolg.</param>

@@ -130,6 +130,67 @@ public sealed class MockVideoServer : IDisposable
     /// <summary><c>true</c> = der Stream-Endpunkt antwortet mit 404 (Wiedergabefehler-Pfad).</summary>
     public bool PlaybackStreamFails { get; set; }
 
+    /// <summary>
+    /// Opt-in Serienfluss: Id der Serie, zu der <see cref="PlaybackEpisodeId"/>
+    /// und <see cref="PlaybackNextEpisodeId"/> gehören (belegt liefert
+    /// <c>GET api/items/tvshow/{id}</c> die Serie mit beiden Episoden in
+    /// einer Staffel und <c>api/continue-watching</c> einen
+    /// Episoden-Eintrag mit eingebettetem Seriengraph).
+    /// </summary>
+    public long? PlaybackShowId { get; set; }
+
+    /// <summary>Anzeigetitel der Opt-in-Serie.</summary>
+    public string PlaybackShowTitle { get; set; } = "E2E-Testserie";
+
+    /// <summary>Id der Episoden-Weiterschauen-Eintrags (Opt-in Serienfluss).</summary>
+    public long? PlaybackEpisodeId { get; set; }
+
+    /// <summary>Anzeigetitel der Ausgangs-Episode.</summary>
+    public string PlaybackEpisodeTitle { get; set; } = "E2E-Episode 1";
+
+    /// <summary>Id der Folge-Episode (nächste Episode der Serie).</summary>
+    public long? PlaybackNextEpisodeId { get; set; }
+
+    /// <summary>Anzeigetitel der Folge-Episode.</summary>
+    public string PlaybackNextEpisodeTitle { get; set; } = "E2E-Episode 2";
+
+    /// <summary>Weiterschauen-Position der Episode in Sekunden; <c>null</c> = kein Episoden-Fortsetzungseintrag.</summary>
+    public long? PlaybackEpisodeResumePositionSeconds { get; set; }
+
+    /// <summary>
+    /// Opt-in nicht abspielbarer Weiterschauen-Eintrag: Id eines
+    /// Serieneintrags (<c>mediaType: "show"</c>) — öffnet die
+    /// Detailansicht statt der Wiedergabe.
+    /// </summary>
+    public long? ContinueWatchingShowId { get; set; }
+
+    /// <summary>Anzeigetitel des nicht abspielbaren Weiterschauen-Serieneintrags.</summary>
+    public string ContinueWatchingShowTitle { get; set; } = "E2E-Serie";
+
+    /// <summary>Alle empfangenen Anfragepfade in Reihenfolge (Diagnose: Detail- vs. Wiedergabeaufrufe).</summary>
+    public List<string> RequestedPaths { get; } = [];
+
+    /// <summary>
+    /// Prüft, ob ein Anfragepfad empfangen wurde (Thread-sicherer Leser;
+    /// gespeicherte Einträge im Format <c>"{Methode} {Pfad}"</c>,
+    /// Vergleich ohne Query-String).
+    /// </summary>
+    /// <param name="path">Der gesuchte Pfad ohne Methode (z. B. <c>/api/items/movie/7</c>).</param>
+    /// <returns><c>true</c>, wenn der Pfad mindestens einmal angefragt wurde.</returns>
+    public bool WasPathRequested(string path)
+    {
+        lock (RequestedPaths)
+        {
+            return RequestedPaths.Any(entry =>
+            {
+                var space = entry.IndexOf(' ');
+                var requestPath = space >= 0 ? entry[(space + 1)..] : entry;
+                return requestPath.Split('?')[0].TrimEnd('/')
+                    .Equals(path, StringComparison.OrdinalIgnoreCase);
+            });
+        }
+    }
+
     /// <inheritdoc/>
     public void Dispose()
     {
@@ -184,6 +245,11 @@ public sealed class MockVideoServer : IDisposable
     /// Routen wird implizit konvertiert; zusätzliche Header nur für
     /// Endpunkte, die sie brauchen (Stream: Accept-Ranges/Content-Range).
     /// </summary>
+    /// <param name="Status">HTTP-Statuscode der Antwort.</param>
+    /// <param name="ContentType">MIME-Typ des Antwortkörpers.</param>
+    /// <param name="Body">Der Antwortkörper (UTF-8-JSON oder Videodaten).</param>
+    /// <param name="Headers">Zusätzliche Antwort-Header (optional).</param>
+    /// <returns>Die Mock-Antwort.</returns>
     private sealed record MockResponse(
         int Status,
         string ContentType,
@@ -191,6 +257,8 @@ public sealed class MockVideoServer : IDisposable
         IReadOnlyDictionary<string, string>? Headers = null)
     {
         /// <summary>Wandelt das bisherige Antwort-Tupel um (ohne Zusatz-Header).</summary>
+        /// <param name="tuple">Das Tupel (Status, ContentType, Body) der bisherigen Routen.</param>
+        /// <returns>Die konvertierte Mock-Antwort ohne Zusatz-Header.</returns>
         public static implicit operator MockResponse((int Status, string ContentType, byte[] Body) tuple) =>
             new(tuple.Status, tuple.ContentType, tuple.Body);
     }
@@ -199,6 +267,11 @@ public sealed class MockVideoServer : IDisposable
     {
         var path = request.Path.Split('?')[0].TrimEnd('/');
         var method = request.Method;
+
+        lock (RequestedPaths)
+        {
+            RequestedPaths.Add($"{method} {path}");
+        }
 
         if (method == "GET" && path.Equals("/api/health", StringComparison.OrdinalIgnoreCase))
         {
@@ -276,6 +349,48 @@ public sealed class MockVideoServer : IDisposable
             return HandleMovieItem(path, request);
         }
 
+        // Opt-in Serienfluss: Seriendetails und Episoden-Details/-Stream.
+        if (method == "GET" && path.StartsWith("/api/items/tvshow/", StringComparison.OrdinalIgnoreCase))
+        {
+            if (!IsGateValid(request))
+            {
+                return GateRejected();
+            }
+
+            if (!IsBearerValid(request))
+            {
+                return (401, "text/plain", Encoding.UTF8.GetBytes("unauthorized"));
+            }
+
+            return HandleTvShowItem(path);
+        }
+
+        if (method == "GET" && path.StartsWith("/api/items/tvshowepisode/", StringComparison.OrdinalIgnoreCase))
+        {
+            if (path.EndsWith("/stream", StringComparison.OrdinalIgnoreCase))
+            {
+                var token = QueryValue(request.Path, "access_token");
+                if (!string.Equals(token, AuthToken, StringComparison.Ordinal))
+                {
+                    return (401, "text/plain", Encoding.UTF8.GetBytes("unauthorized"));
+                }
+            }
+            else
+            {
+                if (!IsGateValid(request))
+                {
+                    return GateRejected();
+                }
+
+                if (!IsBearerValid(request))
+                {
+                    return (401, "text/plain", Encoding.UTF8.GetBytes("unauthorized"));
+                }
+            }
+
+            return HandleEpisodeItem(path, request);
+        }
+
         // Authentifizierte Listen-Endpunkte: Gate + Bearer prüfen,
         // leere Liste liefern (ausreichend für Token-Validierung und Sync).
         // Ablehnung ohne Bearer → text/plain wie die Credential-Ablehnung
@@ -296,7 +411,7 @@ public sealed class MockVideoServer : IDisposable
 
             // Opt-in Wiedergabefluss: konfigurierte Listenantworten statt
             // der Standard-Leerliste.
-            if (PlaybackMovieId is not null && ListOverride(path) is { } overrideBody)
+            if (ListOverride(path) is { } overrideBody)
             {
                 return (200, "application/json", overrideBody);
             }
@@ -312,9 +427,12 @@ public sealed class MockVideoServer : IDisposable
     /// liefert den konfigurierten Movie-Eintrag, „continue-watching" den
     /// Fortsetzungseintrag (nur bei gesetzter <see cref="PlaybackResumePositionSeconds"/>).
     /// </summary>
+    /// <param name="path">Der angefragte Request-Pfad (ohne Query).</param>
+    /// <returns>Der überschreibende Antwortkörper bzw. <c>null</c> ohne Überschreibung.</returns>
     private byte[]? ListOverride(string path)
     {
-        if (path.Equals("/api/items/recent", StringComparison.OrdinalIgnoreCase))
+        if (path.Equals("/api/items/recent", StringComparison.OrdinalIgnoreCase)
+            && PlaybackMovieId is not null)
         {
             return JsonBody(new[]
             {
@@ -335,12 +453,12 @@ public sealed class MockVideoServer : IDisposable
             });
         }
 
-        if (path.Equals("/api/continue-watching", StringComparison.OrdinalIgnoreCase)
-            && PlaybackResumePositionSeconds is > 0)
+        if (path.Equals("/api/continue-watching", StringComparison.OrdinalIgnoreCase))
         {
-            return JsonBody(new[]
+            var entries = new List<object>();
+            if (PlaybackResumePositionSeconds is > 0 && PlaybackMovieId is not null)
             {
-                new
+                entries.Add(new
                 {
                     mediaType = "movie",
                     entry = new PlaybackMediaEntryJson
@@ -352,8 +470,62 @@ public sealed class MockVideoServer : IDisposable
                     positionSeconds = PlaybackResumePositionSeconds.Value,
                     durationSeconds = 20L,
                     title = PlaybackMovieTitle
-                }
-            });
+                });
+            }
+
+            if (PlaybackEpisodeId is { } episodeId)
+            {
+                entries.Add(new
+                {
+                    mediaType = "episode",
+                    entry = new PlaybackMediaEntryJson
+                    {
+                        Type = "episode",
+                        Id = episodeId,
+                        Name = PlaybackEpisodeTitle,
+                        MediaSourceId = 1,
+                        Number = 1,
+                        Season = new PlaybackMediaEntryJson
+                        {
+                            Type = "season",
+                            Id = 9001,
+                            Name = "Staffel 1",
+                            MediaSourceId = 1,
+                            Number = 1,
+                            Show = new PlaybackMediaEntryJson
+                            {
+                                Type = "show",
+                                Id = PlaybackShowId ?? 0,
+                                Name = PlaybackShowTitle,
+                                MediaSourceId = 1
+                            }
+                        }
+                    },
+                    positionSeconds = PlaybackEpisodeResumePositionSeconds ?? 0L,
+                    durationSeconds = 20L,
+                    title = PlaybackEpisodeTitle
+                });
+            }
+
+            if (ContinueWatchingShowId is { } showId)
+            {
+                entries.Add(new
+                {
+                    mediaType = "show",
+                    entry = new PlaybackMediaEntryJson
+                    {
+                        Type = "show",
+                        Id = showId,
+                        Name = ContinueWatchingShowTitle,
+                        MediaSourceId = 1
+                    },
+                    positionSeconds = 60L,
+                    durationSeconds = 1200L,
+                    title = ContinueWatchingShowTitle
+                });
+            }
+
+            return entries.Count > 0 ? JsonBody(entries) : null;
         }
 
         return null;
@@ -361,7 +533,10 @@ public sealed class MockVideoServer : IDisposable
 
     /// <summary>
     /// Medieneintrag im Server-JSON-Format (<c>$type</c>-Diskriminator
-    /// der polymorphen MediaEntry-Hierarchie).
+    /// der polymorphen MediaEntry-Hierarchie). Trägt optional die
+    /// Serien-Einbettung (<c>season</c>/<c>show</c>) und die
+    /// Staffel-/Episoden-Container (<c>seasons</c>/<c>episodes</c>) des
+    /// Serienflusses; <c>null</c>-Felder werden nicht serialisiert.
     /// </summary>
     private sealed class PlaybackMediaEntryJson
     {
@@ -372,6 +547,21 @@ public sealed class MockVideoServer : IDisposable
         [JsonPropertyName("name")] public string Name { get; set; } = string.Empty;
 
         [JsonPropertyName("mediaSourceId")] public long MediaSourceId { get; set; }
+
+        [JsonPropertyName("number"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public int? Number { get; set; }
+
+        [JsonPropertyName("season"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public PlaybackMediaEntryJson? Season { get; set; }
+
+        [JsonPropertyName("show"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public PlaybackMediaEntryJson? Show { get; set; }
+
+        [JsonPropertyName("seasons"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public PlaybackMediaEntryJson[]? Seasons { get; set; }
+
+        [JsonPropertyName("episodes"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public PlaybackMediaEntryJson[]? Episodes { get; set; }
     }
 
     /// <summary>
@@ -380,6 +570,9 @@ public sealed class MockVideoServer : IDisposable
     /// Range-Support für den Seek: <c>Accept-Ranges</c>, <c>206 Partial
     /// Content</c> auf <c>Range</c>-Requests).
     /// </summary>
+    /// <param name="path">Der angefragte Request-Pfad (ohne Query).</param>
+    /// <param name="request">Die eingehende HTTP-Anfrage (für Header-Prüfung des Streams).</param>
+    /// <returns>Die Mock-Antwort des Detail- bzw. Stream-Endpunkts.</returns>
     private MockResponse HandleMovieItem(
         string path,
         (string Method, string Path, Dictionary<string, string> Headers, string Body) request)
@@ -419,10 +612,129 @@ public sealed class MockVideoServer : IDisposable
     }
 
     /// <summary>
+    /// <c>GET api/items/tvshow/{id}</c>: liefert die Opt-in-Serie mit
+    /// einer Staffel, die Ausgangs-Episode (<see cref="PlaybackEpisodeId"/>)
+    /// und die Folge-Episode (<see cref="PlaybackNextEpisodeId"/>)
+    /// enthält. Dient auch der Detailansicht des nicht abspielbaren
+    /// Weiterschauen-Serieneintrags (<see cref="ContinueWatchingShowId"/>).
+    /// </summary>
+    /// <param name="path">Der angefragte Request-Pfad (ohne Query).</param>
+    /// <returns>Die Mock-Antwort des Serien-Endpunkts.</returns>
+    private MockResponse HandleTvShowItem(string path)
+    {
+        var rest = path["/api/items/tvshow/".Length..];
+        if (!long.TryParse(rest, out var id))
+        {
+            return (404, "application/json", JsonBody(new { error = "not found" }));
+        }
+
+        if (PlaybackShowId is { } showId && id == showId)
+        {
+            return (200, "application/json", JsonBody(new PlaybackMediaEntryJson
+            {
+                Type = "show",
+                Id = showId,
+                Name = PlaybackShowTitle,
+                MediaSourceId = 1,
+                Seasons =
+                [
+                    new PlaybackMediaEntryJson
+                    {
+                        Type = "season",
+                        Id = 9001,
+                        Name = "Staffel 1",
+                        MediaSourceId = 1,
+                        Number = 1,
+                        Episodes =
+                        [
+                            new PlaybackMediaEntryJson
+                            {
+                                Type = "episode",
+                                Id = PlaybackEpisodeId ?? 0,
+                                Name = PlaybackEpisodeTitle,
+                                MediaSourceId = 1,
+                                Number = 1
+                            },
+                            new PlaybackMediaEntryJson
+                            {
+                                Type = "episode",
+                                Id = PlaybackNextEpisodeId ?? 0,
+                                Name = PlaybackNextEpisodeTitle,
+                                MediaSourceId = 1,
+                                Number = 2
+                            }
+                        ]
+                    }
+                ]
+            }));
+        }
+
+        if (ContinueWatchingShowId is { } cwShowId && id == cwShowId)
+        {
+            return (200, "application/json", JsonBody(new PlaybackMediaEntryJson
+            {
+                Type = "show",
+                Id = cwShowId,
+                Name = ContinueWatchingShowTitle,
+                MediaSourceId = 1
+            }));
+        }
+
+        return (404, "application/json", JsonBody(new { error = "not found" }));
+    }
+
+    /// <summary>
+    /// <c>GET api/items/tvshowepisode/{id}</c> (Episoden-Details) und
+    /// <c>GET api/items/tvshowepisode/{id}/stream</c> (Videodaten wie
+    /// beim Movie-Stream). Liefert Episoden des Opt-in-Serienflusses.
+    /// </summary>
+    /// <param name="path">Der angefragte Request-Pfad (ohne Query).</param>
+    /// <param name="request">Die eingehende HTTP-Anfrage (für Header-Prüfung des Streams).</param>
+    /// <returns>Die Mock-Antwort des Detail- bzw. Stream-Endpunkts.</returns>
+    private MockResponse HandleEpisodeItem(
+        string path,
+        (string Method, string Path, Dictionary<string, string> Headers, string Body) request)
+    {
+        var rest = path["/api/items/tvshowepisode/".Length..];
+        if (rest.EndsWith("/stream", StringComparison.OrdinalIgnoreCase))
+        {
+            var idPart = rest[..^"/stream".Length];
+            if (!long.TryParse(idPart, out var streamId)
+                || (streamId != PlaybackEpisodeId && streamId != PlaybackNextEpisodeId)
+                || PlaybackStreamFails
+                || PlaybackVideoPath is null
+                || !File.Exists(PlaybackVideoPath))
+            {
+                return (404, "application/json", JsonBody(new { error = "not found" }));
+            }
+
+            return ServeVideo(request, File.ReadAllBytes(PlaybackVideoPath));
+        }
+
+        if (!long.TryParse(rest, out var id)
+            || (id != PlaybackEpisodeId && id != PlaybackNextEpisodeId))
+        {
+            return (404, "application/json", JsonBody(new { error = "not found" }));
+        }
+
+        return (200, "application/json", JsonBody(new PlaybackMediaEntryJson
+        {
+            Type = "episode",
+            Id = id,
+            Name = id == PlaybackEpisodeId ? PlaybackEpisodeTitle : PlaybackNextEpisodeTitle,
+            MediaSourceId = 1,
+            Number = id == PlaybackEpisodeId ? 1 : 2
+        }));
+    }
+
+    /// <summary>
     /// Liefert die Videodatei: ganz (<c>200 OK</c>, <c>Accept-Ranges:
     /// bytes</c>) oder als Byte-Range (<c>206 Partial Content</c> mit
     /// <c>Content-Range</c>).
     /// </summary>
+    /// <param name="request">Die eingehende HTTP-Anfrage (Range-Header).</param>
+    /// <param name="video">Die abzuspielenden Videodaten.</param>
+    /// <returns>Die Mock-Antwort (200 vollständig bzw. 206 Byte-Range).</returns>
     private static MockResponse ServeVideo(
         (string Method, string Path, Dictionary<string, string> Headers, string Body) request,
         byte[] video)
@@ -441,6 +753,9 @@ public sealed class MockVideoServer : IDisposable
     }
 
     /// <summary>Liest einen Query-Parameter aus dem Request-Pfad.</summary>
+    /// <param name="path">Der Request-Pfad mit Query-String.</param>
+    /// <param name="name">Der gesuchte Query-Parametername.</param>
+    /// <returns>Der URL-dekodierte Wert bzw. <c>null</c>, wenn nicht vorhanden.</returns>
     private static string? QueryValue(string path, string name)
     {
         var queryStart = path.IndexOf('?');
@@ -462,6 +777,11 @@ public sealed class MockVideoServer : IDisposable
     }
 
     /// <summary>Parst <c>bytes=start-end</c>, <c>bytes=start-</c> und <c>bytes=-suffix</c>.</summary>
+    /// <param name="header">Der Range-Header-Wert.</param>
+    /// <param name="length">Gesamtlänge der Ressource in Bytes.</param>
+    /// <param name="start">Ausgabeparameter: erstes Byte des Bereichs.</param>
+    /// <param name="end">Ausgabeparameter: letztes Byte des Bereichs.</param>
+    /// <returns><c>true</c>, wenn ein gültiger Bereich gelesen wurde.</returns>
     private static bool TryParseRange(string header, long length, out long start, out long end)
     {
         start = 0;
@@ -582,6 +902,8 @@ public sealed class MockVideoServer : IDisposable
     /// Kurzcode-Alias) ein und liefert das verschlüsselte Session-Paket —
     /// anonymer Endpunkt wie <c>exchange</c> (kein Gate, kein Bearer).
     /// </summary>
+    /// <param name="body">Der JSON-Anfragekörper mit dem Ticket.</param>
+    /// <returns>Status, MIME-Typ und Antwortkörper des Endpunkts.</returns>
     private (int, string, byte[]) HandleBootstrap(string body)
     {
         BootstrapCount++;
@@ -624,6 +946,8 @@ public sealed class MockVideoServer : IDisposable
     /// der alte Wert wird beim Antworten ungültig. Liegt hinter dem
     /// Client-Gate (wie der echte Server).
     /// </summary>
+    /// <param name="request">Die eingehende HTTP-Anfrage (Refresh-Token im Body).</param>
+    /// <returns>Status, MIME-Typ und Antwortkörper des Endpunkts.</returns>
     private (int, string, byte[]) HandleRefresh(
         (string Method, string Path, Dictionary<string, string> Headers, string Body) request)
     {
@@ -662,6 +986,8 @@ public sealed class MockVideoServer : IDisposable
     /// <c>api/auth/logout</c>: widerruft den Refresh-Token — idempotent,
     /// antwortet auch bei bereits ungültigem Token mit 200.
     /// </summary>
+    /// <param name="request">Die eingehende HTTP-Anfrage (Refresh-Token im Body).</param>
+    /// <returns>Status, MIME-Typ und Antwortkörper des Endpunkts.</returns>
     private (int, string, byte[]) HandleLogout(
         (string Method, string Path, Dictionary<string, string> Headers, string Body) request)
     {
@@ -737,6 +1063,9 @@ public sealed class MockVideoServer : IDisposable
     /// Liest eine HTTP/1.1-Anfrage: Request-Line + Header bis zur
     /// Leerzeile, dann <c>Content-Length</c> Bytes Body.
     /// </summary>
+    /// <param name="stream">Der Netzwerk-Stream der Client-Verbindung.</param>
+    /// <param name="cancellationToken">Bricht das Lesen ab.</param>
+    /// <returns>Die gelesene Anfrage bzw. <c>null</c> bei Verbindungsabbruch.</returns>
     private static async Task<(string Method, string Path, Dictionary<string, string> Headers, string Body)?> ReadRequestAsync(
         NetworkStream stream, CancellationToken cancellationToken)
     {

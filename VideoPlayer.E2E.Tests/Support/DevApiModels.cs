@@ -98,6 +98,12 @@ public sealed class DevApiModel
     /// <summary>Eine Wiedergabe ist angefordert (Player-Seite belegt).</summary>
     [JsonPropertyName("playerIsActive")] public bool PlayerIsActive { get; set; }
 
+    /// <summary>Medien-Id des aktuell abzuspielenden Mediums (0 = keine).</summary>
+    [JsonPropertyName("playerMediaId")] public long PlayerMediaId { get; set; }
+
+    /// <summary>Anzahl der bereitstehenden Folge-Episoden.</summary>
+    [JsonPropertyName("playerUpcomingEpisodeCount")] public int PlayerUpcomingEpisodeCount { get; set; }
+
     /// <summary>Die Wiedergabe läuft gerade.</summary>
     [JsonPropertyName("playerIsPlaying")] public bool PlayerIsPlaying { get; set; }
 

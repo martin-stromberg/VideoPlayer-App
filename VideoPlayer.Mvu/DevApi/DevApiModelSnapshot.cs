@@ -98,6 +98,12 @@ public sealed record DevApiModelSnapshot
     /// <summary>Eine Wiedergabe ist angefordert (Player-Zustand belegt).</summary>
     public bool PlayerIsActive { get; init; }
 
+    /// <summary>Medien-Id des aktuell abzuspielenden Mediums (0 = keine).</summary>
+    public long PlayerMediaId { get; init; }
+
+    /// <summary>Anzahl der bereitstehenden Folge-Episoden (Folgevideo-Funktion).</summary>
+    public int PlayerUpcomingEpisodeCount { get; init; }
+
     /// <summary>Die Wiedergabe läuft gerade.</summary>
     public bool PlayerIsPlaying { get; init; }
 
@@ -161,6 +167,8 @@ public sealed record DevApiModelSnapshot
             FavoritesCount = model.Favorites.Count,
             RecentEntriesCount = model.RecentEntries.Count,
             PlayerIsActive = model.Player.IsActive,
+            PlayerMediaId = model.Player.MediaId,
+            PlayerUpcomingEpisodeCount = model.Player.UpcomingEpisodes.Count,
             PlayerIsPlaying = model.Player.IsPlaying,
             PlayerPositionSeconds = model.Player.Position.TotalSeconds,
             PlayerError = model.Player.Error
