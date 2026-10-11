@@ -79,12 +79,25 @@ runs:
         printf '{"microsoft.net.sdk.ios": "%s"}\n' "${{ inputs.ios-workload-version }}" > "$RUNNER_TEMP/workload-rollback.json"
         dotnet workload update --from-rollback-file "$RUNNER_TEMP/workload-rollback.json"
         dotnet workload install maui-ios ios --skip-manifest-update
-        # Auf dem Runner vorinstallierte iOS-Packs anderer Version
-        # entfernen: die TPV-Resolution wuerde sonst das neueste Pack
-        # waehlen - unabhaengig vom gepinnten Manifest.
-        for d in "$HOME"/.dotnet/packs/Microsoft.iOS.Sdk.net10.0_*/*/; do
+        # iOS-Sdk-Packs mit neuerer Zielplattformversion (TPV) als der
+        # gepinnten entfernen: die TPV-Resolution wuerde sonst das
+        # neueste Pack waehlen - unabhaengig vom gepinnten Manifest
+        # (net10.0_27.0 verlangt Beta-Xcode, der Store lehnt Beta ab).
+        # Packs kleinerer TPV muessen bleiben: Bibliotheken ohne
+        # OutputType=Exe loesen ihre TPV ueber
+        # _XamarinTargetPlatformVersionLibrary auf (statt
+        # _XamarinTargetPlatformVersionExecutable, siehe
+        # Xamarin.Shared.Sdk.TargetFrameworkInference.props) und
+        # brauchen dafuer das zugehoerige Sdk-Pack - NETSDK1147 sonst.
+        pinned_tpv="$(printf '%s' "${{ inputs.ios-workload-version }}" | cut -d. -f1-2)"  # 26.5.10318 -> 26.5
+        IFS=. read -r pmaj pmin _ <<< "$pinned_tpv"
+        for d in "$HOME"/.dotnet/packs/Microsoft.iOS.Sdk.net10.0_*/; do
           [ -d "$d" ] || continue
-          [ "$(basename "$d")" = "${{ inputs.ios-workload-version }}" ] || rm -rf "$(dirname "$d")"
+          tpv="$(basename "$d")"; tpv="${tpv##*_}"  # ...net10.0_27.0 -> 27.0
+          IFS=. read -r tmaj tmin _ <<< "$tpv"
+          if (( 10#$tmaj > 10#$pmaj || (10#$tmaj == 10#$pmaj && 10#$tmin > 10#$pmin) )); then
+            rm -rf "$d"
+          fi
         done
       shell: bash
 
