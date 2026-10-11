@@ -48,6 +48,14 @@ public sealed record AppSettings
     /// </summary>
     public bool HomeHeroEnabled { get; init; } = true;
 
+    /// <summary>
+    /// Protokollierung an/aus: bei <c>true</c> schreibt die App ein
+    /// Programmprotokoll in die Protokolldatei
+    /// (<see cref="AppStorageLayout.LogsDirectory"/>/<c>videoplayer.log</c>;
+    /// Standard: deaktiviert).
+    /// </summary>
+    public bool LoggingEnabled { get; init; }
+
     /// <summary>Liefert eine Kopie mit auf die zulässigen Schranken geklammerten Werten.</summary>
     /// <returns>Eine Kopie der Einstellungen mit normalisierten Werten.</returns>
     public AppSettings Normalize() => this with

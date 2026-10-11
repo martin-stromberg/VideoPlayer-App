@@ -74,6 +74,12 @@ public static class AppUpdate
     /// <summary>Fehlertext der Wiedergabeseite bei nicht verfügbarer/abspielbarer Quelle.</summary>
     public const string PlaybackUnavailableError = "Das Video kann nicht abgespielt werden.";
 
+    /// <summary>Fehlertext des Protokollversands, wenn noch keine Protokolldatei vorhanden ist.</summary>
+    public const string LogProtocolEmptyError = "Es ist noch kein Protokoll vorhanden.";
+
+    /// <summary>Fehlertext des Protokollversands, wenn weder ein Mailentwurf geöffnet noch die Datei geteilt werden kann.</summary>
+    public const string LogSendFailedError = "Der Protokollversand ist auf diesem Gerät nicht möglich — es konnte weder ein E-Mail-Entwurf geöffnet noch die Datei geteilt werden.";
+
     /// <summary>
     /// Wendet eine Nachricht auf das übergebene Model an und liefert den
     /// Übergang: das neue Model plus die daraus resultierenden Effekte.
@@ -169,6 +175,8 @@ public static class AppUpdate
             DownloadCancelRequestedMessage requested => UpdateDownloadCancelRequested(model, requested),
             DownloadRetryRequestedMessage requested => UpdateDownloadRetryRequested(model, requested),
             DownloadDeleteRequestedMessage requested => UpdateDownloadDeleteRequested(model, requested),
+            SendLogProtocolRequestedMessage => UpdateSendLogProtocolRequested(model),
+            SendLogProtocolCompletedMessage completed => UpdateSendLogProtocolCompleted(model, completed),
             LogoutRequestedMessage => UpdateLogoutRequested(model),
             _ => AppTransition.Unchanged(model)
         };
@@ -224,6 +232,28 @@ public static class AppUpdate
         // Hero-Bild nachgeladen — nur bei bestehender Verbindung.
         var updated = WithHeroLoad(model with { Settings = normalized }, effects);
         return new AppTransition(updated, effects);
+    }
+
+    private static AppTransition UpdateSendLogProtocolRequested(AppModel model)
+    {
+        // Der Versand ist nur bei aktivierter Protokollierung zulässig —
+        // der Button ist dann auch nur sichtbar; der Guard fängt
+        // veraltete/externe Dispatches ab.
+        if (!model.Settings.LoggingEnabled)
+        {
+            return AppTransition.Unchanged(model);
+        }
+
+        return new AppTransition(
+            model with { LogSendError = null },
+            [new SendLogProtocolEffect()]);
+    }
+
+    private static AppTransition UpdateSendLogProtocolCompleted(AppModel model, SendLogProtocolCompletedMessage message)
+    {
+        return new AppTransition(
+            model with { LogSendError = message.Error },
+            []);
     }
 
     private static AppTransition UpdateServersLoaded(AppModel model, ServersLoadedMessage message)

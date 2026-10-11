@@ -83,6 +83,12 @@ public sealed class DevApiModel
     /// <summary>Hinweistext der Ablage.</summary>
     [JsonPropertyName("storageNotice")] public string? StorageNotice { get; set; }
 
+    /// <summary>Protokollierung ist aktiviert (Einstellung „Protokollierung").</summary>
+    [JsonPropertyName("settingsLoggingEnabled")] public bool SettingsLoggingEnabled { get; set; }
+
+    /// <summary>Fehlertext des Protokollversands.</summary>
+    [JsonPropertyName("logSendError")] public string? LogSendError { get; set; }
+
     /// <summary>Titel des Hero-Bereichs der Startseite.</summary>
     [JsonPropertyName("heroTitle")] public string? HeroTitle { get; set; }
 

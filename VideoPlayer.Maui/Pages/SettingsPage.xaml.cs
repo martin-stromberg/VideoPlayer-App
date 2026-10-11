@@ -27,6 +27,7 @@ public partial class SettingsPage : ContentPage
         WifiOnlySwitch.Toggled += OnWifiOnlyToggled;
         AutoDeleteWatchedSwitch.Toggled += OnAutoDeleteWatchedToggled;
         AutoResumeSwitch.Toggled += OnAutoResumeToggled;
+        LoggingSwitch.Toggled += OnLoggingToggled;
 
         WireNumeric(PreloadEpisodeCountEntry, OnPreloadEpisodeCountCompleted);
         WireNumeric(DownloadQuotaGbEntry, OnDownloadQuotaCompleted);
@@ -69,6 +70,7 @@ public partial class SettingsPage : ContentPage
             WifiOnlySwitch.IsToggled = settings.WifiOnlyDownloads;
             AutoDeleteWatchedSwitch.IsToggled = settings.AutoDeleteWatchedEpisodes;
             AutoResumeSwitch.IsToggled = settings.AutoResumeEnabled;
+            LoggingSwitch.IsToggled = settings.LoggingEnabled;
 
             SetTextIfNotFocused(PreloadEpisodeCountEntry, settings.PreloadEpisodeCount);
             SetTextIfNotFocused(DownloadQuotaGbEntry, settings.DownloadQuotaGb);
@@ -79,6 +81,12 @@ public partial class SettingsPage : ContentPage
         {
             suppressEvents = false;
         }
+
+        // Der Versand-Bereich ist nur bei aktivierter Protokollierung
+        // sichtbar; der Fehlerhinweis folgt dem Modell-Fehlertext.
+        SendLogSection.IsVisible = settings.LoggingEnabled;
+        SendLogErrorLabel.Text = mvuHost.Model.LogSendError;
+        SendLogErrorLabel.IsVisible = mvuHost.Model.LogSendError is not null;
     }
 
     private static void SetTextIfNotFocused(Entry entry, int value)
@@ -114,6 +122,11 @@ public partial class SettingsPage : ContentPage
         Save(s => s with { AutoResumeEnabled = e.Value });
     }
 
+    private void OnLoggingToggled(object? sender, ToggledEventArgs e)
+    {
+        Save(s => s with { LoggingEnabled = e.Value });
+    }
+
     private void OnPreloadEpisodeCountCompleted(object? sender, EventArgs e)
     {
         SaveNumeric(PreloadEpisodeCountEntry, v => s => s with { PreloadEpisodeCount = v });
@@ -140,6 +153,14 @@ public partial class SettingsPage : ContentPage
     private void OnServerSwitchClicked(object? sender, EventArgs e)
     {
         _ = mvuHost.DispatchAsync(new NavigateToMessage(AppPage.ServerSetup));
+    }
+
+    /// <summary>„Protokoll senden": Versand des Programmprotokolls per Mailentwurf anfordern.</summary>
+    /// <param name="sender">Auslösendes Steuerelement.</param>
+    /// <param name="e">Ereignisargumente.</param>
+    private void OnSendLogClicked(object? sender, EventArgs e)
+    {
+        _ = mvuHost.DispatchAsync(new SendLogProtocolRequestedMessage());
     }
 
     /// <summary>

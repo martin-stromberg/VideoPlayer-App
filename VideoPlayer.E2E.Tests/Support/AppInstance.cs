@@ -14,7 +14,7 @@ namespace VideoPlayer.E2E.Tests.Support;
 /// App kein Geräte-Pairing einfordern). Wartet auf <c>devapi.json</c>
 /// mit der eigenen PID, stellt <see cref="DevApiClient"/> und den
 /// FlaUI-<see cref="UiDriver"/> bereit und beendet den Prozess im
-/// <see cref="Dispose"/> garantiert.
+/// <see cref="Dispose()"/> garantiert.
 /// </summary>
 public sealed class AppInstance : IDisposable
 {
@@ -114,7 +114,7 @@ public sealed class AppInstance : IDisposable
     public void Dispose() => Dispose(deleteProfile: true);
 
     /// <summary>
-    /// Beendet die App wie <see cref="Dispose"/>, lässt das
+    /// Beendet die App wie <see cref="Dispose()"/>, lässt das
     /// Profilverzeichnis aber auf Wunsch bestehen — für Neustart-Tests,
     /// die mit derselben Ablage weiterarbeiten (die Folge-Instanz räumt
     /// dann beim regulären Dispose auf).
@@ -158,6 +158,30 @@ public sealed class AppInstance : IDisposable
         }
     }
 
+    /// <summary>
+    /// Sucht eine Datei im Protokollverzeichnis des Testprofils
+    /// (<c>AppStorageLayout.LogsDirectory</c>). Die App läuft unpackaged:
+    /// <c>FileSystem.AppDataDirectory</c> liegt auf Windows unter
+    /// <c>%LOCALAPPDATA%\&lt;Publisher&gt;\de.martinstromberg.videos\Data</c> —
+    /// der Publisher-Abschnitt wird deshalb nicht hart kodiert, sondern
+    /// über eine Verzeichnissuche aufgelöst.
+    /// </summary>
+    /// <param name="fileName">Der gesuchte Dateiname (Standard: <c>videoplayer.log</c>).</param>
+    /// <returns>Der gefundene Pfad oder <c>null</c>.</returns>
+    public string? FindLogFile(string fileName = "videoplayer.log")
+    {
+        foreach (var noBackupDir in ProfileNoBackupDirectories())
+        {
+            var candidate = Path.Combine(noBackupDir, "logs", fileName);
+            if (File.Exists(candidate))
+            {
+                return candidate;
+            }
+        }
+
+        return null;
+    }
+
     private void DeleteProfileDirectory()
     {
         // Profildaten liegen auf Windows unter %APPDATA%/VideoPlayer/<profil>
@@ -168,11 +192,19 @@ public sealed class AppInstance : IDisposable
             Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData)
         };
-        foreach (var root in roots)
+        var candidates = roots
+            .Select(root => Path.Combine(root, "VideoPlayer", Profile))
+            // Nicht backup-pflichtige Ablage und Temp-Cache liegen unter dem
+            // unpackaged AppDataDirectory (%LOCALAPPDATA%\<Publisher>\
+            // de.martinstromberg.videos\…\<profil>) — Protokolle und
+            // Downloads würden sonst als Testleichen liegen bleiben.
+            .Concat(ProfileNoBackupDirectories())
+            .Concat(AppDataProfileDirectories("Cache"));
+
+        foreach (var dir in candidates)
         {
             try
             {
-                var dir = Path.Combine(root, "VideoPlayer", Profile);
                 if (Directory.Exists(dir))
                 {
                     Directory.Delete(dir, recursive: true);
@@ -181,6 +213,34 @@ public sealed class AppInstance : IDisposable
             catch (Exception)
             {
                 // Reste eines Testprofils sind unkritisch.
+            }
+        }
+    }
+
+    /// <summary>
+    /// Liefert die nicht backup-pflichtigen Profilverzeichnisse
+    /// (<c>…\de.martinstromberg.videos\Data\nobackup\{profil}</c>) unter
+    /// <c>%LOCALAPPDATA%</c> — über Verzeichnissuche, weil der
+    /// Publisher-Abschnitt vom MAUI-Essentials-Fallback abhängt.
+    /// </summary>
+    /// <returns>Die vorhandenen Kandidatenverzeichnisse.</returns>
+    private IEnumerable<string> ProfileNoBackupDirectories()
+        => AppDataProfileDirectories(Path.Combine("Data", "nobackup"));
+
+    private IEnumerable<string> AppDataProfileDirectories(string subDirectory)
+    {
+        var local = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+        var appDataRoots = Directory
+            .EnumerateDirectories(local)
+            .Select(d => Path.Combine(d, "de.martinstromberg.videos"))
+            .Prepend(Path.Combine(local, "de.martinstromberg.videos"));
+
+        foreach (var appDataRoot in appDataRoots.Distinct())
+        {
+            var candidate = Path.Combine(appDataRoot, subDirectory, Profile);
+            if (Directory.Exists(candidate))
+            {
+                yield return candidate;
             }
         }
     }

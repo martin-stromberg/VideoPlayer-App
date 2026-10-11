@@ -1,4 +1,5 @@
 using System.Net;
+using Microsoft.Extensions.Logging;
 using VideoPlayer.ApiClient;
 using VideoPlayer.ApiClient.Discovery;
 using VideoPlayer.Mvu;
@@ -26,6 +27,11 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
     private readonly ServerEventsService serverEvents;
     private readonly DownloadService downloads;
     private readonly AutoDownloadService autoDownloads;
+    private readonly AppLogService appLog;
+    private readonly ILogger<ShellAppEffectHandler> logger;
+
+    /// <summary>Empfängeradresse des Protokollversands per Mail.</summary>
+    private const string LogProtocolRecipient = "mstromberg84+heimkino@gmail.com";
 
     /// <summary>Initialisiert eine neue Instanz der <see cref="ShellAppEffectHandler"/>-Klasse.</summary>
     /// <param name="services">Dienstanbieter zum Auflösen der am Effekt beteiligten Dienste (inkl. <see cref="MvuHost"/>).</param>
@@ -38,6 +44,8 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
     /// <param name="serverEvents">Server-Ereignisverbindung; meldet Ereignisse und Trennung in den MVU-Zyklus.</param>
     /// <param name="downloads">Download-Verwaltung; meldet Zustands-/Fortschrittsänderungen in den MVU-Zyklus.</param>
     /// <param name="autoDownloads">Automatischer Vorlauf der Weiterschauen-Liste.</param>
+    /// <param name="appLog">Datei-Protokoll-Dienst (Schaltzustand und Versand-Dateien).</param>
+    /// <param name="logger">Logger des Handlers — Diagnosemeldungen laufen ins Programmprotokoll.</param>
     public ShellAppEffectHandler(
         IServiceProvider services,
         IServerHealthProbe healthProbe,
@@ -48,7 +56,9 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
         INetworkStatusMonitor networkMonitor,
         ServerEventsService serverEvents,
         DownloadService downloads,
-        AutoDownloadService autoDownloads)
+        AutoDownloadService autoDownloads,
+        AppLogService appLog,
+        ILogger<ShellAppEffectHandler> logger)
     {
         this.services = services;
         this.healthProbe = healthProbe;
@@ -60,6 +70,8 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
         this.serverEvents = serverEvents;
         this.downloads = downloads;
         this.autoDownloads = autoDownloads;
+        this.appLog = appLog;
+        this.logger = logger;
 
         // Endgültig abgelehnte stille Neuanmeldung (401 ohne gültige
         // Zugangsdaten) → die App wechselt in den Anmeldezustand.
@@ -238,7 +250,77 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
             case DeleteWatchedDownloadEffect deleteWatched:
                 await DeleteDownloadAsync(deleteWatched.MediaType, deleteWatched.MediaId, cancellationToken, completedOnly: true);
                 break;
+            case SendLogProtocolEffect:
+                await SendLogProtocolAsync();
+                break;
         }
+    }
+
+    /// <summary>
+    /// Protokollversand: das Programmprotokoll als Anhang eines
+    /// Mailentwurfs an <see cref="LogProtocolRecipient"/> öffnen
+    /// (<see cref="Email.ComposeAsync(EmailMessage)"/>). Kann kein
+    /// Mailentwurf geöffnet werden (kein Mail-Client, unpackaged
+    /// Windows), greift der Teilen-Fallback
+    /// (<see cref="Share.RequestAsync(ShareFileRequest)"/>); schlägt auch
+    /// dieser fehl, erhält der Anwender einen verständlichen Hinweis über
+    /// <see cref="SendLogProtocolCompletedMessage"/>.
+    /// </summary>
+    /// <returns>Eine abgeschlossene Aufgabe nach dem Melden des Versandergebnisses.</returns>
+    private async Task SendLogProtocolAsync()
+    {
+        var attachments = appLog.GetAttachmentPaths();
+        if (!appLog.IsEnabled || attachments.Count == 0)
+        {
+            await DispatchMessageAsync(
+                new SendLogProtocolCompletedMessage(AppUpdate.LogProtocolEmptyError));
+            return;
+        }
+
+        try
+        {
+            await MainThread.InvokeOnMainThreadAsync(async () =>
+            {
+                var message = new EmailMessage
+                {
+                    Subject = "Heimkino – Programmprotokoll",
+                    Body = "Programmprotokoll der Heimkino-App (automatisch erzeugt).",
+                    BodyFormat = EmailBodyFormat.PlainText,
+                    To = new List<string> { LogProtocolRecipient },
+                    Attachments = attachments
+                        .Select(path => new EmailAttachment(path))
+                        .ToList()
+                };
+
+                try
+                {
+                    await Email.ComposeAsync(message);
+                }
+                catch (Exception mailException) when (mailException is FeatureNotSupportedException
+                    || mailException is System.Runtime.InteropServices.COMException
+                    || mailException is InvalidOperationException)
+                {
+                    // Kein Mail-Client verfügbar (unpackaged Windows:
+                    // ShowComposeNewEmailAsync ist dort nicht nutzbar) —
+                    // Teilen-Dialog als Fallback.
+                    logger.LogInformation(
+                        "Mailentwurf nicht verfügbar ({Detail}) — Teilen-Fallback.",
+                        mailException.Message);
+                    await Share.RequestAsync(new ShareFileRequest(
+                        "Heimkino – Programmprotokoll",
+                        new ShareFile(appLog.LogFilePath)));
+                }
+            });
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Protokollversand fehlgeschlagen");
+            await DispatchMessageAsync(
+                new SendLogProtocolCompletedMessage(AppUpdate.LogSendFailedError));
+            return;
+        }
+
+        await DispatchMessageAsync(new SendLogProtocolCompletedMessage(null));
     }
 
     private async Task NavigateToPlayerAsync()
@@ -254,7 +336,7 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"[ShellAppEffectHandler] Player-Navigation fehlgeschlagen: {ex.Message}");
+            logger.LogError(ex, "Player-Navigation fehlgeschlagen");
         }
     }
 
@@ -278,7 +360,7 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"[ShellAppEffectHandler] Quellauflösung fehlgeschlagen: {ex.Message}");
+            logger.LogError(ex, "Quellauflösung fehlgeschlagen");
             error = AppUpdate.PlaybackUnavailableError;
         }
 
@@ -305,7 +387,7 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"[ShellAppEffectHandler] Folge-Episoden laden fehlgeschlagen: {ex.Message}");
+            logger.LogError(ex, "Folge-Episoden laden fehlgeschlagen");
         }
 
         await DispatchMessageAsync(new UpcomingEpisodesLoadedMessage(loadUpcoming.MediaId, episodes));
@@ -323,7 +405,7 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
         catch (Exception ex)
         {
             // Ein Fehlschlag ist nicht fatal — der nächste Takt meldet erneut.
-            System.Diagnostics.Debug.WriteLine($"[ShellAppEffectHandler] Fortschrittsmeldung fehlgeschlagen: {ex.Message}");
+            logger.LogError(ex, "Fortschrittsmeldung fehlgeschlagen");
         }
     }
 
@@ -337,7 +419,7 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"[ShellAppEffectHandler] PiP-Umschaltung fehlgeschlagen: {ex.Message}");
+            logger.LogError(ex, "PiP-Umschaltung fehlgeschlagen");
         }
 
         await DispatchMessageAsync(new PictureInPictureChangedMessage(isActive));
@@ -351,7 +433,7 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"[ShellAppEffectHandler] Netzwerk-Monitoring fehlgeschlagen: {ex.Message}");
+            logger.LogError(ex, "Netzwerk-Monitoring fehlgeschlagen");
         }
 
         // Ist-Wert in den MVU-Zyklus melden (ConnectivityChanged meldet
@@ -369,7 +451,7 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
         {
             // Ein Fehlschlag ist nicht fatal — der nächste Netzwerkwechsel
             // oder das nächste Ereignis bietet eine neue Gelegenheit.
-            System.Diagnostics.Debug.WriteLine($"[ShellAppEffectHandler] Ereignisverbindung fehlgeschlagen: {ex.Message}");
+            logger.LogError(ex, "Ereignisverbindung fehlgeschlagen");
         }
     }
 
@@ -381,7 +463,7 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"[ShellAppEffectHandler] Trennen der Ereignisverbindung fehlgeschlagen: {ex.Message}");
+            logger.LogError(ex, "Trennen der Ereignisverbindung fehlgeschlagen");
         }
     }
 
@@ -394,7 +476,7 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"[ShellAppEffectHandler] Synchronisation fehlgeschlagen: {ex.Message}");
+            logger.LogError(ex, "Synchronisation fehlgeschlagen");
             result = new SyncResult(0, 0, false, false, false);
         }
 
@@ -409,7 +491,7 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"[ShellAppEffectHandler] Teil-Synchronisation fehlgeschlagen: {ex.Message}");
+            logger.LogError(ex, "Teil-Synchronisation fehlgeschlagen");
         }
 
         // Alle Teil-Synchronisationen betreffen Startseiten-Listen — die
@@ -436,7 +518,7 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"[ShellAppEffectHandler] Weiterschauen-Mutation fehlgeschlagen: {ex.Message}");
+            logger.LogError(ex, "Weiterschauen-Mutation fehlgeschlagen");
         }
 
         if (success)
@@ -464,7 +546,7 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
         {
             // Fehler beim Cache-Lesen → leere Listen, die Startseite bleibt
             // anzeigbar.
-            System.Diagnostics.Debug.WriteLine($"[ShellAppEffectHandler] Startseiten-Listen laden fehlgeschlagen: {ex.Message}");
+            logger.LogError(ex, "Startseiten-Listen laden fehlgeschlagen");
             lists = HomeLists.Empty;
         }
 
@@ -493,7 +575,7 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"[ShellAppEffectHandler] Hero-Hintergrund laden fehlgeschlagen: {ex.Message}");
+            logger.LogError(ex, "Hero-Hintergrund laden fehlgeschlagen");
         }
 
         await DispatchMessageAsync(new HeroBackgroundLoadedMessage(imageBytes));
@@ -529,7 +611,7 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"[ShellAppEffectHandler] Detail-Navigation fehlgeschlagen: {ex.Message}");
+            logger.LogError(ex, "Detail-Navigation fehlgeschlagen");
         }
     }
 
@@ -558,7 +640,7 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"[ShellAppEffectHandler] Quellen-Navigation fehlgeschlagen: {ex.Message}");
+            logger.LogError(ex, "Quellen-Navigation fehlgeschlagen");
         }
     }
 
@@ -610,7 +692,7 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"[ShellAppEffectHandler] Quellen laden fehlgeschlagen: {ex.Message}");
+            logger.LogError(ex, "Quellen laden fehlgeschlagen");
             error = "Die Quellen konnten nicht geladen werden.";
         }
 
@@ -629,7 +711,7 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
         {
             // Genre-Ladefehler sind nicht fatal — die Leiste zeigt dann
             // nur „Alle" (kein Filter).
-            System.Diagnostics.Debug.WriteLine($"[ShellAppEffectHandler] Genres laden fehlgeschlagen: {ex.Message}");
+            logger.LogError(ex, "Genres laden fehlgeschlagen");
             items = [new SourceGenreItem { Id = 0, Name = SourceBrowserService.AllGenresName, IsSelected = true }];
         }
 
@@ -647,7 +729,7 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"[ShellAppEffectHandler] Quelleneinträge laden fehlgeschlagen: {ex.Message}");
+            logger.LogError(ex, "Quelleneinträge laden fehlgeschlagen");
             page = new SourceItemsPage(items.Page, [], HasMore: false);
             error = "Die Einträge konnten nicht geladen werden.";
         }
@@ -670,7 +752,7 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"[ShellAppEffectHandler] Detail-Ladung fehlgeschlagen: {ex.Message}");
+            logger.LogError(ex, "Detail-Ladung fehlgeschlagen");
             error = "Die Details konnten nicht geladen werden.";
         }
 
@@ -705,7 +787,7 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"[ShellAppEffectHandler] Detail-Kopfbild laden fehlgeschlagen: {ex.Message}");
+            logger.LogError(ex, "Detail-Kopfbild laden fehlgeschlagen");
         }
 
         await DispatchMessageAsync(new MediaDetailsHeaderImageLoadedMessage(
@@ -723,7 +805,7 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"[ShellAppEffectHandler] Favoriten-Umschaltung fehlgeschlagen: {ex.Message}");
+            logger.LogError(ex, "Favoriten-Umschaltung fehlgeschlagen");
         }
 
         await DispatchMessageAsync(new FavoriteToggleCompletedMessage(
@@ -760,7 +842,7 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"[ShellAppEffectHandler] Favoriten laden fehlgeschlagen: {ex.Message}");
+            logger.LogError(ex, "Favoriten laden fehlgeschlagen");
             error = "Die Favoriten konnten nicht geladen werden.";
         }
 
@@ -777,7 +859,7 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"[ShellAppEffectHandler] Favorit entfernen fehlgeschlagen: {ex.Message}");
+            logger.LogError(ex, "Favorit entfernen fehlgeschlagen");
         }
 
         await DispatchMessageAsync(new FavoriteRemoveCompletedMessage(favoriteId, success));
@@ -803,7 +885,7 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
         {
             // Ohne lesbare Ablage bleibt die Seite mit Platzhaltern
             // anzeigbar (Benutzername/E-Mail „—").
-            System.Diagnostics.Debug.WriteLine($"[ShellAppEffectHandler] Profilinformationen laden fehlgeschlagen: {ex.Message}");
+            logger.LogError(ex, "Profilinformationen laden fehlgeschlagen");
             info = new ProfileInfo(null, null, null);
         }
 
@@ -818,7 +900,7 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"[ShellAppEffectHandler] Abmeldung fehlgeschlagen: {ex.Message}");
+            logger.LogError(ex, "Abmeldung fehlgeschlagen");
         }
     }
 
@@ -834,7 +916,7 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"[ShellAppEffectHandler] Download-Liste laden fehlgeschlagen: {ex.Message}");
+            logger.LogError(ex, "Download-Liste laden fehlgeschlagen");
             error = "Die Downloads konnten nicht geladen werden.";
         }
 
@@ -854,7 +936,7 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"[ShellAppEffectHandler] Download einreihen fehlgeschlagen: {ex.Message}");
+            logger.LogError(ex, "Download einreihen fehlgeschlagen");
             result = new DownloadEnqueueResult
             {
                 Item = null,
@@ -890,7 +972,7 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"[ShellAppEffectHandler] Download löschen fehlgeschlagen: {ex.Message}");
+            logger.LogError(ex, "Download löschen fehlgeschlagen");
         }
     }
 
@@ -902,7 +984,7 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"[ShellAppEffectHandler] Download-Wiederaufnahme fehlgeschlagen: {ex.Message}");
+            logger.LogError(ex, "Download-Wiederaufnahme fehlgeschlagen");
         }
     }
 
@@ -930,7 +1012,7 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"[ShellAppEffectHandler] Dispatch von {message.GetType().Name} fehlgeschlagen: {ex.Message}");
+            logger.LogError(ex, "Dispatch von {MessageType} fehlgeschlagen", message.GetType().Name);
         }
     }
 
@@ -943,7 +1025,7 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"[ShellAppEffectHandler] Automatische Anmeldung fehlgeschlagen: {ex.Message}");
+            logger.LogError(ex, "Automatische Anmeldung fehlgeschlagen");
             attempt = new AuthAttempt(AuthAttemptStatus.Failed);
         }
 
@@ -961,7 +1043,7 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"[ShellAppEffectHandler] Anmeldung fehlgeschlagen: {ex.Message}");
+            logger.LogError(ex, "Anmeldung fehlgeschlagen");
             attempt = new AuthAttempt(AuthAttemptStatus.Failed);
         }
 
@@ -981,7 +1063,7 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"[ShellAppEffectHandler] Offline-Daten-Prüfung fehlgeschlagen: {ex.Message}");
+            logger.LogError(ex, "Offline-Daten-Prüfung fehlgeschlagen");
         }
 
         var host = services.GetRequiredService<MvuHost>();
@@ -1006,7 +1088,7 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"[ShellAppEffectHandler] SessionExpired-Dispatch fehlgeschlagen: {ex.Message}");
+            logger.LogError(ex, "SessionExpired-Dispatch fehlgeschlagen");
         }
     }
 
@@ -1028,7 +1110,7 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
         catch (Exception ex)
         {
             failed = true;
-            System.Diagnostics.Debug.WriteLine($"[ShellAppEffectHandler] Backup-Ablage-Initialisierung fehlgeschlagen: {ex.Message}");
+            logger.LogError(ex, "Backup-Ablage-Initialisierung fehlgeschlagen");
         }
 
         try
@@ -1038,7 +1120,7 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
         catch (Exception ex)
         {
             failed = true;
-            System.Diagnostics.Debug.WriteLine($"[ShellAppEffectHandler] Cache-Ablage-Initialisierung fehlgeschlagen: {ex.Message}");
+            logger.LogError(ex, "Cache-Ablage-Initialisierung fehlgeschlagen");
         }
 
         if (recovered)
@@ -1064,9 +1146,11 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"[ShellAppEffectHandler] Einstellungen laden fehlgeschlagen: {ex.Message}");
+            logger.LogError(ex, "Einstellungen laden fehlgeschlagen");
             settings = new AppSettings();
         }
+
+        appLog.SetEnabled(settings.LoggingEnabled);
 
         var host = services.GetRequiredService<MvuHost>();
         await MainThread.InvokeOnMainThreadAsync(
@@ -1078,10 +1162,13 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
         try
         {
             services.GetRequiredService<AppSettingsService>().Save(settings);
+            // Laufzeit-Umschaltung der Protokollierung unmittelbar nach dem
+            // erfolgreichen Schreiben — ohne Neustart wirksam.
+            appLog.SetEnabled(settings.LoggingEnabled);
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"[ShellAppEffectHandler] Einstellungen speichern fehlgeschlagen: {ex.Message}");
+            logger.LogError(ex, "Einstellungen speichern fehlgeschlagen");
         }
     }
 
@@ -1102,7 +1189,7 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"[ShellAppEffectHandler] Serververwaltung laden fehlgeschlagen: {ex.Message}");
+            logger.LogError(ex, "Serververwaltung laden fehlgeschlagen");
         }
 
         // Geräte-Token des aktiven Servers laden und den Gate-Provider
@@ -1127,7 +1214,7 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"[ShellAppEffectHandler] Server-Erkennung fehlgeschlagen: {ex.Message}");
+            logger.LogError(ex, "Server-Erkennung fehlgeschlagen");
         }
 
         var host = services.GetRequiredService<MvuHost>();
@@ -1158,7 +1245,7 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
                 }
                 catch (Exception ex)
                 {
-                    System.Diagnostics.Debug.WriteLine($"[ShellAppEffectHandler] Geräte-Token des Kandidaten konnte nicht verworfen werden: {ex.Message}");
+                    logger.LogError(ex, "Geräte-Token des Kandidaten konnte nicht verworfen werden");
                 }
 
                 // Provider-Rücksetzung nur, wenn der Kandidat der
@@ -1174,7 +1261,7 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"[ShellAppEffectHandler] Kandidatenprüfung fehlgeschlagen: {ex.Message}");
+            logger.LogError(ex, "Kandidatenprüfung fehlgeschlagen");
         }
 
         var host = services.GetRequiredService<MvuHost>();
@@ -1191,7 +1278,7 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"[ShellAppEffectHandler] Server speichern fehlgeschlagen: {ex.Message}");
+            logger.LogError(ex, "Server speichern fehlgeschlagen");
         }
 
         // Provider auf das Geräte-Token des neuen Servers umstellen, bevor
@@ -1211,7 +1298,7 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"[ShellAppEffectHandler] Erreichbarkeitsprüfung fehlgeschlagen: {ex.Message}");
+            logger.LogError(ex, "Erreichbarkeitsprüfung fehlgeschlagen");
         }
 
         if (result == HealthCheckResult.GateRejected)
@@ -1228,7 +1315,7 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"[ShellAppEffectHandler] Erreichbarkeits-Nachprüfung fehlgeschlagen: {ex.Message}");
+                logger.LogError(ex, "Erreichbarkeits-Nachprüfung fehlgeschlagen");
                 result = HealthCheckResult.Unreachable;
             }
 
@@ -1276,7 +1363,7 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"[ShellAppEffectHandler] Pairing-Erforderlichkeit fehlgeschlagen: {ex.Message}");
+            logger.LogError(ex, "Pairing-Erforderlichkeit fehlgeschlagen");
             return false;
         }
     }
@@ -1345,13 +1432,13 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
                 null => PairingStatus.ServerUnreachable,
                 _ => PairingStatus.Failed
             };
-            System.Diagnostics.Debug.WriteLine($"[ShellAppEffectHandler] Pairing-Austausch fehlgeschlagen: {ex.Message}");
+            logger.LogError(ex, "Pairing-Austausch fehlgeschlagen");
         }
         catch (Exception ex)
         {
             // Ungültige/nicht entschlüsselbare Antwort oder sonstiger
             // Fehler → allgemeiner Pairing-Fehler.
-            System.Diagnostics.Debug.WriteLine($"[ShellAppEffectHandler] Pairing-Austausch fehlgeschlagen: {ex.Message}");
+            logger.LogError(ex, "Pairing-Austausch fehlgeschlagen");
             status = PairingStatus.Failed;
         }
 
@@ -1378,7 +1465,7 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"[ShellAppEffectHandler] Bootstrap-Serverprüfung fehlgeschlagen: {ex.Message}");
+            logger.LogError(ex, "Bootstrap-Serverprüfung fehlgeschlagen");
         }
 
         var host = services.GetRequiredService<MvuHost>();
@@ -1456,13 +1543,13 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
                 null => BootstrapStatus.ServerUnreachable,
                 _ => BootstrapStatus.Failed
             };
-            System.Diagnostics.Debug.WriteLine($"[ShellAppEffectHandler] Bootstrap-Austausch fehlgeschlagen: {ex.Message}");
+            logger.LogError(ex, "Bootstrap-Austausch fehlgeschlagen");
         }
         catch (Exception ex)
         {
             // Ungültige/nicht entschlüsselbare Antwort oder sonstiger
             // Fehler → allgemeiner Bootstrap-Fehler.
-            System.Diagnostics.Debug.WriteLine($"[ShellAppEffectHandler] Bootstrap-Austausch fehlgeschlagen: {ex.Message}");
+            logger.LogError(ex, "Bootstrap-Austausch fehlgeschlagen");
             status = BootstrapStatus.Failed;
         }
 

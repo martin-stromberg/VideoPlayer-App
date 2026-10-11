@@ -49,7 +49,7 @@ dotnet build .\VideoPlayer.Maui\VideoPlayer.Maui.csproj -f net10.0-windows10.0.1
 | `VideoPlayer.Maui` | Die App (MVU-Architektur): Seitenmenü, Serververwaltung, Startseite, Quellen-Browsing, Detailseiten, Wiedergabe/PiP, Downloads, Offline-Modus |
 | `VideoPlayer.Mvu` | Plattformneutrale MVU-Schicht: Modell, Update, Effekte; Authentifizierung, Synchronisation, Ereignisverbindung, Pairing-Flows |
 | `VideoPlayer.ApiClient` | Zugriff auf die öffentliche Server-API: Pairing/Bootstrap (ECDH-nistP256 + AES-256-GCM), Refresh/Logout, Server-Discovery |
-| `VideoPlayer.Storage` | Lokale Datenhaltung: SQLite-Cache, Einstellungen, Geheimnis-Ablage (`SecureStorage`), Download-Manifest |
+| `VideoPlayer.Storage` | Lokale Datenhaltung: SQLite-Cache, Einstellungen, Geheimnis-Ablage (`SecureStorage`), Download-Manifest, schaltbares Programmprotokoll (Datei-Logging) |
 | `VideoWebPlayer.Maui` | Altbestand der bisherigen App — wird schrittweise durch `VideoPlayer.Maui` abgelöst |
 | `msTools.DeveloperApi` | Wiederverwendbarer Kern der lokalen Developer-API (Loopback-HTTP-Server, Routing, `devapi.json`, Snapshot-Provider) — plattformneutral, nur Debug/`DEV_API` |
 | `msTools.DeveloperApi.Maui` | MAUI-Handler der Developer-API (`/tree`, `/invoke`, `/set-text`, Elementbaum) — baut auf `msTools.DeveloperApi` auf |

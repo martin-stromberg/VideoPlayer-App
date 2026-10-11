@@ -63,6 +63,17 @@ namespace VideoPlayer.Maui
             builder.Services.AddSingleton<AppSecretsService>();
             builder.Services.AddSingleton(sp =>
                 AppStorageLayoutProvider.CreateLayout(sp.GetRequiredService<AppProfile>()));
+
+            // Programmprotokoll (Datei-Logging im Logs-Verzeichnis des
+            // Ablage-Layouts): der Startzustand wird synchron aus der
+            // persistenten Einstellung gelesen; Laufzeit-Umschaltungen
+            // laufen über ShellAppEffectHandler → AppLogService.SetEnabled.
+            builder.Services.AddSingleton(sp =>
+                new AppLogService(
+                    sp.GetRequiredService<AppStorageLayout>(),
+                    sp.GetRequiredService<AppSettingsService>().Load().LoggingEnabled));
+            builder.Services.AddSingleton<ILoggerProvider>(
+                sp => new FileLoggerProvider(sp.GetRequiredService<AppLogService>()));
             builder.Services.AddSingleton<BackupDatabase>();
             builder.Services.AddSingleton<CacheDatabase>();
 

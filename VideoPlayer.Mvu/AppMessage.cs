@@ -668,3 +668,18 @@ public sealed record DownloadRetryRequestedMessage(DownloadListItem Item) : AppM
 /// <param name="Item">Der zu löschende Download-Eintrag.</param>
 /// <returns>Nachricht für die Lösch-Anforderung.</returns>
 public sealed record DownloadDeleteRequestedMessage(DownloadListItem Item) : AppMessage;
+
+/// <summary>
+/// Der Anwender fordert den Protokollversand an („Protokoll senden" auf der
+/// Einstellungsseite) — nur wirksam bei aktivierter Protokollierung.
+/// </summary>
+public sealed record SendLogProtocolRequestedMessage : AppMessage;
+
+/// <summary>
+/// Ergebnis des Protokollversands: <paramref name="Error"/> trägt den
+/// anwendersichtbaren Fehlertext; <c>null</c> = Mailentwurf bzw.
+/// Share-Fallback wurde geöffnet.
+/// </summary>
+/// <param name="Error">Fehlertext bei Fehlschlag; <c>null</c> bei Erfolg.</param>
+/// <returns>Nachricht mit dem Versandergebnis.</returns>
+public sealed record SendLogProtocolCompletedMessage(string? Error) : AppMessage;
