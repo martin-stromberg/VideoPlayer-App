@@ -16,12 +16,14 @@
                                    Padding="24,2,24,10">
                 <BindableLayout.ItemTemplate>
                     <DataTemplate x:DataType="mvu:HomeMediaItem">
-                        <VerticalStackLayout WidthRequest="150" Spacing="8">
-                            <!-- Posterkarte 2:3 — der Rahmen schneidet Bild,
-                                 Fortschrittsbalken und Badge in die
-                                 Rundung. -->
-                            <Border WidthRequest="150"
-                                    HeightRequest="225"
+                        <VerticalStackLayout WidthRequest="{Binding Source={x:Reference Root}, Path=ItemWidth}"
+                                             Spacing="8">
+                            <!-- Bildkarte im Seitenverhältnis des Abschnitts
+                                 (Poster 2:3; Weiterschauen 16:9-Stills) —
+                                 der Rahmen schneidet Bild, Fortschrittsbalken
+                                 und Badge in die Rundung. -->
+                            <Border WidthRequest="{Binding Source={x:Reference Root}, Path=ItemWidth}"
+                                    HeightRequest="{Binding Source={x:Reference Root}, Path=ItemHeight}"
                                     Padding="0"
                                     Margin="0"
                                     Stroke="{StaticResource VpBorder}"
