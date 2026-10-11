@@ -139,6 +139,24 @@ public class HomePageContractTests
         Assert.Contains("{Binding Progress}", xaml, StringComparison.Ordinal);
     }
 
+    /// <summary>Prüft HomePage: die Weiterschauen-Karten folgen dem Querformat
+    /// der Vorschaubilder (16:9-Stills), Poster-Listen bleiben im Hochformat —
+    /// die Kartendimensionen sind Bindable Properties des Carousels.</summary>
+    [Fact]
+    public void HomePage_ContinueWatching_UsesLandscapeCards()
+    {
+        var page = Read("VideoPlayer.Maui", "Pages", "HomePage.xaml");
+        var code = Read("VideoPlayer.Maui", "Controls", "MediaCarousel.xaml.cs");
+
+        // 256×144 = exakt 16:9.
+        Assert.Contains("ItemWidth=\"256\"", page, StringComparison.Ordinal);
+        Assert.Contains("ItemHeight=\"144\"", page, StringComparison.Ordinal);
+        Assert.Contains("Model.ContinueWatching", page, StringComparison.Ordinal);
+        // Dimensionen als bindbare Eigenschaften (Default = Porträt-Poster).
+        Assert.Contains("ItemWidthProperty", code, StringComparison.Ordinal);
+        Assert.Contains("ItemHeightProperty", code, StringComparison.Ordinal);
+    }
+
     /// <summary>Prüft HomePage: die Auswahl dispatcht eine MediaItemSelected-Nachricht.</summary>
     [Fact]
     public void HomePage_SelectionDispatchesMediaItemSelected()

@@ -144,7 +144,12 @@
                 </Label.Triggers>
             </Label>
 
+            <!-- Weiterschauen-Einträge zeigen querformatige
+                 Vorschaubilder (16:9-Stills der Videos) — die Karten
+                 folgen dem Querformat statt dem Posterformat 2:3. -->
             <controls:MediaCarousel Title="Weiterschauen"
+                                    ItemWidth="256"
+                                    ItemHeight="144"
                                     Items="{Binding Model.ContinueWatching}"
                                     ItemTapped="OnMediaItemTapped" />
             <controls:MediaCarousel Title="Favoriten"
