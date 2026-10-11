@@ -1,0 +1,41 @@
+# Planprüfung — Direkte Wiedergabe aus Weiterschauen, Protokollversand und Playlist-Support (Issue #43)
+
+## Ergebnis
+
+**Status:** Projektplan vollständig
+
+## Abgleich Anforderung ↔ Entwicklungsschritte
+
+| Anforderung | Abgedeckt durch | Deckung |
+|---|---|---|
+| 1. Direkte Wiedergabe aus der Weiterschauen-Liste (ab Fortsetzungsposition; andere Listen weiterhin nur Detailansicht) | Schritt 1 | vollständig — Direktstart über den vorhandenen `PlayRequested`-Pfad, Fortsetzungsposition kommt automatisch über `PlaybackSourceService.ResolveAsync` (Fundstellen decken sich mit `inventory/listen-wiedergabe.md`), Abgrenzung zu Favoriten/„Neu im Programm"/Quellen-Übersichten (plus Favoriten-Seite, Episodenliste, Kollektionen) sowie Fallback Detailansicht für nicht abspielbare Typen (`show`/`season`/`collection`, dokumentierte Entscheidung) sind als Akzeptanzkriterien gepinnt. |
+| 2. Protokollierung aktivieren + „Protokoll senden"-Button (Mailentwurf mit Protokoll-Anhang an mstromberg84+heimkino@gmail.com) | Schritt 3 | vollständig — persistenter Einstellungs-Schalter, Datei-Protokoll (`AppStorageLayout`-Ablage), Button nur bei aktivierter Protokollierung sichtbar, Versand via `Email.ComposeAsync` (verbindliche Entscheidung) mit Fehlerhinweis ohne Mail-Client, Empfängeradresse exakt in den Akzeptanzkriterien; Nicht-Ziel „kein Versand ohne aktivierte Protokollierung" explizit gepinnt. |
+| 3. Playlist-Unterstützung (Umfang verbindlich „wie Server-UI" mit freigegebener Ausnahme Cover-Verwaltung; Aufruf über das Menü) | Schritte 4, 5, 6 | vollständig — Menüeintrag, eigene + öffentliche Playlists, paginierte Detailansicht in Server-Reihenfolge, Wiedergabe inkl. Vor/Zurück/Auto-Fortsetzung, Verwaltung (CRUD, Einträge hinzufügen/entfernen mit 409-Konflikt-Dialog, Sortieren, Sortiermodus, Genres, Öffentlich-Flag) und Cover-Anzeige abgedeckt. Der Ausschluss der Cover-Verwaltung ist jetzt korrekt als verbindlich geklärte Nutzerentscheidung dokumentiert (Übersicht, Schritt 6, Offene Punkte) — keine unbestätigte Annahme mehr. Damit ist der frühere Befund 1 behoben. |
+| 4. Wiedergabe- und Download-Reihenfolge bei Playlists | Schritt 5 (Folgevideo), Schritt 7 (Download) | vollständig — Folgevideo bei playlist-gebundenem Weiterschauen-Eintrag über die `play`-Endpunkte inkl. Erweiterung der `ContinueWatchingEntry`-DTO um `PlaylistId`/`PlaylistName`/`PlaylistEntryId` und Durchreichung bis `PlayerState` (Schritt 5, Akzeptanzkriterium 3); Download-Reihenfolge mit Verifizierung des Ist-Zustands (FIFO/Serienreihenfolge, deckt sich mit `inventory/reihenfolge-downloads.md`) und bedingter Korrektur (Schritt 7), wie von der Anforderung („falls noch nicht der Fall") vorgesehen. |
+| 5. iOS-Serienansicht: fehlende Episodenliste, falsche Staffelreihenfolge, Zurückspringen der Auswahl | Schritt 8 | vollständig — alle drei Teilbefunde sind eigene Akzeptanzkriterien (Episodenliste sichtbar, aufsteigende Staffelreihenfolge, Auswahl bleibt bestehen) plus „keine Regression auf anderen Plattformen"; plausible Ursachenhypothesen (CollectionView-in-ScrollView, verzögertes iOS-Picker-Event jenseits des Schutzflags) aus der Bestandsaufnahme übernommen, iOS-Testlauf als Nachweis benannt. |
+| 6. Kontextmenü in der Weiterschauen-Liste (2-Sekunden-Long-Press, „Ausblenden"/„Überspringen") | Schritt 2 | vollständig — 2-Sekunden-Long-Press (Altbestand-Muster `TouchBehavior LongPressDuration="2000"` als Referenz benannt), Menü mit beiden Aktionen, Nutzung der bereits vorhandenen Client-Endpunkte `POST api/continue-watching/hide|skip` (im Repo verifiziert, `VideoPlayerApiClient.cs` Z. 296/315), Listen-Aktualisierung online über Sync-Strecke und offline über lokales Entfernen, Beschränkung auf die Weiterschauen-Liste (Nicht-Ziel) gepinnt. |
+
+## Abhängigkeitsprüfung
+
+- Alle Verweise zeigen ausschließlich auf frühere Schritte; der Graph ist zyklenfrei (1: –, 2: –, 3: –, 4: –, 5: 1+4, 6: 4, 7: 5, 8: –).
+- Fachlich korrekt und jetzt auch zwingend begründet: Schritt 5 setzt Schritt 1 voraus, weil die dort neu geschaffene detailseiten-unabhängige Serienkontext-Auflösung die Fallback-Quelle für Weiterschauen-Einträge ohne Playlist-Bezug ist (Schritt 5, Abschnitt „Kontextquellen", Z. 111) — zusätzlich zur Playlist-Infrastruktur aus Schritt 4. Schritt 6 baut auf den in Schritt 4 angelegten Ansichten/Endpunkten auf; Schritt 7 setzt zutreffend den in Schritt 5 geschaffenen Playlist-Bezug an den Weiterschauen-Daten voraus.
+- Schritte 1 und 2 berühren beide das Weiterschauen-Karussell ohne gegenseitige Abhängigkeit — weiterhin zulässig (unabhängige Features Tap vs. Long-Press); das Akzeptanzkriterium in Schritt 2 („kurzer Tap = bisheriges Verhalten (Wiedergabe/Detailansicht)") ist bewusst reihenfolgen-neutral formuliert und widerspricht Schritt 1 nicht.
+- **Früherer Befund 2 (Zwischen-Regression) — behoben:** Schritt 1 enthält jetzt den eigenständigen Arbeitsauftrag, den Serienkontext per Datenabruf (z. B. `api/items/tvshow/{showId}` — als `GetTvShowAsync` im Client vorhanden) ohne Detailseite zu laden, und Akzeptanzkriterium 5 pinnt den Erhalt der Folgevideo-/Auto-Fortsetzungs-Funktion. Schritt 5 referenziert diese Auflösung konsistent als Bestand und ergänzt den Playlist-Kontext — kein Widerspruch zwischen Schritt 1 und 5 mehr, keine Zwischen-Regression.
+- Übersichtstabelle stimmt mit den Schritten überein (Titel, Abhängigkeiten, betroffene Bereiche konsistent).
+
+## Fehlende oder unvollständige Punkte
+
+Keine. Beide Befunde der vorherigen Prüfung (`project-plan-check.1.md`) sind korrekt und vollständig behoben:
+
+1. **Cover-Verwaltung:** Der Ausschluss wird nun überall als verbindliche, vom Nutzer freigegebene Abweichung vom Umfang „wie Server-UI" geführt (Übersicht Z. 9 und Z. 31, Schritt 6 Z. 131, Offene Punkte Z. 191) — die zuvor beanstandete Gegen-Annahme ist entfernt. Die Cover-Anzeige ist zudem fest im Scope verankert (Schritt 4: `GET api/playlists/{id}/cover` unter den zu schaffenden Endpunkten; „Festgelegt: Die Cover-Anzeige ist Teil des Scopes").
+2. **Zwischen-Regression Folgevideo:** Die detailseiten-unabhängige Serienkontext-Auflösung wurde aus Schritt 5 in Schritt 1 vorgezogen und dort als Akzeptanzkriterium verankert; Schritt 5 ergänzt nur noch die Playlist-Quelle. Die beschlossene Regel „keine Hintergrund-Detailansicht" wird dabei ausdrücklich nicht angetastet.
+
+Neue Probleme durch die Nachbesserung wurden nicht festgestellt.
+
+## Hinweise
+
+- **Nicht-Ziele sauber eingehalten:** keine Server-Änderungen (reine Client-Umsetzung; die `MockVideoServer`-Erweiterung in Schritt 4 ist Testinfrastruktur), keine Direktwiedergabe in anderen Listen (Schritt 1), Kontextmenü explizit auf die Weiterschauen-Liste beschränkt (Schritt 2), kein Protokollversand ohne aktivierte Protokollierung (Schritt 3). Die verbindlichen Nutzerentscheidungen (bekannte Playlist-API mit Instanz `http://localhost:83/`, `Email.ComposeAsync`, Button nur bei aktivierter Protokollierung sichtbar, keine Hintergrund-Detailansicht, Ausschluss der Cover-Verwaltung) sind korrekt als Festlegungen statt als offene Fragen dokumentiert.
+- **Schrittqualität gut:** Alle acht Schritte sind fachlich geschnitten (keine Klassenebenen-Zerlegung), eigenständig verständlich, mit konkreten Akzeptanzkriterien, dokumentierten Annahmen und plausiblen, stichprobenartig verifizierten Fundstellen-Hinweisen aus der Bestandsaufnahme — als Lifecycle-Eingabe geeignet.
+- **Kleinigkeit (kein Mangel):** Die Cover-Anzeige ist in Schritt 4 als Scope-Bestandteil festgelegt und der Endpunkt `GET .../{id}/cover` ist eingeplant, aber kein eigenes Akzeptanzkriterium pinnt die Cover-Anzeige — bei der Umsetzung sicherstellen, dass sie nicht untergeht.
+- **Kleinigkeit (kein Mangel):** Schritt 1 dokumentiert den Fallback „Detailansicht" für nicht abspielbare Weiterschauen-Typen (`show`/`season`/`collection`) als vorgeschlagene Entscheidung — technisch zwingend (Update-Guard lässt nur `movie`/`episode` zu) und fachlich plausibel; im Schritt-Lifecycle ggf. kurz bestätigen.
+- Die Verifikationsstrategie ist konsistent: Statt API-Exploration wird in den Playlist-Schritten gegen die lokale Instanz und das Server-Repo (`IPlaylistApiClient`, Blazor-UI als Verhaltensreferenz) verifiziert — passt zur geklärten Ausgangslage.
