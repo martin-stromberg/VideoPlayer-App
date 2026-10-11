@@ -11,11 +11,11 @@
 - [x] Einstiegspunkt bestimmt: neues Projekt, Start bei Anforderung
 - [x] Anforderung aufbereitet (`requirement.md`)
 - [x] Bestandsaufnahme (`inventory.md`)
-- [ ] Projektplan (`project-plan.md`)
-- [ ] Offene Punkte geklärt
-- [ ] Planprüfung (`project-plan-check.md`, Status: vollständig)
-- [ ] Planungscommit
-- [ ] Entwicklungsschritte-Tracking (`steps.md`, `status.html`)
+- [x] Projektplan (`project-plan.md`)
+- [x] Offene Punkte geklärt (Playlist-API via Server-Repo+localhost:83, Umfang wie Server-UI, Cover nur Anzeige)
+- [x] Planprüfung (`project-plan-check.md`, Status: vollständig)
+- [x] Planungscommit (c1dd7ee)
+- [x] Entwicklungsschritte-Tracking (`steps.md`, `status.html`)
 - [ ] Entwicklungsschleife (je Schritt: lifecycle, Abnahme, Merge)
 - [ ] Aufräumen (Projektverzeichnis entfernt)
 - [ ] Abschlusscommit
