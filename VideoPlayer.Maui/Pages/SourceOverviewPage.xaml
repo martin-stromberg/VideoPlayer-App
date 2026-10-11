@@ -32,9 +32,6 @@
             <CollectionView.ItemTemplate>
                 <DataTemplate x:DataType="mvu:SourceGenreItem">
                     <Border Style="{StaticResource Chip}">
-                        <Label Text="{Binding Name}"
-                               FontSize="13"
-                               TextColor="{StaticResource VpTextMuted}" />
                         <Border.Triggers>
                             <DataTrigger TargetType="Border"
                                          Binding="{Binding IsSelected}"
@@ -43,14 +40,18 @@
                                 <Setter Property="Stroke" Value="Transparent" />
                             </DataTrigger>
                         </Border.Triggers>
-                        <Label.Triggers>
-                            <DataTrigger TargetType="Label"
-                                         Binding="{Binding IsSelected}"
-                                         Value="True">
-                                <Setter Property="TextColor" Value="{StaticResource VpPrimarySoft}" />
-                                <Setter Property="FontFamily" Value="InterSemiBold" />
-                            </DataTrigger>
-                        </Label.Triggers>
+                        <Label Text="{Binding Name}"
+                               FontSize="13"
+                               TextColor="{StaticResource VpTextMuted}">
+                            <Label.Triggers>
+                                <DataTrigger TargetType="Label"
+                                             Binding="{Binding IsSelected}"
+                                             Value="True">
+                                    <Setter Property="TextColor" Value="{StaticResource VpPrimarySoft}" />
+                                    <Setter Property="FontFamily" Value="InterSemiBold" />
+                                </DataTrigger>
+                            </Label.Triggers>
+                        </Label>
                     </Border>
                 </DataTemplate>
             </CollectionView.ItemTemplate>

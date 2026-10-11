@@ -250,6 +250,39 @@ public class DesignTokensContractTests
         Assert.Contains("UserAppTheme = AppTheme.Dark", code, StringComparison.Ordinal);
     }
 
+    /// <summary>Prüft alle XAML-Dateien der App: Trigger-Sammlungen hängen
+    /// an einem Element des passenden TargetType — ein <c>&lt;Label.Triggers&gt;</c>
+    /// als Geschwister unter einer <c>Border</c> würde zur Laufzeit in
+    /// <c>AttachTo</c> mit „bindable not an instance of AssociatedType" knallen.</summary>
+    [Fact]
+    public void Xaml_TriggersAttachToMatchingElementType()
+    {
+        var baseTypes = new HashSet<string>(StringComparer.Ordinal)
+        {
+            "Element", "VisualElement", "BindableObject", "NavigableElement",
+            "InputView", "View", "Layout"
+        };
+
+        foreach (var file in UiXamlFiles)
+        {
+            var document = XDocument.Load(file);
+            foreach (var triggers in document.Descendants()
+                         .Where(e => e.Name.LocalName.EndsWith(".Triggers", StringComparison.Ordinal)))
+            {
+                var qualifier = triggers.Name.LocalName[..^".Triggers".Length];
+                if (baseTypes.Contains(qualifier))
+                {
+                    continue;
+                }
+
+                var parentType = triggers.Parent!.Name.LocalName;
+                Assert.True(
+                    string.Equals(qualifier, parentType, StringComparison.Ordinal),
+                    $"{Path.GetFileName(file)}: <{qualifier}.Triggers> hängt an <{parentType}> statt an <{qualifier}>");
+            }
+        }
+    }
+
     /// <summary>Prüft alle XAML-Dateien der App: jeder StaticResource-Verweis löst auf einen definierten Schlüssel auf.</summary>
     [Fact]
     public void Xaml_UsesOnlyKnownResourceKeys()
