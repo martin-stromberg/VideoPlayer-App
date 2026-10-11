@@ -208,6 +208,15 @@ public sealed class DevApiModel
 
     /// <summary><c>true</c>, wenn der Hinweis einen Fehler beschreibt.</summary>
     [JsonPropertyName("addToPlaylistNoticeIsError")] public bool AddToPlaylistNoticeIsError { get; set; }
+
+    /// <summary>Anzeigenamen der Staffeln der Serienansicht in Modellreihenfolge.</summary>
+    [JsonPropertyName("mediaDetailsSeasonNames")] public List<string>? MediaDetailsSeasonNames { get; set; }
+
+    /// <summary>Staffelnummer der gewählten Staffel der Serienansicht (0 = keine).</summary>
+    [JsonPropertyName("mediaDetailsSelectedSeasonNumber")] public int MediaDetailsSelectedSeasonNumber { get; set; }
+
+    /// <summary>Anzeigetitel der Episoden der gewählten Staffel.</summary>
+    [JsonPropertyName("mediaDetailsSeasonEpisodeTitles")] public List<string>? MediaDetailsSeasonEpisodeTitles { get; set; }
 }
 
 /// <summary>DTO einer Genre-Option des Playlist-Genre-Editors im Modell-Snapshot.</summary>

@@ -170,7 +170,7 @@ public class SourcesContractTests
         // Serienansicht (Staffel-Picker + Episodenliste), Kollektionsansicht
         // und der Favoriten-Schalter.
         Assert.Contains("SeasonPicker", xaml, StringComparison.Ordinal);
-        Assert.Contains("EpisodesCollection", xaml, StringComparison.Ordinal);
+        Assert.Contains("EpisodesList", xaml, StringComparison.Ordinal);
         Assert.Contains("CollectionCollection", xaml, StringComparison.Ordinal);
         Assert.Contains("FavoriteButton", xaml, StringComparison.Ordinal);
     }
