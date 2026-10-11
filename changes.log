@@ -1,5 +1,11 @@
 # Änderungsprotokoll
 
+## 2026-10-11 — Download-Reihenfolge bei Playlist-Bezug (Issue #43, Schritt 7)
+
+- **Automatischer Vorlauf in Playlist-Reihenfolge:** Der `AutoDownloadService` wertet jetzt den Playlist-Bezug der Weiterschauen-Einträge (`PlaylistId` + `PlaylistEntryId` am `HomeMediaItem`) aus. Playlist-gebundene Einträge planen ihre Folge-Downloads aus der Server-Playlist-Reihenfolge ein (`api/playlists/{id}/entries/paged` ab dem aktuellen Eintrag, bis zu „Vorzuladende Episoden" ladbare/zugängliche Einträge) statt aus der Serienstruktur — die FIFO-Warteschlange übernimmt die Einplanung als Ausführungsreihenfolge. Playlist-gebundene Filme laden sich selbst plus die Folge-Einträge; verwaister Eintragsbezug oder nicht erreichbare Playlist fallen auf den Serienpfad zurück.
+- **Playlist-Bezug im Download-Manifest:** `download_manifest` erhält `PlaylistId`/`PlaylistEntryId`/`PlaylistSortOrder` (nullable; `EnsureColumnAsync`-Nachzug in `CacheDatabase.InitializeAsync` — upgrade-sicher wie die Serienkontext-Spalten). Übergabe über den neuen Record `DownloadPlaylistContext` an `DownloadService.EnqueueAsync` (`ApplyPlaylistContext` mit `??=`-Semantik); Serien-Hints playlist-gebundener Episoden kommen aus den `ParentMedia*`-Feldern der Einträge.
+- **Tests:** Sechs neue `AutoDownloadServiceTests`-Fälle (Reihenfolge, Überspringen nicht ladbarer/gesperrter Einträge, Manifest-Felder, Film-Selbst+Fortsetzung, beide Rückfallfälle) plus `LocalDatabaseTests.CacheDatabase_MigratesPlaylistContextOntoExistingManifest`; Suite 1285/1285 grün, Coverage 85,8 %.
+
 ## 2026-10-11 — Playlist-Verwaltung auf dem Gerät (Issue #43, Schritt 6)
 
 - **Playlist-Pflege vollständig in der App:** „Neue Playlist" auf der Übersichtsseite öffnet ein Dialog-Formular (Name als Pflichtfeld mit Inline-Fehltext, Beschreibung, Sortiermodus); auf der Detailseite bündelt ein neuer „Verwalten"-Schalter die Aktionen „Bearbeiten" (Name/Beschreibung), „Playlist löschen" mit Bestätigungsdialog und Rückkehr zur Übersicht, Sortiermodus-Wechsel, „Genres bearbeiten" sowie — nur für Administrator:innen — „Öffentlich schalten"/„Privat schalten". Alle Operationen laufen über die serverseitigen Verwaltungs-Endpunkte (`POST/PUT/DELETE api/playlists`, `…/sort-mode`, `…/genres`, `…/genres/reset`, `…/public`).
