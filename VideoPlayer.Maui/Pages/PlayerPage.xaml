@@ -38,16 +38,23 @@
         <VerticalStackLayout x:Name="OverlayChrome"
                              VerticalOptions="Start"
                              Spacing="0">
-            <Border Padding="12"
-                    InputTransparent="True"
-                    BackgroundColor="{StaticResource VpOverlay}">
+            <Border Padding="14"
+                    InputTransparent="True">
+                <!-- Scrim-Verlauf statt Vollfläche: dunkel oben,
+                     auslaufend nach unten. -->
+                <Border.Background>
+                    <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                        <GradientStop Color="{StaticResource VpScrimStart}" Offset="0.0" />
+                        <GradientStop Color="{StaticResource VpScrimEnd}" Offset="1.0" />
+                    </LinearGradientBrush>
+                </Border.Background>
                 <Grid ColumnDefinitions="*,Auto"
                       ColumnSpacing="8">
                     <Label x:Name="TitleLabel"
                            Grid.Column="0"
                            FontSize="16"
-                           FontAttributes="Bold"
-                           TextColor="{StaticResource VpPrimarySoft}"
+                           FontFamily="InterSemiBold"
+                           TextColor="{StaticResource VpText}"
                            VerticalOptions="Center"
                            LineBreakMode="TailTruncation" />
                     <Label x:Name="WatchedBadge"
@@ -65,9 +72,10 @@
              damit er nicht vom eingabedurchlässigen Border mit blockiert wird. -->
         <Button x:Name="PipButton"
                 Text="Mini-Player"
+                Style="{StaticResource SecondaryButton}"
                 FontSize="12"
-                HeightRequest="36"
-                Margin="0,16,16,0"
+                HeightRequest="38"
+                Margin="0,18,16,0"
                 HorizontalOptions="End"
                 VerticalOptions="Start"
                 IsVisible="False"
@@ -77,13 +85,12 @@
         <Border x:Name="ErrorPanel"
                 VerticalOptions="End"
                 Margin="16"
-                Padding="12"
-                StrokeShape="RoundRectangle 8"
+                Padding="14,10"
+                StrokeShape="RoundRectangle 12"
                 BackgroundColor="{StaticResource VpOverlay}"
                 IsVisible="False">
             <Label x:Name="ErrorLabel"
-                   FontSize="13"
-                   TextColor="{StaticResource VpDanger}" />
+                   Style="{StaticResource ErrorText}" />
         </Border>
 
     </Grid>

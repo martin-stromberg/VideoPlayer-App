@@ -150,13 +150,13 @@ public class DesignTokensContractTests
         }
     }
 
-    /// <summary>Prüft Styles.xaml: normale Buttons haben den Web-Radius 4, Karten bleiben bei 8.</summary>
+    /// <summary>Prüft Styles.xaml: Buttons haben den modernen Radius 10, Karten 14, Poster 12.</summary>
     [Fact]
     public void Styles_PinsButtonAndCardRadius()
     {
         var document = XDocument.Parse(Read("VideoPlayer.Maui", "Resources", "Styles", "Styles.xaml"));
 
-        // Impliziter Button-Style (ohne x:Key): CornerRadius 4.
+        // Impliziter Button-Style (ohne x:Key): CornerRadius 10.
         var buttonStyle = document.Root!
             .Elements(MauiNs + "Style")
             .Single(e =>
@@ -165,19 +165,28 @@ public class DesignTokensContractTests
         var radius = buttonStyle
             .Elements(MauiNs + "Setter")
             .Single(s => (string?)s.Attribute("Property") == "CornerRadius");
-        Assert.Equal("4", (string?)radius.Attribute("Value"));
+        Assert.Equal("10", (string?)radius.Attribute("Value"));
 
-        // Kartenradius 8 bleibt in den Karten-Templates verankert.
+        // Kartenradius 14 steckt im zentralen Card-Stil; die Karten-
+        // Templates der Seiten verwenden ihn einheitlich.
+        var cardStyle = document.Root!
+            .Elements(MauiNs + "Style")
+            .Single(e => (string?)e.Attribute(XNs + "Key") == "Card");
+        var cardShape = cardStyle
+            .Elements(MauiNs + "Setter")
+            .Single(s => (string?)s.Attribute("Property") == "StrokeShape");
+        Assert.Equal("RoundRectangle 14", (string?)cardShape.Attribute("Value"));
+
         foreach (var file in new[] { "DownloadsPage.xaml", "FavoritesPage.xaml", "MediaDetailsPage.xaml", "ProfilePage.xaml" })
         {
             Assert.Contains(
-                "RoundRectangle 8",
+                "{StaticResource Card}",
                 Read("VideoPlayer.Maui", "Pages", file),
                 StringComparison.Ordinal);
         }
 
         Assert.Contains(
-            "CornerRadius=\"8\"",
+            "CornerRadius=\"12\"",
             Read("VideoPlayer.Maui", "Controls", "MediaCarousel.xaml"),
             StringComparison.Ordinal);
     }
@@ -200,8 +209,15 @@ public class DesignTokensContractTests
             .Single(s => (string?)s.Attribute("Property") == "CornerRadius");
         Assert.Equal("999", (string?)radius.Attribute("Value"));
 
-        // Genre-Chip und Platzhalter-Badge sind pill-förmig.
-        Assert.Contains("RoundRectangle 999", sourceOverview, StringComparison.Ordinal);
+        // Chip-Stil (Genre-Filter) und Platzhalter-Badge sind pill-förmig.
+        var chipStyle = document.Root!
+            .Elements(MauiNs + "Style")
+            .Single(e => (string?)e.Attribute(XNs + "Key") == "Chip");
+        var chipShape = chipStyle
+            .Elements(MauiNs + "Setter")
+            .Single(s => (string?)s.Attribute("Property") == "StrokeShape");
+        Assert.Equal("RoundRectangle 999", (string?)chipShape.Attribute("Value"));
+        Assert.Contains("{StaticResource Chip}", sourceOverview, StringComparison.Ordinal);
         Assert.Contains("CornerRadius=\"999\"", carousel, StringComparison.Ordinal);
     }
 

@@ -4,10 +4,13 @@
              x:Class="VideoPlayer.Maui.Pages.LoadingPage"
              Title="VideoPlayer">
 
-    <VerticalStackLayout Padding="20" Spacing="12" HorizontalOptions="Center" VerticalOptions="Center">
+    <VerticalStackLayout Padding="24" Spacing="14" HorizontalOptions="Center" VerticalOptions="Center">
+        <Label Text="VIDEOPLAYER"
+               Style="{StaticResource Kicker}"
+               HorizontalTextAlignment="Center" />
         <ActivityIndicator IsRunning="True" WidthRequest="48" HeightRequest="48" />
-        <Label Text="VideoPlayer wird geladen" FontAttributes="Bold" HorizontalTextAlignment="Center" />
-        <Label Text="{Binding Model.StartupStatusText}" HorizontalTextAlignment="Center" />
+        <Label Text="VideoPlayer wird geladen" FontFamily="InterSemiBold" FontSize="16" HorizontalTextAlignment="Center" />
+        <Label Text="{Binding Model.StartupStatusText}" Style="{StaticResource Caption}" FontSize="13" HorizontalTextAlignment="Center" />
     </VerticalStackLayout>
 
 </ContentPage>

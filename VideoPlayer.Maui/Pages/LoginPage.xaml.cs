@@ -19,7 +19,18 @@ public partial class LoginPage : ContentPage
     {
         InitializeComponent();
         this.mvuHost = mvuHost;
+        SizeChanged += OnSizeChanged;
         UpdateUi(mvuHost.Model);
+    }
+
+    private void OnSizeChanged(object? sender, EventArgs e)
+    {
+        // Zentrierter Formularbereich mit Maximalbreite — App-Gegenstück
+        // zu max-width: 460px.
+        if (Width > 0)
+        {
+            LoginContent.WidthRequest = Math.Min(460, Width);
+        }
     }
 
     /// <inheritdoc/>

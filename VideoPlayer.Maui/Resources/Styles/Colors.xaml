@@ -56,4 +56,11 @@
     <Color x:Key="VpHeroFadeClear">#00131313</Color>
     <Color x:Key="VpHeroAccentPrimary">#4DE50914</Color>
     <Color x:Key="VpHeroAccentSecondary">#3800A8E8</Color>
+
+    <!-- Ergänzende Tokens des Redesigns: getönte Primärfläche für
+         ausgewählte Chips/Zustands-Badges (rgba(229,9,20,.18)) und ein
+         schwarzer Scrim-Verlauf für Video-Overlays. -->
+    <Color x:Key="VpPrimaryTint">#2EE50914</Color>
+    <Color x:Key="VpScrimStart">#B3000000</Color>
+    <Color x:Key="VpScrimEnd">#00000000</Color>
 </ResourceDictionary>

@@ -106,9 +106,9 @@ public class ServerSetupContractTests
     {
         var xaml = MauiFile("Pages", "ServerSetupPage.xaml");
 
-        // Kartenform: abgerundete Flächen (Radius 8 wie die übrigen Karten
-        // der App — Pin aus DesignTokensContractTests).
-        Assert.Contains("RoundRectangle 8", xaml, StringComparison.Ordinal);
+        // Kartenform: abgerundete Flächen über den zentralen Card-Stil
+        // (Radius 14 — Pin aus DesignTokensContractTests).
+        Assert.Contains("{StaticResource Card}", xaml, StringComparison.Ordinal);
         // Status-Badge des aktiven Servers (Pill-Form) mit Model-Bindung.
         Assert.Contains("ServerHealthLabel", xaml, StringComparison.Ordinal);
         Assert.Contains("RoundRectangle 999", xaml, StringComparison.Ordinal);
