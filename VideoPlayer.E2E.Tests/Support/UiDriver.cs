@@ -309,6 +309,119 @@ public sealed class UiDriver : IDisposable
         return false;
     }
 
+    /// <summary>
+    /// Wählt einen Eintrag einer ComboBox (MAUI-<c>Picker</c> meldet sich
+    /// auf Windows als ComboBox) per Anzeigetext aus: aufklappen,
+    /// Listeneintrag per Name suchen und per SelectionItem/Invoke wählen.
+    /// </summary>
+    /// <param name="automationId">AutomationId der ComboBox.</param>
+    /// <param name="itemText">Anzeigetext des zu wählenden Eintrags.</param>
+    public void SelectComboBoxItem(string automationId, string itemText)
+    {
+        var combo = FindByAutomationId(automationId).AsComboBox();
+        combo.Expand();
+        var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(15);
+        while (true)
+        {
+            var item = combo.Items.FirstOrDefault(i =>
+                string.Equals(i.Name, itemText, StringComparison.Ordinal));
+            if (item is not null)
+            {
+                if (item.Patterns.SelectionItem.IsSupported)
+                {
+                    item.Patterns.SelectionItem.Pattern.Select();
+                }
+                else if (item.Patterns.Invoke.IsSupported)
+                {
+                    item.Patterns.Invoke.Pattern.Invoke();
+                }
+                else
+                {
+                    item.Click();
+                }
+
+                return;
+            }
+
+            if (DateTime.UtcNow >= deadline)
+            {
+                throw new TimeoutException(
+                    $"Kein ComboBox-Eintrag '{itemText}' unter '{automationId}' gefunden "
+                    + $"({string.Join(", ", combo.Items.Select(i => i.Name))}).");
+            }
+
+            Thread.Sleep(200);
+        }
+    }
+
+    /// <summary>
+    /// Liest die Anzeigenamen der Einträge einer ComboBox in
+    /// Reihenfolge (klappt die Liste dafür auf und wieder zu).
+    /// </summary>
+    /// <param name="automationId">AutomationId der ComboBox.</param>
+    /// <returns>Die Eintragsnamen in Anzeigereihenfolge.</returns>
+    public IReadOnlyList<string> GetComboBoxItemNames(string automationId)
+    {
+        var combo = FindByAutomationId(automationId).AsComboBox();
+        combo.Expand();
+        try
+        {
+            var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(15);
+            while (combo.Items.Length == 0 && DateTime.UtcNow < deadline)
+            {
+                Thread.Sleep(200);
+            }
+
+            return combo.Items.Select(i => i.Name ?? string.Empty).ToList();
+        }
+        finally
+        {
+            combo.Collapse();
+        }
+    }
+
+    /// <summary>
+    /// Löst die Zurück-Navigation der Shell aus: der WinUI-Back-Button
+    /// der NavigationView (sichtbar bei geschobener Seite) wird per
+    /// AutomationId/Name gesucht und per Invoke/Klick betätigt; fehlt
+    /// er, gilt Alt+Links als Systemzurück-Fallback.
+    /// </summary>
+    /// <param name="timeout">Maximale Wartezeit (Standard 15 s).</param>
+    public void GoBack(TimeSpan? timeout = null)
+    {
+        var deadline = DateTime.UtcNow + (timeout ?? TimeSpan.FromSeconds(15));
+        while (DateTime.UtcNow < deadline)
+        {
+            var element = window.FindFirstDescendant(
+                Conditions.ByAutomationId("NavigationViewBackButton"))
+                ?? window
+                    .FindAllDescendants(Conditions.ByControlType(ControlType.Button))
+                    .FirstOrDefault(b =>
+                        b.Name is "Back" or "Zurück" or "Navigate back");
+            if (element is not null)
+            {
+                if (element.Patterns.Invoke.IsSupported)
+                {
+                    element.Patterns.Invoke.Pattern.Invoke();
+                }
+                else
+                {
+                    element.Click();
+                }
+
+                return;
+            }
+
+            Thread.Sleep(200);
+        }
+
+        // Fallback: Alt+Links (Systemzurück der Shell-Navigation).
+        FlaUI.Core.Input.Keyboard.Press(FlaUI.Core.WindowsAPI.VirtualKeyShort.ALT);
+        FlaUI.Core.Input.Keyboard.Press(FlaUI.Core.WindowsAPI.VirtualKeyShort.LEFT);
+        FlaUI.Core.Input.Keyboard.Release(FlaUI.Core.WindowsAPI.VirtualKeyShort.LEFT);
+        FlaUI.Core.Input.Keyboard.Release(FlaUI.Core.WindowsAPI.VirtualKeyShort.ALT);
+    }
+
     /// <summary>Sucht ein Element per Anzeigename (einmalig, ohne Retry).</summary>
     /// <param name="name">Der gesuchte Name.</param>
     /// <returns>Das Element oder <c>null</c>.</returns>

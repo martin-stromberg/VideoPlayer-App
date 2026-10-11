@@ -244,6 +244,14 @@ public sealed class MockVideoServer : IDisposable
     public string ContinueWatchingShowTitle { get; set; } = "E2E-Serie";
 
     /// <summary>
+    /// Opt-in Staffelstruktur der Detailserie: befüllt liefert
+    /// <c>GET api/items/tvshow/{id}</c> für <see cref="ContinueWatchingShowId"/>
+    /// die Serie inklusive dieser Staffeln und Episoden (Serienansicht
+    /// mit Staffel-Picker); leer = bisheriges Verhalten ohne Staffeln.
+    /// </summary>
+    public List<MockShowSeason> ShowSeasons { get; } = [];
+
+    /// <summary>
     /// Opt-in Playlist-Bezug der Weiterschauen-Einträge (Film und
     /// Episode): Id der Playlist, aus deren Kontext der Eintrag
     /// entstand; <c>null</c> = kein Playlist-Bezug (Serienpfad).
@@ -1619,7 +1627,25 @@ public sealed class MockVideoServer : IDisposable
                 Type = "show",
                 Id = cwShowId,
                 Name = ContinueWatchingShowTitle,
-                MediaSourceId = 1
+                MediaSourceId = 1,
+                Seasons = ShowSeasons.Count > 0
+                    ? ShowSeasons.Select(s => new PlaybackMediaEntryJson
+                    {
+                        Type = "season",
+                        Id = s.Id,
+                        Name = s.Name,
+                        MediaSourceId = 1,
+                        Number = s.Number,
+                        Episodes = s.Episodes.Select(e => new PlaybackMediaEntryJson
+                        {
+                            Type = "episode",
+                            Id = e.Id,
+                            Name = e.Title,
+                            MediaSourceId = 1,
+                            Number = e.Number
+                        }).ToArray()
+                    }).ToArray()
+                    : null
             }));
         }
 
@@ -2261,5 +2287,34 @@ public sealed class MockKnownMedia
     public long MediaId { get; set; }
 
     /// <summary>Anzeigetitel des Mediums.</summary>
+    public string Title { get; set; } = string.Empty;
+}
+
+/// <summary>Staffel der Mock-Serie (<see cref="MockVideoServer.ShowSeasons"/>) — Serienansicht-E2E.</summary>
+public sealed class MockShowSeason
+{
+    /// <summary>Id der Staffel.</summary>
+    public long Id { get; set; }
+
+    /// <summary>Staffelnummer (Sortier- und Anzeigeschlüssel).</summary>
+    public int Number { get; set; }
+
+    /// <summary>Anzeigename der Staffel (z. B. „Staffel 1").</summary>
+    public string Name { get; set; } = string.Empty;
+
+    /// <summary>Episoden der Staffel.</summary>
+    public List<MockShowEpisode> Episodes { get; } = [];
+}
+
+/// <summary>Episode einer <see cref="MockShowSeason"/>.</summary>
+public sealed class MockShowEpisode
+{
+    /// <summary>Id der Episode.</summary>
+    public long Id { get; set; }
+
+    /// <summary>Episodennummer innerhalb der Staffel.</summary>
+    public int Number { get; set; }
+
+    /// <summary>Anzeigetitel der Episode.</summary>
     public string Title { get; set; } = string.Empty;
 }

@@ -26,6 +26,8 @@ public partial class MediaDetailsPage : ContentPage
     private long? episodeId;
     private bool requested;
     private bool updatingSeasonPicker;
+    private List<SeasonItem>? appliedSeasonItems;
+    private IReadOnlyList<EpisodeItem>? appliedEpisodes;
     private byte[]? appliedHeaderBytes;
     private bool subscribed;
 
@@ -231,21 +233,59 @@ public partial class MediaDetailsPage : ContentPage
         SeasonSection.IsVisible = details.HasSeasons;
         if (!details.HasSeasons)
         {
+            appliedSeasonItems = null;
+            appliedEpisodes = null;
             return;
         }
 
         updatingSeasonPicker = true;
         try
         {
-            SeasonPicker.ItemsSource = details.Seasons.ToList();
-            SeasonPicker.SelectedItem = details.SelectedSeason;
-            EpisodesCollection.ItemsSource = details.SelectedSeasonEpisodes;
+            // ItemsSource nur bei geänderter Staffel-Liste neu setzen:
+            // ein Picker-Neuaufbau je Model-Tick destabilisiert die
+            // Anzeige (iOS: verzögerte SelectedIndexChanged-Echos
+            // setzen die Auswahl zurück und ordnen Einträge neu).
+            // Der Vergleich muss die Record-Gleichheit der Einträge
+            // einbeziehen — ein In-place-Neubau der Staffelliste mit
+            // gleichen Ids (z. B. MarkEpisodeWatchedInDetails oder der
+            // Reload nach der Rückkehr von der Episoden-Detailseite)
+            // muss die neuen Instanzen in den Picker bringen, sonst
+            // verbliebe ItemsSource veraltet und SelectedItem löste
+            // per IndexOf auf -1 auf (sichtbarer Auswahl-Desync).
+            if (appliedSeasonItems is null || !SeasonsEqual(appliedSeasonItems, details.Seasons))
+            {
+                appliedSeasonItems = details.Seasons.ToList();
+                SeasonPicker.ItemsSource = appliedSeasonItems;
+            }
+
+            if (!Equals(SeasonPicker.SelectedItem, details.SelectedSeason))
+            {
+                SeasonPicker.SelectedItem = details.SelectedSeason;
+            }
+
+            // Episodenliste nur bei neuer Quelle neu aufbauen — sonst
+            // erstellt jeder Model-Tick (z. B. Kopfbild-Nachlauf) alle
+            // Karten erneut.
+            if (!ReferenceEquals(appliedEpisodes, details.SelectedSeasonEpisodes))
+            {
+                appliedEpisodes = details.SelectedSeasonEpisodes;
+                BindableLayout.SetItemsSource(EpisodesList, appliedEpisodes);
+            }
         }
         finally
         {
             updatingSeasonPicker = false;
         }
     }
+
+    /// <summary>Vergleicht zwei Staffellisten elementweise per Record-Gleichheit
+    /// (Id, Nummer, Name, Bild, Jahr und die Episoden-Listenreferenz) — nicht
+    /// nur die Ids, damit In-place-Neubauten als Änderung erkannt werden.</summary>
+    /// <param name="a">Die bisher dem Picker zugewiesene Staffelliste.</param>
+    /// <param name="b">Die Staffelliste des aktuellen Modells.</param>
+    /// <returns><c>true</c>, wenn beide Listen gleichwertige Staffeln in gleicher Reihenfolge enthalten.</returns>
+    private static bool SeasonsEqual(IReadOnlyList<SeasonItem> a, IReadOnlyList<SeasonItem> b) =>
+        a.SequenceEqual(b);
 
     private void UpdateCollectionSection(MediaDetailsView details)
     {
@@ -264,20 +304,20 @@ public partial class MediaDetailsPage : ContentPage
             return;
         }
 
-        if (SeasonPicker.SelectedItem is SeasonItem season)
+        // Echo-Guard: verzögerte Selection-Events (iOS feuert
+        // SelectedIndexChanged u. U. zeitversetzt nach programmatischen
+        // Updates) dürfen die bereits angewendete Modell-Auswahl nicht
+        // erneut als Benutzerwahl melden.
+        if (SeasonPicker.SelectedItem is SeasonItem season
+            && season.Id != mvuHost.Model.MediaDetails.Details?.SelectedSeason?.Id)
         {
             _ = mvuHost.DispatchAsync(new SeasonSelectedMessage(season.Id));
         }
     }
 
-    private void OnEpisodeSelected(object? sender, SelectionChangedEventArgs e)
+    private void OnEpisodeTapped(object? sender, TappedEventArgs e)
     {
-        var episode = e.CurrentSelection.FirstOrDefault() as EpisodeItem;
-        if (sender is CollectionView collectionView)
-        {
-            collectionView.SelectedItem = null;
-        }
-        if (episode is null || episode.IsPlaceholder)
+        if ((sender as Element)?.BindingContext is not EpisodeItem episode || episode.IsPlaceholder)
         {
             // Platzhalter fehlender Offline-Episoden sind nicht auswählbar.
             return;

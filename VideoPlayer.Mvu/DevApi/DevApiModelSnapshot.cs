@@ -209,6 +209,15 @@ public sealed record DevApiModelSnapshot
     /// <summary><c>true</c>, wenn <see cref="AddToPlaylistNotice"/> einen Fehler beschreibt.</summary>
     public bool AddToPlaylistNoticeIsError { get; init; }
 
+    /// <summary>Anzeigenamen der Staffeln der Serienansicht in Modellreihenfolge (leer ohne Serien-Details).</summary>
+    public IReadOnlyList<string> MediaDetailsSeasonNames { get; init; } = [];
+
+    /// <summary>Staffelnummer der gewählten Staffel der Serienansicht (0 = keine Serien-Details).</summary>
+    public int MediaDetailsSelectedSeasonNumber { get; init; }
+
+    /// <summary>Anzeigetitel der Episoden der gewählten Staffel (leer ohne Serien-Details).</summary>
+    public IReadOnlyList<string> MediaDetailsSeasonEpisodeTitles { get; init; } = [];
+
     /// <summary>Erzeugt den Snapshot aus dem aktuellen Modell.</summary>
     /// <param name="model">Das unveränderliche App-Modell.</param>
     /// <returns>Der serialisierbare Auszug.</returns>
@@ -306,7 +315,12 @@ public sealed record DevApiModelSnapshot
             PlaylistTargets = model.MediaDetails.PlaylistTargets?.Select(p => p.Name).ToList(),
             PlaylistPickerPending = model.MediaDetails.PlaylistPickerPending,
             AddToPlaylistNotice = model.MediaDetails.AddToPlaylistNotice,
-            AddToPlaylistNoticeIsError = model.MediaDetails.AddToPlaylistNoticeIsError
+            AddToPlaylistNoticeIsError = model.MediaDetails.AddToPlaylistNoticeIsError,
+            MediaDetailsSeasonNames = model.MediaDetails.Details?.Seasons
+                .Select(s => s.Name).ToList() ?? [],
+            MediaDetailsSelectedSeasonNumber = model.MediaDetails.Details?.SelectedSeason?.Number ?? 0,
+            MediaDetailsSeasonEpisodeTitles = model.MediaDetails.Details?.SelectedSeasonEpisodes
+                .Select(e => e.DisplayTitle).ToList() ?? []
         };
     }
 }
