@@ -16,7 +16,7 @@
 - [x] Planprüfung (`project-plan-check.md`, Status: vollständig)
 - [x] Planungscommit (c1dd7ee)
 - [x] Entwicklungsschritte-Tracking (`steps.md`, `status.html`)
-- [ ] Entwicklungsschleife (je Schritt: lifecycle, Abnahme, Merge)
+- [x] Entwicklungsschleife (8/8 Schritte: lifecycle, Abnahme, Merge)
 - [ ] Aufräumen (Projektverzeichnis entfernt)
 - [ ] Abschlusscommit
 
