@@ -108,6 +108,7 @@
                                 IsVisible="False"
                                 Clicked="OnDownloadClicked" />
                         <Button x:Name="PlayButton"
+                                AutomationId="PlayButton"
                                 Text="Abspielen"
                                 FontSize="13"
                                 HeightRequest="40"

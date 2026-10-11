@@ -94,6 +94,18 @@ public sealed class DevApiModel
 
     /// <summary>Anzahl der zuletzt gesehenen Einträge.</summary>
     [JsonPropertyName("recentEntriesCount")] public int RecentEntriesCount { get; set; }
+
+    /// <summary>Eine Wiedergabe ist angefordert (Player-Seite belegt).</summary>
+    [JsonPropertyName("playerIsActive")] public bool PlayerIsActive { get; set; }
+
+    /// <summary>Die Wiedergabe läuft gerade.</summary>
+    [JsonPropertyName("playerIsPlaying")] public bool PlayerIsPlaying { get; set; }
+
+    /// <summary>Zuletzt gemeldete Wiedergabeposition in Sekunden.</summary>
+    [JsonPropertyName("playerPositionSeconds")] public double PlayerPositionSeconds { get; set; }
+
+    /// <summary>Fehlertext der letzten Wiedergabe-Störung.</summary>
+    [JsonPropertyName("playerError")] public string? PlayerError { get; set; }
 }
 
 /// <summary>DTO eines bekannten Servers im Modell-Snapshot.</summary>

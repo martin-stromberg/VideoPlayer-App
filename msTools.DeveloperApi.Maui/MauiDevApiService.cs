@@ -109,8 +109,10 @@ public sealed class MauiDevApiService : IDisposable
                 : DevApiResponse.Error(404, $"Kein Element mit der AutomationId '{automationId}' gefunden.");
         }
 
-        // Item-Auswahl in einer CollectionView (UIA-Lücke: Einträge fehlen im
-        // Automation-Baum): SelectedItem setzen feuert SelectionChanged — dieselbe
+        // Item-Auswahl in einer CollectionView oder einem BindableLayout-
+        // Container (UIA-Lücke: Einträge fehlen im Automation-Baum):
+        // SelectedItem setzen feuert SelectionChanged bzw. der Tap-
+        // Recognizer des Eintrags wird ausgelöst — dieselbe
         // Ereigniskette wie ein Fingertipp auf die Zeile.
         if (itemIndex is not null)
         {
@@ -163,7 +165,7 @@ public sealed class MauiDevApiService : IDisposable
     {
         public string? AutomationId { get; set; }
 
-        /// <summary>Optionaler Index eines CollectionView-Eintrags zur Auswahl.</summary>
+        /// <summary>Optionaler Index eines Listeneintrags (CollectionView oder BindableLayout-Container) zur Auswahl.</summary>
         public int? ItemIndex { get; set; }
     }
 

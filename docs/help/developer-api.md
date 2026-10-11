@@ -41,7 +41,9 @@ Kuratierter JSON-Snapshot des unveränderlichen `AppModel`
 `knownServers`/`discoveredServers`, Discovery-/Check-Flags,
 `serverSetupError`, Pairing-Flags/`pairingError`,
 Bootstrap-Flags/`bootstrapError`, `storageNotice`,
-`heroTitle` sowie Zähler der Startseiten-Listen. Tokens und Passwörter
+`heroTitle`, Zähler der Startseiten-Listen sowie der
+Wiedergabe-Zustand (`playerIsActive`, `playerIsPlaying`,
+`playerPositionSeconds`, `playerError`). Tokens und Passwörter
 stehen per Konstruktion nicht im Modell.
 
 ### `GET /tree`
@@ -49,10 +51,11 @@ stehen per Konstruktion nicht im Modell.
 Logischer Elementbaum der aktuellen Seite über `IVisualTreeElement`:
 je Knoten `automationId`, `type`, `isVisible`, `bounds`
 (`x`/`y`/`width`/`height`), `text` (Label/Button/InputView/MenuItem) und
-`placeholder` (Eingabefelder). `CollectionView`-Einträge werden aus der
-`ItemsSource` abgeleitet (`items` mit `index`, `type`, `text`, `detail`)
-– das schließt die UIA-Lücke, unter der Windows-Automation keine
-Listeneinträge sieht.
+`placeholder` (Eingabefelder). Einträge einer `CollectionView` oder
+eines `BindableLayout`-Containers im Teilbaum (z. B. die Karussells
+der Startseite) werden aus der `ItemsSource` abgeleitet (`items` mit
+`index`, `type`, `text`, `detail`) – das schließt die UIA-Lücke,
+unter der Windows-Automation keine Listeneinträge beider Formen sieht.
 
 ### `POST /invoke`
 
@@ -66,15 +69,21 @@ Clicked-Äquivalent aus: `SendClicked()` auf `Button`/`ImageButton`,
 Toggle auf `Switch`/`CheckBox`, `Activate()` auf `MenuItem`, sonst
 `Command`-Ausführung (inkl. Tap-Gesten mit Command).
 
-Mit optionalem `itemIndex` wird stattdessen der Eintrag einer
-`CollectionView` ausgewählt (`SelectedItem` gesetzt → echtes
-`SelectionChanged`-Event mit dem regulären App-Nachrichtenfluss) —
-der koordinatenfreie Listenpfad für Einträge, die Windows-UIA nicht
-zuverlässig adressiert.
+Mit optionalem `itemIndex` wird stattdessen ein Listeneintrag
+ausgewählt: bei einer `CollectionView` über `SelectedItem` (echtes
+`SelectionChanged`-Event mit dem regulären App-Nachrichtenfluss),
+bei einem Element mit `BindableLayout`-Container im Teilbaum (z. B.
+`MediaCarousel`) über den `TapGestureRecognizer` des indexierten
+Eintrags — der interne `SendTapped(View, Func<IElement?, Point?>?)`-Aufruf
+wird per Reflection ausgelöst, exakt der Aufruf, den der
+Plattform-Gesture-Manager bei einem Fingertipp macht (`Tapped` feuert
+mit `sender` = Eintrags-View). Beide Pfade sind der koordinatenfreie
+Listenpfad für Einträge, die Windows-UIA nicht zuverlässig adressiert.
 
 Antworten: `200 {"invoked":true,…}`, `404` Element nicht gefunden,
-`400` Element nicht auslösbar, `itemIndex` auf Nicht-CollectionView
-oder außerhalb der Liste bzw. Body ungültig.
+`400` Element nicht auslösbar, `itemIndex` auf Element ohne
+CollectionView/BindableLayout-Container oder außerhalb der Liste bzw.
+Body ungültig.
 
 ### `POST /set-text`
 
@@ -103,6 +112,11 @@ Fehlerantworten tragen `{"error":"<deutscher Text>"}`.
 - Es existiert **kein** `POST /dispatch` – bewusste Entscheidung: Die
   API bleibt auf der echten UI-Eingabekette, Automatisierung wirkt wie
   echte Bedienung.
+- Die `BindableLayout`-Item-Auswahl hängt am internen
+  `TapGestureRecognizer.SendTapped(View, Func<IElement?, Point?>?)`:
+  die Signatur wird einmalig per Reflection aufgelöst und gepinnt —
+  ändert ein MAUI-Upgrade den Member, meldet `/invoke` einen klaren
+  Fehlertext (HTTP 400) statt still nichts auszulösen.
 - Implementierung: wiederverwendbare Bibliotheken `msTools.DeveloperApi`
   (plattformneutraler Kern: Parser, Router, Server, Metadaten,
   Server-Fassade `DevApiServer`, `GET /model`-Provider) und

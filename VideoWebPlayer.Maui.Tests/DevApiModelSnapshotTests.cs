@@ -59,6 +59,30 @@ public class DevApiModelSnapshotTests
         Assert.Equal("http://server/videoplayer/", known.Address);
     }
 
+    /// <summary>Der Snapshot mappt den Wiedergabezustand des Modells.</summary>
+    [Fact]
+    public void DevApiModelSnapshot_MapsPlayerState()
+    {
+        var model = new AppModel
+        {
+            Player = new PlayerState
+            {
+                MediaType = "movie",
+                MediaId = 4711,
+                IsPlaying = true,
+                Position = TimeSpan.FromSeconds(42.5),
+                Error = "Die Wiedergabe ist fehlgeschlagen."
+            }
+        };
+
+        var snapshot = DevApiModelSnapshot.FromModel(model);
+
+        Assert.True(snapshot.PlayerIsActive);
+        Assert.True(snapshot.PlayerIsPlaying);
+        Assert.Equal(42.5, snapshot.PlayerPositionSeconds);
+        Assert.Equal("Die Wiedergabe ist fehlgeschlagen.", snapshot.PlayerError);
+    }
+
     /// <summary>Die JSON-Serialisierung nutzt camelCase-Feldnamen.</summary>
     [Fact]
     public void Snapshot_SerializesCamelCase()

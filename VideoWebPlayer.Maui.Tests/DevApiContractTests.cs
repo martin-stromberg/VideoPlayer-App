@@ -150,6 +150,58 @@ public class DevApiContractTests
     }
 
     /// <summary>
+    /// Pinnt den BindableLayout-Pfad der Item-Auswahl: neben der
+    /// CollectionView löst <c>TrySelectItem</c> den Tap-Recognizer des
+    /// indexierten Eintrags über den internen <c>SendTapped</c>-Aufruf
+    /// aus (Reflection, Signatur gepinnt — ein MAU-Upgrade-Umbau bricht
+    /// diesen Test bewusst, statt still nichts auszulösen).
+    /// </summary>
+    [Fact]
+    public void DevApiVisualTree_SelectItem_InvokesBindableLayoutItemTap()
+    {
+        var source = File.ReadAllText(Path.Combine(Root, "msTools.DeveloperApi.Maui", "DevApiVisualTree.cs"));
+
+        // BindableLayout-Container-Suche über die GetItemsSource-Attached-
+        // Property (gleiche UIA-Lücke wie bei CollectionView-Items).
+        Assert.Contains("BindableLayout.GetItemsSource", source, StringComparison.Ordinal);
+
+        // Interner SendTapped-Aufruf per Reflection mit gepinnter
+        // Signatur (View, Func<IElement?, Point?>?).
+        Assert.Contains("\"SendTapped\"", source, StringComparison.Ordinal);
+        Assert.Contains("BindingFlags.NonPublic", source, StringComparison.Ordinal);
+        Assert.Contains("typeof(Func<IElement?, Point?>)", source, StringComparison.Ordinal);
+
+        // Fehlerzweige: kein Container, Index außerhalb, kein Recognizer.
+        Assert.Contains("keinen BindableLayout-Container", source, StringComparison.Ordinal);
+        Assert.Contains("liegt außerhalb der Liste", source, StringComparison.Ordinal);
+        Assert.Contains("keinen TapGestureRecognizer", source, StringComparison.Ordinal);
+
+        // Der Baum liefert die Einträge auch für BindableLayout-Container.
+        Assert.Contains("ItemsOf", source, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// Pinnt die Fehlerisolierung der SendTapped-Reflection: die Lazy-
+    /// Auswertung von <c>SendTappedMethod.Value</c> liegt innerhalb des
+    /// try/catch von <c>TrySelectBindableLayoutItem</c> — wirft die
+    /// Auflösung selbst (z. B. <c>AmbiguousMatchException</c> nach einem
+    /// MAUI-Upgrade mit mehreren Überladungen), wird ein deutscher
+    /// Fehlertext gemeldet statt dem Server als HTTP 500 zu entkommen.
+    /// </summary>
+    [Fact]
+    public void DevApiVisualTree_SendTappedResolution_IsFailureIsolated()
+    {
+        var source = File.ReadAllText(Path.Combine(Root, "msTools.DeveloperApi.Maui", "DevApiVisualTree.cs"));
+        var select = MethodBody(source, "private static bool TrySelectBindableLayoutItem");
+
+        var tryIndex = select.IndexOf("try", StringComparison.Ordinal);
+        var lazyIndex = select.IndexOf("SendTappedMethod.Value", StringComparison.Ordinal);
+        Assert.True(tryIndex >= 0, "TrySelectBindableLayoutItem enthält kein try/catch.");
+        Assert.True(lazyIndex > tryIndex,
+            "SendTappedMethod.Value muss innerhalb des try/catch ausgewertet werden.");
+    }
+
+    /// <summary>
     /// Der Kern <c>msTools.DeveloperApi</c> bleibt frei von MAUI-
     /// Abhängigkeiten und öffnet keine Internals für Fremdassemblies.
     /// </summary>
@@ -207,6 +259,32 @@ public class DevApiContractTests
                     source);
             }
         }
+    }
+
+    /// <summary>Extrahiert den Rumpf einer Methode ab der ersten öffnenden Klammer.</summary>
+    /// <param name="code">Quelltext der Datei.</param>
+    /// <param name="signature">Eindeutige Signaturmarke der Methode.</param>
+    /// <returns>Methodenrumpf inklusive Klammern.</returns>
+    private static string MethodBody(string code, string signature)
+    {
+        var start = code.IndexOf(signature, StringComparison.Ordinal);
+        Assert.True(start >= 0, $"Methode '{signature}' nicht gefunden.");
+        var open = code.IndexOf('{', start);
+        Assert.True(open >= 0, $"Rumpf von '{signature}' nicht gefunden.");
+        var depth = 0;
+        for (var i = open; i < code.Length; i++)
+        {
+            if (code[i] == '{')
+            {
+                depth++;
+            }
+            else if (code[i] == '}' && --depth == 0)
+            {
+                return code.Substring(open, i - open + 1);
+            }
+        }
+
+        return code[open..];
     }
 
     private static int CountOccurrences(string haystack, string needle)

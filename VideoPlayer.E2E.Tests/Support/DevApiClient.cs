@@ -47,8 +47,9 @@ public sealed class DevApiClient : IDisposable
 
     /// <summary>
     /// Löst das Clicked-Äquivalent eines Elements aus — oder wählt bei
-    /// angegebenem <paramref name="itemIndex"/> einen CollectionView-Eintrag
-    /// aus (<c>POST /invoke</c>).
+    /// angegebenem <paramref name="itemIndex"/> einen Listeneintrag
+    /// (CollectionView oder BindableLayout-Container) aus
+    /// (<c>POST /invoke</c>).
     /// </summary>
     /// <param name="automationId">AutomationId des Elements.</param>
     /// <param name="itemIndex">Optionaler Index des auszuwählenden Eintrags.</param>
