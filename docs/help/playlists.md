@@ -1,4 +1,4 @@
-# Playlists-Übersicht, -Detailansicht, -Wiedergabe und -Verwaltung (Issue 43, Entwicklungsschritte 4–6)
+# Playlists-Übersicht, -Detailansicht, -Wiedergabe und -Verwaltung (Issue 43, Entwicklungsschritte 4–7)
 
 Die Menüseite **„Playlists"** der neuen VideoPlayer-App bindet die
 Playlist-Funktionalität des Servers an: eigene und öffentliche
@@ -161,6 +161,21 @@ Folgevideo kommt aus der **Playlist-Reihenfolge**, nicht aus der
 Serienreihenfolge des Mediums. Ist das Medium inzwischen nicht mehr
 Teil der Playlist (`playlistEntryId` fehlt), gilt wie bisher der
 detailseiten-unabhängige Serienkontext.
+
+## Downloads mit Playlist-Bezug (Schritt 7)
+
+Der automatische Download-Vorlauf folgt bei playlist-gebundenen
+Weiterschauen-Einträgen der **Playlist-Reihenfolge**: statt der
+nächsten Serien-Episoden reiht er die nächsten ladbaren und
+zugänglichen Einträge der Playlist (`api/playlists/{id}/entries/paged`,
+Server-Reihenfolge ab dem aktuellen Eintrag) ein — bis zur Anzahl
+„Vorzuladende Episoden". Playlist-gebundene Filme laden sich selbst
+plus die folgenden Playlist-Einträge. Der Bezug landet als
+`PlaylistId`/`PlaylistEntryId`/`PlaylistSortOrder` im Download-Manifest
+(`download_manifest`, Spalten werden in Bestandsinstallationen
+nachgezogen). Bei verwaistem Eintragsbezug oder nicht erreichbarer
+Playlist gilt der Serien-Pfad; Einträge ohne Playlist-Bezug bleiben
+unverändert. Details siehe `downloads.md`.
 
 ## MVU-Anbindung
 

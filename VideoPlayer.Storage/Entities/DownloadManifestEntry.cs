@@ -65,6 +65,24 @@ public sealed class DownloadManifestEntry
     /// <summary>Episodennummer innerhalb der Staffel (nur Episoden-Downloads); <c>null</c> = unbekannt.</summary>
     public int? EpisodeNumber { get; set; }
 
+    /// <summary>
+    /// Id der Playlist, aus deren Kontext der Download eingeplant wurde
+    /// (nur playlist-gebundene Downloads); <c>null</c> = kein Playlist-Bezug.
+    /// </summary>
+    public long? PlaylistId { get; set; }
+
+    /// <summary>
+    /// Id des Playlist-Eintrags, dem das Medium innerhalb der Playlist
+    /// entspricht; <c>null</c> = kein Playlist-Bezug oder unbekannt.
+    /// </summary>
+    public long? PlaylistEntryId { get; set; }
+
+    /// <summary>
+    /// Sortierposition des Eintrags in der Playlist (serverseitige
+    /// Reihenfolge); <c>null</c> = kein Playlist-Bezug oder nicht zugewiesen.
+    /// </summary>
+    public long? PlaylistSortOrder { get; set; }
+
     /// <summary>Zeitpunkt der letzten Aktualisierung (UTC).</summary>
     public DateTime UpdatedAtUtc { get; set; }
 }

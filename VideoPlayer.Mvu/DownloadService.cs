@@ -219,6 +219,7 @@ public sealed class DownloadService
     /// <param name="title">Anzeigetitel des Downloads; <c>null</c> = Fallback.</param>
     /// <param name="settings">Aktuelle App-Einstellungen (Kontingent, WLAN-Bedingung).</param>
     /// <param name="seriesContext">Optionaler Serienkontext eines Episoden-Downloads (Grundlage des Offline-„Weiterschauen").</param>
+    /// <param name="playlistContext">Optionaler Playlist-Bezug des Downloads (Herkunft und Reihenfolge playlist-gebundener Einplanungen).</param>
     /// <param name="cancellationToken">Bricht die Manifest-Operation ab (nicht den Transfer).</param>
     /// <returns>Das Einreihe-Ergebnis mit Snapshot und Hinweistext.</returns>
     public async Task<DownloadEnqueueResult> EnqueueAsync(
@@ -227,6 +228,7 @@ public sealed class DownloadService
         string? title,
         AppSettings settings,
         DownloadSeriesContext? seriesContext = null,
+        DownloadPlaylistContext? playlistContext = null,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(settings);
@@ -273,6 +275,7 @@ public sealed class DownloadService
                     existing.Title = title;
                 }
                 ApplySeriesContext(existing, seriesContext);
+                ApplyPlaylistContext(existing, playlistContext);
                 existing.UpdatedAtUtc = DateTime.UtcNow;
                 await cache.Connection.UpdateAsync(existing);
                 entry = existing;
@@ -289,6 +292,7 @@ public sealed class DownloadService
                     UpdatedAtUtc = DateTime.UtcNow
                 };
                 ApplySeriesContext(entry, seriesContext);
+                ApplyPlaylistContext(entry, playlistContext);
                 await cache.Connection.InsertAsync(entry);
             }
         }
@@ -333,6 +337,26 @@ public sealed class DownloadService
         entry.ShowTitle ??= seriesContext.ShowTitle;
         entry.SeasonNumber ??= seriesContext.SeasonNumber;
         entry.EpisodeNumber ??= seriesContext.EpisodeNumber;
+    }
+
+    /// <summary>
+    /// Überträgt den mitgegebenen Playlist-Bezug in den Manifesteintrag —
+    /// nur, wenn Werte bekannt sind (vorhandene Werte eines Re-Enqueue
+    /// werden nicht zurückgesetzt). Gilt für alle ladbaren Medientypen —
+    /// auch Filme können playlist-gebunden eingeplant werden.
+    /// </summary>
+    /// <param name="entry">Der zu ergänzende Manifesteintrag.</param>
+    /// <param name="playlistContext">Der Playlist-Bezug; <c>null</c> = keine Änderung.</param>
+    private static void ApplyPlaylistContext(DownloadManifestEntry entry, DownloadPlaylistContext? playlistContext)
+    {
+        if (playlistContext is null)
+        {
+            return;
+        }
+
+        entry.PlaylistId ??= playlistContext.PlaylistId;
+        entry.PlaylistEntryId ??= playlistContext.PlaylistEntryId;
+        entry.PlaylistSortOrder ??= playlistContext.PlaylistSortOrder;
     }
 
     /// <summary>

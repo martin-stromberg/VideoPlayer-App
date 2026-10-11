@@ -80,13 +80,27 @@ auch offline, weil der Bestand lokal im Download-Manifest liegt.
   **N** Episoden je Weiterschauen-Eintrag vor — die Anzahl kommt aus
   der Einstellung „Vorzuladende Episoden" (staffelübergreifend, in
   Episodenreihenfolge, Serienkontext vom Server).
-- Film-Einträge der Weiterschauen-Liste laden den Film selbst.
+- **Playlist-Bezug:** Stammt ein Weiterschauen-Eintrag aus einer
+  Playlist, folgt der Vorlauf der **Playlist-Reihenfolge** statt der
+  Serienreihenfolge — die Folge-Einträge werden ab dem aktuellen
+  Playlist-Eintrag in Server-Reihenfolge eingeplant (nur ladbare,
+  zugängliche Einträge — Filme und Episoden; Serien-, Staffel- und
+  gesperrte Einträge werden übersprungen). Ein playlist-gebundener
+  Film lädt sich selbst plus die folgenden Playlist-Einträge. Ist der
+  Eintragsbezug verwaist (Medium nicht mehr in der Playlist) oder die
+  Playlist nicht erreichbar, gilt wieder die Serienreihenfolge.
+- Film-Einträge der Weiterschauen-Liste ohne Playlist-Bezug laden den
+  Film selbst.
 - Der Vorlauf läuft nach der Synchronisation, nach Server-Ereignissen
   mit Listen-Änderung und beim Einschalten der Einstellung; er ist
   gedrosselt (mindestens 60 Sekunden Abstand) und respektiert die
   WLAN-Bedingung.
 - Bereits vorhandene oder laufende Downloads werden nicht doppelt
   angelegt.
+- Die Warteschlange arbeitet in Einplanungs-Reihenfolge (ältester
+  wartender Auftrag zuerst) — dadurch werden playlist-gebundene
+  Downloads auch in der Playlist-Reihenfolge ausgeführt, wie sie
+  eingeplant wurden.
 
 ## Gesehene Episoden automatisch löschen
 

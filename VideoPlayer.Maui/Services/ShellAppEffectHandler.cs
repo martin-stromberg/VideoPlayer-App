@@ -1448,7 +1448,8 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
                 ? null
                 : new DownloadSeriesContext(enqueue.ShowId, enqueue.ShowTitle, enqueue.SeasonNumber, enqueue.EpisodeNumber);
             result = await downloads.EnqueueAsync(
-                enqueue.MediaType, enqueue.MediaId, enqueue.Title, enqueue.Settings, seriesContext, cancellationToken);
+                enqueue.MediaType, enqueue.MediaId, enqueue.Title, enqueue.Settings, seriesContext,
+                cancellationToken: cancellationToken);
         }
         catch (Exception ex)
         {
