@@ -22,6 +22,24 @@ public class ContinueWatchingEntry
 
     /// <summary>ID des Posterbilds, falls vorhanden.</summary>
     public long? PosterPictureId { get; set; }
+
+    /// <summary>
+    /// ID der Playlist, aus deren Wiedergabekontext der Eintrag entstand;
+    /// <c>null</c>, wenn der Eintrag außerhalb einer Playlist entstand.
+    /// </summary>
+    public long? PlaylistId { get; set; }
+
+    /// <summary>Name der zugehörigen Playlist; <c>null</c>, wenn <see cref="PlaylistId"/> nicht gesetzt ist.</summary>
+    public string? PlaylistName { get; set; }
+
+    /// <summary>
+    /// ID des Playlist-Eintrags, dem das Medium innerhalb der Playlist
+    /// aktuell entspricht; <c>null</c>, wenn <see cref="PlaylistId"/> nicht
+    /// gesetzt ist oder das Medium nicht mehr Teil der Playlist ist.
+    /// Grundlage der Playlist-Wiedergabe ab der exakten Position
+    /// (<c>POST api/playlists/{id}/play?entryId=…</c>).
+    /// </summary>
+    public long? PlaylistEntryId { get; set; }
 }
 
 /// <summary>

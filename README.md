@@ -8,10 +8,10 @@ Die App koppelt sich beim Erststart über einen vom Server erzeugten Einmal-QR-C
 
 - **QR-/Kurzcode-Onboarding** — Kopplung über den QR-Code der Server-Verwaltung oder 8-stelligen Kurzcode; alternativ klassisches Pairing per Einmal-Code. Erzeugt Geräte-, Anmelde- und Refresh-Token in einem Schritt.
 - **Server-Entdeckung** — automatische Erkennung der Server im lokalen Netz (UDP-Broadcast, mDNS).
-- **Wiedergabe** — Server-Stream oder lokale Datei mit Fortsetzungsposition, „angesehen"-Markierung, automatischem Fortsetzen und Picture-in-Picture (Windows: kompaktes Overlay-Fenster; iOS: nativer PiP der Transportsteuerung).
+- **Wiedergabe** — Server-Stream oder lokale Datei mit Fortsetzungsposition, „angesehen"-Markierung, automatischem Fortsetzen und Picture-in-Picture (Windows: kompaktes Overlay-Fenster; iOS: nativer PiP der Transportsteuerung); bei Playlist-Wiedergabe steuern „Zurück"/„Weiter"-Schaltflächen die serverseitige Reihenfolge.
 - **Offline-Betrieb** — Downloads mit GB-Kontingent und WLAN-Bedingung; die Startseite, Serienstruktur und Detail-Snapshots bleiben ohne Serververbindung nutzbar, fehlende Kopfbereichs-Bilder der Detailseite werden nach der Wiederverbindung automatisch nachgeladen.
 - **Startseite** — „Weiterschauen", „Favoriten" und „Neu im Programm" mit Hero-Kopfbereich im Erscheinungsbild der Web-Oberfläche; abspielbare Weiterschauen-Einträge (Filme/Episoden) starten direkt an der Fortsetzungsposition, ein 2-s-Long-Press öffnet das Kontextmenü „Ausblenden"/„Überspringen".
-- **Playlists** — Menüseite „Playlists" mit eigenen und öffentlichen Playlists des Servers (Cover, Sortiermodus, Genres) sowie Detailansicht mit Einträgen in Server-Reihenfolge und seitenweisem Nachladen; reines Online-Feature mit verständlicher Fehleranzeige.
+- **Playlists** — Menüseite „Playlists" mit eigenen und öffentlichen Playlists des Servers (Cover, Sortiermodus, Genres), Detailansicht mit Einträgen in Server-Reihenfolge und seitenweisem Nachladen sowie direkter Wiedergabe aus der Playlist-Reihenfolge (Vor-/Zurück-Navigation, Auto-Fortsetzung und Fehler-Rückfall über die serverseitigen Play-Endpunkte); reines Online-Feature mit verständlicher Fehleranzeige.
 - **Verbindungs-Workflow** — Anmelde- und Servermaske mit Offline-Modus, automatischer Wiederverbindung und SignalR-Ereignisverbindung.
 
 ## Plattformen

@@ -116,6 +116,15 @@ public sealed record DevApiModelSnapshot
     /// <summary>Zuletzt gemeldete Wiedergabeposition in Sekunden.</summary>
     public double PlayerPositionSeconds { get; init; }
 
+    /// <summary>Id der Playlist der laufenden Playlist-Wiedergabe (0 = kein Playlist-Kontext).</summary>
+    public long PlayerPlaylistId { get; init; }
+
+    /// <summary>Id des aktuell gespielten Playlist-Eintrags (0 = kein Playlist-Kontext).</summary>
+    public long PlayerPlaylistEntryId { get; init; }
+
+    /// <summary>1-basierte Position des aktuellen Eintrags in der Playlist (0 = unbekannt/kein Kontext).</summary>
+    public int PlayerPlaylistPosition { get; init; }
+
     /// <summary>Fehlertext der letzten Wiedergabe-Störung; <c>null</c> = kein Fehler.</summary>
     public string? PlayerError { get; init; }
 
@@ -194,6 +203,9 @@ public sealed record DevApiModelSnapshot
             PlayerUpcomingEpisodeCount = model.Player.UpcomingEpisodes.Count,
             PlayerIsPlaying = model.Player.IsPlaying,
             PlayerPositionSeconds = model.Player.Position.TotalSeconds,
+            PlayerPlaylistId = model.Player.PlaylistId ?? 0,
+            PlayerPlaylistEntryId = model.Player.PlaylistEntryId,
+            PlayerPlaylistPosition = model.Player.PlaylistPosition,
             PlayerError = model.Player.Error,
             PlaylistsPageItemCount = model.PlaylistsPage.Items.Count(i => !i.IsHeader),
             PlaylistsPageError = model.PlaylistsPage.Error,

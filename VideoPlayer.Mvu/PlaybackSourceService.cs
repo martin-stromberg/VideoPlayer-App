@@ -74,12 +74,20 @@ public sealed class PlaybackSourceService
     /// unerreichbare Stream-URL zu erzeugen; die Fortsetzungsposition
     /// kommt direkt aus der Cache-Kopie.
     /// </param>
+    /// <param name="resumePositionSecondsOverride">
+    /// Vom Aufrufer bereits bekannte Fortsetzungsposition in Sekunden
+    /// (z. B. aus der Playlist-Start-/Navigationsantwort des Servers) —
+    /// überschreibt die Weiterschauen-Auflösung verbindlich, auch bei
+    /// <c>0</c> (Wiedergabe beginnt am Anfang); <c>null</c> = bisherige
+    /// Weiterschauen-Auflösung.
+    /// </param>
     /// <returns>Die aufgelöste Quelle; <c>null</c>, wenn keine Quelle verfügbar ist.</returns>
     public async Task<PlaybackSource?> ResolveAsync(
         string mediaType,
         long mediaId,
         CancellationToken cancellationToken = default,
-        bool allowServerStream = true)
+        bool allowServerStream = true,
+        long? resumePositionSecondsOverride = null)
     {
         var type = MediaTypeNames.Normalize(mediaType);
         if (mediaId <= 0 || type is not ("movie" or "tvshowepisode"))
@@ -87,9 +95,11 @@ public sealed class PlaybackSourceService
             return null;
         }
 
-        var resumePosition = allowServerStream
-            ? await ResolveResumePositionAsync(type, mediaId, cancellationToken)
-            : await ReadCachedResumePositionAsync(type, mediaId);
+        var resumePosition = resumePositionSecondsOverride is { } overrideSeconds
+            ? TimeSpan.FromSeconds(overrideSeconds)
+            : allowServerStream
+                ? await ResolveResumePositionAsync(type, mediaId, cancellationToken)
+                : await ReadCachedResumePositionAsync(type, mediaId);
 
         var localFile = await ResolveLocalFileAsync(type, mediaId);
         if (localFile is not null)

@@ -634,6 +634,100 @@ public class VideoPlayerApiClient
         }
     }
 
+    /// <summary>
+    /// Startet die Wiedergabe einer Playlist (<c>POST api/playlists/{id}/play</c>)
+    /// ab dem angegebenen Eintrag bzw. ab dem ersten abspielbaren und
+    /// zugänglichen Eintrag, wenn <paramref name="entryId"/> nicht gesetzt ist.
+    /// </summary>
+    /// <param name="playlistId">ID der Playlist.</param>
+    /// <param name="entryId">ID des Starteintrags; <c>null</c> = erster abspielbarer und zugänglicher Eintrag.</param>
+    /// <param name="cancellationToken">Abbruchtoken.</param>
+    /// <returns>Die Wiedergabe-Startinformationen.</returns>
+    public async Task<PlaylistPlaybackStart> StartPlaylistPlaybackAsync(
+        long playlistId,
+        long? entryId = null,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(playlistId);
+
+        var url = $"api/playlists/{playlistId}/play";
+        if (entryId is > 0)
+        {
+            url += $"?entryId={entryId}";
+        }
+
+        return await PostJsonAsync<PlaylistPlaybackStart>(url, cancellationToken)
+            ?? throw new InvalidOperationException($"Antwort von {url} konnte nicht deserialisiert werden.");
+    }
+
+    /// <summary>
+    /// Liefert den nächsten abspielbaren und zugänglichen Eintrag nach
+    /// <paramref name="currentEntryId"/> samt seiner Position
+    /// (<c>POST api/playlists/{id}/play/next</c>) — manuelle
+    /// Vorwärts-Navigation innerhalb der Playlist.
+    /// </summary>
+    /// <param name="playlistId">ID der Playlist.</param>
+    /// <param name="currentEntryId">ID des aktuell gespielten Playlist-Eintrags.</param>
+    /// <param name="cancellationToken">Abbruchtoken.</param>
+    /// <returns>Das Navigationsergebnis bzw. <c>null</c>, wenn es keinen Folgeeintrag gibt (HTTP 204).</returns>
+    public async Task<PlaylistNavigationResult?> GetNextPlaylistEntryAsync(
+        long playlistId,
+        long currentEntryId,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(playlistId);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(currentEntryId);
+
+        return await PostJsonAsync<PlaylistNavigationResult>(
+            $"api/playlists/{playlistId}/play/next?currentEntryId={currentEntryId}",
+            cancellationToken);
+    }
+
+    /// <summary>
+    /// Liefert den vorherigen abspielbaren und zugänglichen Eintrag vor
+    /// <paramref name="currentEntryId"/> samt seiner Position
+    /// (<c>POST api/playlists/{id}/play/previous</c>) — manuelle
+    /// Rückwärts-Navigation innerhalb der Playlist.
+    /// </summary>
+    /// <param name="playlistId">ID der Playlist.</param>
+    /// <param name="currentEntryId">ID des aktuell gespielten Playlist-Eintrags.</param>
+    /// <param name="cancellationToken">Abbruchtoken.</param>
+    /// <returns>Das Navigationsergebnis bzw. <c>null</c>, wenn es keinen vorherigen Eintrag gibt (HTTP 204).</returns>
+    public async Task<PlaylistNavigationResult?> GetPreviousPlaylistEntryAsync(
+        long playlistId,
+        long currentEntryId,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(playlistId);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(currentEntryId);
+
+        return await PostJsonAsync<PlaylistNavigationResult>(
+            $"api/playlists/{playlistId}/play/previous?currentEntryId={currentEntryId}",
+            cancellationToken);
+    }
+
+    /// <summary>
+    /// Liefert den Folgeeintrag für das automatische Weiterschalten am
+    /// Titelende (<c>POST api/playlists/{id}/play/advance</c>) — semantisch
+    /// die automatische Fortsetzung der Playlist-Wiedergabe.
+    /// </summary>
+    /// <param name="playlistId">ID der Playlist.</param>
+    /// <param name="currentEntryId">ID des gerade zu Ende gespielten Playlist-Eintrags.</param>
+    /// <param name="cancellationToken">Abbruchtoken.</param>
+    /// <returns>Das Navigationsergebnis bzw. <c>null</c>, wenn es keinen Folgeeintrag gibt (HTTP 204).</returns>
+    public async Task<PlaylistNavigationResult?> AdvancePlaylistAsync(
+        long playlistId,
+        long currentEntryId,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(playlistId);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(currentEntryId);
+
+        return await PostJsonAsync<PlaylistNavigationResult>(
+            $"api/playlists/{playlistId}/play/advance?currentEntryId={currentEntryId}",
+            cancellationToken);
+    }
+
     #endregion
 
     #region Send pipeline
@@ -645,6 +739,31 @@ public class VideoPlayerApiClient
             () => new HttpRequestMessage(HttpMethod.Get, endpoint),
             allowReauth: true,
             cancellationToken);
+        return await DeserializeAsync<T>(endpoint, response, cancellationToken);
+    }
+
+    /// <summary>
+    /// Sendet eine POST-Anfrage ohne Anfragekörper (Parameter laufen über
+    /// die Query) und deserialisiert die Antwort. Eine leere Erfolgsantwort
+    /// (HTTP 204) ergibt <c>default</c> — die Playlist-Navigations-Endpunkte
+    /// signalisieren damit „kein Folgeeintrag".
+    /// </summary>
+    /// <typeparam name="T">Der erwartete Antworttyp.</typeparam>
+    /// <param name="endpoint">Relativer Endpunktpfad inkl. Query-Parametern.</param>
+    /// <param name="cancellationToken">Abbruchtoken.</param>
+    /// <returns>Die deserialisierte Antwort bzw. <c>default</c> bei HTTP 204.</returns>
+    private async Task<T?> PostJsonAsync<T>(string endpoint, CancellationToken cancellationToken)
+    {
+        using var response = await SendWithPolicyAsync(
+            endpoint,
+            () => new HttpRequestMessage(HttpMethod.Post, endpoint),
+            allowReauth: true,
+            cancellationToken);
+        if (response.StatusCode == HttpStatusCode.NoContent)
+        {
+            return default;
+        }
+
         return await DeserializeAsync<T>(endpoint, response, cancellationToken);
     }
 

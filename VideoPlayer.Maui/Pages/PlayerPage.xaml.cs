@@ -173,11 +173,16 @@ public partial class PlayerPage : ContentPage
         var player = model.Player;
 
         TitleLabel.Text = player.Title ?? string.Empty;
+        PlaylistContextLabel.Text = player.PlaylistLabel;
+        PlaylistContextLabel.IsVisible = player.IsPlaylistPlayback;
         WatchedBadge.IsVisible = player.IsWatched;
         ErrorPanel.IsVisible = player.HasError && !player.IsPictureInPicture;
         ErrorLabel.Text = player.Error;
         // Im Mini-Player (kompaktes Overlay) wird nur das Video gezeigt.
         OverlayChrome.IsVisible = !player.IsPictureInPicture;
+        PlaylistNavigationBar.IsVisible = player.IsPlaylistPlayback && !player.IsPictureInPicture;
+        PreviousButton.IsEnabled = player.CanNavigatePrevious;
+        NextButton.IsEnabled = player.CanNavigateNext;
         LoadingIndicator.IsVisible = player.IsResolving || player.IsBuffering;
         LoadingIndicator.IsRunning = LoadingIndicator.IsVisible;
 
@@ -230,6 +235,9 @@ public partial class PlayerPage : ContentPage
     /// einen nicht leeren Pfad — ungültige Werte lösen am nativen Player
     /// sonst unausweichende Ausnahmen aus.
     /// </summary>
+    /// <param name="source">Die aufgelöste Quelle (nur die Art ist relevant).</param>
+    /// <param name="location">Die zu prüfende Quell-Adresse (URL oder Pfad).</param>
+    /// <returns><see langword="true"/>, wenn die Adresse zur Quellenart passt.</returns>
     private static bool IsValidSourceLocation(PlaybackSource source, string location)
     {
         return source.Kind switch
@@ -250,6 +258,7 @@ public partial class PlayerPage : ContentPage
     /// unabhängig davon, ob das Modell dieselbe Adresse erneut liefert
     /// oder die Quelle leert.
     /// </summary>
+    /// <param name="logMessage">Diagnosemeldung für das Protokoll.</param>
     private void FailPlaybackStart(string logMessage)
     {
         System.Diagnostics.Debug.WriteLine($"[PlayerPage] {logMessage}");
@@ -333,6 +342,8 @@ public partial class PlayerPage : ContentPage
     /// für alle Folge-Seeks. Timeout oder Fehler werden als
     /// Wiedergabefehler gemeldet statt den Prozess abzubrechen.
     /// </summary>
+    /// <param name="position">Zielposition des Fortsetzungs-Sprungs.</param>
+    /// <returns>Eine Aufgabe, die nach dem Sprung oder Fehlschlag abschließt.</returns>
     private async Task ApplyResumeSeekAsync(TimeSpan position)
     {
         try
@@ -390,11 +401,23 @@ public partial class PlayerPage : ContentPage
         _ = mvuHost.DispatchAsync(new PictureInPictureRequestedMessage());
     }
 
+    private void OnPreviousClicked(object? sender, EventArgs e)
+    {
+        _ = mvuHost.DispatchAsync(new PlaylistPreviousRequestedMessage());
+    }
+
+    private void OnNextClicked(object? sender, EventArgs e)
+    {
+        _ = mvuHost.DispatchAsync(new PlaylistNextRequestedMessage());
+    }
+
     /// <summary>
     /// Windows-Workaround: Ein Tip auf die Videofläche blendet die
     /// Transportsteuerung wieder ein. Das Ausblenden übernimmt weiterhin der
     /// Auto-Timer des MediaPlayerElement.
     /// </summary>
+    /// <param name="sender">Das auslösende Element.</param>
+    /// <param name="e">Ereignisdaten.</param>
     private void OnPlayerTapped(object? sender, TappedEventArgs e)
     {
 #if WINDOWS

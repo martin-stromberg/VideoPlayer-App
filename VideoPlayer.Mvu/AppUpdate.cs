@@ -173,6 +173,11 @@ public static class AppUpdate
             PlaylistEntriesNextPageRequestedMessage => UpdatePlaylistEntriesNextPageRequested(model),
             PlaylistEntriesRetryRequestedMessage => UpdatePlaylistEntriesRetryRequested(model),
             PlaylistEntrySelectedMessage selected => UpdatePlaylistEntrySelected(model, selected),
+            PlaylistPlaybackStartRequestedMessage requested => UpdatePlaylistPlaybackStartRequested(model, requested),
+            PlaylistPlaybackStartedMessage started => UpdatePlaylistPlaybackStarted(model, started),
+            PlaylistNextRequestedMessage => UpdatePlaylistNextRequested(model),
+            PlaylistPreviousRequestedMessage => UpdatePlaylistPreviousRequested(model),
+            PlaylistNavigationCompletedMessage completed => UpdatePlaylistNavigationCompleted(model, completed),
             ProfilePageOpenedMessage => UpdateProfilePageOpened(model),
             ProfileInfoLoadedMessage loaded => UpdateProfileInfoLoaded(model, loaded),
             PlayRequestedMessage play => UpdatePlayRequested(model, play),
@@ -1287,6 +1292,16 @@ public static class AppUpdate
                     item.ShowId, item.SeasonId, item.EpisodeId)]);
         }
 
+        if (item.PlaylistId is > 0 && item.PlaylistEntryId is > 0)
+        {
+            // Playlist-gebundener Weiterschauen-Eintrag: Wiedergabe und
+            // Folgevideo laufen über den serverseitigen Playlist-Kontext
+            // (Reihenfolge der Playlist) statt über den Serienkontext.
+            return new AppTransition(
+                model,
+                [new StartPlaylistPlaybackEffect(item.PlaylistId.Value, item.PlaylistEntryId.Value)]);
+        }
+
         var transition = StartPlayback(model, mediaType, item.Id, item.Title);
         if (mediaType == "tvshowepisode" && item.ShowId is > 0)
         {
@@ -2237,6 +2252,20 @@ public static class AppUpdate
             return AppTransition.Unchanged(model);
         }
 
+        // Abspielbare und zugängliche Einträge starten die Wiedergabe ab
+        // dem gewählten Eintrag über den serverseitigen Playlist-Kontext;
+        // alle übrigen Einträge (Serie, Staffel, Kollektion, nicht
+        // zugängliche Medien) öffnen weiterhin die Medien-Detailseite.
+        var mediaType = MediaTypeNames.Normalize(item.MediaType);
+        if (item.IsAccessible
+            && mediaType is "movie" or "tvshowepisode"
+            && model.PlaylistDetails.PlaylistId > 0)
+        {
+            return new AppTransition(
+                model,
+                [new StartPlaylistPlaybackEffect(model.PlaylistDetails.PlaylistId, item.EntryId)]);
+        }
+
         // Der Elternkontext wird als Show-/Season-Hint an die
         // Medien-Detailseite weitergereicht (Episode → Staffel bzw.
         // Serie, Staffel → Serie).
@@ -2247,6 +2276,214 @@ public static class AppUpdate
             [new NavigateToMediaDetailsEffect(
                 item.MediaType, item.MediaId, item.Title,
                 ShowId: showId, SeasonId: seasonId)]);
+    }
+
+    /// <summary>
+    /// Wiedergabe-Anforderung einer Playlist (Kopf-Schaltfläche der
+    /// Detailseite): der serverseitige Wiedergabestart löst den
+    /// Starteintrag auf — das Ergebnis kommt als
+    /// <see cref="PlaylistPlaybackStartedMessage"/> zurück.
+    /// </summary>
+    /// <param name="model">Aktuelles App-Model.</param>
+    /// <param name="message">Die Start-Anforderung.</param>
+    /// <returns>Übergang mit dem Start-Effekt bzw. unverändertem Model.</returns>
+    private static AppTransition UpdatePlaylistPlaybackStartRequested(AppModel model, PlaylistPlaybackStartRequestedMessage message)
+    {
+        return message.PlaylistId > 0
+            ? new AppTransition(model, [new StartPlaylistPlaybackEffect(message.PlaylistId, message.EntryId)])
+            : AppTransition.Unchanged(model);
+    }
+
+    /// <summary>
+    /// Ergebnis des Playlist-Wiedergabestarts: bei Erfolg wird der
+    /// Player-State mit dem aufgelösten Eintrag und dem Playlist-Kontext
+    /// belegt (die Folgevideo-Ermittlung läuft dann über die
+    /// Play-Endpunkte, nicht über die Serien-Fortsetzungsliste), zur
+    /// Wiedergabeseite navigiert und die Quelle mit der serverseitigen
+    /// Fortsetzungsposition aufgelöst; bei Fehlschlag zeigt die
+    /// Wiedergabeseite den Fehler.
+    /// </summary>
+    /// <param name="model">Aktuelles App-Model.</param>
+    /// <param name="message">Das Ergebnis des Wiedergabestarts.</param>
+    /// <returns>Übergang zum Player mit belegtem Zustand bzw. Fehlerzustand.</returns>
+    private static AppTransition UpdatePlaylistPlaybackStarted(AppModel model, PlaylistPlaybackStartedMessage message)
+    {
+        if (message.Start is { } start)
+        {
+            var mediaType = MediaTypeNames.Normalize(start.MediaType);
+            return new AppTransition(
+                model with
+                {
+                    Player = new PlayerState
+                    {
+                        MediaType = mediaType,
+                        MediaId = start.MediaId,
+                        Title = start.Title,
+                        PlaylistId = start.PlaylistId,
+                        PlaylistName = start.PlaylistName,
+                        PlaylistEntryId = start.CurrentEntryId,
+                        PlaylistPosition = start.CurrentPosition,
+                        PlaylistTotalCount = start.TotalCount,
+                        IsResolving = true,
+                        Attempted = true
+                    }
+                },
+                [new NavigateToPlayerEffect(),
+                 new ResolvePlaybackSourceEffect(mediaType, start.MediaId, start.StartPositionSeconds)]);
+        }
+
+        // Start fehlgeschlagen (z. B. kein abspielbarer Eintrag): die
+        // Wiedergabeseite zeigt den Fehler im Fehlerbanner.
+        return new AppTransition(
+            model with
+            {
+                Player = new PlayerState { Error = message.Error ?? PlaybackUnavailableError }
+            },
+            [new NavigateToPlayerEffect()]);
+    }
+
+    /// <summary>
+    /// Manuelle Vorwärts-Navigation der Playlist-Wiedergabe („Weiter"):
+    /// der Server löst den nächsten abspielbaren Eintrag auf — das
+    /// Ergebnis kommt als <see cref="PlaylistNavigationCompletedMessage"/>
+    /// zurück. Ein ausstehender Lauf (<see cref="PlayerState.IsResolving"/>)
+    /// unterbindet weitere Versendungen.
+    /// </summary>
+    /// <param name="model">Aktuelles App-Model.</param>
+    /// <returns>Übergang mit dem Navigations-Effekt bzw. unverändertem Model.</returns>
+    private static AppTransition UpdatePlaylistNextRequested(AppModel model)
+    {
+        var player = model.Player;
+        if (!player.IsPlaylistPlayback || player.IsResolving || player.PlaylistNextExhausted)
+        {
+            return AppTransition.Unchanged(model);
+        }
+
+        return new AppTransition(
+            model with { Player = player with { IsResolving = true, Error = null } },
+            [new LoadNextPlaylistEntryEffect(player.PlaylistId!.Value, player.PlaylistEntryId)]);
+    }
+
+    /// <summary>
+    /// Manuelle Rückwärts-Navigation der Playlist-Wiedergabe („Zurück"):
+    /// der Server löst den vorherigen abspielbaren Eintrag auf — das
+    /// Ergebnis kommt als <see cref="PlaylistNavigationCompletedMessage"/>
+    /// zurück.
+    /// </summary>
+    /// <param name="model">Aktuelles App-Model.</param>
+    /// <returns>Übergang mit dem Navigations-Effekt bzw. unverändertem Model.</returns>
+    private static AppTransition UpdatePlaylistPreviousRequested(AppModel model)
+    {
+        var player = model.Player;
+        if (!player.IsPlaylistPlayback || player.IsResolving)
+        {
+            return AppTransition.Unchanged(model);
+        }
+
+        return new AppTransition(
+            model with { Player = player with { IsResolving = true, Error = null } },
+            [new LoadPreviousPlaylistEntryEffect(player.PlaylistId!.Value, player.PlaylistEntryId)]);
+    }
+
+    /// <summary>
+    /// Übernimmt das Ergebnis einer Playlist-Navigation: der Player
+    /// wechselt auf den aufgelösten Eintrag (Medium, Titel, Position)
+    /// und löst dessen Quelle mit der serverseitigen Fortsetzungsposition
+    /// auf. Ein leeres Ergebnis meldet „kein Eintrag in dieser Richtung"
+    /// und erschöpft die Vorwärts-Versuche
+    /// (<see cref="PlayerState.PlaylistNextExhausted"/>); Antworten
+    /// abgelösender Identitäten werden verworfen.
+    /// </summary>
+    /// <param name="model">Aktuelles App-Model.</param>
+    /// <param name="message">Das Ergebnis der Navigation.</param>
+    /// <returns>Übergang zum Folgeeintrag, zum Erschöpfungs-/Fehlerstand bzw. unverändertem Model.</returns>
+    private static AppTransition UpdatePlaylistNavigationCompleted(AppModel model, PlaylistNavigationCompletedMessage message)
+    {
+        var player = model.Player;
+        if (!player.IsPlaylistPlayback
+            || player.PlaylistId != message.PlaylistId
+            || player.PlaylistEntryId != message.CurrentEntryId)
+        {
+            // Antwort einer inzwischen abgelösten Navigation verwerfen.
+            return AppTransition.Unchanged(model);
+        }
+
+        if (message.Error is { } error)
+        {
+            return new AppTransition(
+                model with { Player = player with { IsResolving = false, Error = error } },
+                []);
+        }
+
+        if (message.Result is not { } next)
+        {
+            // Kein Eintrag in dieser Richtung (204): bei Vorwärts-
+            // navigation weitere Versuche bis zum nächsten Medienwechsel
+            // unterdrücken; die Wiedergabe läuft unverändert weiter.
+            return new AppTransition(
+                model with
+                {
+                    Player = player with
+                    {
+                        IsResolving = false,
+                        PlaylistNextExhausted = message.Forward || player.PlaylistNextExhausted
+                    }
+                },
+                []);
+        }
+
+        var mediaType = MediaTypeNames.Normalize(next.MediaType);
+        return new AppTransition(
+            model with
+            {
+                Player = player with
+                {
+                    MediaType = mediaType,
+                    MediaId = next.MediaId,
+                    Title = next.Title,
+                    PlaylistEntryId = next.EntryId,
+                    PlaylistPosition = next.Position,
+                    PlaylistNextExhausted = false,
+                    Source = null,
+                    IsResolving = true,
+                    IsPlaying = false,
+                    IsBuffering = false,
+                    IsWatched = false,
+                    IsPictureInPicture = false,
+                    Position = TimeSpan.Zero,
+                    Duration = TimeSpan.Zero,
+                    LastReportedPositionSeconds = -1
+                }
+            },
+            [new ResolvePlaybackSourceEffect(mediaType, next.MediaId, next.StartPositionSeconds)]);
+    }
+
+    /// <summary>
+    /// Wechsel zum nächsten Eintrag der Playlist (Auto-Fortsetzung und
+    /// Fehler-Rückfall): <c>POST api/playlists/{id}/play/advance</c> wird
+    /// angefordert; der Ladezustand zeigt die Auflösung an und ein
+    /// etwaiger Fehlertext bleibt als Hinweis sichtbar — Gegenstück zu
+    /// <see cref="AdvanceToNextEpisode"/> im Playlist-Kontext.
+    /// </summary>
+    /// <param name="model">Aktuelles App-Model.</param>
+    /// <param name="player">Bisheriger Player-Zustand.</param>
+    /// <param name="error">Fehlertext; <c>null</c> beim regulären Weiterschalten.</param>
+    /// <returns>Übergang mit dem Advance-Effekt.</returns>
+    private static AppTransition AdvancePlaylistEntry(AppModel model, PlayerState player, string? error)
+    {
+        return new AppTransition(
+            model with
+            {
+                Player = player with
+                {
+                    Source = null,
+                    IsResolving = true,
+                    IsPlaying = false,
+                    IsBuffering = false,
+                    Error = error
+                }
+            },
+            [new AdvancePlaylistEntryEffect(player.PlaylistId!.Value, player.PlaylistEntryId)]);
     }
 
     private static AppTransition UpdateProfilePageOpened(AppModel model)
@@ -2472,8 +2709,14 @@ public static class AppUpdate
                 []);
         }
 
-        // Quelle nicht verfügbar → Fehler anzeigen und auf die nächste
-        // Episode zurückfallen (ohne Folge-Episode bleibt der Fehlerzustand).
+        // Quelle nicht verfügbar → Fehler anzeigen und auf den nächsten
+        // Eintrag zurückfallen: im Playlist-Kontext über die serverseitige
+        // Playlist-Reihenfolge, sonst über die Serien-Fortsetzungsliste.
+        if (player.IsPlaylistPlayback && !player.PlaylistNextExhausted)
+        {
+            return AdvancePlaylistEntry(model, player, message.Error ?? PlaybackUnavailableError);
+        }
+
         return AdvanceToNextEpisode(model, player, message.Error ?? PlaybackUnavailableError);
     }
 
@@ -2591,9 +2834,27 @@ public static class AppUpdate
             }
 
             // Auto-Fortsetzung: Restlaufzeit unterschreitet das Fenster
-            // → die nächste Episode startet (bei aktiviertem Schalter).
+            // → der nächste Titel startet (bei aktiviertem Schalter).
             // Nur bei laufender Wiedergabe — ein Takt im Pausenzustand
             // (StateChanged) darf nicht zum nächsten Titel weiterschalten.
+            // Im Playlist-Kontext übernimmt der Server die Folge-Ermittlung
+            // (Reihenfolge der Playlist); ein ausstehender Lauf
+            // (IsResolving) bzw. ein erschöpftes Listenende
+            // (PlaylistNextExhausted) unterbinden weitere Versendungen.
+            if (model.Settings.AutoResumeEnabled
+                && message.IsPlaying
+                && updated.IsPlaylistPlayback
+                && !updated.PlaylistNextExhausted
+                && !updated.IsResolving
+                && remaining <= TimeSpan.FromSeconds(model.Settings.AutoResumeRemainingSeconds))
+            {
+                var transition = AdvancePlaylistEntry(
+                    MarkEpisodeWatchedInDetails(model, updated), updated, null);
+                return new AppTransition(
+                    transition.Model,
+                    [.. effects, .. transition.Effects]);
+            }
+
             if (model.Settings.AutoResumeEnabled
                 && message.IsPlaying
                 && updated.HasNextEpisode
@@ -2647,7 +2908,20 @@ public static class AppUpdate
         }
 
         // Am Ende liegt die Restlaufzeit bei 0 — die Auto-Fortsetzung
-        // greift damit wie im Takt (Fenster ist stets > 0).
+        // greift damit wie im Takt (Fenster ist stets > 0). Im
+        // Playlist-Kontext übernimmt der Server die Folge-Ermittlung.
+        if (model.Settings.AutoResumeEnabled
+            && updated.IsPlaylistPlayback
+            && !updated.PlaylistNextExhausted
+            && !updated.IsResolving)
+        {
+            var transition = AdvancePlaylistEntry(
+                MarkEpisodeWatchedInDetails(model, updated), updated, null);
+            return new AppTransition(
+                transition.Model,
+                [.. effects, .. transition.Effects]);
+        }
+
         if (model.Settings.AutoResumeEnabled && updated.HasNextEpisode)
         {
             var transition = AdvanceToNextEpisode(
@@ -2722,8 +2996,14 @@ public static class AppUpdate
             return AppTransition.Unchanged(model);
         }
 
-        // Abspielfehler → Fehlermeldung und Rückfall auf die nächste
-        // Episode (ohne Folge-Episode bleibt der Fehlerzustand stehen).
+        // Abspielfehler → Fehlermeldung und Rückfall auf den nächsten
+        // Eintrag: im Playlist-Kontext über die serverseitige Playlist-
+        // Reihenfolge, sonst über die Serien-Fortsetzungsliste.
+        if (player.IsPlaylistPlayback && !player.PlaylistNextExhausted)
+        {
+            return AdvancePlaylistEntry(model, player, PlaybackUnavailableError);
+        }
+
         return AdvanceToNextEpisode(model, player, PlaybackUnavailableError);
     }
 

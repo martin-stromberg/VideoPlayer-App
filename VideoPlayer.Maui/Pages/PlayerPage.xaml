@@ -50,13 +50,21 @@
                 </Border.Background>
                 <Grid ColumnDefinitions="*,Auto"
                       ColumnSpacing="8">
-                    <Label x:Name="TitleLabel"
-                           Grid.Column="0"
-                           FontSize="16"
-                           FontFamily="InterSemiBold"
-                           TextColor="{StaticResource VpText}"
-                           VerticalOptions="Center"
-                           LineBreakMode="TailTruncation" />
+                    <VerticalStackLayout Grid.Column="0"
+                                       Spacing="2">
+                        <Label x:Name="TitleLabel"
+                               FontSize="16"
+                               FontFamily="InterSemiBold"
+                               TextColor="{StaticResource VpText}"
+                               VerticalOptions="Center"
+                               LineBreakMode="TailTruncation" />
+                        <Label x:Name="PlaylistContextLabel"
+                               FontSize="12"
+                               TextColor="{StaticResource VpSecondary}"
+                               VerticalOptions="Center"
+                               LineBreakMode="TailTruncation"
+                               IsVisible="False" />
+                    </VerticalStackLayout>
                     <Label x:Name="WatchedBadge"
                            Grid.Column="1"
                            Text="Angesehen"
@@ -67,6 +75,32 @@
                 </Grid>
             </Border>
         </VerticalStackLayout>
+
+        <!-- Playlist-Navigation (nur bei Playlist-Wiedergabe sichtbar):
+             liegt wie der Mini-Player-Schalter als eigenes Element über
+             dem Video, damit sie nicht vom eingabedurchlässigen Kopfband
+             blockiert wird. -->
+        <HorizontalStackLayout x:Name="PlaylistNavigationBar"
+                               Spacing="10"
+                               Margin="0,64,16,0"
+                               HorizontalOptions="End"
+                               VerticalOptions="Start"
+                               IsVisible="False">
+            <Button x:Name="PreviousButton"
+                    AutomationId="PlayerPreviousButton"
+                    Text="Zurück"
+                    Style="{StaticResource SecondaryButton}"
+                    FontSize="12"
+                    HeightRequest="38"
+                    Clicked="OnPreviousClicked" />
+            <Button x:Name="NextButton"
+                    AutomationId="PlayerNextButton"
+                    Text="Weiter"
+                    Style="{StaticResource SecondaryButton}"
+                    FontSize="12"
+                    HeightRequest="38"
+                    Clicked="OnNextClicked" />
+        </HorizontalStackLayout>
 
         <!-- Mini-Player-Schalter liegt als eigenes Element über dem Kopfband,
              damit er nicht vom eingabedurchlässigen Border mit blockiert wird. -->
