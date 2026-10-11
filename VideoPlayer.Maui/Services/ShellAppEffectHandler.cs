@@ -199,6 +199,9 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
             case ResolvePlaybackSourceEffect resolve:
                 await ResolvePlaybackSourceAsync(resolve, cancellationToken);
                 break;
+            case LoadUpcomingEpisodesEffect loadUpcoming:
+                await LoadUpcomingEpisodesAsync(loadUpcoming, cancellationToken);
+                break;
             case ReportPlaybackProgressEffect report:
                 await ReportPlaybackProgressAsync(report, cancellationToken);
                 break;
@@ -275,6 +278,31 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
 
         await DispatchMessageAsync(new PlaybackSourceResolvedMessage(
             resolve.MediaType, resolve.MediaId, source, error));
+    }
+
+    /// <summary>
+    /// Serienkontext einer direkt gestarteten Episode laden (ohne
+    /// Detailseite) und die Folge-Episoden in den MVU-Zyklus melden —
+    /// ein Fehlschlag ergibt eine leere Fortsetzungsliste statt eines
+    /// Fehlerzustands (die Folgevideo-Funktion entfällt dann still).
+    /// </summary>
+    /// <param name="loadUpcoming">Der Effekt mit Episoden- und Serien-Id.</param>
+    /// <param name="cancellationToken">Bricht den Ladevorgang ab.</param>
+    /// <returns>Eine abgeschlossene Aufgabe nach dem Melden der Fortsetzungsliste.</returns>
+    private async Task LoadUpcomingEpisodesAsync(LoadUpcomingEpisodesEffect loadUpcoming, CancellationToken cancellationToken)
+    {
+        IReadOnlyList<PlayerEpisodeRef> episodes = [];
+        try
+        {
+            episodes = await services.GetRequiredService<UpcomingEpisodesService>()
+                .LoadAsync(loadUpcoming.MediaId, loadUpcoming.ShowId, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[ShellAppEffectHandler] Folge-Episoden laden fehlgeschlagen: {ex.Message}");
+        }
+
+        await DispatchMessageAsync(new UpcomingEpisodesLoadedMessage(loadUpcoming.MediaId, episodes));
     }
 
     private async Task ReportPlaybackProgressAsync(ReportPlaybackProgressEffect report, CancellationToken cancellationToken)

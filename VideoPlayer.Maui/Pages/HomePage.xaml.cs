@@ -106,4 +106,11 @@ public partial class HomePage : ContentPage
         // über die Detail-Navigation.
         _ = mvuHost.DispatchAsync(new MediaItemSelectedMessage(item));
     }
+
+    private void OnContinueWatchingItemTapped(object? sender, HomeMediaItem item)
+    {
+        // Weiterschauen-Einträge starten abspielbare Typen direkt —
+        // Update entscheidet über Wiedergabe bzw. Detail-Fallback.
+        _ = mvuHost.DispatchAsync(new ContinueWatchingItemSelectedMessage(item));
+    }
 }

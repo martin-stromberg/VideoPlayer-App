@@ -101,6 +101,9 @@ namespace VideoPlayer.Maui
             // App-Fensters; iOS: nativer PiP der Transportsteuerung).
             builder.Services.AddSingleton<PlaybackSourceService>();
             builder.Services.AddSingleton<IPictureInPictureService, PictureInPictureService>();
+            // Folgevideo-Auflösung des Weiterschauen-Direktstarts:
+            // Serienkontext ohne Detailseite (Server bzw. Cache).
+            builder.Services.AddSingleton<UpcomingEpisodesService>();
 
             // Download-Verwaltung: persistente Aufträge im Download-
             // Manifest, parallele Transfers mit Quota/WLAN-Bedingung —

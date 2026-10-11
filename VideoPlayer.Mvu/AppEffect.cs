@@ -321,6 +321,21 @@ public sealed record ResolvePlaybackSourceEffect(
     long MediaId) : AppEffect;
 
 /// <summary>
+/// Serienkontext einer direkt aus der Weiterschauen-Liste gestarteten
+/// Episode laden — ohne die Detailseite zu öffnen (online
+/// <c>api/items/tvshow/{showId}</c> inklusive Cache-Auffrischung, offline
+/// <see cref="ShowDetailsCache"/>; Ergebnis:
+/// <c>UpcomingEpisodesLoadedMessage</c>). Grundlage der Folgevideo-/
+/// Auto-Fortsetzungs-Funktion beim Direktstart.
+/// </summary>
+/// <param name="MediaId">Id der gestarteten Episode (Bezugspunkt der Folgeliste).</param>
+/// <param name="ShowId">Id der zugehörigen Serie (Serienkontext-Hint des Weiterschauen-Eintrags).</param>
+/// <returns>Effekt-Datensatz für die Serienkontext-Ladung.</returns>
+public sealed record LoadUpcomingEpisodesEffect(
+    long MediaId,
+    long ShowId) : AppEffect;
+
+/// <summary>
 /// Wiedergabefortschritt eines Mediums an den Server melden — online
 /// sofort, sonst verlustfrei über die persistente Warteschlange
 /// <c>pending_progress</c> (Nachsendung bei Online-Rückkehr über den

@@ -78,9 +78,35 @@ public class DevApiModelSnapshotTests
         var snapshot = DevApiModelSnapshot.FromModel(model);
 
         Assert.True(snapshot.PlayerIsActive);
+        Assert.Equal(4711, snapshot.PlayerMediaId);
         Assert.True(snapshot.PlayerIsPlaying);
         Assert.Equal(42.5, snapshot.PlayerPositionSeconds);
         Assert.Equal("Die Wiedergabe ist fehlgeschlagen.", snapshot.PlayerError);
+    }
+
+    /// <summary>Der Snapshot mappt die Fortsetzungsliste des Players (Folgevideo-Messpunkt des Weiterschauen-Direktstarts).</summary>
+    [Fact]
+    public void DevApiModelSnapshot_MapsUpcomingEpisodes()
+    {
+        var model = new AppModel
+        {
+            Player = new PlayerState
+            {
+                MediaType = "tvshowepisode",
+                MediaId = 31,
+                IsPlaying = true,
+                UpcomingEpisodes =
+                [
+                    new PlayerEpisodeRef { MediaId = 32, Title = "Folge 2" },
+                    new PlayerEpisodeRef { MediaId = 33, Title = "Folge 3" }
+                ]
+            }
+        };
+
+        var snapshot = DevApiModelSnapshot.FromModel(model);
+
+        Assert.Equal(31, snapshot.PlayerMediaId);
+        Assert.Equal(2, snapshot.PlayerUpcomingEpisodeCount);
     }
 
     /// <summary>Die JSON-Serialisierung nutzt camelCase-Feldnamen.</summary>

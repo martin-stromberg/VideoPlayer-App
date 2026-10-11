@@ -124,6 +124,8 @@ public static class AppUpdate
             HeroBackgroundLoadedMessage loaded => UpdateHeroBackgroundLoaded(model, loaded),
             StorageRecoveredMessage recovered => UpdateStorageRecovered(model, recovered),
             MediaItemSelectedMessage selected => UpdateMediaItemSelected(model, selected),
+            ContinueWatchingItemSelectedMessage selected => UpdateContinueWatchingItemSelected(model, selected),
+            UpcomingEpisodesLoadedMessage loaded => UpdateUpcomingEpisodesLoaded(model, loaded),
             SourcesLoadedMessage loaded => UpdateSourcesLoaded(model, loaded),
             SourcesReloadRequestedMessage => UpdateSourcesReloadRequested(model),
             SourceSelectedMessage selected => UpdateSourceSelected(model, selected),
@@ -1202,6 +1204,77 @@ public static class AppUpdate
                 item.ShowId, item.SeasonId, item.EpisodeId)]);
     }
 
+    /// <summary>
+    /// Auswahl eines Weiterschauen-Eintrags: abspielbare Medientypen
+    /// (<c>movie</c>/<c>tvshowepisode</c>) starten direkt die Wiedergabe
+    /// über den gemeinsamen Startpfad — ohne Detailansicht; bei einer
+    /// Episode mit bekanntem Serienkontext wird die Fortsetzungsliste
+    /// zusätzlich per Datenabruf nachgeladen. Alle übrigen Einträge
+    /// öffnen weiterhin die Detailseite.
+    /// </summary>
+    /// <param name="model">Aktuelles App-Model.</param>
+    /// <param name="message">Die Auswahl-Nachricht.</param>
+    /// <returns>Übergang zum Wiedergabestart bzw. zur Detailseite.</returns>
+    private static AppTransition UpdateContinueWatchingItemSelected(AppModel model, ContinueWatchingItemSelectedMessage message)
+    {
+        var item = message.Item;
+        if (item.Id <= 0 || string.IsNullOrWhiteSpace(item.MediaType) || !item.IsSelectable)
+        {
+            // Ohne identifizierbares Medium keine Aktion; Platzhalter
+            // fehlender Offline-Episoden sind nicht auswählbar.
+            return AppTransition.Unchanged(model);
+        }
+
+        var mediaType = MediaTypeNames.Normalize(item.MediaType);
+        if (mediaType is not ("movie" or "tvshowepisode"))
+        {
+            // Nicht direkt abspielbare Typen (Serie, Staffel, Kollektion)
+            // behalten die Detail-Navigation.
+            return new AppTransition(
+                model,
+                [new NavigateToMediaDetailsEffect(
+                    item.MediaType, item.Id, item.Title,
+                    item.ShowId, item.SeasonId, item.EpisodeId)]);
+        }
+
+        var transition = StartPlayback(model, mediaType, item.Id, item.Title);
+        if (mediaType == "tvshowepisode" && item.ShowId is > 0)
+        {
+            // Der Serienkontext für die Folgevideo-Funktion fehlt ohne
+            // Detailseite — er wird unabhängig per Datenabruf geladen.
+            return transition with
+            {
+                Effects = [.. transition.Effects, new LoadUpcomingEpisodesEffect(item.Id, item.ShowId.Value)]
+            };
+        }
+
+        return transition;
+    }
+
+    /// <summary>
+    /// Übernimmt die nachgeladenen Folge-Episoden in den Player-Zustand —
+    /// nur wenn der Player noch dieselbe Episode spielt (Antworten
+    /// abgelösender Identitäten werden wie bei
+    /// <see cref="UpdatePlaybackSourceResolved"/> verworfen).
+    /// </summary>
+    /// <param name="model">Aktuelles App-Model.</param>
+    /// <param name="message">Die Ergebnisnachricht der Serienkontext-Ladung.</param>
+    /// <returns>Übergang mit befüllter Fortsetzungsliste bzw. unverändertem Model.</returns>
+    private static AppTransition UpdateUpcomingEpisodesLoaded(AppModel model, UpcomingEpisodesLoadedMessage message)
+    {
+        var player = model.Player;
+        if (!player.IsActive
+            || player.MediaId != message.MediaId
+            || player.MediaType != "tvshowepisode")
+        {
+            return AppTransition.Unchanged(model);
+        }
+
+        return new AppTransition(
+            model with { Player = player with { UpcomingEpisodes = message.Episodes } },
+            []);
+    }
+
     private static AppTransition UpdateSourcesLoaded(AppModel model, SourcesLoadedMessage message)
     {
         // Verspätete Antworten eines abgelösten Ladevorgangs (Offline-
@@ -1928,20 +2001,37 @@ public static class AppUpdate
             return AppTransition.Unchanged(model);
         }
 
+        return StartPlayback(model, mediaType, message.MediaId, message.Title);
+    }
+
+    /// <summary>
+    /// Gemeinsamer Wiedergabe-Start der Aufrufe aus Detailseite und
+    /// Weiterschauen-Liste: Player-State mit dem Medium und der aus dem
+    /// Serienkontext ermittelten Fortsetzungsliste belegen, zur
+    /// Wiedergabeseite navigieren und die Quelle auflösen (die
+    /// Fortsetzungsposition ermittelt die Quellauflösung selbst).
+    /// </summary>
+    /// <param name="model">Aktuelles App-Model.</param>
+    /// <param name="mediaType">Medientyp (normalisiert, CLR-Konvention).</param>
+    /// <param name="mediaId">Id des Mediums.</param>
+    /// <param name="title">Anzeigetitel des Mediums.</param>
+    /// <returns>Übergang mit belegtem Player-State, Navigations- und Auflösungs-Effekt.</returns>
+    private static AppTransition StartPlayback(AppModel model, string mediaType, long mediaId, string? title)
+    {
         return new AppTransition(
             model with
             {
                 Player = new PlayerState
                 {
                     MediaType = mediaType,
-                    MediaId = message.MediaId,
-                    Title = message.Title,
+                    MediaId = mediaId,
+                    Title = title,
                     IsResolving = true,
                     Attempted = true,
-                    UpcomingEpisodes = NextEpisodeQueue(model, message.MediaId)
+                    UpcomingEpisodes = NextEpisodeQueue(model, mediaId)
                 }
             },
-            [new NavigateToPlayerEffect(), new ResolvePlaybackSourceEffect(mediaType, message.MediaId)]);
+            [new NavigateToPlayerEffect(), new ResolvePlaybackSourceEffect(mediaType, mediaId)]);
     }
 
     /// <summary>
