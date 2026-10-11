@@ -74,6 +74,12 @@ public sealed class AppStorageLayout
         get { return Path.Combine(NoBackupDirectory, "previews"); }
     }
 
+    /// <summary>Programmprotokolle (nicht backup-pflichtig, profil-isoliert).</summary>
+    public string LogsDirectory
+    {
+        get { return Path.Combine(NoBackupDirectory, "logs"); }
+    }
+
     /// <summary>Temp-Cache (nie gesichert, von der Plattform räumbar).</summary>
     public string TempDirectory
     {
@@ -87,6 +93,7 @@ public sealed class AppStorageLayout
         Directory.CreateDirectory(NoBackupDirectory);
         Directory.CreateDirectory(VideosDirectory);
         Directory.CreateDirectory(PreviewsDirectory);
+        Directory.CreateDirectory(LogsDirectory);
         Directory.CreateDirectory(TempDirectory);
     }
 

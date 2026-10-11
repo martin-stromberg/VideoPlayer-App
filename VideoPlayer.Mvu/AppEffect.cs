@@ -476,3 +476,10 @@ public sealed record RunAutoDownloadsEffect(AppSettings Settings, bool Force) : 
 /// <param name="MediaId">Id des Mediums.</param>
 /// <returns>Effekt-Datensatz für das automatische Entfernen.</returns>
 public sealed record DeleteWatchedDownloadEffect(string MediaType, long MediaId) : AppEffect;
+
+/// <summary>
+/// Protokollversand ausführen: das Programmprotokoll als Anhang eines
+/// Mailentwurfs öffnen (Fallback: Teilen-Dialog) — Ergebnis:
+/// <c>SendLogProtocolCompletedMessage</c>.
+/// </summary>
+public sealed record SendLogProtocolEffect : AppEffect;

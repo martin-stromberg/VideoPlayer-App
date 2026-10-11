@@ -75,26 +75,67 @@ public sealed class UiDriver : IDisposable
     /// <summary>
     /// Setzt den Text eines Eingabefelds über das UIA-Value-Pattern
     /// (echte UI-Eingabekette — der MAUI-Handler feuert
-    /// <c>TextChanged</c> wie eine Tastatureingabe).
+    /// <c>TextChanged</c> wie eine Tastatureingabe). Danach wird der
+    /// Feldwert zurückgelesen; ist er nicht gelandet (Seite noch im
+    /// Aufbau / Fokus verloren), wird die Eingabe bis zum
+    /// <paramref name="timeout"/> wiederholt.
     /// </summary>
     /// <param name="automationId">AutomationId des Eingabefelds.</param>
     /// <param name="text">Der einzugebende Text.</param>
-    public void EnterText(string automationId, string text)
+    /// <param name="timeout">Maximale Wartezeit (Standard 15 s).</param>
+    public void EnterText(string automationId, string text, TimeSpan? timeout = null)
     {
-        var element = FindByAutomationId(automationId);
-        var textBox = element.AsTextBox();
-        textBox.Focus();
-        // ValuePattern setzt den Text atomar — simulierte Tasten gehen
-        // unter Last gelegentlich verloren (Truncated-Input-Flakes wie
-        // „server" statt „ftp://server"). Feuert TextChanged ebenso.
-        if (textBox.Patterns.Value.IsSupported)
+        var deadline = DateTime.UtcNow + (timeout ?? TimeSpan.FromSeconds(15));
+        while (DateTime.UtcNow < deadline)
         {
-            textBox.Patterns.Value.Pattern.SetValue(text);
+            var element = window.FindFirstDescendant(Conditions.ByAutomationId(automationId));
+            if (element is not null)
+            {
+                try
+                {
+                    var textBox = element.AsTextBox();
+                    textBox.Focus();
+                    if (element.Properties.IsPassword.ValueOrDefault)
+                    {
+                        // Passwortboxen blenden den Wert aus (ValuePattern
+                        // liefert nie den Klartext) — dort bleibt reine
+                        // Tastatureingabe ohne Rücklesen.
+                        textBox.Enter(text);
+                        return;
+                    }
+
+                    // ValuePattern setzt den Text atomar — simulierte Tasten
+                    // gehen unter Last gelegentlich verloren (Truncated-Input-
+                    // Flakes wie „server" statt „ftp://server"). Feuert
+                    // TextChanged ebenso.
+                    if (textBox.Patterns.Value.IsSupported)
+                    {
+                        textBox.Patterns.Value.Pattern.SetValue(text);
+                        Thread.Sleep(150);
+                        var current = textBox.Patterns.Value.Pattern.Value.ValueOrDefault;
+                        if (string.Equals(current, text, StringComparison.Ordinal))
+                        {
+                            return;
+                        }
+                    }
+                    else
+                    {
+                        textBox.Enter(text);
+                        return;
+                    }
+                }
+                catch (Exception)
+                {
+                    // Element-Referenz veraltet oder noch nicht bereit —
+                    // erneut suchen bis zum Timeout.
+                }
+            }
+
+            Thread.Sleep(200);
         }
-        else
-        {
-            textBox.Enter(text);
-        }
+
+        throw new TimeoutException(
+            $"Element mit AutomationId '{automationId}' nahm den Text nicht auf.");
     }
 
     /// <summary>
@@ -107,6 +148,29 @@ public sealed class UiDriver : IDisposable
         var element = FindByAutomationId(automationId);
         var button = element.AsButton();
         button.Invoke();
+    }
+
+    /// <summary>
+    /// Schaltet einen Schalter (<c>Switch</c>) per UIA-TogglePattern um;
+    /// ist das Muster nicht verfügbar, greifen Invoke bzw. Klick als
+    /// Fallback.
+    /// </summary>
+    /// <param name="automationId">AutomationId des Schalters.</param>
+    public void Toggle(string automationId)
+    {
+        var element = FindByAutomationId(automationId);
+        if (element.Patterns.Toggle.IsSupported)
+        {
+            element.Patterns.Toggle.Pattern.Toggle();
+        }
+        else if (element.Patterns.Invoke.IsSupported)
+        {
+            element.Patterns.Invoke.Pattern.Invoke();
+        }
+        else
+        {
+            element.Click();
+        }
     }
 
     /// <summary>
@@ -199,6 +263,50 @@ public sealed class UiDriver : IDisposable
                 || string.Equals(b.Name, "Open Navigation", StringComparison.OrdinalIgnoreCase))
             ?? buttons.FirstOrDefault(b =>
                 string.Equals(b.AutomationId, "OK", StringComparison.Ordinal));
+    }
+
+    /// <summary>
+    /// Wartet, bis ein Element mit der AutomationId sichtbar im Fenster
+    /// existiert; rollt es dabei über <c>ScrollItemPattern</c> in den
+    /// sichtbaren Bereich (Elemente in einer ScrollView meldet UIA erst
+    /// als sichtbar, wenn sie eingerollt sind). Liefert <c>false</c>,
+    /// wenn das Element bis zum Timeout nicht sichtbar wird — damit
+    /// taugt es auch für Negativ-Behauptungen.
+    /// </summary>
+    /// <param name="automationId">Die gesuchte AutomationId.</param>
+    /// <param name="timeout">Maximale Wartezeit (Standard 15 s).</param>
+    /// <returns><c>true</c>, wenn das Element sichtbar wurde.</returns>
+    public bool WaitForVisible(string automationId, TimeSpan? timeout = null)
+    {
+        var deadline = DateTime.UtcNow + (timeout ?? TimeSpan.FromSeconds(15));
+        while (DateTime.UtcNow < deadline)
+        {
+            var element = window.FindFirstDescendant(Conditions.ByAutomationId(automationId));
+            if (element is not null)
+            {
+                if (element.Patterns.ScrollItem.IsSupported)
+                {
+                    try
+                    {
+                        element.Patterns.ScrollItem.Pattern.ScrollIntoView();
+                    }
+                    catch (Exception)
+                    {
+                        // ScrollIntoView kann auf nicht scrollbar gehosteten
+                        // Elementen fehlschlagen — Sichtbarkeit dennoch prüfen.
+                    }
+                }
+
+                if (!element.Properties.IsOffscreen.ValueOrDefault)
+                {
+                    return true;
+                }
+            }
+
+            Thread.Sleep(200);
+        }
+
+        return false;
     }
 
     /// <summary>Sucht ein Element per Anzeigename (einmalig, ohne Retry).</summary>

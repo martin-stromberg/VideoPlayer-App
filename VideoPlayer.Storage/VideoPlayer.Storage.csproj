@@ -10,6 +10,10 @@
     <Authors>Martin Stromberg</Authors>
   </PropertyGroup>
   <ItemGroup>
+    <!-- ILogger/ILoggerProvider für das Datei-Protokoll (AppLogService/
+         FileLoggerProvider) — deckungsgleiche Version mit
+         Microsoft.Extensions.Logging.Debug in VideoPlayer.Maui. -->
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.10" />
     <PackageReference Include="sqlite-net-pcl" Version="1.11.285" />
     <PackageReference Include="SQLitePCLRaw.bundle_green" Version="2.1.11" />
     <PackageReference Include="SQLitePCLRaw.lib.e_sqlite3" Version="3.53.3" />

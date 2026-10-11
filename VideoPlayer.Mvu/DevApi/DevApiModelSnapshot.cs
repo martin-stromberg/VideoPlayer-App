@@ -83,6 +83,12 @@ public sealed record DevApiModelSnapshot
     /// <summary>Hinweis der Ablage-Wiederherstellung.</summary>
     public string? StorageNotice { get; init; }
 
+    /// <summary>Protokollierung ist aktiviert (Einstellung „Protokollierung").</summary>
+    public bool SettingsLoggingEnabled { get; init; }
+
+    /// <summary>Fehlertext des Protokollversands; <c>null</c> = kein Fehler.</summary>
+    public string? LogSendError { get; init; }
+
     /// <summary>Titelzeile des Hero-Kopfbereichs.</summary>
     public string HeroTitle { get; init; } = string.Empty;
 
@@ -162,6 +168,8 @@ public sealed record DevApiModelSnapshot
             IsBootstrapRunning = model.IsBootstrapRunning,
             BootstrapError = model.BootstrapError,
             StorageNotice = model.StorageNotice,
+            SettingsLoggingEnabled = model.Settings.LoggingEnabled,
+            LogSendError = model.LogSendError,
             HeroTitle = model.HeroTitle,
             ContinueWatchingCount = model.ContinueWatching.Count,
             FavoritesCount = model.Favorites.Count,

@@ -221,4 +221,11 @@ public sealed record AppModel
     /// Startseite als Banner angezeigt.
     /// </summary>
     public string? StorageNotice { get; init; }
+
+    /// <summary>
+    /// Inline-Fehlertext des Protokollversands auf der Einstellungsseite
+    /// (kein Protokoll vorhanden / Versand nicht möglich);
+    /// <c>null</c> = kein Fehler.
+    /// </summary>
+    public string? LogSendError { get; init; }
 }

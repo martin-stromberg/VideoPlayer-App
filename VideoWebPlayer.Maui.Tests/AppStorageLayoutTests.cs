@@ -75,7 +75,19 @@ public class AppStorageLayoutTests : IDisposable
         Assert.True(Directory.Exists(layout.NoBackupDirectory));
         Assert.True(Directory.Exists(layout.VideosDirectory));
         Assert.True(Directory.Exists(layout.PreviewsDirectory));
+        Assert.True(Directory.Exists(layout.LogsDirectory));
         Assert.True(Directory.Exists(layout.TempDirectory));
+    }
+
+    /// <summary>Prüft LogsDirectory: liegt unterhalb der nicht backup-pflichtigen Wurzel.</summary>
+    [Fact]
+    public void LogsDirectory_LiesUnderNoBackup()
+    {
+        var layout = CreateLayout("p1");
+
+        Assert.Equal(
+            Path.Combine(layout.NoBackupDirectory, "logs"),
+            layout.LogsDirectory);
     }
 
     /// <summary>Prüft Constructor: lehnt leere Wurzelverzeichnisse ab.</summary>
