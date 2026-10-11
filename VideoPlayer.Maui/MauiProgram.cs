@@ -103,6 +103,9 @@ namespace VideoPlayer.Maui
             builder.Services.AddSingleton<SourceBrowserService>();
             builder.Services.AddSingleton<MediaDetailsService>();
             builder.Services.AddSingleton<FavoritesService>();
+            // Playlists: Übersicht (eigene + öffentliche) und paginierte
+            // Einträge — reines Online-Feature ohne lokale Kopie.
+            builder.Services.AddSingleton<PlaylistService>();
             // Profil-Seite: Benutzerinfo aus Token-Claims/gespeicherter
             // Anmelde-Kennung plus aktives lokales Profil.
             builder.Services.AddSingleton<ProfileInfoService>();
@@ -130,6 +133,7 @@ namespace VideoPlayer.Maui
             builder.Services.AddTransient<Pages.LoadingPage>();
             builder.Services.AddTransient<Pages.HomePage>();
             builder.Services.AddTransient<Pages.FavoritesPage>();
+            builder.Services.AddTransient<Pages.PlaylistsPage>();
             builder.Services.AddTransient<Pages.DownloadsPage>();
             builder.Services.AddTransient<Pages.ProfilePage>();
             builder.Services.AddTransient<Pages.SettingsPage>();
@@ -139,6 +143,8 @@ namespace VideoPlayer.Maui
             // Quellen-Browsing-Seite (Shell-Route „sourceoverview").
             builder.Services.AddTransient<Pages.MediaDetailsPage>();
             builder.Services.AddTransient<Pages.SourceOverviewPage>();
+            // Playlist-Detailseite (Shell-Route „playlistdetails").
+            builder.Services.AddTransient<Pages.PlaylistDetailsPage>();
             // Wiedergabeseite (Shell-Route „player").
             builder.Services.AddTransient<Pages.PlayerPage>();
 

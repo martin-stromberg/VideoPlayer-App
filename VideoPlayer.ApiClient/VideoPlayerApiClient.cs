@@ -521,6 +521,121 @@ public class VideoPlayerApiClient
 
     #endregion
 
+    #region Playlists
+
+    /// <summary>
+    /// Liefert die Playlists des angemeldeten Benutzers
+    /// (<c>GET api/playlists</c>), optional auf Playlists mit einem
+    /// bestimmten Genre eingeschränkt.
+    /// </summary>
+    /// <param name="genreId">Optionaler Genre-Filter (ID des Genres).</param>
+    /// <param name="cancellationToken">Abbruchtoken.</param>
+    /// <returns>Liste der eigenen Playlists (ggf. leer).</returns>
+    public async Task<IReadOnlyList<Playlist>> GetPlaylistsAsync(
+        long? genreId = null,
+        CancellationToken cancellationToken = default)
+    {
+        var url = "api/playlists";
+        if (genreId is > 0)
+        {
+            url += $"?genreId={genreId}";
+        }
+
+        return await GetJsonAsync<Playlist[]>(url, cancellationToken) ?? [];
+    }
+
+    /// <summary>
+    /// Liefert alle als öffentlich markierten Playlists
+    /// (<c>GET api/playlists/public</c>), optional auf Playlists mit
+    /// einem bestimmten Genre eingeschränkt.
+    /// </summary>
+    /// <param name="genreId">Optionaler Genre-Filter (ID des Genres).</param>
+    /// <param name="cancellationToken">Abbruchtoken.</param>
+    /// <returns>Liste der öffentlichen Playlists (ggf. leer).</returns>
+    public async Task<IReadOnlyList<Playlist>> GetPublicPlaylistsAsync(
+        long? genreId = null,
+        CancellationToken cancellationToken = default)
+    {
+        var url = "api/playlists/public";
+        if (genreId is > 0)
+        {
+            url += $"?genreId={genreId}";
+        }
+
+        return await GetJsonAsync<Playlist[]>(url, cancellationToken) ?? [];
+    }
+
+    /// <summary>
+    /// Liefert eine einzelne Playlist (<c>GET api/playlists/{id}</c>).
+    /// </summary>
+    /// <param name="playlistId">ID der Playlist.</param>
+    /// <param name="cancellationToken">Abbruchtoken.</param>
+    /// <returns>Die angeforderte Playlist bzw. <c>null</c>, wenn sie nicht existiert (HTTP 404).</returns>
+    public async Task<Playlist?> GetPlaylistAsync(long playlistId, CancellationToken cancellationToken = default)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(playlistId);
+        try
+        {
+            return await GetJsonAsync<Playlist>($"api/playlists/{playlistId}", cancellationToken);
+        }
+        catch (ApiException ex) when (ex.StatusCode == HttpStatusCode.NotFound)
+        {
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Liefert eine sortierte, paginierte Seite der Einträge einer
+    /// Playlist (<c>GET api/playlists/{id}/entries/paged</c>). Die
+    /// Einträge kommen in der serverseitigen Reihenfolge — der Client
+    /// sortiert nicht um.
+    /// </summary>
+    /// <param name="playlistId">ID der Playlist.</param>
+    /// <param name="pageNumber">1-basierte Nummer der zu ladenden Seite.</param>
+    /// <param name="pageSize">Maximale Einträge pro Seite.</param>
+    /// <param name="cancellationToken">Abbruchtoken.</param>
+    /// <returns>Die angeforderte Eintragsseite.</returns>
+    public async Task<PlaylistEntriesPagedResult> GetPlaylistEntriesPagedAsync(
+        long playlistId,
+        int pageNumber,
+        int pageSize,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(playlistId);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(pageNumber);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(pageSize);
+
+        return await GetJsonAsync<PlaylistEntriesPagedResult>(
+            $"api/playlists/{playlistId}/entries/paged?pageNumber={pageNumber}&pageSize={pageSize}",
+            cancellationToken);
+    }
+
+    /// <summary>
+    /// Lädt das Cover-Bild einer Playlist (<c>GET api/playlists/{id}/cover</c>).
+    /// </summary>
+    /// <param name="playlistId">ID der Playlist.</param>
+    /// <param name="cancellationToken">Abbruchtoken.</param>
+    /// <returns>Die Bilddaten als Byte-Array bzw. <c>null</c>, wenn die Playlist kein Cover hat (HTTP 404).</returns>
+    public async Task<byte[]?> GetPlaylistCoverAsync(long playlistId, CancellationToken cancellationToken = default)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(playlistId);
+        try
+        {
+            using var response = await SendWithPolicyAsync(
+                $"api/playlists/{playlistId}/cover",
+                () => new HttpRequestMessage(HttpMethod.Get, $"api/playlists/{playlistId}/cover"),
+                allowReauth: true,
+                cancellationToken);
+            return await response.Content.ReadAsByteArrayAsync(cancellationToken);
+        }
+        catch (ApiException ex) when (ex.StatusCode == HttpStatusCode.NotFound)
+        {
+            return null;
+        }
+    }
+
+    #endregion
+
     #region Send pipeline
 
     private async Task<T> GetJsonAsync<T>(string endpoint, CancellationToken cancellationToken)

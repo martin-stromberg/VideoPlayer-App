@@ -118,6 +118,21 @@ public sealed class DevApiModel
 
     /// <summary>Fehlertext der letzten Wiedergabe-Störung.</summary>
     [JsonPropertyName("playerError")] public string? PlayerError { get; set; }
+
+    /// <summary>Anzahl der Playlist-Einträge der Übersichtsseite (ohne Sektionsüberschriften).</summary>
+    [JsonPropertyName("playlistsPageItemCount")] public int PlaylistsPageItemCount { get; set; }
+
+    /// <summary>Fehlertext der Playlists-Übersichtsseite.</summary>
+    [JsonPropertyName("playlistsPageError")] public string? PlaylistsPageError { get; set; }
+
+    /// <summary>Playlist-Id der geöffneten Detailseite (0 = keine).</summary>
+    [JsonPropertyName("playlistDetailsId")] public long PlaylistDetailsId { get; set; }
+
+    /// <summary>Anzahl geladener Einträge der Playlist-Detailseite.</summary>
+    [JsonPropertyName("playlistDetailsEntryCount")] public int PlaylistDetailsEntryCount { get; set; }
+
+    /// <summary>Fehlertext der Playlist-Detailseite.</summary>
+    [JsonPropertyName("playlistDetailsError")] public string? PlaylistDetailsError { get; set; }
 }
 
 /// <summary>DTO eines bekannten Servers im Modell-Snapshot.</summary>

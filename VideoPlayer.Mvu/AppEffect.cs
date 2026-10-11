@@ -314,6 +314,47 @@ public sealed record LoadFavoritesPageEffect(bool RefreshFromServer) : AppEffect
 public sealed record RemoveFavoriteEffect(long FavoriteId) : AppEffect;
 
 /// <summary>
+/// Eigene und öffentliche Playlists vom Server laden —
+/// <c>api/playlists</c> und <c>api/playlists/public</c> (Ergebnis:
+/// <c>PlaylistsLoadedMessage</c>). Reiner Online-Lauf ohne Cache.
+/// </summary>
+public sealed record LoadPlaylistsEffect : AppEffect;
+
+/// <summary>
+/// Zur Playlist-Detailseite navigieren (Shell-Route
+/// <c>playlistdetails?id=…&amp;name=…</c>, geschoben auf den Stack).
+/// </summary>
+/// <param name="PlaylistId">Id der zu öffnenden Playlist.</param>
+/// <param name="Name">Anzeigename der Playlist (Seitentitel).</param>
+/// <returns>Effekt-Datensatz für die Navigation zur Playlist-Detailseite.</returns>
+public sealed record NavigateToPlaylistDetailsEffect(
+    long PlaylistId,
+    string Name) : AppEffect;
+
+/// <summary>
+/// Kopfdaten einer Playlist nachladen — <c>api/playlists/{id}</c>
+/// (Ergebnis: <c>PlaylistDetailsLoadedMessage</c>). Nicht-fataler
+/// Nachschlag für die Detailseite ohne bekannten Listenstand.
+/// </summary>
+/// <param name="PlaylistId">Id der Playlist.</param>
+/// <returns>Effekt-Datensatz für das Nachladen der Kopfdaten.</returns>
+public sealed record LoadPlaylistDetailsEffect(long PlaylistId) : AppEffect;
+
+/// <summary>
+/// Eine Eintragsseite einer Playlist laden —
+/// <c>api/playlists/{id}/entries/paged</c> in der serverseitigen
+/// Reihenfolge (Ergebnis: <c>PlaylistEntriesLoadedMessage</c>).
+/// </summary>
+/// <param name="PlaylistId">Id der Playlist.</param>
+/// <param name="Page">Zu ladende Seite (1-basiert, Server-Konvention).</param>
+/// <param name="Append"><c>true</c> = Folgeseite an die Liste anhängen, <c>false</c> = Liste ersetzen.</param>
+/// <returns>Effekt-Datensatz für das Laden der Eintragsseite.</returns>
+public sealed record LoadPlaylistEntriesEffect(
+    long PlaylistId,
+    int Page,
+    bool Append) : AppEffect;
+
+/// <summary>
 /// Profilinformationen der Profil-Seite ermitteln — Benutzername/E-Mail
 /// aus den Claims des gespeicherten Anmelde-Tokens bzw. dem gespeicherten
 /// Anmelde-Benutzernamen plus aktives lokales Profil (Ergebnis:

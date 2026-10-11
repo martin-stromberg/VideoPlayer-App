@@ -16,11 +16,12 @@ public class VideoPlayerMauiContractTests
 
     // Die Quellen stehen als dynamische Einträge je freigegebener Quelle
     // im Menü (aufgebaut in AppShell.xaml.cs) — die statischen
-    // FlyoutItem-Einträge sind nur die fünf Menüseiten.
+    // FlyoutItem-Einträge sind nur die sechs Menüseiten.
     private static readonly (string Title, AppPage Page)[] ExpectedMenuEntries =
     [
         ("Startseite", AppPage.Home),
         ("Favoriten", AppPage.Favorites),
+        ("Playlists", AppPage.Playlists),
         ("Downloads", AppPage.Downloads),
         ("Profil", AppPage.Profile),
         ("Einstellungen", AppPage.Settings)

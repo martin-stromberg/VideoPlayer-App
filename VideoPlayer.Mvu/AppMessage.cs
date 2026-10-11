@@ -478,6 +478,80 @@ public sealed record FavoriteRemoveRequestedMessage(FavoriteListItem Item) : App
 /// <returns>Nachricht mit dem Ergebnis des Entfernens.</returns>
 public sealed record FavoriteRemoveCompletedMessage(long FavoriteId, bool Success) : AppMessage;
 
+/// <summary>
+/// Die Playlists-Übersichtsseite wurde geöffnet bzw. soll (erneut)
+/// laden — Playlists sind ein reines Online-Feature: ohne
+/// Serververbindung zeigt die Seite eine verständliche Fehleranzeige
+/// statt eines Cache-Stands.
+/// </summary>
+public sealed record PlaylistsPageOpenedMessage : AppMessage;
+
+/// <summary>Die Playlists-Übersicht wurde geladen (<paramref name="Error"/> bei Fehlschlag).</summary>
+/// <param name="Own">Die eigenen Playlists des angemeldeten Benutzers.</param>
+/// <param name="Public">Die öffentlichen Playlists.</param>
+/// <param name="Error">Fehlertext bei Fehlschlag; <c>null</c> bei Erfolg.</param>
+/// <returns>Nachricht mit dem Ladeergebnis der Playlists-Übersicht.</returns>
+public sealed record PlaylistsLoadedMessage(
+    IReadOnlyList<PlaylistListItem> Own,
+    IReadOnlyList<PlaylistListItem> Public,
+    string? Error) : AppMessage;
+
+/// <summary>Eine Playlist wurde in der Übersicht ausgewählt — die Detailseite wird geöffnet und die erste Eintragsseite geladen.</summary>
+/// <param name="Item">Die ausgewählte Playlist.</param>
+/// <returns>Nachricht für die Playlist-Auswahl.</returns>
+public sealed record PlaylistSelectedMessage(PlaylistListItem Item) : AppMessage;
+
+/// <summary>
+/// Die Playlist-Detailseite wurde geöffnet — Rückkehr- und
+/// Wiederherstellungspfad (z. B. zurück von der Medien-Detailseite oder
+/// Seitenaufruf ohne vorherige Auswahl): Kopfdaten und erste
+/// Eintragsseite werden bei Bedarf geladen.
+/// </summary>
+/// <param name="PlaylistId">Id der geöffneten Playlist.</param>
+/// <param name="Name">Anzeigename aus dem Navigationspfad (Fallback-Titel).</param>
+/// <returns>Nachricht für das Öffnen der Detailseite.</returns>
+public sealed record PlaylistDetailsOpenedMessage(long PlaylistId, string Name) : AppMessage;
+
+/// <summary>
+/// Die Kopfdaten einer Playlist wurden nachgeladen (nicht-fataler
+/// Nachschlag der Detailseite); <paramref name="Info"/> ist
+/// <c>null</c>, wenn die Playlist nicht gefunden wurde oder der
+/// Nachschlag fehlschlug — der bisherige Kopfstand bleibt.
+/// </summary>
+/// <param name="PlaylistId">Id der Playlist, zu der die Kopfdaten gehören.</param>
+/// <param name="Info">Die geladenen Kopfdaten; <c>null</c> bei Fehlschlag.</param>
+/// <returns>Nachricht mit den Kopfdaten der Playlist.</returns>
+public sealed record PlaylistDetailsLoadedMessage(long PlaylistId, PlaylistListItem? Info) : AppMessage;
+
+/// <summary>Eine Eintragsseite der geöffneten Playlist wurde geladen (<paramref name="Error"/> bei Fehlschlag).</summary>
+/// <param name="PlaylistId">Id der Playlist, zu der die Einträge gehören.</param>
+/// <param name="Page">Geladene Seite (1-basiert, Server-Konvention).</param>
+/// <param name="Items">Die Einträge der Seite in Server-Reihenfolge.</param>
+/// <param name="HasMore"><c>true</c>, solange der Server weitere Seiten meldet.</param>
+/// <param name="TotalCount">Gesamtzahl der Einträge laut Server.</param>
+/// <param name="Append"><c>true</c> = an die bestehende Liste anhängen; <c>false</c> = Liste ersetzen.</param>
+/// <param name="Error">Fehlertext bei Fehlschlag; <c>null</c> bei Erfolg.</param>
+/// <returns>Nachricht mit dem Ladeergebnis der Eintragsseite.</returns>
+public sealed record PlaylistEntriesLoadedMessage(
+    long PlaylistId,
+    int Page,
+    IReadOnlyList<PlaylistEntryItem> Items,
+    bool HasMore,
+    int TotalCount,
+    bool Append,
+    string? Error) : AppMessage;
+
+/// <summary>Die nächste Eintragsseite der geöffneten Playlist soll nachgeladen werden (Scroll-Ende).</summary>
+public sealed record PlaylistEntriesNextPageRequestedMessage : AppMessage;
+
+/// <summary>Der letzte fehlgeschlagene Lauf der Playlist-Detailseite soll wiederholt werden.</summary>
+public sealed record PlaylistEntriesRetryRequestedMessage : AppMessage;
+
+/// <summary>Ein Playlist-Eintrag wurde ausgewählt — die Medien-Detailseite wird geöffnet (Wiedergabe gehört zum Folgeschritt).</summary>
+/// <param name="Item">Der ausgewählte Eintrag.</param>
+/// <returns>Nachricht für die Eintragsauswahl.</returns>
+public sealed record PlaylistEntrySelectedMessage(PlaylistEntryItem Item) : AppMessage;
+
 /// <summary>Die Profil-Seite wurde geöffnet — die Profilinformationen werden (erneut) ermittelt.</summary>
 public sealed record ProfilePageOpenedMessage : AppMessage;
 

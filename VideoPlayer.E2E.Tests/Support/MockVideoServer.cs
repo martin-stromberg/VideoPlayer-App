@@ -158,6 +158,19 @@ public sealed class MockVideoServer : IDisposable
     public long? PlaybackEpisodeResumePositionSeconds { get; set; }
 
     /// <summary>
+    /// Opt-in Playlistfluss: die Playlist-Testdaten. Einträge mit
+    /// <see cref="MockPlaylist.IsOwner"/> erscheinen in
+    /// <c>GET /api/playlists</c>, solche mit <see cref="MockPlaylist.IsPublic"/>
+    /// in <c>GET /api/playlists/public</c>; Detail-, Eintrags- und
+    /// Cover-Endpunkte liefern die konfigurierten Daten der jeweiligen
+    /// Playlist.
+    /// </summary>
+    public List<MockPlaylist> Playlists { get; } = [];
+
+    /// <summary><c>true</c> = alle Playlist-Endpunkte antworten mit 404 (Fehlerpfad der Playlists-Anzeige).</summary>
+    public bool PlaylistsUnavailable { get; set; }
+
+    /// <summary>
     /// Opt-in nicht abspielbarer Weiterschauen-Eintrag: Id eines
     /// Serieneintrags (<c>mediaType: "show"</c>) — öffnet die
     /// Detailansicht statt der Wiedergabe.
@@ -441,6 +454,24 @@ public sealed class MockVideoServer : IDisposable
             return HandleEpisodeItem(path, request);
         }
 
+        // Opt-in Playlistfluss: eigene + öffentliche Playlists, Detail,
+        // Einträge (unpaginiert/paginiert) und Cover — authentifiziert
+        // wie die übrigen Listen-Endpunkte.
+        if (method == "GET" && path.StartsWith("/api/playlists", StringComparison.OrdinalIgnoreCase))
+        {
+            if (!IsGateValid(request))
+            {
+                return GateRejected();
+            }
+
+            if (!IsBearerValid(request))
+            {
+                return (401, "text/plain", Encoding.UTF8.GetBytes("unauthorized"));
+            }
+
+            return HandlePlaylistRequest(path, request.Path);
+        }
+
         // Authentifizierte Listen-Endpunkte: Gate + Bearer prüfen,
         // leere Liste liefern (ausreichend für Token-Validierung und Sync).
         // Ablehnung ohne Bearer → text/plain wie die Credential-Ablehnung
@@ -581,6 +612,142 @@ public sealed class MockVideoServer : IDisposable
 
         return null;
     }
+
+    /// <summary>
+    /// Antwortet die Playlist-Endpunkte der App: eigene/öffentliche
+    /// Listen (<c>/api/playlists</c>, <c>/api/playlists/public</c>),
+    /// Einzel-Playlist (<c>/api/playlists/{id}</c>), Einträge
+    /// (<c>/entries</c> und <c>/entries/paged</c>, letzteres in
+    /// Server-Reihenfolge und 1-basiert) sowie Cover (<c>/cover</c>).
+    /// <see cref="PlaylistsUnavailable"/> simuliert einen ausgefallenen
+    /// Playlist-Bereich (404 auf allen Playlist-Routen).
+    /// </summary>
+    /// <param name="path">Der angefragte Pfad ohne Query-String.</param>
+    /// <param name="rawPath">Der angefragte Pfad inkl. Query-String.</param>
+    /// <returns>Die Mock-Antwort des Playlist-Endpunkts.</returns>
+    private MockResponse HandlePlaylistRequest(string path, string rawPath)
+    {
+        if (PlaylistsUnavailable)
+        {
+            return (404, "application/json", JsonBody(new { error = "not found" }));
+        }
+
+        if (path.Equals("/api/playlists", StringComparison.OrdinalIgnoreCase))
+        {
+            return (200, "application/json", JsonBody(
+                Playlists.Where(p => p.IsOwner).Select(PlaylistJson)));
+        }
+
+        if (path.Equals("/api/playlists/public", StringComparison.OrdinalIgnoreCase))
+        {
+            return (200, "application/json", JsonBody(
+                Playlists.Where(p => p.IsPublic).Select(PlaylistJson)));
+        }
+
+        var segments = path.Split('/', StringSplitOptions.RemoveEmptyEntries);
+        if (segments.Length < 3
+            || !long.TryParse(segments[2], out var playlistId)
+            || Playlists.FirstOrDefault(p => p.Id == playlistId) is not { } playlist)
+        {
+            return (404, "application/json", JsonBody(new { error = "not found" }));
+        }
+
+        if (segments.Length == 3)
+        {
+            return (200, "application/json", JsonBody(PlaylistJson(playlist)));
+        }
+
+        if (segments.Length == 4
+            && segments[3].Equals("cover", StringComparison.OrdinalIgnoreCase))
+        {
+            return playlist.CoverPng is { Length: > 0 } png
+                ? (MockResponse)new MockResponse(200, "image/png", png)
+                : (404, "application/json", JsonBody(new { error = "no cover" }));
+        }
+
+        if (segments.Length >= 4 && segments.Length <= 5
+            && segments[3].Equals("entries", StringComparison.OrdinalIgnoreCase))
+        {
+            if (segments.Length == 4)
+            {
+                return (200, "application/json", JsonBody(
+                    playlist.Entries.Select(e => EntryJson(e, playlist.Id))));
+            }
+
+            if (!segments[4].Equals("paged", StringComparison.OrdinalIgnoreCase))
+            {
+                return (404, "application/json", JsonBody(new { error = "not found" }));
+            }
+
+            // 1-basiertes Paging wie der Server (pageNumber >= 1,
+            // sonst 400).
+            var pageNumber = int.TryParse(QueryValue(rawPath, "pageNumber"), out var pn) ? pn : 1;
+            var pageSize = int.TryParse(QueryValue(rawPath, "pageSize"), out var ps) ? ps : 20;
+            if (pageNumber < 1 || pageSize < 1)
+            {
+                return (400, "application/json", JsonBody(new { error = "invalid page" }));
+            }
+
+            var slice = playlist.Entries
+                .Skip((pageNumber - 1) * pageSize)
+                .Take(pageSize)
+                .Select(e => EntryJson(e, playlist.Id))
+                .ToList();
+            return (200, "application/json", JsonBody(new
+            {
+                entries = slice,
+                totalCount = playlist.Entries.Count,
+                hasNextPage = pageNumber * pageSize < playlist.Entries.Count,
+                pageNumber,
+                pageSize
+            }));
+        }
+
+        return (404, "application/json", JsonBody(new { error = "not found" }));
+    }
+
+    /// <summary>JSON-Repräsentation einer Playlist mit den DTO-Feldnamen.</summary>
+    /// <param name="playlist">Die Playlist.</param>
+    /// <returns>Das serialisierbare Anonym-Objekt.</returns>
+    private static object PlaylistJson(MockPlaylist playlist) => new
+    {
+        id = playlist.Id,
+        name = playlist.Name,
+        description = playlist.Description,
+        sortMode = playlist.SortMode,
+        createdAt = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc),
+        updatedAt = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc),
+        genres = playlist.Genres.Select((name, i) => new { id = (long)(100 + i), name }),
+        allGenreIds = playlist.Genres.Select((_, i) => (long)(100 + i)),
+        genresManuallyOverridden = false,
+        coverPictureId = playlist.CoverPictureId,
+        coverPictureIsUserUploaded = false,
+        isPublic = playlist.IsPublic,
+        isOwner = playlist.IsOwner
+    };
+
+    /// <summary>JSON-Repräsentation eines Playlist-Eintrags mit den DTO-Feldnamen.</summary>
+    /// <param name="entry">Der Eintrag.</param>
+    /// <param name="playlistId">Id der zugehörigen Playlist.</param>
+    /// <returns>Das serialisierbare Anonym-Objekt.</returns>
+    private static object EntryJson(MockPlaylistEntry entry, long playlistId) => new
+    {
+        id = entry.Id,
+        playlistId,
+        mediaType = entry.MediaType,
+        mediaId = entry.MediaId,
+        mediaTitle = entry.Title,
+        parentMediaType = entry.ParentMediaType,
+        parentMediaId = entry.ParentMediaId,
+        parentMediaTitle = entry.ParentTitle,
+        addedAt = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc),
+        resolvedPictureId = entry.ResolvedPictureId,
+        isAccessible = entry.IsAccessible,
+        sortOrder = (long?)entry.Id,
+        releaseDate = (DateTime?)null,
+        plot = (string?)null,
+        episodeNumber = entry.EpisodeNumber
+    };
 
     /// <summary>
     /// Merkt einen per hide/skip entfernten Weiterschauen-Eintrag aus dem
@@ -1301,4 +1468,72 @@ public sealed class MockVideoServer : IDisposable
         await stream.WriteAsync(Encoding.ASCII.GetBytes(head.ToString()), cancellationToken);
         await stream.WriteAsync(response.Body, cancellationToken);
     }
+}
+
+/// <summary>Opt-in-Playlist des Mock-Servers (Listen-, Detail-, Eintrags- und Cover-Antworten).</summary>
+public sealed class MockPlaylist
+{
+    /// <summary>Id der Playlist.</summary>
+    public long Id { get; set; }
+
+    /// <summary>Name der Playlist.</summary>
+    public string Name { get; set; } = string.Empty;
+
+    /// <summary>Beschreibung der Playlist; <c>null</c> = keine.</summary>
+    public string? Description { get; set; }
+
+    /// <summary>Sortiermodus (<c>ByReleaseDate</c> oder <c>Manual</c>).</summary>
+    public string SortMode { get; set; } = "Manual";
+
+    /// <summary>Id des Cover-Bilds (steuert den Cover-Abruf der App); <c>null</c> = kein Cover.</summary>
+    public long? CoverPictureId { get; set; }
+
+    /// <summary>Bilddaten, die <c>GET /api/playlists/{id}/cover</c> ausliefert; <c>null</c> = 404.</summary>
+    public byte[]? CoverPng { get; set; }
+
+    /// <summary>Anzeige-Genres der Playlist (Namen).</summary>
+    public string[] Genres { get; set; } = [];
+
+    /// <summary>Die Playlist erscheint in <c>GET /api/playlists</c> (eigene Playlists).</summary>
+    public bool IsOwner { get; set; } = true;
+
+    /// <summary>Die Playlist erscheint in <c>GET /api/playlists/public</c>.</summary>
+    public bool IsPublic { get; set; }
+
+    /// <summary>Einträge der Playlist — die Server-Reihenfolge (wird nicht sortiert).</summary>
+    public List<MockPlaylistEntry> Entries { get; } = [];
+}
+
+/// <summary>Opt-in-Eintrag einer <see cref="MockPlaylist"/>.</summary>
+public sealed class MockPlaylistEntry
+{
+    /// <summary>Id des Eintrags.</summary>
+    public long Id { get; set; }
+
+    /// <summary>Medientyp der Referenz (Server-Konvention, z. B. <c>Movie</c>, <c>TVShowEpisode</c>).</summary>
+    public string MediaType { get; set; } = "Movie";
+
+    /// <summary>Id des referenzierten Mediums.</summary>
+    public long MediaId { get; set; }
+
+    /// <summary>Anzeigetitel des Mediums.</summary>
+    public string Title { get; set; } = string.Empty;
+
+    /// <summary>Medientyp des Elternelements; <c>null</c> = kein Elternkontext.</summary>
+    public string? ParentMediaType { get; set; }
+
+    /// <summary>Id des Elternelements; <c>null</c> = kein Elternkontext.</summary>
+    public long? ParentMediaId { get; set; }
+
+    /// <summary>Titel des Elternelements; <c>null</c> = kein Elternkontext.</summary>
+    public string? ParentTitle { get; set; }
+
+    /// <summary>Serverseitig aufgelöste Bild-Id des Eintrags; <c>null</c> = kein Bild.</summary>
+    public long? ResolvedPictureId { get; set; }
+
+    /// <summary>Episodennummer bei Episoden-Einträgen; <c>null</c> sonst.</summary>
+    public int? EpisodeNumber { get; set; }
+
+    /// <summary>Der Benutzer hat Zugriff auf das Medium.</summary>
+    public bool IsAccessible { get; set; } = true;
 }

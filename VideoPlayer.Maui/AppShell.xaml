@@ -53,6 +53,12 @@
         </FlyoutItem.Icon>
         <ShellContent Title="Favoriten" ContentTemplate="{DataTemplate pages:FavoritesPage}" />
     </FlyoutItem>
+    <FlyoutItem Title="Playlists" Route="playlists">
+        <FlyoutItem.Icon>
+            <FontImageSource FontFamily="MaterialIcons" Glyph="&#xe05f;" Color="{StaticResource VpTextMuted}" />
+        </FlyoutItem.Icon>
+        <ShellContent Title="Playlists" ContentTemplate="{DataTemplate pages:PlaylistsPage}" />
+    </FlyoutItem>
     <FlyoutItem Title="Downloads" Route="downloads">
         <FlyoutItem.Icon>
             <FontImageSource FontFamily="MaterialIcons" Glyph="&#xe2c4;" Color="{StaticResource VpTextMuted}" />
