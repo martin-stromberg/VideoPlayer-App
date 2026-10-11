@@ -17,8 +17,8 @@
 - [x] Planungscommit (c1dd7ee)
 - [x] Entwicklungsschritte-Tracking (`steps.md`, `status.html`)
 - [x] Entwicklungsschleife (8/8 Schritte: lifecycle, Abnahme, Merge)
-- [ ] Aufräumen (Projektverzeichnis entfernt)
-- [ ] Abschlusscommit
+- [x] Aufräumen (Projektverzeichnis entfernt)
+- [x] Abschlusscommit
 
 ## Hinweise
 
