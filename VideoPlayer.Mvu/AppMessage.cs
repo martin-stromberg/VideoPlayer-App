@@ -258,6 +258,26 @@ public sealed record MediaItemSelectedMessage(HomeMediaItem Item) : AppMessage;
 public sealed record ContinueWatchingItemSelectedMessage(HomeMediaItem Item) : AppMessage;
 
 /// <summary>
+/// Die Kontextmenü-Aktion „Ausblenden" wurde für einen Eintrag der
+/// Weiterschauen-Liste gewählt (2-s-Long-Press) — der Eintrag soll über
+/// <c>api/continue-watching/hide</c> ausgeblendet bzw. offline lokal aus
+/// dem Cache-Eintrag entfernt werden.
+/// </summary>
+/// <param name="Item">Der betroffene Weiterschauen-Eintrag.</param>
+/// <returns>Nachricht für die Ausblenden-Anforderung.</returns>
+public sealed record ContinueWatchingHideRequestedMessage(HomeMediaItem Item) : AppMessage;
+
+/// <summary>
+/// Die Kontextmenü-Aktion „Überspringen" wurde für einen Eintrag der
+/// Weiterschauen-Liste gewählt (2-s-Long-Press) — der Eintrag soll über
+/// <c>api/continue-watching/skip</c> übersprungen bzw. offline lokal aus
+/// dem Cache-Eintrag entfernt werden.
+/// </summary>
+/// <param name="Item">Der betroffene Weiterschauen-Eintrag.</param>
+/// <returns>Nachricht für die Überspringen-Anforderung.</returns>
+public sealed record ContinueWatchingSkipRequestedMessage(HomeMediaItem Item) : AppMessage;
+
+/// <summary>
 /// Die Folge-Episoden eines direkt aus der Weiterschauen-Liste
 /// gestarteten Mediums wurden geladen (Serienkontext ohne
 /// Detailseiten-Navigation); das Update übernimmt sie nur, wenn der

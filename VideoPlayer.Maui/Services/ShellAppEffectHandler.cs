@@ -148,6 +148,12 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
             case SyncContinueWatchingEffect:
                 await RunPartialSyncAsync(s => s.SyncContinueWatchingAsync(cancellationToken));
                 break;
+            case HideContinueWatchingEntryEffect hide:
+                await MutateContinueWatchingAsync(s => s.HideAsync(hide.MediaType, hide.MediaId, cancellationToken));
+                break;
+            case SkipContinueWatchingEntryEffect skip:
+                await MutateContinueWatchingAsync(s => s.SkipAsync(skip.MediaType, skip.MediaId, cancellationToken));
+                break;
             case SyncFavoritesEffect:
                 await RunPartialSyncAsync(s => s.SyncFavoritesAsync(cancellationToken));
                 break;
@@ -409,6 +415,37 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
         // Alle Teil-Synchronisationen betreffen Startseiten-Listen — die
         // Anzeige lädt danach den (ggf. unveränderten) Cache-Stand neu.
         await DispatchMessageAsync(new CachedListsChangedMessage());
+    }
+
+    /// <summary>
+    /// Weiterschauen-Kontextmenü-Mutation (Ausblenden/Überspringen):
+    /// führt den Server-Aufruf samt Cache-Erneuerung bzw. das lokale
+    /// Offline-Entfernen aus und meldet bei Erfolg die Cache-Änderung —
+    /// die Startseite lädt den neuen Stand ohne manuelle Aktualisierung
+    /// nach. Ein Fehlschlag lässt die Liste unverändert (der Eintrag
+    /// bleibt sichtbar).
+    /// </summary>
+    /// <param name="mutate">Die Mutation auf dem aufgelösten <see cref="ContinueWatchingMutationService"/>.</param>
+    /// <returns>Eine abgeschlossene Aufgabe nach der Mutation.</returns>
+    private async Task MutateContinueWatchingAsync(Func<ContinueWatchingMutationService, Task<bool>> mutate)
+    {
+        var success = false;
+        try
+        {
+            success = await mutate(services.GetRequiredService<ContinueWatchingMutationService>());
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[ShellAppEffectHandler] Weiterschauen-Mutation fehlgeschlagen: {ex.Message}");
+        }
+
+        if (success)
+        {
+            // Die Cache-Kopie wurde aktualisiert (Server-Sync bzw.
+            // lokales Entfernen) — die Weiterschauen-Liste lädt den
+            // neuen Stand ohne manuelle Aktualisierung nach.
+            await DispatchMessageAsync(new CachedListsChangedMessage());
+        }
     }
 
     private async Task LoadHomeListsAsync()

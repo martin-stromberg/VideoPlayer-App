@@ -108,4 +108,42 @@ public abstract class E2ETestBase
         }
         Assert.Equal(server.BaseAddress, model.ActiveServerAddress);
     }
+
+    /// <summary>
+    /// Führt den Einrichtungsfluss bis zur befüllten Startseite aus
+    /// (Weiterschauen-Eintrag sichtbar) — gemeinsamer Einstieg der
+    /// Weiterschauen-Szenarien.
+    /// </summary>
+    /// <param name="app">Die laufende App-Instanz.</param>
+    /// <param name="server">Der Mock-Server.</param>
+    /// <param name="expectedTitle">Titel des erwarteten Weiterschauen-Eintrags (Diagnose).</param>
+    /// <returns>Eine abgeschlossene Aufgabe nach Erreichen der Startseite.</returns>
+    protected static async Task LoginOnHomeAsync(AppInstance app, MockVideoServer server, string expectedTitle)
+    {
+        await ConnectToPairingRequiredAsync(app, server);
+        await PairAsync(app, server);
+        await LoginAsync(app, server);
+
+        await app.DevApi.WaitForModelAsync(
+            m => m.ContinueWatchingCount > 0,
+            TimeSpan.FromSeconds(30),
+            $"Karussell „Weiterschauen\" befüllt (erwartet „{expectedTitle}\")", Ct);
+    }
+
+    /// <summary>Ermittelt den Index eines Weiterschauen-Eintrags anhand seines Titels im Karussell-Tree.</summary>
+    /// <param name="app">Die laufende App-Instanz.</param>
+    /// <param name="title">Der gesuchte Eintragstitel.</param>
+    /// <returns>Der Index des Eintrags im Karussell.</returns>
+    protected static async Task<int> ContinueWatchingIndexAsync(AppInstance app, string title)
+    {
+        var tree = await app.DevApi.GetTreeAsync(Ct);
+        var carousel = tree.FindByAutomationId("ContinueWatchingCarousel");
+        Assert.NotNull(carousel);
+        Assert.NotNull(carousel.Items);
+        var index = carousel.Items.FindIndex(i => i.Text == title);
+        Assert.True(index >= 0,
+            $"'{title}' fehlt im Karussell: " +
+            string.Join(", ", carousel.Items.Select(i => i.Text)));
+        return index;
+    }
 }

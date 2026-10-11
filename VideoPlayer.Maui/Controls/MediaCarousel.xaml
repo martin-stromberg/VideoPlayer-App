@@ -38,6 +38,14 @@
                                 </Border.Shadow>
                                 <Border.GestureRecognizers>
                                     <TapGestureRecognizer Tapped="OnItemTapped" />
+                                    <!-- Long-Press (2 s) für das Kontextmenü:
+                                         nur aktiv, wenn die Seite
+                                         LongPressEnabled setzt — kurzer
+                                         Tap bleibt dem TapGestureRecognizer
+                                         vorbehalten. -->
+                                    <PointerGestureRecognizer PointerPressed="OnItemPointerPressed"
+                                                              PointerReleased="OnItemPointerEnded"
+                                                              PointerExited="OnItemPointerEnded" />
                                 </Border.GestureRecognizers>
                                 <Grid>
                                     <!-- Titel-Fallback: liegt unter dem Bild und bleibt sichtbar,

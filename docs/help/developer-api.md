@@ -62,6 +62,7 @@ unter der Windows-Automation keine Listeneinträge beider Formen sieht.
 ```json
 {"automationId":"ConnectButton"}
 {"automationId":"KnownServersView","itemIndex":0}
+{"automationId":"ContinueWatchingCarousel","itemIndex":0,"gesture":"longpress"}
 ```
 
 Findet das Element per AutomationId und löst auf dem UI-Thread das
@@ -79,6 +80,16 @@ wird per Reflection ausgelöst, exakt der Aufruf, den der
 Plattform-Gesture-Manager bei einem Fingertipp macht (`Tapped` feuert
 mit `sender` = Eintrags-View). Beide Pfade sind der koordinatenfreie
 Listenpfad für Einträge, die Windows-UIA nicht zuverlässig adressiert.
+
+Das optionale Feld `gesture` wählt bei `itemIndex` die Geste der
+Item-Auswahl: `"tap"` (Standard) wie beschrieben, `"longpress"` ruft
+stattdessen die Methode `SendItemLongPressed(int)` des Zielelements
+per Reflection auf — die App-seitige Konvention, mit der ein Element
+seine Long-Press-Ereigniskette selbst auslöst (dieselbe Kette wie das
+tatsächliche 2-s-Halten, z. B. das Kontextmenü der
+Weiterschauen-Liste). Unbekannte Werte werden mit `400` und einem
+deutschen Fehlertext abgelehnt; Elemente ohne
+`SendItemLongPressed`-Konvention ebenso.
 
 Antworten: `200 {"invoked":true,…}`, `404` Element nicht gefunden,
 `400` Element nicht auslösbar, `itemIndex` auf Element ohne

@@ -62,6 +62,9 @@ public sealed class MauiDevApiService : IDisposable
     }
 
     /// <summary>Liefert den logischen Elementbaum der aktuellen Seite.</summary>
+    /// <param name="request">Die eingehende Anfrage.</param>
+    /// <param name="cancellationToken">Abbruchtoken.</param>
+    /// <returns>Die Antwort mit dem Baum oder einer Fehlermeldung.</returns>
     private async Task<DevApiResponse> HandleTreeAsync(DevApiRequest request, CancellationToken cancellationToken)
     {
         var node = await MainThread.InvokeOnMainThreadAsync(() =>
@@ -75,6 +78,9 @@ public sealed class MauiDevApiService : IDisposable
     }
 
     /// <summary>Löst das Clicked-Äquivalent des Elements mit der angegebenen AutomationId aus.</summary>
+    /// <param name="request">Die eingehende Anfrage mit dem Invoke-Body.</param>
+    /// <param name="cancellationToken">Abbruchtoken.</param>
+    /// <returns>Die Antwort mit dem Auslöseergebnis oder einer Fehlermeldung.</returns>
     private async Task<DevApiResponse> HandleInvokeAsync(DevApiRequest request, CancellationToken cancellationToken)
     {
         if (!request.TryGetJsonBody<InvokeBody>(out var body, out var bodyError)
@@ -83,10 +89,13 @@ public sealed class MauiDevApiService : IDisposable
             return DevApiResponse.Error(400, bodyError ?? "Der Body benötigt das Feld 'automationId'.");
         }
 
-        return await MainThread.InvokeOnMainThreadAsync(() => InvokeOnPage(body.AutomationId, body.ItemIndex));
+        return await MainThread.InvokeOnMainThreadAsync(() => InvokeOnPage(body.AutomationId, body.ItemIndex, body.Gesture));
     }
 
     /// <summary>Setzt den Text des Eingabefelds mit der angegebenen AutomationId.</summary>
+    /// <param name="request">Die eingehende Anfrage mit dem Set-Text-Body.</param>
+    /// <param name="cancellationToken">Abbruchtoken.</param>
+    /// <returns>Die Antwort mit dem Ergebnis oder einer Fehlermeldung.</returns>
     private async Task<DevApiResponse> HandleSetTextAsync(DevApiRequest request, CancellationToken cancellationToken)
     {
         if (!request.TryGetJsonBody<SetTextBody>(out var body, out var bodyError)
@@ -99,7 +108,7 @@ public sealed class MauiDevApiService : IDisposable
         return await MainThread.InvokeOnMainThreadAsync(() => SetTextOnPage(body.AutomationId, body.Text));
     }
 
-    private DevApiResponse InvokeOnPage(string automationId, int? itemIndex)
+    private DevApiResponse InvokeOnPage(string automationId, int? itemIndex, string? gesture)
     {
         var element = FindElement(automationId, out var pageMissing);
         if (element is null)
@@ -113,15 +122,16 @@ public sealed class MauiDevApiService : IDisposable
         // Container (UIA-Lücke: Einträge fehlen im Automation-Baum):
         // SelectedItem setzen feuert SelectionChanged bzw. der Tap-
         // Recognizer des Eintrags wird ausgelöst — dieselbe
-        // Ereigniskette wie ein Fingertipp auf die Zeile.
+        // Ereigniskette wie ein Fingertipp auf die Zeile. Die optionale
+        // Geste "longpress" löst stattdessen die Long-Press-Auswahl aus.
         if (itemIndex is not null)
         {
-            if (!DevApiVisualTree.TrySelectItem(element, itemIndex.Value, out var selectError))
+            if (!DevApiVisualTree.TrySelectItem(element, itemIndex.Value, gesture, out var selectError))
             {
                 return DevApiResponse.Error(400, selectError!);
             }
 
-            return DevApiResponse.Json(new { invoked = true, automationId, itemIndex, type = element.GetType().Name });
+            return DevApiResponse.Json(new { invoked = true, automationId, itemIndex, gesture, type = element.GetType().Name });
         }
 
         if (!DevApiVisualTree.TryInvoke(element, out var error))
@@ -158,6 +168,7 @@ public sealed class MauiDevApiService : IDisposable
     }
 
     /// <summary>Die aktuell angezeigte Seite des ersten Fensters (LoadingPage oder AppShell).</summary>
+    /// <returns>Die aktuelle Seite oder <c>null</c>, wenn kein Fenster existiert.</returns>
     private static Page? CurrentPage() =>
         Application.Current?.Windows.OfType<Window>().FirstOrDefault()?.Page;
 
@@ -167,6 +178,9 @@ public sealed class MauiDevApiService : IDisposable
 
         /// <summary>Optionaler Index eines Listeneintrags (CollectionView oder BindableLayout-Container) zur Auswahl.</summary>
         public int? ItemIndex { get; set; }
+
+        /// <summary>Optionale Geste der Item-Auswahl (<c>"tap"</c> = Standard, <c>"longpress"</c> = 2-s-Halte-Äquivalent).</summary>
+        public string? Gesture { get; set; }
     }
 
     private sealed class SetTextBody

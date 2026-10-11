@@ -132,6 +132,34 @@ public sealed record RunFullSyncEffect : AppEffect;
 /// <summary>Weiterschauen-Liste vom Server neu laden und cachen.</summary>
 public sealed record SyncContinueWatchingEffect : AppEffect;
 
+/// <summary>
+/// Einen Weiterschauen-Eintrag ausblenden: online über
+/// <c>api/continue-watching/hide</c> mit anschließender Erneuerung der
+/// Cache-Kopie, offline lokal aus dem <c>cached_lists</c>-Eintrag
+/// <c>continue_watching</c> entfernen (Ergebnis bei Erfolg:
+/// <c>CachedListsChangedMessage</c>).
+/// </summary>
+/// <param name="MediaType">Medientyp des Eintrags (Server-Konvention der Weiterschauen-Liste).</param>
+/// <param name="MediaId">Id des Mediums.</param>
+/// <returns>Effekt-Datensatz für das Ausblenden.</returns>
+public sealed record HideContinueWatchingEntryEffect(
+    string MediaType,
+    long MediaId) : AppEffect;
+
+/// <summary>
+/// Einen Weiterschauen-Eintrag überspringen: online über
+/// <c>api/continue-watching/skip</c> mit anschließender Erneuerung der
+/// Cache-Kopie, offline lokal aus dem <c>cached_lists</c>-Eintrag
+/// <c>continue_watching</c> entfernen (Ergebnis bei Erfolg:
+/// <c>CachedListsChangedMessage</c>).
+/// </summary>
+/// <param name="MediaType">Medientyp des Eintrags (Server-Konvention der Weiterschauen-Liste).</param>
+/// <param name="MediaId">Id des Mediums.</param>
+/// <returns>Effekt-Datensatz für das Überspringen.</returns>
+public sealed record SkipContinueWatchingEntryEffect(
+    string MediaType,
+    long MediaId) : AppEffect;
+
 /// <summary>Favoriten vom Server neu laden und als lokale Kopie ersetzen.</summary>
 public sealed record SyncFavoritesEffect : AppEffect;
 

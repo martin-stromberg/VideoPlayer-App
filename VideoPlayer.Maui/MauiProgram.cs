@@ -104,6 +104,9 @@ namespace VideoPlayer.Maui
             // Folgevideo-Auflösung des Weiterschauen-Direktstarts:
             // Serienkontext ohne Detailseite (Server bzw. Cache).
             builder.Services.AddSingleton<UpcomingEpisodesService>();
+            // Weiterschauen-Kontextmenü: Ausblenden/Überspringen über die
+            // Server-Endpunkte bzw. lokales Entfernen aus dem Cache.
+            builder.Services.AddSingleton<ContinueWatchingMutationService>();
 
             // Download-Verwaltung: persistente Aufträge im Download-
             // Manifest, parallele Transfers mit Quota/WLAN-Bedingung —

@@ -55,13 +55,20 @@ nicht-erreichbaren Server und dem Wiedergabestart).
   Fortsetzungsposition, `api/items/movie/{id}/stream` (`video/mp4`
   aus `Assets/testvideo.mp4`, `Accept-Ranges`/`206 Partial Content`
   auf `Range`-Requests, per `access_token`-Query authentifiziert,
-  optionaler 404-Fehlschlag) und die Fortschritts-Senke
-  `POST api/continue-watching/progress` (204).
+  optionaler 404-Fehlschlag), die Fortschritts-Senke
+  `POST api/continue-watching/progress` (204) sowie die
+  Kontextmenü-Mutationen `POST api/continue-watching/hide` und
+  `…/skip` — gemeldete `mediaType`/`mediaId`-Paare werden aus
+  Folgeantworten der Liste entfernt (`RemovedContinueWatchingKeys`,
+  `HideContinueWatchingCount`, `SkipContinueWatchingCount` als
+  Diagnose-Zähler).
 - **`UiDriver`** — AutomationId-Suche, Texteingabe per Value-Pattern,
-  Button-Invoke, Flyout-Navigation per `SelectionItem` — bewusst ohne
+  Button-Invoke, Flyout-Navigation per `SelectionItem`, Auslösung per
+  Klartext-Name (`ClickByName`: Fenster + prozessbezogene Popups, für
+  Dialog-Schaltflächen wie das `DisplayActionSheet`) — bewusst ohne
   Koordinatenklicks.
 
-## Szenarien (19 Tests)
+## Szenarien (25 Tests)
 
 - **Server-Einrichtung** (5): Erststart zeigt die Einrichtungsseite
   (inkl. `ConnectCard` im Elementbaum); ungültige Adresse →
@@ -94,6 +101,17 @@ nicht-erreichbaren Server und dem Wiedergabestart).
   (Regressionsschutz für den iOS-Absturz beim Resume-Start); sowie
   Stream-Fehlschlag (Endpunkt → 404) → `playerError` im Modell
   sichtbar statt Prozessabbruch.
+- **Weiterschauen-Direktstart** (3, `ContinueWatchingPlaybackTests`):
+  Tap auf Film-Eintrag → Wiedergabe ab Fortsetzungsposition ohne
+  Detailaufruf; Tap auf Episoden-Eintrag → Wiedergabe mit
+  Serienkontext-Auflösung und Wechsel zur Folge-Episode; Tap auf
+  Serien-Eintrag → Detailansicht statt Wiedergabe.
+- **Weiterschauen-Kontextmenü** (3, `ContinueWatchingContextMenuTests`):
+  Long-Press (`/invoke` mit `gesture:"longpress"`) öffnet das Menü mit
+  „Ausblenden"/„Überspringen" — „Ausblenden" ruft den hide-Endpunkt
+  und der Eintrag verschwindet, „Überspringen" entsprechend den
+  skip-Endpunkt, „Abbrechen" löst keinen Request aus und lässt den
+  Eintrag bestehen.
 
 ## Grenzen und Hinweise
 
