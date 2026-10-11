@@ -10,5 +10,5 @@ Branch: `task/issue-43-3ee1dbce5f284347add37dde0e222b44-folge-direkte-wiedergabe
 | 4 | Playlist-Anbindung und -Anzeige (Übersicht + Detailansicht) | Keine | `task/issue-43-3ee1dbce5f284347add37dde0e222b44-folge-direkte-wiedergabe-aus-w-schritt-4-playlist-anzeige` | Fertig |
 | 5 | Playlist-Wiedergabe und Folgevideo-Auflösung | 1, 4 | `task/issue-43-3ee1dbce5f284347add37dde0e222b44-folge-direkte-wiedergabe-aus-w-schritt-5-playlist-wiedergabe` | Fertig |
 | 6 | Playlist-Verwaltung in der App | 4 | `task/issue-43-3ee1dbce5f284347add37dde0e222b44-folge-direkte-wiedergabe-aus-w-schritt-6-playlist-verwaltung` | Fertig |
-| 7 | Download-Reihenfolge bei Playlist-Bezug | 5 | `task/issue-43-3ee1dbce5f284347add37dde0e222b44-folge-direkte-wiedergabe-aus-w-schritt-7-download-reihenfolge` | In Arbeit |
-| 8 | iOS-Bugfix: Serienansicht (Episodenliste + Staffelauswahl) | Keine | `task/issue-43-3ee1dbce5f284347add37dde0e222b44-folge-direkte-wiedergabe-aus-w-schritt-8-ios-serienansicht` | Offen |
+| 7 | Download-Reihenfolge bei Playlist-Bezug | 5 | `task/issue-43-3ee1dbce5f284347add37dde0e222b44-folge-direkte-wiedergabe-aus-w-schritt-7-download-reihenfolge` | Fertig |
+| 8 | iOS-Bugfix: Serienansicht (Episodenliste + Staffelauswahl) | Keine | `task/issue-43-3ee1dbce5f284347add37dde0e222b44-folge-direkte-wiedergabe-aus-w-schritt-8-ios-serienansicht` | In Arbeit |
