@@ -1,3 +1,4 @@
+using FlaUI.Core.AutomationElements;
 using VideoPlayer.E2E.Tests.Support;
 
 namespace VideoPlayer.E2E.Tests.Tests;
@@ -100,6 +101,48 @@ public sealed class SeriesDetailsTests : E2ETestBase
         Assert.False(app.Process.HasExited, "Die App wurde beim Staffelwechsel beendet.");
     }
 
+    /// <summary>
+    /// Regression (Abnahmebefund): Rückkehr von der Episoden-Detailseite
+    /// löst einen Reload der Serie aus — die Staffelliste wird mit
+    /// gleichen Ids, aber neuen Instanzen neu gebaut. Der Picker muss
+    /// danach die modellseitig ausgewählte Staffel anzeigen (hier die
+    /// vom Reload vorbelegte „Staffel 1") und darf nicht per
+    /// IndexOf-Auflösung auf den Platzhaltertitel „Staffel" desyncen.
+    /// </summary>
+    [Fact]
+    public async Task ReturnFromEpisodeDetails_PickerShowsSelectedSeason()
+    {
+        using var server = NewServer();
+        using var app = await StartAppAsync();
+        await LoginOnHomeAsync(app, server, ShowTitle);
+        await OpenShowDetailsAsync(app);
+
+        // Episode der ersten Staffel öffnen → Episoden-Detailseite lädt
+        // die Serie erneut (neue SeasonItem-Instanzen bei gleichen Ids).
+        await app.DevApi.InvokeAsync("EpisodesList", 0, Ct);
+        await WaitForShowRequestCountAsync(server, 2, "Episoden-Detailseite geladen");
+
+        app.Ui.GoBack();
+
+        // Die Rückkehr fordert die eigene Serien-Identität erneut an;
+        // der Reload legt die Auswahl modellseitig auf Staffel 1 fest.
+        await WaitForShowRequestCountAsync(server, 3, "Serien-Reload nach Rückkehr");
+        await app.DevApi.WaitForModelAsync(
+            m => m.MediaDetailsSelectedSeasonNumber == 1
+                && m.MediaDetailsSeasonNames != null
+                && m.MediaDetailsSeasonNames.SequenceEqual(
+                    new[] { "Staffel 1", "Staffel 2", "Staffel 3" }),
+            TimeSpan.FromSeconds(30),
+            "Modell-Auswahl nach Reload ist Staffel 1", Ct);
+
+        // Sichtbare Auswahl = Modellauswahl — nicht der
+        // Platzhaltertitel „Staffel" (SelectedIndex -1 → keine Auswahl).
+        var selected = app.Ui.FindByAutomationId("SeasonPicker").AsComboBox().SelectedItem;
+        Assert.NotNull(selected);
+        Assert.Equal("Staffel 1", selected.Name);
+        Assert.False(app.Process.HasExited, "Die App wurde bei der Rückkehr beendet.");
+    }
+
     /// <summary>Mock-Server mit dreistäffeliger Detailserie im Weiterschauen-Eintrag.</summary>
     /// <returns>Der konfigurierte Mock-Server.</returns>
     private static MockVideoServer NewServer()
@@ -159,5 +202,34 @@ public sealed class SeriesDetailsTests : E2ETestBase
         var index = await ContinueWatchingIndexAsync(app, ShowTitle);
         await app.DevApi.InvokeAsync("ContinueWatchingCarousel", index, Ct);
         app.Ui.FindByAutomationId("SeasonPicker", TimeSpan.FromSeconds(30));
+    }
+
+    /// <summary>Wartet, bis der Mock-Server die Serie so oft abgerufen hat.</summary>
+    /// <param name="server">Der Mock-Server.</param>
+    /// <param name="count">Die erwartete Mindestzahl der tvshow-Abrufe.</param>
+    /// <param name="description">Beschreibung der Wartebedingung für Fehlermeldungen.</param>
+    /// <returns>Eine abgeschlossene Aufgabe nach Erreichen der Bedingung.</returns>
+    private static async Task WaitForShowRequestCountAsync(
+        MockVideoServer server, int count, string description)
+    {
+        var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(30);
+        while (true)
+        {
+            int actual;
+            lock (server.RequestedPaths)
+            {
+                actual = server.RequestedPaths.Count(p =>
+                    p.Contains($"/api/items/tvshow/{ShowId}", StringComparison.Ordinal));
+            }
+
+            if (actual >= count)
+            {
+                return;
+            }
+
+            Assert.True(DateTime.UtcNow < deadline,
+                $"{description}: {actual}/{count} tvshow-Abrufe.");
+            await Task.Delay(200, Ct);
+        }
     }
 }

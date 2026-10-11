@@ -380,6 +380,48 @@ public sealed class UiDriver : IDisposable
         }
     }
 
+    /// <summary>
+    /// Löst die Zurück-Navigation der Shell aus: der WinUI-Back-Button
+    /// der NavigationView (sichtbar bei geschobener Seite) wird per
+    /// AutomationId/Name gesucht und per Invoke/Klick betätigt; fehlt
+    /// er, gilt Alt+Links als Systemzurück-Fallback.
+    /// </summary>
+    /// <param name="timeout">Maximale Wartezeit (Standard 15 s).</param>
+    public void GoBack(TimeSpan? timeout = null)
+    {
+        var deadline = DateTime.UtcNow + (timeout ?? TimeSpan.FromSeconds(15));
+        while (DateTime.UtcNow < deadline)
+        {
+            var element = window.FindFirstDescendant(
+                Conditions.ByAutomationId("NavigationViewBackButton"))
+                ?? window
+                    .FindAllDescendants(Conditions.ByControlType(ControlType.Button))
+                    .FirstOrDefault(b =>
+                        b.Name is "Back" or "Zurück" or "Navigate back");
+            if (element is not null)
+            {
+                if (element.Patterns.Invoke.IsSupported)
+                {
+                    element.Patterns.Invoke.Pattern.Invoke();
+                }
+                else
+                {
+                    element.Click();
+                }
+
+                return;
+            }
+
+            Thread.Sleep(200);
+        }
+
+        // Fallback: Alt+Links (Systemzurück der Shell-Navigation).
+        FlaUI.Core.Input.Keyboard.Press(FlaUI.Core.WindowsAPI.VirtualKeyShort.ALT);
+        FlaUI.Core.Input.Keyboard.Press(FlaUI.Core.WindowsAPI.VirtualKeyShort.LEFT);
+        FlaUI.Core.Input.Keyboard.Release(FlaUI.Core.WindowsAPI.VirtualKeyShort.LEFT);
+        FlaUI.Core.Input.Keyboard.Release(FlaUI.Core.WindowsAPI.VirtualKeyShort.ALT);
+    }
+
     /// <summary>Sucht ein Element per Anzeigename (einmalig, ohne Retry).</summary>
     /// <param name="name">Der gesuchte Name.</param>
     /// <returns>Das Element oder <c>null</c>.</returns>

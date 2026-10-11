@@ -161,10 +161,19 @@ public class MediaDetailsPageContractTests
         var code = Read("VideoPlayer.Maui", "Pages", "MediaDetailsPage.xaml.cs");
 
         var update = MethodBody(code, "private void UpdateSeasonSection(MediaDetailsView details)");
-        // Kein ItemsSource-Neuaufbau je Model-Tick — Id-Sequenz-Vergleich.
-        Assert.Contains("SeasonIdsEqual", update, StringComparison.Ordinal);
+        // Kein ItemsSource-Neuaufbau je Model-Tick — Änderungsvergleich
+        // der Staffelliste.
+        Assert.Contains("SeasonsEqual", update, StringComparison.Ordinal);
         Assert.Contains("appliedSeasonItems", update, StringComparison.Ordinal);
         Assert.Contains("BindableLayout.SetItemsSource(EpisodesList", update, StringComparison.Ordinal);
+
+        var compare = MethodBody(code, "private static bool SeasonsEqual");
+        // Record-Gleichheit (nicht nur Ids): In-place-Neubauten der
+        // Staffelliste (z. B. MarkEpisodeWatchedInDetails, Reload)
+        // müssen als Änderung erkannt werden — sonst verliert der
+        // Picker per IndexOf-Auflösung die sichtbare Auswahl.
+        Assert.Contains("SequenceEqual", compare, StringComparison.Ordinal);
+        Assert.DoesNotContain(".Id", compare, StringComparison.Ordinal);
 
         var handler = MethodBody(code, "private void OnSeasonSelected(object? sender, EventArgs e)");
         // Echo-Guard: kein Dispatch für die bereits angewendete Modell-Auswahl.

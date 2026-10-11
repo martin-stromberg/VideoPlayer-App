@@ -245,7 +245,14 @@ public partial class MediaDetailsPage : ContentPage
             // ein Picker-Neuaufbau je Model-Tick destabilisiert die
             // Anzeige (iOS: verzögerte SelectedIndexChanged-Echos
             // setzen die Auswahl zurück und ordnen Einträge neu).
-            if (appliedSeasonItems is null || !SeasonIdsEqual(appliedSeasonItems, details.Seasons))
+            // Der Vergleich muss die Record-Gleichheit der Einträge
+            // einbeziehen — ein In-place-Neubau der Staffelliste mit
+            // gleichen Ids (z. B. MarkEpisodeWatchedInDetails oder der
+            // Reload nach der Rückkehr von der Episoden-Detailseite)
+            // muss die neuen Instanzen in den Picker bringen, sonst
+            // verbliebe ItemsSource veraltet und SelectedItem löste
+            // per IndexOf auf -1 auf (sichtbarer Auswahl-Desync).
+            if (appliedSeasonItems is null || !SeasonsEqual(appliedSeasonItems, details.Seasons))
             {
                 appliedSeasonItems = details.Seasons.ToList();
                 SeasonPicker.ItemsSource = appliedSeasonItems;
@@ -271,12 +278,14 @@ public partial class MediaDetailsPage : ContentPage
         }
     }
 
-    /// <summary>Vergleicht zwei Staffellisten anhand der Id-Sequenz.</summary>
+    /// <summary>Vergleicht zwei Staffellisten elementweise per Record-Gleichheit
+    /// (Id, Nummer, Name, Bild, Jahr und die Episoden-Listenreferenz) — nicht
+    /// nur die Ids, damit In-place-Neubauten als Änderung erkannt werden.</summary>
     /// <param name="a">Die bisher dem Picker zugewiesene Staffelliste.</param>
     /// <param name="b">Die Staffelliste des aktuellen Modells.</param>
-    /// <returns><c>true</c>, wenn beide Listen dieselben Staffel-Ids in gleicher Reihenfolge enthalten.</returns>
-    private static bool SeasonIdsEqual(IReadOnlyList<SeasonItem> a, IReadOnlyList<SeasonItem> b) =>
-        a.Count == b.Count && a.Zip(b).All(pair => pair.First.Id == pair.Second.Id);
+    /// <returns><c>true</c>, wenn beide Listen gleichwertige Staffeln in gleicher Reihenfolge enthalten.</returns>
+    private static bool SeasonsEqual(IReadOnlyList<SeasonItem> a, IReadOnlyList<SeasonItem> b) =>
+        a.SequenceEqual(b);
 
     private void UpdateCollectionSection(MediaDetailsView details)
     {
