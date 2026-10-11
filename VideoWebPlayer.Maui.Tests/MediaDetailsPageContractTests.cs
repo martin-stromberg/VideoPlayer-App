@@ -70,6 +70,47 @@ public class MediaDetailsPageContractTests
         Assert.Contains("DownloadNoticeLabel", xaml, StringComparison.Ordinal);
     }
 
+    /// <summary>Prüft MediaDetailsPage: fordert die eigene Identität erneut
+    /// an, wenn der globale Detail-Slot inzwischen ein anderes Medium
+    /// beschreibt (Rückkehr von einer geschobenen Episoden-Detailseite —
+    /// ohne Wiederanfrage bliebe die Serienansicht leer/schwarz).</summary>
+    [Fact]
+    public void MediaDetailsPage_Reappearing_RequestsOwnIdentityAfterForeignDetails()
+    {
+        var code = Read("VideoPlayer.Maui", "Pages", "MediaDetailsPage.xaml.cs");
+
+        var onAppearing = MethodBody(code, "protected override void OnAppearing()");
+        // Identitätsvergleich gegen den eigenen Routen-Parameter …
+        Assert.Contains("state.MediaType", onAppearing, StringComparison.Ordinal);
+        Assert.Contains("state.MediaId", onAppearing, StringComparison.Ordinal);
+        Assert.Contains("mediaId", onAppearing, StringComparison.Ordinal);
+        // … und erneute Anforderung bei abweichender Identität.
+        Assert.Contains("!requested || !identityMatches", onAppearing, StringComparison.Ordinal);
+        Assert.Contains("MediaDetailsRequestedMessage", onAppearing, StringComparison.Ordinal);
+    }
+
+    /// <summary>Extrahiert den Methodenrumpf einer Signatur aus dem Quelltext.</summary>
+    /// <param name="code">Der Quelltext der Datei.</param>
+    /// <param name="signature">Die Methodensignatur bis zur öffnenden Klammer.</param>
+    /// <returns>Der Methodenrumpf inklusive Signatur.</returns>
+    private static string MethodBody(string code, string signature)
+    {
+        var start = code.IndexOf(signature, StringComparison.Ordinal);
+        Assert.True(start >= 0, $"Methode '{signature}' nicht gefunden.");
+        var open = code.IndexOf('{', start);
+        var depth = 0;
+        for (var i = open; i < code.Length; i++)
+        {
+            if (code[i] == '{') depth++;
+            else if (code[i] == '}' && --depth == 0)
+            {
+                return code[start..(i + 1)];
+            }
+        }
+
+        throw new InvalidOperationException($"Rumpf von '{signature}' nicht gefunden.");
+    }
+
     /// <summary>Prüft MediaDetailsPage-Code: bindet die Kopfdaten des Views und koppelt die Höhe an die Breite.</summary>
     [Fact]
     public void MediaDetailsPage_CodeBehind_HeaderBindingAndResponsiveHeight()

@@ -83,21 +83,19 @@
                                      Padding="24,0,24,28"
                                      Spacing="10"
                                      MaximumWidthRequest="820">
-                    <Border StrokeShape="RoundRectangle 4"
-                            Stroke="{StaticResource VpBorder}"
-                            BackgroundColor="{StaticResource VpOverlay}"
-                            Padding="10,4"
-                            HorizontalOptions="Start">
+                    <Border Style="{StaticResource KickerChip}">
                         <Label x:Name="HeroKicker"
                                AutomationId="HeroKicker"
                                Text="PRIVATE MEDIA LIBRARY"
                                FontSize="11"
+                               FontFamily="InterSemiBold"
+                               CharacterSpacing="1.6"
                                TextColor="{StaticResource VpText}" />
                     </Border>
                     <Label x:Name="HeroTitle"
                            AutomationId="HeroTitle"
                            Text="{Binding Model.HeroTitle}"
-                           FontSize="32"
+                           FontSize="34"
                            FontAttributes="Bold"
                            TextColor="{StaticResource VpText}" />
                     <Label x:Name="HeroDescription"
@@ -111,35 +109,31 @@
             <!-- Hinweis bei fehlender Verbindung: die gecachten Inhalte
                  bleiben trotzdem sichtbar. -->
             <Border x:Name="OfflineBanner"
-                    Margin="20,0"
-                    Padding="12,8"
-                    StrokeShape="RoundRectangle 8"
-                    Stroke="{StaticResource VpBorderStrong}"
-                    BackgroundColor="{StaticResource VpSurfaceHigh}"
+                    Margin="24,0"
+                    Style="{StaticResource Banner}"
                     IsVisible="False">
                 <Label Text="Offline-Modus – zwischengespeicherte Inhalte werden angezeigt. Neue Inhalte, Quellen und Profildaten sind nicht verfügbar."
                        TextColor="{StaticResource VpText}"
-                       FontAttributes="Bold" />
+                       FontFamily="InterMedium" />
             </Border>
 
             <!-- Hinweis der Ablage-Wiederherstellung: beschädigte lokale
                  Daten wurden neu initialisiert. -->
             <Border x:Name="StorageNoticeBanner"
-                    Margin="20,0"
-                    Padding="12,8"
-                    StrokeShape="RoundRectangle 8"
-                    Stroke="{StaticResource VpBorderStrong}"
-                    BackgroundColor="{StaticResource VpSurfaceHigh}"
+                    Margin="24,0"
+                    Style="{StaticResource Banner}"
                     IsVisible="False">
                 <Label x:Name="StorageNoticeLabel"
                        Text="{Binding Model.StorageNotice}"
                        TextColor="{StaticResource VpText}"
-                       FontAttributes="Bold" />
+                       FontFamily="InterMedium" />
             </Border>
 
             <!-- Leerer Zustand: noch keine gecachten oder synchronisierten Inhalte. -->
             <Label Text="Noch keine Inhalte vorhanden. Sobald ein Server verbunden ist, erscheinen hier deine Medien."
-                   Padding="20,0"
+                   Style="{StaticResource Caption}"
+                   FontSize="14"
+                   Padding="24,0"
                    IsVisible="False">
                 <Label.Triggers>
                     <DataTrigger TargetType="Label"
@@ -163,8 +157,8 @@
 
             <Label x:Name="ServerStatusLabel"
                    Text="{Binding Model.ServerHealthText}"
-                   FontSize="12"
-                   Padding="20,0" />
+                   Style="{StaticResource Caption}"
+                   Padding="24,0" />
         </VerticalStackLayout>
     </ScrollView>
 </ContentPage>

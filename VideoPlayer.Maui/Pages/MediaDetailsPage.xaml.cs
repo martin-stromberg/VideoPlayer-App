@@ -87,10 +87,18 @@ public partial class MediaDetailsPage : ContentPage
         mvuHost.ModelChanged -= OnModelChanged;
         mvuHost.ModelChanged += OnModelChanged;
         UpdateUi(mvuHost.Model);
-        // Nur einmal pro Seiteninstanz anfragen — Details laden bei jeder
-        // Rückkehr neu anzufordern würde Staffel-Vorwahl und Favoriten-
-        // Anzeige zurücksetzen.
-        if (!requested && mediaId > 0 && !string.IsNullOrWhiteSpace(mediaType))
+        // Anfrage nur einmal pro Seiteninstanz — Details bei jeder
+        // Rückkehr neu zu laden würde Staffel-Vorwahl und Favoriten-
+        // Anzeige zurücksetzen. Ausnahme: der globale Detail-Slot
+        // beschreibt inzwischen ein anderes Medium — die Rückkehr von
+        // einer geschobenen Detailseite (z. B. Episode → Serie) muss
+        // die eigene Identität wieder anfordern, sonst bliebe die
+        // Seite leer.
+        var state = mvuHost.Model.MediaDetails;
+        var ownType = MediaTypeNames.Normalize(mediaType);
+        var identityMatches = string.Equals(state.MediaType, ownType, StringComparison.Ordinal)
+            && state.MediaId == mediaId;
+        if ((!requested || !identityMatches) && mediaId > 0 && !string.IsNullOrWhiteSpace(mediaType))
         {
             requested = true;
             _ = mvuHost.DispatchAsync(new MediaDetailsRequestedMessage(

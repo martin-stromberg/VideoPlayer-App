@@ -7,17 +7,20 @@
              x:Name="SourceOverviewRoot"
              x:DataType="mvu:MvuHost">
 
-    <Grid Padding="12"
+    <Grid Padding="16"
           RowDefinitions="Auto,Auto,Auto,Auto,*"
-          RowSpacing="10">
+          RowSpacing="12">
 
-        <!-- Suchfeld: Abschicken über Return/Suchen-Taste -->
-        <SearchBar x:Name="MediaSearchBar"
-                   Grid.Row="0"
-                   Placeholder="Suchen"
-                   SearchButtonPressed="OnSearchButtonPressed" />
+        <!-- Suchfeld in gefülltem Eingaberahmen: Abschicken über
+             Return/Suchen-Taste -->
+        <Border Grid.Row="0" Style="{StaticResource InputFrame}">
+            <SearchBar x:Name="MediaSearchBar"
+                       Placeholder="Suchen"
+                       SearchButtonPressed="OnSearchButtonPressed" />
+        </Border>
 
-        <!-- Genre-Leiste: horizontal, „Alle" als erster Eintrag -->
+        <!-- Genre-Leiste: horizontal, „Alle" als erster Eintrag —
+             Auswahl als getönte Pill statt Vollfläche. -->
         <CollectionView x:Name="GenresCollection"
                         Grid.Row="1"
                         ItemsSource="{Binding Model.SourceBrowser.Genres}"
@@ -28,27 +31,27 @@
             </CollectionView.ItemsLayout>
             <CollectionView.ItemTemplate>
                 <DataTemplate x:DataType="mvu:SourceGenreItem">
-                    <Border Padding="12,6"
-                            StrokeShape="RoundRectangle 999"
-                            BackgroundColor="{StaticResource VpSurface}">
-                        <Label Text="{Binding Name}"
-                               FontSize="13"
-                               TextColor="{StaticResource VpPrimarySoft}" />
+                    <Border Style="{StaticResource Chip}">
                         <Border.Triggers>
                             <DataTrigger TargetType="Border"
                                          Binding="{Binding IsSelected}"
                                          Value="True">
-                                <Setter Property="BackgroundColor" Value="{StaticResource VpPrimary}" />
+                                <Setter Property="BackgroundColor" Value="{StaticResource VpPrimaryTint}" />
+                                <Setter Property="Stroke" Value="Transparent" />
                             </DataTrigger>
                         </Border.Triggers>
-                        <Label.Triggers>
-                            <DataTrigger TargetType="Label"
-                                         Binding="{Binding IsSelected}"
-                                         Value="True">
-                                <Setter Property="TextColor" Value="{StaticResource VpText}" />
-                                <Setter Property="FontAttributes" Value="Bold" />
-                            </DataTrigger>
-                        </Label.Triggers>
+                        <Label Text="{Binding Name}"
+                               FontSize="13"
+                               TextColor="{StaticResource VpTextMuted}">
+                            <Label.Triggers>
+                                <DataTrigger TargetType="Label"
+                                             Binding="{Binding IsSelected}"
+                                             Value="True">
+                                    <Setter Property="TextColor" Value="{StaticResource VpPrimarySoft}" />
+                                    <Setter Property="FontFamily" Value="InterSemiBold" />
+                                </DataTrigger>
+                            </Label.Triggers>
+                        </Label>
                     </Border>
                 </DataTemplate>
             </CollectionView.ItemTemplate>
@@ -63,10 +66,11 @@
         <!-- Fehler beim Erstladen: Meldung + erneut versuchen -->
         <VerticalStackLayout x:Name="ErrorPanel"
                              Grid.Row="2"
-                             Spacing="8"
+                             Spacing="10"
                              IsVisible="False">
-            <Label x:Name="ErrorLabel" TextColor="{StaticResource VpDanger}" />
+            <Label x:Name="ErrorLabel" Style="{StaticResource ErrorText}" />
             <Button Text="Erneut versuchen"
+                    Style="{StaticResource SecondaryButton}"
                     Clicked="OnRetryClicked"
                     HorizontalOptions="Start" />
         </VerticalStackLayout>
@@ -74,9 +78,12 @@
         <Label x:Name="EmptyLabel"
                Grid.Row="2"
                Text="Keine Einträge gefunden."
+               Style="{StaticResource Caption}"
+               FontSize="14"
                IsVisible="False" />
 
-        <!-- Medien-Raster mit seitenweisem Nachladen -->
+        <!-- Medien-Raster mit seitenweisem Nachladen: Posterkarten mit
+             Rundung und Schatten, Titel darunter. -->
         <CollectionView x:Name="ItemsCollection"
                         Grid.Row="4"
                         ItemsSource="{Binding Model.SourceBrowser.Items}"
@@ -85,17 +92,27 @@
                         RemainingItemsThreshold="6"
                         RemainingItemsThresholdReached="OnRemainingItemsThresholdReached">
             <CollectionView.ItemsLayout>
-                <GridItemsLayout Orientation="Vertical" Span="3" VerticalItemSpacing="10" HorizontalItemSpacing="10" />
+                <GridItemsLayout Orientation="Vertical" Span="3" VerticalItemSpacing="14" HorizontalItemSpacing="14" />
             </CollectionView.ItemsLayout>
             <CollectionView.ItemTemplate>
                 <DataTemplate x:DataType="mvu:SourceMediaItem">
-                    <VerticalStackLayout Spacing="4">
-                        <controls:CachedPosterImage PictureId="{Binding PosterPictureId}"
-                                                    Aspect="AspectFill"
-                                                    HeightRequest="150" />
+                    <VerticalStackLayout Spacing="7">
+                        <Border Padding="0"
+                                Stroke="{StaticResource VpBorder}"
+                                StrokeThickness="1"
+                                HeightRequest="210"
+                                BackgroundColor="{StaticResource VpSurface}"
+                                StrokeShape="RoundRectangle 12">
+                            <Border.Shadow>
+                                <Shadow Brush="{StaticResource VpShadowBrush}" Offset="0,4" Radius="10" Opacity="0.3" />
+                            </Border.Shadow>
+                            <controls:CachedPosterImage PictureId="{Binding PosterPictureId}"
+                                                        Aspect="AspectFill" />
+                        </Border>
                         <Label Text="{Binding Title}"
-                               FontSize="12"
-                               TextColor="{StaticResource VpPrimarySoft}"
+                               FontSize="13"
+                               FontFamily="InterMedium"
+                               TextColor="{StaticResource VpText}"
                                LineBreakMode="TailTruncation"
                                MaxLines="2" />
                     </VerticalStackLayout>
@@ -105,13 +122,13 @@
                 <Grid Padding="0,8">
                     <!-- Fehler beim Nachladen einer Folgeseite -->
                     <HorizontalStackLayout x:Name="FooterErrorPanel"
-                                           Spacing="8"
+                                           Spacing="10"
                                            IsVisible="False">
                         <Label Text="Fehler beim Laden weiterer Einträge"
-                               TextColor="{StaticResource VpDanger}"
+                               Style="{StaticResource ErrorText}"
                                VerticalOptions="Center" />
                         <Button Text="Erneut versuchen"
-                                FontSize="12"
+                                Style="{StaticResource SecondaryButton}"
                                 Clicked="OnRetryClicked" />
                     </HorizontalStackLayout>
                     <ActivityIndicator x:Name="FooterLoadingIndicator"

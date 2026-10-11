@@ -4,70 +4,95 @@
              x:Class="VideoPlayer.Maui.Pages.LoginPage"
              Title="Anmeldung">
     <ScrollView>
-        <VerticalStackLayout Padding="24" Spacing="12">
+        <!-- Inhalt zentriert mit Maximalbreite — die Breite folgt der
+             Fenstergröße (Code-Behind: min(460, Seitenbreite)). -->
+        <VerticalStackLayout x:Name="LoginContent"
+                             Padding="24"
+                             Spacing="16"
+                             HorizontalOptions="Center">
 
-            <Label Text="Anmeldung"
-                   FontSize="24"
-                   FontAttributes="Bold" />
-            <Label Text="Bitte mit den Zugangsdaten des VideoPlayer-Servers anmelden." />
-            <Label x:Name="ServerLabel"
-                   AutomationId="LoginServerLabel"
-                   FontSize="12"
-                   TextColor="{StaticResource VpTextMuted}"
-                   IsVisible="false" />
+            <VerticalStackLayout Spacing="6">
+                <Label Text="VIDEOPLAYER"
+                       Style="{StaticResource Kicker}" />
+                <Label Text="Anmeldung"
+                       Style="{StaticResource PageTitle}" />
+                <Label Text="Bitte mit den Zugangsdaten des VideoPlayer-Servers anmelden."
+                       TextColor="{StaticResource VpTextMuted}" />
+                <Label x:Name="ServerLabel"
+                       AutomationId="LoginServerLabel"
+                       Style="{StaticResource Caption}"
+                       IsVisible="false" />
+            </VerticalStackLayout>
 
-            <Label Text="E-Mail" FontAttributes="Bold" />
-            <Entry x:Name="UsernameEntry"
-                   AutomationId="LoginUsernameEntry"
-                   Placeholder="E-Mail-Adresse"
-                   Keyboard="Email" />
-            <Label Text="Passwort" FontAttributes="Bold" />
-            <Entry x:Name="PasswordEntry"
-                   AutomationId="LoginPasswordEntry"
-                   Placeholder="Passwort"
-                   IsPassword="True" />
+            <Border Style="{StaticResource Card}">
+                <VerticalStackLayout Spacing="14">
+                    <VerticalStackLayout Spacing="8">
+                        <Label Text="E-Mail" Style="{StaticResource Kicker}" />
+                        <Border Style="{StaticResource InputFrame}">
+                            <Entry x:Name="UsernameEntry"
+                                   AutomationId="LoginUsernameEntry"
+                                   Placeholder="E-Mail-Adresse"
+                                   Keyboard="Email" />
+                        </Border>
+                    </VerticalStackLayout>
+                    <VerticalStackLayout Spacing="8">
+                        <Label Text="Passwort" Style="{StaticResource Kicker}" />
+                        <Border Style="{StaticResource InputFrame}">
+                            <Entry x:Name="PasswordEntry"
+                                   AutomationId="LoginPasswordEntry"
+                                   Placeholder="Passwort"
+                                   IsPassword="True" />
+                        </Border>
+                    </VerticalStackLayout>
 
-            <Button x:Name="LoginButton"
-                    AutomationId="LoginButton"
-                    Text="Anmelden"
-                    Clicked="OnLoginClicked" />
-            <ActivityIndicator x:Name="LoginIndicator" IsRunning="false" IsVisible="false" />
-            <Label x:Name="ErrorLabel"
-                   AutomationId="LoginErrorLabel"
-                   TextColor="{StaticResource VpDanger}"
-                   IsVisible="false" />
+                    <Button x:Name="LoginButton"
+                            AutomationId="LoginButton"
+                            Text="Anmelden"
+                            Clicked="OnLoginClicked" />
+                    <ActivityIndicator x:Name="LoginIndicator" IsRunning="false" IsVisible="false" />
+                    <Label x:Name="ErrorLabel"
+                           AutomationId="LoginErrorLabel"
+                           Style="{StaticResource ErrorText}"
+                           IsVisible="false" />
+                </VerticalStackLayout>
+            </Border>
 
             <!-- Kopplungs-Einstieg: Der Kurzcode der Serververwaltung
                  (Profilseite „Geräte") wird gegen den bereits verbundenen
                  Server eingelöst — ohne Passwort. Der QR-Code bleibt bei
                  der Serververbindung, weil er die Adresse selbst trägt. -->
-            <BoxView HeightRequest="1"
-                     BackgroundColor="{StaticResource VpBorder}"
-                     Margin="0,12" />
-            <Label Text="Oder mit Kopplungscode verbinden"
-                   FontAttributes="Bold" />
-            <Label Text="Kurzcode aus der Serververwaltung (Profilseite „Geräte“) eingeben — er wird gegen den verbundenen Server eingelöst."
-                   FontSize="12"
-                   TextColor="{StaticResource VpTextMuted}" />
-            <Entry x:Name="BootstrapCodeEntry"
-                   AutomationId="LoginBootstrapCodeEntry"
-                   Placeholder="Kopplungscode"
-                   Keyboard="Text"
-                   IsSpellCheckEnabled="False"
-                   IsTextPredictionEnabled="False" />
-            <Button x:Name="BootstrapLoginButton"
-                    AutomationId="LoginBootstrapButton"
-                    Text="Kopplungscode einlösen"
-                    Clicked="OnBootstrapClicked" />
-            <ActivityIndicator x:Name="BootstrapIndicator" IsRunning="false" IsVisible="false" />
-            <Label x:Name="BootstrapErrorLabel"
-                   AutomationId="LoginBootstrapErrorLabel"
-                   TextColor="{StaticResource VpDanger}"
-                   IsVisible="false" />
+            <Border Style="{StaticResource Card}">
+                <VerticalStackLayout Spacing="12">
+                    <Label Text="MIT KOPPLUNGSCODE VERBINDEN"
+                           Style="{StaticResource Kicker}" />
+                    <Label Text="Kurzcode aus der Serververwaltung (Profilseite „Geräte“) eingeben — er wird gegen den verbundenen Server eingelöst."
+                           Style="{StaticResource Caption}"
+                           FontSize="13" />
+                    <Border Style="{StaticResource InputFrame}">
+                        <Entry x:Name="BootstrapCodeEntry"
+                               AutomationId="LoginBootstrapCodeEntry"
+                               Placeholder="Kopplungscode"
+                               Keyboard="Text"
+                               IsSpellCheckEnabled="False"
+                               IsTextPredictionEnabled="False" />
+                    </Border>
+                    <Button x:Name="BootstrapLoginButton"
+                            AutomationId="LoginBootstrapButton"
+                            Text="Kopplungscode einlösen"
+                            Style="{StaticResource SecondaryButton}"
+                            Clicked="OnBootstrapClicked" />
+                    <ActivityIndicator x:Name="BootstrapIndicator" IsRunning="false" IsVisible="false" />
+                    <Label x:Name="BootstrapErrorLabel"
+                           AutomationId="LoginBootstrapErrorLabel"
+                           Style="{StaticResource ErrorText}"
+                           IsVisible="false" />
+                </VerticalStackLayout>
+            </Border>
 
             <Button x:Name="ServerSetupButton"
                     AutomationId="LoginServerSetupButton"
                     Text="Anderen Server einrichten"
+                    Style="{StaticResource GhostButton}"
                     Clicked="OnServerSetupClicked" />
 
         </VerticalStackLayout>

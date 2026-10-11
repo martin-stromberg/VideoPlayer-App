@@ -7,28 +7,24 @@
              Title="Downloads"
              x:DataType="mvu:MvuHost">
 
-    <Grid Padding="20"
+    <Grid Padding="24"
           RowDefinitions="Auto,Auto,Auto,*"
-          RowSpacing="12">
+          RowSpacing="14">
 
         <!-- Kontingent-Belegung des Speicherplatzes für Downloads. -->
         <Label x:Name="QuotaLabel"
                Grid.Row="0"
-               FontSize="12"
-               TextColor="{StaticResource VpTextMuted}" />
+               Style="{StaticResource Caption}" />
 
         <!-- Hinweis im Offline-Zustand: die Liste liegt lokal vor;
              wartende Downloads starten mit der Verbindung. -->
         <Border x:Name="OfflineBanner"
                 Grid.Row="1"
-                Padding="12,8"
-                StrokeShape="RoundRectangle 8"
-                Stroke="{StaticResource VpBorderStrong}"
-                BackgroundColor="{StaticResource VpSurfaceHigh}"
+                Style="{StaticResource Banner}"
                 IsVisible="False">
             <Label Text="Offline – Downloads werden fortgesetzt, sobald eine Verbindung besteht."
                    TextColor="{StaticResource VpText}"
-                   FontAttributes="Bold" />
+                   FontFamily="InterMedium" />
         </Border>
 
         <ActivityIndicator x:Name="LoadingIndicator"
@@ -39,11 +35,12 @@
 
         <VerticalStackLayout x:Name="ErrorPanel"
                              Grid.Row="2"
-                             Spacing="8"
+                             Spacing="10"
                              IsVisible="False">
-            <Label x:Name="ErrorLabel" TextColor="{StaticResource VpDanger}" />
+            <Label x:Name="ErrorLabel" Style="{StaticResource ErrorText}" />
             <Button x:Name="RetryButton"
                     Text="Erneut laden"
+                    Style="{StaticResource SecondaryButton}"
                     Clicked="OnRetryClicked"
                     HorizontalOptions="Start" />
         </VerticalStackLayout>
@@ -51,10 +48,12 @@
         <Label x:Name="EmptyLabel"
                Grid.Row="2"
                Text="Keine Downloads vorhanden. Medien lassen sich auf der Detailseite herunterladen."
+               Style="{StaticResource Caption}"
+               FontSize="14"
                IsVisible="False" />
 
-        <!-- Download-Liste: Titel, Zustand, Fortschritt und die Aktionen
-             Abbrechen/Erneut versuchen/Löschen je Eintrag. Die
+        <!-- Download-Liste: Titel, Zustands-Chip, Fortschritt und die
+             Aktionen Abbrechen/Erneut versuchen/Löschen je Eintrag. Die
              ItemsSource wird einmalig im Code-Behind auf eine stabile
              ObservableCollection gesetzt — Fortschritts-Ticks
              aktualisieren nur den betroffenen Eintrag in-place, ohne
@@ -63,49 +62,60 @@
                         Grid.Row="3">
             <CollectionView.ItemTemplate>
                 <DataTemplate x:DataType="mvu:DownloadItemViewModel">
-                    <Border Padding="12"
-                            Margin="0,0,0,10"
-                            StrokeShape="RoundRectangle 8"
-                            BackgroundColor="{StaticResource VpSurface}">
-                        <Border.Shadow>
-                            <Shadow Brush="{StaticResource VpShadowBrush}" Offset="0,2" Radius="4" Opacity="0.3" />
-                        </Border.Shadow>
-                        <VerticalStackLayout Spacing="6">
-                            <Label Text="{Binding Title}"
-                                   FontSize="16"
-                                   FontAttributes="Bold"
-                                   TextColor="{StaticResource VpPrimarySoft}"
-                                   MaxLines="2"
-                                   LineBreakMode="TailTruncation" />
-                            <HorizontalStackLayout Spacing="8">
+                    <Border Style="{StaticResource Card}"
+                            Padding="16"
+                            Margin="0,0,0,12">
+                        <VerticalStackLayout Spacing="10">
+                            <Grid ColumnDefinitions="*,Auto"
+                                  ColumnSpacing="12">
+                                <Label Text="{Binding Title}"
+                                       Grid.Column="0"
+                                       FontSize="16"
+                                       FontFamily="InterSemiBold"
+                                       TextColor="{StaticResource VpText}"
+                                       MaxLines="2"
+                                       LineBreakMode="TailTruncation"
+                                       VerticalOptions="Center" />
+                                <!-- Zustand als Pill-Chip: getönte
+                                     Primärfläche mit weicher Schrift. -->
+                                <Border Grid.Column="1"
+                                        StrokeShape="RoundRectangle 999"
+                                        Stroke="Transparent"
+                                        BackgroundColor="{StaticResource VpPrimaryTint}"
+                                        Padding="10,4"
+                                        VerticalOptions="Center">
+                                    <Label Text="{Binding StateText}"
+                                           FontSize="11"
+                                           FontFamily="InterSemiBold"
+                                           TextColor="{StaticResource VpPrimarySoft}" />
+                                </Border>
+                            </Grid>
+                            <HorizontalStackLayout Spacing="10">
                                 <Label Text="{Binding MediaTypeText}"
-                                       FontSize="12"
-                                       TextColor="{StaticResource VpTextMuted}" />
-                                <Label Text="{Binding StateText}"
-                                       FontSize="12"
-                                       FontAttributes="Bold" />
+                                       Style="{StaticResource Caption}" />
                                 <Label Text="{Binding ProgressPercentText}"
-                                       FontSize="12"
+                                       Style="{StaticResource Caption}"
                                        IsVisible="{Binding ShowProgress}" />
                             </HorizontalStackLayout>
                             <ProgressBar Progress="{Binding Progress}"
                                          ProgressColor="{StaticResource VpPrimary}"
+                                         BackgroundColor="{StaticResource VpSurfaceHigh}"
                                          IsVisible="{Binding ShowProgress}" />
                             <Label Text="{Binding ErrorText}"
-                                   FontSize="12"
-                                   TextColor="{StaticResource VpDanger}"
+                                   Style="{StaticResource ErrorText}"
                                    IsVisible="{Binding HasError}" />
                             <HorizontalStackLayout Spacing="8">
                                 <Button Text="Abbrechen"
-                                        FontSize="12"
+                                        Style="{StaticResource SecondaryButton}"
                                         Clicked="OnCancelClicked"
                                         IsVisible="{Binding CanCancel}" />
                                 <Button Text="Erneut versuchen"
-                                        FontSize="12"
+                                        Style="{StaticResource SecondaryButton}"
                                         Clicked="OnRetryDownloadClicked"
                                         IsVisible="{Binding CanRetry}" />
                                 <Button Text="Löschen"
-                                        FontSize="12"
+                                        Style="{StaticResource GhostButton}"
+                                        TextColor="{StaticResource VpDanger}"
                                         Clicked="OnDeleteClicked" />
                             </HorizontalStackLayout>
                         </VerticalStackLayout>

@@ -7,30 +7,32 @@
              x:Name="Root">
     <VerticalStackLayout Spacing="12">
         <Label Text="{Binding Source={x:Reference Root}, Path=Title}"
-               FontSize="22"
-               FontAttributes="Bold"
-               FontFamily="OpenSansSemibold"
-               Padding="20,0" />
+               Style="{StaticResource SectionTitle}"
+               Padding="24,0" />
         <ScrollView Orientation="Horizontal"
-                    HorizontalScrollBarVisibility="Always">
+                    HorizontalScrollBarVisibility="Never">
             <HorizontalStackLayout BindableLayout.ItemsSource="{Binding Source={x:Reference Root}, Path=Items}"
-                                   Spacing="15"
-                                   Padding="20,0">
+                                   Spacing="14"
+                                   Padding="24,2,24,10">
                 <BindableLayout.ItemTemplate>
                     <DataTemplate x:DataType="mvu:HomeMediaItem">
-                        <VerticalStackLayout WidthRequest="140" Spacing="6">
-                            <Border WidthRequest="140"
-                                    HeightRequest="210"
+                        <VerticalStackLayout WidthRequest="150" Spacing="8">
+                            <!-- Posterkarte 2:3 — der Rahmen schneidet Bild,
+                                 Fortschrittsbalken und Badge in die
+                                 Rundung. -->
+                            <Border WidthRequest="150"
+                                    HeightRequest="225"
                                     Padding="0"
                                     Margin="0"
-                                    StrokeThickness="0"
+                                    Stroke="{StaticResource VpBorder}"
+                                    StrokeThickness="1"
                                     Opacity="{Binding CardOpacity}"
                                     BackgroundColor="{StaticResource VpSurface}">
                                 <Border.StrokeShape>
-                                    <RoundRectangle CornerRadius="8" />
+                                    <RoundRectangle CornerRadius="12" />
                                 </Border.StrokeShape>
                                 <Border.Shadow>
-                                    <Shadow Brush="{StaticResource VpShadowBrush}" Offset="0,2" Radius="4" Opacity="0.3" />
+                                    <Shadow Brush="{StaticResource VpShadowBrush}" Offset="0,4" Radius="10" Opacity="0.3" />
                                 </Border.Shadow>
                                 <Border.GestureRecognizers>
                                     <TapGestureRecognizer Tapped="OnItemTapped" />
@@ -41,7 +43,7 @@
                                     <Label Text="{Binding Title}"
                                            TextColor="{StaticResource VpText}"
                                            FontSize="13"
-                                           Padding="8"
+                                           Padding="10"
                                            HorizontalTextAlignment="Center"
                                            VerticalOptions="Center"
                                            MaxLines="4"
@@ -52,29 +54,32 @@
                                     <ProgressBar Progress="{Binding Progress}"
                                                  IsVisible="{Binding ShowProgress}"
                                                  ProgressColor="{StaticResource VpPrimary}"
-                                                 BackgroundColor="{StaticResource VpSurfaceBright}"
-                                                 HeightRequest="4"
+                                                 BackgroundColor="{StaticResource VpOverlay}"
+                                                 HeightRequest="5"
                                                  VerticalOptions="End" />
                                     <!-- Platzhalter-Markierung fehlender
                                          Offline-Episoden (nicht abspielbar). -->
                                     <Border x:Name="PlaceholderBadge"
                                             IsVisible="{Binding IsPlaceholder}"
-                                            BackgroundColor="{StaticResource VpOverlay}"
-                                            Padding="8,4"
+                                            Stroke="{StaticResource VpBadgeBorder}"
+                                            StrokeThickness="1"
+                                            BackgroundColor="{StaticResource VpBadgeBg}"
+                                            Padding="10,5"
                                             HorizontalOptions="Center"
                                             VerticalOptions="End"
-                                            Margin="0,0,0,10">
+                                            Margin="0,0,0,12">
                                         <Border.StrokeShape>
                                             <RoundRectangle CornerRadius="999" />
                                         </Border.StrokeShape>
                                         <Label Text="Nicht heruntergeladen"
                                                TextColor="{StaticResource VpText}"
-                                               FontSize="10" />
+                                               FontSize="11" />
                                     </Border>
                                 </Grid>
                             </Border>
                             <Label Text="{Binding Title}"
-                                   FontSize="12"
+                                   FontSize="13"
+                                   FontFamily="InterMedium"
                                    MaxLines="2"
                                    LineBreakMode="TailTruncation" />
                         </VerticalStackLayout>

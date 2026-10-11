@@ -127,8 +127,18 @@ namespace VideoPlayer.Maui
 
             builder.ConfigureFonts(fonts =>
             {
-                fonts.AddFont("OpenSans-Regular.ttf", "OpenSansRegular");
-                fonts.AddFont("OpenSans-Semibold.ttf", "OpenSansSemibold");
+                // Hausschrift Inter (SIL Open Font License): Regular löst
+                // FontAttributes.Bold/Italic über die RIBBI-Schnitte Bold/
+                // Italic auf; Medium/SemiBold stehen als eigene Familien
+                // für Zwischenabstufungen zur Verfügung.
+                fonts.AddFont("Inter-Regular.ttf", "Inter");
+                fonts.AddFont("Inter-Italic.ttf", "InterItalic");
+                fonts.AddFont("Inter-Medium.ttf", "InterMedium");
+                fonts.AddFont("Inter-SemiBold.ttf", "InterSemiBold");
+                fonts.AddFont("Inter-Bold.ttf", "InterBold");
+                // Material Icons Round (Apache License 2.0): einheitliche
+                // Glyphen für Menü-Icons und Symbol-Schaltflächen.
+                fonts.AddFont("MaterialIconsRound-Regular.otf", "MaterialIcons");
             });
 
 #if DEBUG || DEV_API

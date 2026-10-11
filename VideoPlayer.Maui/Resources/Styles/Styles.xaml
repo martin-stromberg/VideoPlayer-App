@@ -1,20 +1,96 @@
-﻿<?xml version="1.0" encoding="UTF-8" ?>
+<?xml version="1.0" encoding="UTF-8" ?>
 <ResourceDictionary 
     xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
     xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
     x:Class="VideoPlayer.Maui.Resources.Styles.Styles">
 
-    <!-- Alle Farben kommen aus den Web-Design-Tokens (Colors.xaml, Vp*).
-         Die App ist dunkel-only — keine AppThemeBinding-Varianten. -->
+    <!-- Alle Farben kommen aus den Design-Tokens (Colors.xaml, Vp*).
+         Die App ist dunkel-only — keine AppThemeBinding-Varianten.
+         Typografie: Inter (OFL) — Regular/Bold/Italic lösen über
+         FontAttributes auf, Medium/SemiBold sind eigene Familien.
+         Symbol-Schrift: Material Icons Round (Apache-2.0). -->
 
-    <Style TargetType="ActivityIndicator">
-        <Setter Property="Color" Value="{StaticResource VpPrimary}" />
+    <!-- ==================== Typografie ==================== -->
+
+    <Style TargetType="Label">
+        <Setter Property="TextColor" Value="{StaticResource VpText}" />
+        <Setter Property="BackgroundColor" Value="Transparent" />
+        <Setter Property="FontFamily" Value="Inter" />
+        <Setter Property="FontSize" Value="14" />
+        <Setter Property="VisualStateManager.VisualStateGroups">
+            <VisualStateGroupList>
+                <VisualStateGroup x:Name="CommonStates">
+                    <VisualState x:Name="Normal" />
+                    <VisualState x:Name="Disabled">
+                        <VisualState.Setters>
+                            <Setter Property="TextColor" Value="{StaticResource VpTextMuted}" />
+                        </VisualState.Setters>
+                    </VisualState>
+                </VisualStateGroup>
+            </VisualStateGroupList>
+        </Setter>
     </Style>
 
-    <Style TargetType="IndicatorView">
-        <Setter Property="IndicatorColor" Value="{StaticResource VpSurfaceBright}"/>
-        <Setter Property="SelectedIndicatorColor" Value="{StaticResource VpText}"/>
+    <!-- Großer Seitentitel (Start-/Formularseiten). -->
+    <Style TargetType="Label" x:Key="PageTitle">
+        <Setter Property="TextColor" Value="{StaticResource VpText}" />
+        <Setter Property="FontFamily" Value="Inter" />
+        <Setter Property="FontAttributes" Value="Bold" />
+        <Setter Property="FontSize" Value="28" />
     </Style>
+
+    <!-- Abschnittsüberschrift innerhalb von Seiten und Karten. -->
+    <Style TargetType="Label" x:Key="SectionTitle">
+        <Setter Property="TextColor" Value="{StaticResource VpText}" />
+        <Setter Property="FontFamily" Value="InterSemiBold" />
+        <Setter Property="FontSize" Value="17" />
+    </Style>
+
+    <!-- Titel innerhalb von Karten und Listeneinträgen. -->
+    <Style TargetType="Label" x:Key="CardTitle">
+        <Setter Property="TextColor" Value="{StaticResource VpText}" />
+        <Setter Property="FontFamily" Value="InterSemiBold" />
+        <Setter Property="FontSize" Value="15" />
+    </Style>
+
+    <!-- Sekundärtext/Meta-Angabe. -->
+    <Style TargetType="Label" x:Key="Caption">
+        <Setter Property="TextColor" Value="{StaticResource VpTextMuted}" />
+        <Setter Property="FontFamily" Value="Inter" />
+        <Setter Property="FontSize" Value="12" />
+    </Style>
+
+    <!-- Kleiner Versalien-Kicker (Sektions-/Karten-Augenzeile). -->
+    <Style TargetType="Label" x:Key="Kicker">
+        <Setter Property="TextColor" Value="{StaticResource VpTextMuted}" />
+        <Setter Property="FontFamily" Value="InterSemiBold" />
+        <Setter Property="FontSize" Value="11" />
+        <Setter Property="CharacterSpacing" Value="1.4" />
+    </Style>
+
+    <!-- Fehlertext. -->
+    <Style TargetType="Label" x:Key="ErrorText">
+        <Setter Property="TextColor" Value="{StaticResource VpDanger}" />
+        <Setter Property="FontFamily" Value="Inter" />
+        <Setter Property="FontSize" Value="13" />
+    </Style>
+
+    <Style TargetType="Label" x:Key="Headline">
+        <Setter Property="TextColor" Value="{StaticResource VpText}" />
+        <Setter Property="FontSize" Value="32" />
+        <Setter Property="FontAttributes" Value="Bold" />
+        <Setter Property="HorizontalOptions" Value="Center" />
+        <Setter Property="HorizontalTextAlignment" Value="Center" />
+    </Style>
+
+    <Style TargetType="Label" x:Key="SubHeadline">
+        <Setter Property="TextColor" Value="{StaticResource VpText}" />
+        <Setter Property="FontSize" Value="24" />
+        <Setter Property="HorizontalOptions" Value="Center" />
+        <Setter Property="HorizontalTextAlignment" Value="Center" />
+    </Style>
+
+    <!-- ==================== Flächen ==================== -->
 
     <Style TargetType="Border">
         <Setter Property="Stroke" Value="{StaticResource VpBorder}" />
@@ -22,20 +98,73 @@
         <Setter Property="StrokeThickness" Value="1"/>
     </Style>
 
+    <!-- Standardkarte: Haarriss-Rand, Fläche, großer Radius, weicher Schatten. -->
+    <Style x:Key="Card" TargetType="Border">
+        <Setter Property="Stroke" Value="{StaticResource VpBorder}" />
+        <Setter Property="StrokeShape" Value="RoundRectangle 14" />
+        <Setter Property="StrokeThickness" Value="1"/>
+        <Setter Property="BackgroundColor" Value="{StaticResource VpSurface}" />
+        <Setter Property="Padding" Value="14"/>
+        <Setter Property="Shadow">
+            <Shadow Brush="{StaticResource VpShadowBrush}" Offset="0,6" Radius="16" Opacity="0.30" />
+        </Setter>
+    </Style>
+
+    <!-- Hinweis-/Statusband (Offline, Hinweise): abgesetzte Fläche mit
+         kräftigerem Rand. -->
+    <Style x:Key="Banner" TargetType="Border">
+        <Setter Property="Stroke" Value="{StaticResource VpBorderStrong}" />
+        <Setter Property="StrokeShape" Value="RoundRectangle 12" />
+        <Setter Property="StrokeThickness" Value="1"/>
+        <Setter Property="BackgroundColor" Value="{StaticResource VpSurfaceHigh}" />
+        <Setter Property="Padding" Value="14,10"/>
+    </Style>
+
+    <!-- Rahmen eines Eingabefelds: gefüllte Fläche, ruhige Höhe. -->
+    <Style x:Key="InputFrame" TargetType="Border">
+        <Setter Property="Stroke" Value="{StaticResource VpBorder}" />
+        <Setter Property="StrokeShape" Value="RoundRectangle 10" />
+        <Setter Property="StrokeThickness" Value="1"/>
+        <Setter Property="BackgroundColor" Value="{StaticResource VpSurfaceLow}" />
+        <Setter Property="Padding" Value="14,0"/>
+        <Setter Property="MinimumHeightRequest" Value="48"/>
+        <Setter Property="VerticalOptions" Value="Center"/>
+    </Style>
+
+    <!-- Pill-Chip (Genres, Filter): unselektiert auf hoher Fläche. -->
+    <Style x:Key="Chip" TargetType="Border">
+        <Setter Property="Stroke" Value="{StaticResource VpBorder}" />
+        <Setter Property="StrokeShape" Value="RoundRectangle 999" />
+        <Setter Property="StrokeThickness" Value="1"/>
+        <Setter Property="BackgroundColor" Value="{StaticResource VpSurfaceHigh}" />
+        <Setter Property="Padding" Value="14,7"/>
+    </Style>
+
+    <!-- Kicker-Chip über Bildflächen (Hero, Header). -->
+    <Style x:Key="KickerChip" TargetType="Border">
+        <Setter Property="Stroke" Value="{StaticResource VpBorder}" />
+        <Setter Property="StrokeShape" Value="RoundRectangle 999" />
+        <Setter Property="StrokeThickness" Value="1"/>
+        <Setter Property="BackgroundColor" Value="{StaticResource VpOverlay}" />
+        <Setter Property="Padding" Value="12,5"/>
+        <Setter Property="HorizontalOptions" Value="Start"/>
+    </Style>
+
     <Style TargetType="BoxView">
         <Setter Property="BackgroundColor" Value="{StaticResource VpSurfaceBright}" />
     </Style>
 
-    <!-- Normale Buttons: 4px-Radius wie die Web-Buttons (vp-radius-sm);
-         Hover-Zustand in vp-primary-hover. -->
+    <!-- ==================== Schaltflächen ==================== -->
+
+    <!-- Primärschalter: kräftiger Radius 10, halbfette Inter. -->
     <Style TargetType="Button">
         <Setter Property="TextColor" Value="{StaticResource VpText}" />
         <Setter Property="BackgroundColor" Value="{StaticResource VpPrimary}" />
-        <Setter Property="FontFamily" Value="OpenSansRegular"/>
+        <Setter Property="FontFamily" Value="InterSemiBold"/>
         <Setter Property="FontSize" Value="14"/>
         <Setter Property="BorderWidth" Value="0"/>
-        <Setter Property="CornerRadius" Value="4"/>
-        <Setter Property="Padding" Value="14,10"/>
+        <Setter Property="CornerRadius" Value="10"/>
+        <Setter Property="Padding" Value="18,12"/>
         <Setter Property="MinimumHeightRequest" Value="44"/>
         <Setter Property="MinimumWidthRequest" Value="44"/>
         <Setter Property="VisualStateManager.VisualStateGroups">
@@ -58,13 +187,78 @@
         </Setter>
     </Style>
 
+    <!-- Sekundärschalter: ruhige Fläche mit Haarriss-Rand — für alle
+         Nebenaktionen (Entfernen, Abbrechen, Wechseln, Erneut …). -->
+    <Style x:Key="SecondaryButton" TargetType="Button">
+        <Setter Property="TextColor" Value="{StaticResource VpText}" />
+        <Setter Property="BackgroundColor" Value="{StaticResource VpSurfaceHigh}" />
+        <Setter Property="FontFamily" Value="InterSemiBold"/>
+        <Setter Property="FontSize" Value="13"/>
+        <Setter Property="BorderColor" Value="{StaticResource VpBorder}" />
+        <Setter Property="BorderWidth" Value="1"/>
+        <Setter Property="CornerRadius" Value="10"/>
+        <Setter Property="Padding" Value="16,10"/>
+        <Setter Property="MinimumHeightRequest" Value="44"/>
+        <Setter Property="MinimumWidthRequest" Value="44"/>
+        <Setter Property="VisualStateManager.VisualStateGroups">
+            <VisualStateGroupList>
+                <VisualStateGroup x:Name="CommonStates">
+                    <VisualState x:Name="Normal" />
+                    <VisualState x:Name="Disabled">
+                        <VisualState.Setters>
+                            <Setter Property="TextColor" Value="{StaticResource VpTextMuted}" />
+                            <Setter Property="BackgroundColor" Value="{StaticResource VpSurface}" />
+                        </VisualState.Setters>
+                    </VisualState>
+                    <VisualState x:Name="PointerOver">
+                        <VisualState.Setters>
+                            <Setter Property="BackgroundColor" Value="{StaticResource VpSurfaceBright}" />
+                        </VisualState.Setters>
+                    </VisualState>
+                </VisualStateGroup>
+            </VisualStateGroupList>
+        </Setter>
+    </Style>
+
+    <!-- Rahmenloser Text-Schalter für drittrangige Aktionen. -->
+    <Style x:Key="GhostButton" TargetType="Button">
+        <Setter Property="TextColor" Value="{StaticResource VpSecondarySoft}" />
+        <Setter Property="BackgroundColor" Value="Transparent" />
+        <Setter Property="FontFamily" Value="InterSemiBold"/>
+        <Setter Property="FontSize" Value="13"/>
+        <Setter Property="BorderWidth" Value="0"/>
+        <Setter Property="CornerRadius" Value="10"/>
+        <Setter Property="Padding" Value="14,10"/>
+        <Setter Property="MinimumHeightRequest" Value="44"/>
+        <Setter Property="MinimumWidthRequest" Value="44"/>
+        <Setter Property="VisualStateManager.VisualStateGroups">
+            <VisualStateGroupList>
+                <VisualStateGroup x:Name="CommonStates">
+                    <VisualState x:Name="Normal" />
+                    <VisualState x:Name="Disabled">
+                        <VisualState.Setters>
+                            <Setter Property="TextColor" Value="{StaticResource VpTextMuted}" />
+                        </VisualState.Setters>
+                    </VisualState>
+                    <VisualState x:Name="PointerOver">
+                        <VisualState.Setters>
+                            <Setter Property="BackgroundColor" Value="{StaticResource VpSurfaceHigh}" />
+                            <Setter Property="TextColor" Value="{StaticResource VpText}" />
+                        </VisualState.Setters>
+                    </VisualState>
+                </VisualStateGroup>
+            </VisualStateGroupList>
+        </Setter>
+    </Style>
+
     <!-- Runde Icon-/Glyphen-Schaltflächen (Favorit, Download, Play):
-         pill-förmig wie die Icon-Buttons der Webanwendung, halbdunkle
-         Fläche mit weicher Primärfarbe für das Symbol. -->
+         pill-förmig, halbdunkle Fläche mit weicher Primärfarbe. Die
+         Schrift bleibt Inter — Glyphen aus Material Icons erhalten die
+         Schaltflächen über ein explizites FontFamily am Element. -->
     <Style x:Key="IconButton" TargetType="Button">
         <Setter Property="TextColor" Value="{StaticResource VpPrimarySoft}" />
         <Setter Property="BackgroundColor" Value="{StaticResource VpOverlay}" />
-        <Setter Property="FontFamily" Value="OpenSansRegular"/>
+        <Setter Property="FontFamily" Value="Inter"/>
         <Setter Property="BorderWidth" Value="0"/>
         <Setter Property="CornerRadius" Value="999"/>
         <Setter Property="Padding" Value="0"/>
@@ -85,29 +279,14 @@
         </Setter>
     </Style>
 
-    <Style TargetType="CheckBox">
-        <Setter Property="Color" Value="{StaticResource VpPrimary}" />
-        <Setter Property="MinimumHeightRequest" Value="44"/>
-        <Setter Property="MinimumWidthRequest" Value="44"/>
-        <Setter Property="VisualStateManager.VisualStateGroups">
-            <VisualStateGroupList>
-                <VisualStateGroup x:Name="CommonStates">
-                    <VisualState x:Name="Normal" />
-                    <VisualState x:Name="Disabled">
-                        <VisualState.Setters>
-                            <Setter Property="Color" Value="{StaticResource VpSurfaceBright}" />
-                        </VisualState.Setters>
-                    </VisualState>
-                </VisualStateGroup>
-            </VisualStateGroupList>
-        </Setter>
-    </Style>
+    <!-- ==================== Eingaben ==================== -->
 
-    <Style TargetType="DatePicker">
+    <Style TargetType="Entry">
         <Setter Property="TextColor" Value="{StaticResource VpText}" />
         <Setter Property="BackgroundColor" Value="Transparent" />
-        <Setter Property="FontFamily" Value="OpenSansRegular"/>
-        <Setter Property="FontSize" Value="14"/>
+        <Setter Property="FontFamily" Value="Inter"/>
+        <Setter Property="FontSize" Value="14" />
+        <Setter Property="PlaceholderColor" Value="{StaticResource VpTextMuted}" />
         <Setter Property="MinimumHeightRequest" Value="44"/>
         <Setter Property="MinimumWidthRequest" Value="44"/>
         <Setter Property="VisualStateManager.VisualStateGroups">
@@ -127,7 +306,7 @@
     <Style TargetType="Editor">
         <Setter Property="TextColor" Value="{StaticResource VpText}" />
         <Setter Property="BackgroundColor" Value="Transparent" />
-        <Setter Property="FontFamily" Value="OpenSansRegular"/>
+        <Setter Property="FontFamily" Value="Inter"/>
         <Setter Property="FontSize" Value="14" />
         <Setter Property="PlaceholderColor" Value="{StaticResource VpTextMuted}" />
         <Setter Property="MinimumHeightRequest" Value="44"/>
@@ -146,12 +325,12 @@
         </Setter>
     </Style>
 
-    <Style TargetType="Entry">
+    <Style TargetType="Picker">
         <Setter Property="TextColor" Value="{StaticResource VpText}" />
+        <Setter Property="TitleColor" Value="{StaticResource VpTextMuted}" />
         <Setter Property="BackgroundColor" Value="Transparent" />
-        <Setter Property="FontFamily" Value="OpenSansRegular"/>
+        <Setter Property="FontFamily" Value="Inter"/>
         <Setter Property="FontSize" Value="14" />
-        <Setter Property="PlaceholderColor" Value="{StaticResource VpTextMuted}" />
         <Setter Property="MinimumHeightRequest" Value="44"/>
         <Setter Property="MinimumWidthRequest" Value="44"/>
         <Setter Property="VisualStateManager.VisualStateGroups">
@@ -161,6 +340,123 @@
                     <VisualState x:Name="Disabled">
                         <VisualState.Setters>
                             <Setter Property="TextColor" Value="{StaticResource VpTextMuted}" />
+                            <Setter Property="TitleColor" Value="{StaticResource VpTextMuted}" />
+                        </VisualState.Setters>
+                    </VisualState>
+                </VisualStateGroup>
+            </VisualStateGroupList>
+        </Setter>
+    </Style>
+
+    <Style TargetType="SearchBar">
+        <Setter Property="TextColor" Value="{StaticResource VpText}" />
+        <Setter Property="PlaceholderColor" Value="{StaticResource VpTextMuted}" />
+        <Setter Property="CancelButtonColor" Value="{StaticResource VpTextMuted}" />
+        <Setter Property="BackgroundColor" Value="Transparent" />
+        <Setter Property="FontFamily" Value="Inter" />
+        <Setter Property="FontSize" Value="14" />
+        <Setter Property="MinimumHeightRequest" Value="44"/>
+        <Setter Property="MinimumWidthRequest" Value="44"/>
+        <Setter Property="VisualStateManager.VisualStateGroups">
+            <VisualStateGroupList>
+                <VisualStateGroup x:Name="CommonStates">
+                    <VisualState x:Name="Normal" />
+                    <VisualState x:Name="Disabled">
+                        <VisualState.Setters>
+                            <Setter Property="TextColor" Value="{StaticResource VpTextMuted}" />
+                            <Setter Property="PlaceholderColor" Value="{StaticResource VpTextMuted}" />
+                        </VisualState.Setters>
+                    </VisualState>
+                </VisualStateGroup>
+            </VisualStateGroupList>
+        </Setter>
+    </Style>
+
+    <Style TargetType="SearchHandler">
+        <Setter Property="TextColor" Value="{StaticResource VpText}" />
+        <Setter Property="PlaceholderColor" Value="{StaticResource VpTextMuted}" />
+        <Setter Property="BackgroundColor" Value="Transparent" />
+        <Setter Property="FontFamily" Value="Inter" />
+        <Setter Property="FontSize" Value="14" />
+        <Setter Property="VisualStateManager.VisualStateGroups">
+            <VisualStateGroupList>
+                <VisualStateGroup x:Name="CommonStates">
+                    <VisualState x:Name="Normal" />
+                    <VisualState x:Name="Disabled">
+                        <VisualState.Setters>
+                            <Setter Property="TextColor" Value="{StaticResource VpTextMuted}" />
+                            <Setter Property="PlaceholderColor" Value="{StaticResource VpTextMuted}" />
+                        </VisualState.Setters>
+                    </VisualState>
+                </VisualStateGroup>
+            </VisualStateGroupList>
+        </Setter>
+    </Style>
+
+    <Style TargetType="DatePicker">
+        <Setter Property="TextColor" Value="{StaticResource VpText}" />
+        <Setter Property="BackgroundColor" Value="Transparent" />
+        <Setter Property="FontFamily" Value="Inter"/>
+        <Setter Property="FontSize" Value="14"/>
+        <Setter Property="MinimumHeightRequest" Value="44"/>
+        <Setter Property="MinimumWidthRequest" Value="44"/>
+        <Setter Property="VisualStateManager.VisualStateGroups">
+            <VisualStateGroupList>
+                <VisualStateGroup x:Name="CommonStates">
+                    <VisualState x:Name="Normal" />
+                    <VisualState x:Name="Disabled">
+                        <VisualState.Setters>
+                            <Setter Property="TextColor" Value="{StaticResource VpTextMuted}" />
+                        </VisualState.Setters>
+                    </VisualState>
+                </VisualStateGroup>
+            </VisualStateGroupList>
+        </Setter>
+    </Style>
+
+    <Style TargetType="TimePicker">
+        <Setter Property="TextColor" Value="{StaticResource VpText}" />
+        <Setter Property="BackgroundColor" Value="Transparent"/>
+        <Setter Property="FontFamily" Value="Inter"/>
+        <Setter Property="FontSize" Value="14"/>
+        <Setter Property="MinimumHeightRequest" Value="44"/>
+        <Setter Property="MinimumWidthRequest" Value="44"/>
+        <Setter Property="VisualStateManager.VisualStateGroups">
+            <VisualStateGroupList>
+                <VisualStateGroup x:Name="CommonStates">
+                    <VisualState x:Name="Normal" />
+                    <VisualState x:Name="Disabled">
+                        <VisualState.Setters>
+                            <Setter Property="TextColor" Value="{StaticResource VpTextMuted}" />
+                        </VisualState.Setters>
+                    </VisualState>
+                </VisualStateGroup>
+            </VisualStateGroupList>
+        </Setter>
+    </Style>
+
+    <!-- ==================== Status-/Eingabeelemente ==================== -->
+
+    <Style TargetType="ActivityIndicator">
+        <Setter Property="Color" Value="{StaticResource VpPrimary}" />
+    </Style>
+
+    <Style TargetType="IndicatorView">
+        <Setter Property="IndicatorColor" Value="{StaticResource VpSurfaceBright}"/>
+        <Setter Property="SelectedIndicatorColor" Value="{StaticResource VpText}"/>
+    </Style>
+
+    <Style TargetType="CheckBox">
+        <Setter Property="Color" Value="{StaticResource VpPrimary}" />
+        <Setter Property="MinimumHeightRequest" Value="44"/>
+        <Setter Property="MinimumWidthRequest" Value="44"/>
+        <Setter Property="VisualStateManager.VisualStateGroups">
+            <VisualStateGroupList>
+                <VisualStateGroup x:Name="CommonStates">
+                    <VisualState x:Name="Normal" />
+                    <VisualState x:Name="Disabled">
+                        <VisualState.Setters>
+                            <Setter Property="Color" Value="{StaticResource VpSurfaceBright}" />
                         </VisualState.Setters>
                     </VisualState>
                 </VisualStateGroup>
@@ -190,62 +486,6 @@
         </Setter>
     </Style>
 
-    <Style TargetType="Label">
-        <Setter Property="TextColor" Value="{StaticResource VpText}" />
-        <Setter Property="BackgroundColor" Value="Transparent" />
-        <Setter Property="FontFamily" Value="OpenSansRegular" />
-        <Setter Property="FontSize" Value="14" />
-        <Setter Property="VisualStateManager.VisualStateGroups">
-            <VisualStateGroupList>
-                <VisualStateGroup x:Name="CommonStates">
-                    <VisualState x:Name="Normal" />
-                    <VisualState x:Name="Disabled">
-                        <VisualState.Setters>
-                            <Setter Property="TextColor" Value="{StaticResource VpTextMuted}" />
-                        </VisualState.Setters>
-                    </VisualState>
-                </VisualStateGroup>
-            </VisualStateGroupList>
-        </Setter>
-    </Style>
-
-    <Style TargetType="Label" x:Key="Headline">
-        <Setter Property="TextColor" Value="{StaticResource VpText}" />
-        <Setter Property="FontSize" Value="32" />
-        <Setter Property="HorizontalOptions" Value="Center" />
-        <Setter Property="HorizontalTextAlignment" Value="Center" />
-    </Style>
-
-    <Style TargetType="Label" x:Key="SubHeadline">
-        <Setter Property="TextColor" Value="{StaticResource VpText}" />
-        <Setter Property="FontSize" Value="24" />
-        <Setter Property="HorizontalOptions" Value="Center" />
-        <Setter Property="HorizontalTextAlignment" Value="Center" />
-    </Style>
-
-    <Style TargetType="Picker">
-        <Setter Property="TextColor" Value="{StaticResource VpText}" />
-        <Setter Property="TitleColor" Value="{StaticResource VpTextMuted}" />
-        <Setter Property="BackgroundColor" Value="Transparent" />
-        <Setter Property="FontFamily" Value="OpenSansRegular"/>
-        <Setter Property="FontSize" Value="14" />
-        <Setter Property="MinimumHeightRequest" Value="44"/>
-        <Setter Property="MinimumWidthRequest" Value="44"/>
-        <Setter Property="VisualStateManager.VisualStateGroups">
-            <VisualStateGroupList>
-                <VisualStateGroup x:Name="CommonStates">
-                    <VisualState x:Name="Normal" />
-                    <VisualState x:Name="Disabled">
-                        <VisualState.Setters>
-                            <Setter Property="TextColor" Value="{StaticResource VpTextMuted}" />
-                            <Setter Property="TitleColor" Value="{StaticResource VpTextMuted}" />
-                        </VisualState.Setters>
-                    </VisualState>
-                </VisualStateGroup>
-            </VisualStateGroupList>
-        </Setter>
-    </Style>
-
     <Style TargetType="ProgressBar">
         <Setter Property="ProgressColor" Value="{StaticResource VpPrimary}" />
         <Setter Property="VisualStateManager.VisualStateGroups">
@@ -265,7 +505,7 @@
     <Style TargetType="RadioButton">
         <Setter Property="BackgroundColor" Value="Transparent"/>
         <Setter Property="TextColor" Value="{StaticResource VpText}" />
-        <Setter Property="FontFamily" Value="OpenSansRegular"/>
+        <Setter Property="FontFamily" Value="Inter"/>
         <Setter Property="FontSize" Value="14"/>
         <Setter Property="MinimumHeightRequest" Value="44"/>
         <Setter Property="MinimumWidthRequest" Value="44"/>
@@ -287,56 +527,12 @@
         <Setter Property="RefreshColor" Value="{StaticResource VpPrimary}" />
     </Style>
 
-    <Style TargetType="SearchBar">
-        <Setter Property="TextColor" Value="{StaticResource VpText}" />
-        <Setter Property="PlaceholderColor" Value="{StaticResource VpTextMuted}" />
-        <Setter Property="CancelButtonColor" Value="{StaticResource VpTextMuted}" />
-        <Setter Property="BackgroundColor" Value="Transparent" />
-        <Setter Property="FontFamily" Value="OpenSansRegular" />
-        <Setter Property="FontSize" Value="14" />
-        <Setter Property="MinimumHeightRequest" Value="44"/>
-        <Setter Property="MinimumWidthRequest" Value="44"/>
-        <Setter Property="VisualStateManager.VisualStateGroups">
-            <VisualStateGroupList>
-                <VisualStateGroup x:Name="CommonStates">
-                    <VisualState x:Name="Normal" />
-                    <VisualState x:Name="Disabled">
-                        <VisualState.Setters>
-                            <Setter Property="TextColor" Value="{StaticResource VpTextMuted}" />
-                            <Setter Property="PlaceholderColor" Value="{StaticResource VpTextMuted}" />
-                        </VisualState.Setters>
-                    </VisualState>
-                </VisualStateGroup>
-            </VisualStateGroupList>
-        </Setter>
-    </Style>
-
-    <Style TargetType="SearchHandler">
-        <Setter Property="TextColor" Value="{StaticResource VpText}" />
-        <Setter Property="PlaceholderColor" Value="{StaticResource VpTextMuted}" />
-        <Setter Property="BackgroundColor" Value="Transparent" />
-        <Setter Property="FontFamily" Value="OpenSansRegular" />
-        <Setter Property="FontSize" Value="14" />
-        <Setter Property="VisualStateManager.VisualStateGroups">
-            <VisualStateGroupList>
-                <VisualStateGroup x:Name="CommonStates">
-                    <VisualState x:Name="Normal" />
-                    <VisualState x:Name="Disabled">
-                        <VisualState.Setters>
-                            <Setter Property="TextColor" Value="{StaticResource VpTextMuted}" />
-                            <Setter Property="PlaceholderColor" Value="{StaticResource VpTextMuted}" />
-                        </VisualState.Setters>
-                    </VisualState>
-                </VisualStateGroup>
-            </VisualStateGroupList>
-        </Setter>
-    </Style>
-
+    <!-- Weiche, tiefe Schatten für Karten und Poster. -->
     <Style TargetType="Shadow">
-        <Setter Property="Radius" Value="15" />
-        <Setter Property="Opacity" Value="0.5" />
+        <Setter Property="Radius" Value="18" />
+        <Setter Property="Opacity" Value="0.35" />
         <Setter Property="Brush" Value="{StaticResource VpShadowBrush}" />
-        <Setter Property="Offset" Value="10,10" />
+        <Setter Property="Offset" Value="0,8" />
     </Style>
 
     <Style TargetType="Slider">
@@ -392,34 +588,15 @@
         </Setter>
     </Style>
 
-    <Style TargetType="TimePicker">
-        <Setter Property="TextColor" Value="{StaticResource VpText}" />
-        <Setter Property="BackgroundColor" Value="Transparent"/>
-        <Setter Property="FontFamily" Value="OpenSansRegular"/>
-        <Setter Property="FontSize" Value="14"/>
-        <Setter Property="MinimumHeightRequest" Value="44"/>
-        <Setter Property="MinimumWidthRequest" Value="44"/>
-        <Setter Property="VisualStateManager.VisualStateGroups">
-            <VisualStateGroupList>
-                <VisualStateGroup x:Name="CommonStates">
-                    <VisualState x:Name="Normal" />
-                    <VisualState x:Name="Disabled">
-                        <VisualState.Setters>
-                            <Setter Property="TextColor" Value="{StaticResource VpTextMuted}" />
-                        </VisualState.Setters>
-                    </VisualState>
-                </VisualStateGroup>
-            </VisualStateGroupList>
-        </Setter>
-    </Style>
+    <!-- ==================== Seiten / Shell ==================== -->
 
     <Style TargetType="Page" ApplyToDerivedTypes="True">
         <Setter Property="Padding" Value="0"/>
         <Setter Property="BackgroundColor" Value="{StaticResource VpBg}" />
     </Style>
 
-    <!-- Shell/Flyout in Web-Farbgebung: Seitenhintergrund vp-bg,
-         Flyout und Tab-Leiste im tieferen vp-bg-deep. -->
+    <!-- Shell/Flyout: Seitenhintergrund vp-bg, Flyout und Tab-Leiste
+         im tieferen vp-bg-deep. -->
     <Style TargetType="Shell" ApplyToDerivedTypes="True">
         <Setter Property="Shell.BackgroundColor" Value="{StaticResource VpBg}" />
         <Setter Property="Shell.FlyoutBackgroundColor" Value="{StaticResource VpBgDeep}" />

@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="UTF-8" ?>
+<?xml version="1.0" encoding="utf-8" ?>
 <Shell
     x:Class="VideoPlayer.Maui.AppShell"
     xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
@@ -8,14 +8,15 @@
     FlyoutBehavior="Flyout">
 
     <Shell.Resources>
-        <!-- Sektionstitel der dynamischen Quellengruppe: kleiner,
-             kräftig und abgesetzt formatiert — die Zeile wirkt als
-             Überschrift, nicht als deaktivierter Menüeintrag. -->
+        <!-- Sektionstitel der dynamischen Quellengruppe: Versal-Kicker
+             über den Einträgen — die Zeile wirkt als Überschrift,
+             nicht als deaktivierter Menüeintrag. -->
         <DataTemplate x:Key="SourceSectionTemplate">
             <Label Text="{Binding Text}"
-                   FontSize="12"
-                   FontAttributes="Bold"
-                   Margin="0,12,0,0"
+                   FontFamily="InterSemiBold"
+                   FontSize="11"
+                   CharacterSpacing="1.4"
+                   Margin="0,14,0,0"
                    Padding="16,4"
                    TextColor="{StaticResource VpTextMuted}" />
         </DataTemplate>
@@ -41,18 +42,33 @@
     </Shell.Resources>
 
     <FlyoutItem Title="Startseite" Route="home">
+        <FlyoutItem.Icon>
+            <FontImageSource FontFamily="MaterialIcons" Glyph="&#xe88a;" Color="{StaticResource VpTextMuted}" />
+        </FlyoutItem.Icon>
         <ShellContent Title="Startseite" ContentTemplate="{DataTemplate pages:HomePage}" />
     </FlyoutItem>
     <FlyoutItem Title="Favoriten" Route="favorites">
+        <FlyoutItem.Icon>
+            <FontImageSource FontFamily="MaterialIcons" Glyph="&#xe838;" Color="{StaticResource VpTextMuted}" />
+        </FlyoutItem.Icon>
         <ShellContent Title="Favoriten" ContentTemplate="{DataTemplate pages:FavoritesPage}" />
     </FlyoutItem>
     <FlyoutItem Title="Downloads" Route="downloads">
+        <FlyoutItem.Icon>
+            <FontImageSource FontFamily="MaterialIcons" Glyph="&#xe2c4;" Color="{StaticResource VpTextMuted}" />
+        </FlyoutItem.Icon>
         <ShellContent Title="Downloads" ContentTemplate="{DataTemplate pages:DownloadsPage}" />
     </FlyoutItem>
     <FlyoutItem Title="Profil" Route="profile">
+        <FlyoutItem.Icon>
+            <FontImageSource FontFamily="MaterialIcons" Glyph="&#xe7fd;" Color="{StaticResource VpTextMuted}" />
+        </FlyoutItem.Icon>
         <ShellContent Title="Profil" ContentTemplate="{DataTemplate pages:ProfilePage}" />
     </FlyoutItem>
     <FlyoutItem Title="Einstellungen" Route="settings">
+        <FlyoutItem.Icon>
+            <FontImageSource FontFamily="MaterialIcons" Glyph="&#xe8b8;" Color="{StaticResource VpTextMuted}" />
+        </FlyoutItem.Icon>
         <ShellContent Title="Einstellungen" ContentTemplate="{DataTemplate pages:SettingsPage}" />
     </FlyoutItem>
 

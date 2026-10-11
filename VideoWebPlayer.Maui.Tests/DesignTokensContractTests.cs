@@ -150,13 +150,13 @@ public class DesignTokensContractTests
         }
     }
 
-    /// <summary>Prüft Styles.xaml: normale Buttons haben den Web-Radius 4, Karten bleiben bei 8.</summary>
+    /// <summary>Prüft Styles.xaml: Buttons haben den modernen Radius 10, Karten 14, Poster 12.</summary>
     [Fact]
     public void Styles_PinsButtonAndCardRadius()
     {
         var document = XDocument.Parse(Read("VideoPlayer.Maui", "Resources", "Styles", "Styles.xaml"));
 
-        // Impliziter Button-Style (ohne x:Key): CornerRadius 4.
+        // Impliziter Button-Style (ohne x:Key): CornerRadius 10.
         var buttonStyle = document.Root!
             .Elements(MauiNs + "Style")
             .Single(e =>
@@ -165,19 +165,28 @@ public class DesignTokensContractTests
         var radius = buttonStyle
             .Elements(MauiNs + "Setter")
             .Single(s => (string?)s.Attribute("Property") == "CornerRadius");
-        Assert.Equal("4", (string?)radius.Attribute("Value"));
+        Assert.Equal("10", (string?)radius.Attribute("Value"));
 
-        // Kartenradius 8 bleibt in den Karten-Templates verankert.
+        // Kartenradius 14 steckt im zentralen Card-Stil; die Karten-
+        // Templates der Seiten verwenden ihn einheitlich.
+        var cardStyle = document.Root!
+            .Elements(MauiNs + "Style")
+            .Single(e => (string?)e.Attribute(XNs + "Key") == "Card");
+        var cardShape = cardStyle
+            .Elements(MauiNs + "Setter")
+            .Single(s => (string?)s.Attribute("Property") == "StrokeShape");
+        Assert.Equal("RoundRectangle 14", (string?)cardShape.Attribute("Value"));
+
         foreach (var file in new[] { "DownloadsPage.xaml", "FavoritesPage.xaml", "MediaDetailsPage.xaml", "ProfilePage.xaml" })
         {
             Assert.Contains(
-                "RoundRectangle 8",
+                "{StaticResource Card}",
                 Read("VideoPlayer.Maui", "Pages", file),
                 StringComparison.Ordinal);
         }
 
         Assert.Contains(
-            "CornerRadius=\"8\"",
+            "CornerRadius=\"12\"",
             Read("VideoPlayer.Maui", "Controls", "MediaCarousel.xaml"),
             StringComparison.Ordinal);
     }
@@ -200,8 +209,15 @@ public class DesignTokensContractTests
             .Single(s => (string?)s.Attribute("Property") == "CornerRadius");
         Assert.Equal("999", (string?)radius.Attribute("Value"));
 
-        // Genre-Chip und Platzhalter-Badge sind pill-förmig.
-        Assert.Contains("RoundRectangle 999", sourceOverview, StringComparison.Ordinal);
+        // Chip-Stil (Genre-Filter) und Platzhalter-Badge sind pill-förmig.
+        var chipStyle = document.Root!
+            .Elements(MauiNs + "Style")
+            .Single(e => (string?)e.Attribute(XNs + "Key") == "Chip");
+        var chipShape = chipStyle
+            .Elements(MauiNs + "Setter")
+            .Single(s => (string?)s.Attribute("Property") == "StrokeShape");
+        Assert.Equal("RoundRectangle 999", (string?)chipShape.Attribute("Value"));
+        Assert.Contains("{StaticResource Chip}", sourceOverview, StringComparison.Ordinal);
         Assert.Contains("CornerRadius=\"999\"", carousel, StringComparison.Ordinal);
     }
 
@@ -232,6 +248,39 @@ public class DesignTokensContractTests
         var code = Read("VideoPlayer.Maui", "App.xaml.cs");
 
         Assert.Contains("UserAppTheme = AppTheme.Dark", code, StringComparison.Ordinal);
+    }
+
+    /// <summary>Prüft alle XAML-Dateien der App: Trigger-Sammlungen hängen
+    /// an einem Element des passenden TargetType — ein <c>&lt;Label.Triggers&gt;</c>
+    /// als Geschwister unter einer <c>Border</c> würde zur Laufzeit in
+    /// <c>AttachTo</c> mit „bindable not an instance of AssociatedType" knallen.</summary>
+    [Fact]
+    public void Xaml_TriggersAttachToMatchingElementType()
+    {
+        var baseTypes = new HashSet<string>(StringComparer.Ordinal)
+        {
+            "Element", "VisualElement", "BindableObject", "NavigableElement",
+            "InputView", "View", "Layout"
+        };
+
+        foreach (var file in UiXamlFiles)
+        {
+            var document = XDocument.Load(file);
+            foreach (var triggers in document.Descendants()
+                         .Where(e => e.Name.LocalName.EndsWith(".Triggers", StringComparison.Ordinal)))
+            {
+                var qualifier = triggers.Name.LocalName[..^".Triggers".Length];
+                if (baseTypes.Contains(qualifier))
+                {
+                    continue;
+                }
+
+                var parentType = triggers.Parent!.Name.LocalName;
+                Assert.True(
+                    string.Equals(qualifier, parentType, StringComparison.Ordinal),
+                    $"{Path.GetFileName(file)}: <{qualifier}.Triggers> hängt an <{parentType}> statt an <{qualifier}>");
+            }
+        }
     }
 
     /// <summary>Prüft alle XAML-Dateien der App: jeder StaticResource-Verweis löst auf einen definierten Schlüssel auf.</summary>
