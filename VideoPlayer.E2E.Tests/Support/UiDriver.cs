@@ -210,6 +210,50 @@ public sealed class UiDriver : IDisposable
     }
 
     /// <summary>
+    /// Löst ein Element per Anzeigename aus — für Dialog-Schaltflächen
+    /// (z. B. <c>DisplayActionSheet</c>), die als Popup außerhalb des
+    /// Fenster-Teilbaums liegen können: zuerst im Fenster, danach auf
+    /// Desktop-Ebene eingeschränkt auf den App-Prozess (Retry bis
+    /// Timeout).
+    /// </summary>
+    /// <param name="name">Der Anzeigename des Elements.</param>
+    /// <param name="timeout">Maximale Wartezeit (Standard 15 s).</param>
+    /// <returns>Das gefundene und ausgelöste Element.</returns>
+    public AutomationElement ClickByName(string name, TimeSpan? timeout = null)
+    {
+        var deadline = DateTime.UtcNow + (timeout ?? TimeSpan.FromSeconds(15));
+        var processId = window.Properties.ProcessId.ValueOrDefault;
+        while (true)
+        {
+            var element = window.FindFirstDescendant(Conditions.ByName(name))
+                ?? automation.GetDesktop()
+                    .FindAllDescendants(Conditions.ByName(name))
+                    .FirstOrDefault(e => e.Properties.ProcessId.ValueOrDefault == processId);
+            if (element is not null)
+            {
+                if (element.Patterns.Invoke.IsSupported)
+                {
+                    element.Patterns.Invoke.Pattern.Invoke();
+                }
+                else
+                {
+                    element.Click();
+                }
+
+                return element;
+            }
+
+            if (DateTime.UtcNow >= deadline)
+            {
+                throw new TimeoutException(
+                    $"Kein Element mit dem Namen '{name}' im Fenster oder als Popup des Prozesses gefunden.");
+            }
+
+            Thread.Sleep(200);
+        }
+    }
+
+    /// <summary>
     /// Schreibt den UIA-Baum des Fensters (Name, AutomationId,
     /// ControlType je Knoten) in eine Textdatei — Diagnosehilfe,
     /// wenn ein Element nicht gefunden wird.

@@ -113,4 +113,29 @@ public partial class HomePage : ContentPage
         // Update entscheidet über Wiedergabe bzw. Detail-Fallback.
         _ = mvuHost.DispatchAsync(new ContinueWatchingItemSelectedMessage(item));
     }
+
+    private async void OnContinueWatchingItemLongPressed(object? sender, HomeMediaItem item)
+    {
+        // Kontextmenü nur für verwertbare Einträge (Platzhalter fehlender
+        // Offline-Episoden tragen keine serverseitige Identität).
+        if (!item.IsSelectable)
+        {
+            return;
+        }
+
+        // Kontextmenü der Weiterschauen-Liste (2-s-Long-Press) — analog
+        // zur Serveranwendung: Ausblenden/Überspringen über die MVU-
+        // Nachrichten an die Server-Endpunkte bzw. das lokale Entfernen.
+        var choice = await DisplayActionSheetAsync(
+            item.Title, "Abbrechen", null, FlowDirection.MatchParent, "Ausblenden", "Überspringen");
+        switch (choice)
+        {
+            case "Ausblenden":
+                _ = mvuHost.DispatchAsync(new ContinueWatchingHideRequestedMessage(item));
+                break;
+            case "Überspringen":
+                _ = mvuHost.DispatchAsync(new ContinueWatchingSkipRequestedMessage(item));
+                break;
+        }
+    }
 }

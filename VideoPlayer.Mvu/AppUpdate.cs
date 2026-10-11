@@ -125,6 +125,8 @@ public static class AppUpdate
             StorageRecoveredMessage recovered => UpdateStorageRecovered(model, recovered),
             MediaItemSelectedMessage selected => UpdateMediaItemSelected(model, selected),
             ContinueWatchingItemSelectedMessage selected => UpdateContinueWatchingItemSelected(model, selected),
+            ContinueWatchingHideRequestedMessage requested => UpdateContinueWatchingHideRequested(model, requested),
+            ContinueWatchingSkipRequestedMessage requested => UpdateContinueWatchingSkipRequested(model, requested),
             UpcomingEpisodesLoadedMessage loaded => UpdateUpcomingEpisodesLoaded(model, loaded),
             SourcesLoadedMessage loaded => UpdateSourcesLoaded(model, loaded),
             SourcesReloadRequestedMessage => UpdateSourcesReloadRequested(model),
@@ -1218,7 +1220,7 @@ public static class AppUpdate
     private static AppTransition UpdateContinueWatchingItemSelected(AppModel model, ContinueWatchingItemSelectedMessage message)
     {
         var item = message.Item;
-        if (item.Id <= 0 || string.IsNullOrWhiteSpace(item.MediaType) || !item.IsSelectable)
+        if (!IsSelectableEntry(item))
         {
             // Ohne identifizierbares Medium keine Aktion; Platzhalter
             // fehlender Offline-Episoden sind nicht auswählbar.
@@ -1250,6 +1252,62 @@ public static class AppUpdate
 
         return transition;
     }
+
+    /// <summary>
+    /// Kontextmenü „Ausblenden" auf einem Weiterschauen-Eintrag: der
+    /// Eintrag wird über den Mutations-Effekt ausgeblendet (online
+    /// Server-Endpunkt + Cache-Erneuerung, offline lokales Entfernen) —
+    /// dieselben Guards wie die Eintragsauswahl.
+    /// </summary>
+    /// <param name="model">Aktuelles App-Model.</param>
+    /// <param name="message">Die Ausblenden-Anforderung.</param>
+    /// <returns>Übergang mit dem Hide-Effekt bzw. unverändertem Model.</returns>
+    private static AppTransition UpdateContinueWatchingHideRequested(AppModel model, ContinueWatchingHideRequestedMessage message)
+    {
+        var item = message.Item;
+        if (!IsSelectableEntry(item))
+        {
+            // Ohne identifizierbares Medium keine Aktion; Platzhalter
+            // fehlender Offline-Episoden sind nicht ausblendbar.
+            return AppTransition.Unchanged(model);
+        }
+
+        return new AppTransition(
+            model,
+            [new HideContinueWatchingEntryEffect(item.MediaType, item.Id)]);
+    }
+
+    /// <summary>
+    /// Kontextmenü „Überspringen" auf einem Weiterschauen-Eintrag: der
+    /// Eintrag wird über den Mutations-Effekt übersprungen (online
+    /// Server-Endpunkt + Cache-Erneuerung, offline lokales Entfernen) —
+    /// dieselben Guards wie die Eintragsauswahl.
+    /// </summary>
+    /// <param name="model">Aktuelles App-Model.</param>
+    /// <param name="message">Die Überspringen-Anforderung.</param>
+    /// <returns>Übergang mit dem Skip-Effekt bzw. unverändertem Model.</returns>
+    private static AppTransition UpdateContinueWatchingSkipRequested(AppModel model, ContinueWatchingSkipRequestedMessage message)
+    {
+        var item = message.Item;
+        if (!IsSelectableEntry(item))
+        {
+            return AppTransition.Unchanged(model);
+        }
+
+        return new AppTransition(
+            model,
+            [new SkipContinueWatchingEntryEffect(item.MediaType, item.Id)]);
+    }
+
+    /// <summary>
+    /// Verwertbarer Weiterschauen-Eintrag für Auswahl und Kontextmenü-
+    /// Mutationen: identifizierbares Medium (Id + Typ), kein Platzhalter
+    /// fehlender Offline-Episoden.
+    /// </summary>
+    /// <param name="item">Der zu prüfende Eintrag.</param>
+    /// <returns><c>true</c>, wenn der Eintrag eine Aktion zulässt.</returns>
+    private static bool IsSelectableEntry(HomeMediaItem item) =>
+        item.Id > 0 && !string.IsNullOrWhiteSpace(item.MediaType) && item.IsSelectable;
 
     /// <summary>
     /// Übernimmt die nachgeladenen Folge-Episoden in den Player-Zustand —

@@ -1,3 +1,4 @@
+using Microsoft.Maui.Dispatching;
 using VideoPlayer.Mvu;
 
 namespace VideoPlayer.Maui.Controls;
@@ -39,6 +40,13 @@ public partial class MediaCarousel : ContentView
         typeof(MediaCarousel),
         225.0);
 
+    /// <value>Bindable Property für <see cref="LongPressEnabled"/> — schaltet die 2-s-Long-Press-Erkennung frei (Standard: aus).</value>
+    public static readonly BindableProperty LongPressEnabledProperty = BindableProperty.Create(
+        nameof(LongPressEnabled),
+        typeof(bool),
+        typeof(MediaCarousel),
+        false);
+
     /// <summary>Initialisiert eine neue Instanz der <see cref="MediaCarousel"/>-Klasse.</summary>
     public MediaCarousel()
     {
@@ -77,8 +85,24 @@ public partial class MediaCarousel : ContentView
         set => SetValue(ItemHeightProperty, value);
     }
 
+    /// <summary>
+    /// Aktiviert die Long-Press-Erkennung: ein 2-s-Halten eines Eintrags
+    /// löst <see cref="ItemLongPressed"/> aus — der kurze Tap bleibt dem
+    /// <see cref="ItemTapped"/>-Pfad vorbehalten. Standard: aus, damit
+    /// das Kontextmenü auf die jeweils verdrahtete Liste beschränkt
+    /// bleibt (Weiterschauen-Liste der Startseite).
+    /// </summary>
+    public bool LongPressEnabled
+    {
+        get => (bool)GetValue(LongPressEnabledProperty);
+        set => SetValue(LongPressEnabledProperty, value);
+    }
+
     /// <summary>Ein Eintrag wurde per Tippen ausgewählt.</summary>
     public event EventHandler<HomeMediaItem>? ItemTapped;
+
+    /// <summary>Ein Eintrag wurde 2 Sekunden gehalten (Kontextmenü-Anforderung).</summary>
+    public event EventHandler<HomeMediaItem>? ItemLongPressed;
 
     private static void OnItemsChanged(BindableObject bindable, object oldValue, object newValue)
     {
@@ -93,6 +117,82 @@ public partial class MediaCarousel : ContentView
         if (sender is BindableObject element && element.BindingContext is HomeMediaItem item)
         {
             ItemTapped?.Invoke(this, item);
+        }
+    }
+
+    // --- Long-Press-Erkennung (2 s Halten → ItemLongPressed) ---
+
+    /// <summary>Halte-Dauer des Long-Press in Millisekunden (Serveranwendung/Altbestand: 2000 ms).</summary>
+    internal const int LongPressDurationMs = 2000;
+
+    private IDispatcherTimer? longPressTimer;
+    private HomeMediaItem? pendingLongPressItem;
+
+    /// <summary>
+    /// Startet den Long-Press-Timer für den gedrückten Eintrag — nur bei
+    /// aktivem <see cref="LongPressEnabled"/>; ein Loslassen oder
+    /// Verlassen der Karte vor Ablauf verwirft den Timer, sodass der
+    /// kurze Tap unverändert zur Auswahl führt.
+    /// </summary>
+    /// <param name="sender">Die gedrückte Eintragskarte.</param>
+    /// <param name="e">Die Ereignisdaten des Pointer-Drucks.</param>
+    private void OnItemPointerPressed(object? sender, PointerEventArgs e)
+    {
+        if (!LongPressEnabled
+            || sender is not BindableObject element
+            || element.BindingContext is not HomeMediaItem item)
+        {
+            return;
+        }
+
+        CancelLongPress();
+        pendingLongPressItem = item;
+        var timer = Dispatcher.CreateTimer();
+        longPressTimer = timer;
+        timer.Interval = TimeSpan.FromMilliseconds(LongPressDurationMs);
+        timer.Tick += OnLongPressElapsed;
+        timer.Start();
+    }
+
+    private void OnItemPointerEnded(object? sender, PointerEventArgs e)
+    {
+        CancelLongPress();
+    }
+
+    private void OnLongPressElapsed(object? sender, EventArgs e)
+    {
+        var item = pendingLongPressItem;
+        CancelLongPress();
+        if (item is not null)
+        {
+            ItemLongPressed?.Invoke(this, item);
+        }
+    }
+
+    private void CancelLongPress()
+    {
+        pendingLongPressItem = null;
+        if (longPressTimer is { } timer)
+        {
+            longPressTimer = null;
+            timer.Tick -= OnLongPressElapsed;
+            timer.Stop();
+        }
+    }
+
+    /// <summary>
+    /// Löst die Long-Press-Auswahl eines Eintrags aus — identisch zur
+    /// Ereigniskette des Timer-Auslaufs. Auslöser ist die Developer-API
+    /// (<c>POST /invoke</c> mit <c>gesture: "longpress"</c>): Einträge des
+    /// BindableLayout-Karussells fehlen im UIA-Baum und sind sonst nicht
+    /// per Automatisierung erreichbar.
+    /// </summary>
+    /// <param name="itemIndex">Der Index des Eintrags in <see cref="Items"/>.</param>
+    internal void SendItemLongPressed(int itemIndex)
+    {
+        if (Items is { } items && itemIndex >= 0 && itemIndex < items.Count)
+        {
+            ItemLongPressed?.Invoke(this, items[itemIndex]);
         }
     }
 }

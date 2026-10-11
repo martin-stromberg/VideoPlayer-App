@@ -170,6 +170,19 @@ public sealed class MockVideoServer : IDisposable
     /// <summary>Alle empfangenen Anfragepfade in Reihenfolge (Diagnose: Detail- vs. Wiedergabeaufrufe).</summary>
     public List<string> RequestedPaths { get; } = [];
 
+    /// <summary>Anzahl eingegangener <c>POST /api/continue-watching/hide</c>-Aufrufe (Diagnose).</summary>
+    public int HideContinueWatchingCount { get; private set; }
+
+    /// <summary>Anzahl eingegangener <c>POST /api/continue-watching/skip</c>-Aufrufe (Diagnose).</summary>
+    public int SkipContinueWatchingCount { get; private set; }
+
+    /// <summary>
+    /// Per hide/skip entfernte Weiterschauen-Einträge im Format
+    /// <c>"{mediaType}:{mediaId}"</c> — <c>GET /api/continue-watching</c>
+    /// liefert diese Einträge danach nicht mehr (Serverstand).
+    /// </summary>
+    public List<string> RemovedContinueWatchingKeys { get; } = [];
+
     /// <summary>
     /// Prüft, ob ein Anfragepfad empfangen wurde (Thread-sicherer Leser;
     /// gespeicherte Einträge im Format <c>"{Methode} {Pfad}"</c>,
@@ -319,6 +332,43 @@ public sealed class MockVideoServer : IDisposable
             return (204, "text/plain", Array.Empty<byte>());
         }
 
+        // Kontextmenü-Mutationen der Weiterschauen-Liste: hide/skip
+        // nehmen den Eintrag aus dem Serverstand (folgende Listenantworten
+        // enthalten ihn nicht mehr).
+        if (method == "POST" && path.Equals("/api/continue-watching/hide", StringComparison.OrdinalIgnoreCase))
+        {
+            if (!IsGateValid(request))
+            {
+                return GateRejected();
+            }
+
+            if (!IsBearerValid(request))
+            {
+                return (401, "text/plain", Encoding.UTF8.GetBytes("unauthorized"));
+            }
+
+            HideContinueWatchingCount++;
+            RecordRemoval(request.Body);
+            return (200, "application/json", JsonBody(new { status = "hidden", message = "ok" }));
+        }
+
+        if (method == "POST" && path.Equals("/api/continue-watching/skip", StringComparison.OrdinalIgnoreCase))
+        {
+            if (!IsGateValid(request))
+            {
+                return GateRejected();
+            }
+
+            if (!IsBearerValid(request))
+            {
+                return (401, "text/plain", Encoding.UTF8.GetBytes("unauthorized"));
+            }
+
+            SkipContinueWatchingCount++;
+            RecordRemoval(request.Body);
+            return (200, "application/json", JsonBody(new { status = "skipped", message = "ok" }));
+        }
+
         // Opt-in Wiedergabefluss: Movie-Details und Stream-Endpunkt.
         if (method == "GET" && path.StartsWith("/api/items/movie/", StringComparison.OrdinalIgnoreCase))
         {
@@ -456,7 +506,8 @@ public sealed class MockVideoServer : IDisposable
         if (path.Equals("/api/continue-watching", StringComparison.OrdinalIgnoreCase))
         {
             var entries = new List<object>();
-            if (PlaybackResumePositionSeconds is > 0 && PlaybackMovieId is not null)
+            if (PlaybackResumePositionSeconds is > 0 && PlaybackMovieId is not null
+                && !IsRemoved("movie", PlaybackMovieId.Value))
             {
                 entries.Add(new
                 {
@@ -473,7 +524,7 @@ public sealed class MockVideoServer : IDisposable
                 });
             }
 
-            if (PlaybackEpisodeId is { } episodeId)
+            if (PlaybackEpisodeId is { } episodeId && !IsRemoved("episode", episodeId))
             {
                 entries.Add(new
                 {
@@ -507,7 +558,7 @@ public sealed class MockVideoServer : IDisposable
                 });
             }
 
-            if (ContinueWatchingShowId is { } showId)
+            if (ContinueWatchingShowId is { } showId && !IsRemoved("show", showId))
             {
                 entries.Add(new
                 {
@@ -529,6 +580,63 @@ public sealed class MockVideoServer : IDisposable
         }
 
         return null;
+    }
+
+    /// <summary>
+    /// Merkt einen per hide/skip entfernten Weiterschauen-Eintrag aus dem
+    /// Anfragekörper (<c>{ mediaType, mediaId }</c>, Pascal- oder
+    /// camelCase) vor — die nächste Listenantwort lässt ihn aus.
+    /// </summary>
+    /// <param name="body">Der JSON-Anfragekörper der Mutation.</param>
+    private void RecordRemoval(string body)
+    {
+        try
+        {
+            using var doc = JsonDocument.Parse(body);
+            var mediaType = ReadStringProperty(doc.RootElement, "mediaType");
+            var mediaId = ReadLongProperty(doc.RootElement, "mediaId");
+            lock (RemovedContinueWatchingKeys)
+            {
+                RemovedContinueWatchingKeys.Add($"{mediaType}:{mediaId}");
+            }
+        }
+        catch (Exception)
+        {
+            // Unlesbarer Body: der Request gilt dennoch als bedient —
+            // Diagnose über die Request-Zähler.
+        }
+    }
+
+    /// <summary>Prüft, ob ein Weiterschauen-Eintrag per hide/skip entfernt wurde.</summary>
+    /// <param name="mediaType">Der Server-Medientyp des Eintrags.</param>
+    /// <param name="mediaId">Die Medien-Id des Eintrags.</param>
+    /// <returns><c>true</c>, wenn der Eintrag nicht mehr geliefert wird.</returns>
+    private bool IsRemoved(string mediaType, long mediaId)
+    {
+        var key = $"{mediaType}:{mediaId}";
+        lock (RemovedContinueWatchingKeys)
+        {
+            return RemovedContinueWatchingKeys.Contains(key);
+        }
+    }
+
+    /// <summary>Liest eine numerische Eigenschaft case-insensitiv (Pascal- oder camelCase).</summary>
+    /// <param name="root">Das JSON-Wurzelelement.</param>
+    /// <param name="name">Der gesuchte Eigenschaftsname.</param>
+    /// <returns>Der Wert oder <c>0</c>.</returns>
+    private static long ReadLongProperty(JsonElement root, string name)
+    {
+        foreach (var property in root.EnumerateObject())
+        {
+            if (string.Equals(property.Name, name, StringComparison.OrdinalIgnoreCase)
+                && property.Value.ValueKind == JsonValueKind.Number
+                && property.Value.TryGetInt64(out var value))
+            {
+                return value;
+            }
+        }
+
+        return 0;
     }
 
     /// <summary>

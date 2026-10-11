@@ -107,6 +107,29 @@ Die Fortsetzungsposition kommt beim Direktstart über denselben
 Auflösungspfad wie beim Wiedergabestart von der Detailseite — der
 Eintrag muss dafür keine weiteren Angaben mitbringen.
 
+## Kontextmenü der Weiterschauen-Liste
+
+Ein **2-Sekunden-Long-Press** auf einen Eintrag der
+Weiterschauen-Liste öffnet ein Kontextmenü mit den Aktionen
+**„Ausblenden"** und **„Überspringen"** sowie **„Abbrechen"** — analog
+zur Serveranwendung. Der kurze Tap bleibt davon unberührt und startet
+weiterhin die direkte Wiedergabe bzw. die Detailansicht.
+
+- **„Ausblenden"** ruft den Server-Endpunkt
+  `api/continue-watching/hide` auf, **„Überspringen"**
+  `api/continue-watching/skip` — danach wird die Cache-Kopie der
+  Liste autoritativ vom Serverstand erneuert
+  (`SyncContinueWatchingAsync` + `CachedListsChangedMessage`) und der
+  Eintrag verschwindet gemäß Server-Antwort aus der Anzeige.
+- **Offline** (ohne angemeldeten Client) wird der Eintrag lokal aus
+  dem `cached_lists`-Eintrag `continue_watching` entfernt; die Liste
+  aktualisiert sich über dieselbe Cache-Geändert-Kette.
+- Technisch trägt das `MediaCarousel` einen
+  `PointerGestureRecognizer` mit 2-s-Timer, der nur bei gesetztem
+  `LongPressEnabled` aktiv ist — das Kontextmenü bleibt auf die
+  Weiterschauen-Liste beschränkt; „Favoriten" und „Neu im Programm"
+  bieten kein Menü.
+
 Damit das **Folgevideo** (Auto-Fortsetzung bzw. Fehler-Rückfall auf
 die nächste Episode) auch beim Direktstart einer Episode funktioniert,
 lädt die App den Serienkontext unabhängig von der Detailseite: online

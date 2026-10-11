@@ -120,6 +120,8 @@ public static class DevApiVisualTree
     /// Führt <c>Command</c>/<c>CommandParameter</c> eines Objekts per
     /// Reflection aus (kein gemeinsames öffentliches Interface in MAUI).
     /// </summary>
+    /// <param name="source">Das Objekt mit den Command-Eigenschaften.</param>
+    /// <returns><c>true</c>, wenn ein Command ausgeführt wurde.</returns>
     private static bool TryExecuteCommand(object source)
     {
         var type = source.GetType();
@@ -153,12 +155,24 @@ public static class DevApiVisualTree
     /// </summary>
     /// <param name="element">Das Zielelement (<see cref="CollectionView"/> oder Element mit <see cref="BindableLayout"/>-Container).</param>
     /// <param name="itemIndex">Nullbasierter Index in der <c>ItemsSource</c>.</param>
+    /// <param name="gesture">Auszulösende Geste: <c>null</c>/<c>"tap"</c> = Tap-Kette; <c>"longpress"</c> = Long-Press-Auswahl über die <c>SendItemLongPressed</c>-Konvention des Zielelements.</param>
     /// <param name="error">Deutscher Fehlertext, wenn die Auswahl nicht möglich ist.</param>
     /// <returns><c>true</c>, wenn der Eintrag ausgewählt wurde.</returns>
-    public static bool TrySelectItem(Element element, int itemIndex, out string? error)
+    public static bool TrySelectItem(Element element, int itemIndex, string? gesture, out string? error)
     {
         ArgumentNullException.ThrowIfNull(element);
         error = null;
+        if (string.Equals(gesture, "longpress", StringComparison.OrdinalIgnoreCase))
+        {
+            return TryLongPressItem(element, itemIndex, out error);
+        }
+
+        if (!string.IsNullOrEmpty(gesture) && !string.Equals(gesture, "tap", StringComparison.OrdinalIgnoreCase))
+        {
+            error = $"Die Geste '{gesture}' wird nicht unterstützt (erlaubt: \"tap\", \"longpress\").";
+            return false;
+        }
+
         if (element is CollectionView collectionView)
         {
             if (collectionView.ItemsSource is not IEnumerable items)
@@ -194,6 +208,45 @@ public static class DevApiVisualTree
     }
 
     /// <summary>
+    /// Long-Press-Auswahl eines Eintrags: ruft die Methode
+    /// <c>SendItemLongPressed(int)</c> auf dem Zielelement per Reflection
+    /// auf — die App-seitige Konvention, mit der ein Element seine
+    /// Long-Press-Ereigniskette selbst auslöst (dieselbe Kette wie das
+    /// tatsächliche 2-s-Halten). Schließt dieselbe UIA-Lücke wie
+    /// <see cref="TrySelectItem"/> für den Tap.
+    /// </summary>
+    /// <param name="element">Das Zielelement (z. B. ein Karussell mit Long-Press-Unterstützung).</param>
+    /// <param name="itemIndex">Nullbasierter Index des Eintrags.</param>
+    /// <param name="error">Deutscher Fehlertext, wenn kein Long-Press auslösbar ist.</param>
+    /// <returns><c>true</c>, wenn der Long-Press ausgelöst wurde.</returns>
+    private static bool TryLongPressItem(Element element, int itemIndex, out string? error)
+    {
+        error = null;
+        var method = element.GetType().GetMethod(
+            "SendItemLongPressed",
+            BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance,
+            binder: null,
+            types: [typeof(int)],
+            modifiers: null);
+        if (method is null)
+        {
+            error = $"Das Element vom Typ '{element.GetType().Name}' unterstützt keine Long-Press-Auswahl (SendItemLongPressed fehlt).";
+            return false;
+        }
+
+        try
+        {
+            method.Invoke(element, [itemIndex]);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            error = $"Der Long-Press auf den Eintrag {itemIndex} konnte nicht ausgelöst werden: {ex.GetBaseException().Message}";
+            return false;
+        }
+    }
+
+    /// <summary>
     /// Item-Auswahl über einen <see cref="BindableLayout"/>-Container im
     /// Teilbaum des Elements: das indexierte Kind-View wird genommen und
     /// der erste <see cref="TapGestureRecognizer"/> in seinem Teilbaum per
@@ -201,6 +254,10 @@ public static class DevApiVisualTree
     /// der Plattform-Gesture-Manager bei einem Fingertipp macht
     /// (<c>Tapped</c> feuert mit <c>sender</c> = Eintrags-View).
     /// </summary>
+    /// <param name="element">Das Zielelement mit dem BindableLayout-Container.</param>
+    /// <param name="itemIndex">Nullbasierter Index des Eintrags.</param>
+    /// <param name="error">Deutscher Fehlertext, wenn die Auswahl nicht möglich ist.</param>
+    /// <returns><c>true</c>, wenn der Tap ausgelöst wurde.</returns>
     private static bool TrySelectBindableLayoutItem(Element element, int itemIndex, out string? error)
     {
         error = null;
@@ -260,10 +317,8 @@ public static class DevApiVisualTree
         }
     }
 
-    /// <summary>
-    /// Interner <c>TapGestureRecognizer.SendTapped(View, Func&lt;IElement?, Point?&gt;?)</c>
-    /// — wird einmalig per Reflection aufgelöst und auf die Signatur gepinnt.
-    /// </summary>
+    // Interner TapGestureRecognizer.SendTapped(View, Func<IElement?, Point?>?)
+    // — wird einmalig per Reflection aufgelöst und auf die Signatur gepinnt.
     private static readonly Lazy<MethodInfo?> SendTappedMethod = new(() =>
     {
         var method = typeof(TapGestureRecognizer).GetMethod(
@@ -282,6 +337,8 @@ public static class DevApiVisualTree
     /// des Elements selbst), dem per <see cref="BindableLayout"/> eine
     /// <c>ItemsSource</c> zugewiesen ist.
     /// </summary>
+    /// <param name="element">Wurzelelement der Suche.</param>
+    /// <returns>Der Container oder <c>null</c>, wenn keiner gefunden wurde.</returns>
     private static BindableObject? FindBindableLayoutContainer(Element element)
     {
         if (BindableLayout.GetItemsSource(element) is IEnumerable)
@@ -307,6 +364,7 @@ public static class DevApiVisualTree
     /// </summary>
     /// <param name="element">Wurzelelement der Suche.</param>
     /// <param name="owner">Die tragende Ansicht des gefundenen Recognizers.</param>
+    /// <returns>Der Recognizer oder <c>null</c>, wenn keiner gefunden wurde.</returns>
     private static TapGestureRecognizer? FindTapRecognizer(Element element, out View? owner)
     {
         if (element is View view)
@@ -361,6 +419,8 @@ public static class DevApiVisualTree
     /// aktuell angezeigte Seite eingehängt, da sie nicht zwingend als
     /// visuelles Kind der Shell auftaucht.
     /// </summary>
+    /// <param name="element">Das Element, dessen Kinder ermittelt werden.</param>
+    /// <returns>Die visuellen Kind-Elemente.</returns>
     private static IEnumerable<Element> VisualChildren(Element element)
     {
         var children = new List<Element>();
@@ -412,6 +472,8 @@ public static class DevApiVisualTree
     /// die Items beider Listenformen erscheinen unter Windows nicht im
     /// Automation-Baum).
     /// </summary>
+    /// <param name="element">Das Container-Element.</param>
+    /// <returns>Die abgeleiteten Einträge oder <c>null</c>, wenn das Element keine Liste ist.</returns>
     private static IReadOnlyList<DevApiTreeItem>? ItemsOf(Element element)
     {
         var items = element is CollectionView collectionView
@@ -441,6 +503,8 @@ public static class DevApiVisualTree
     }
 
     /// <summary>Anzeigetext eines Listeneintrags über die bekannten Anzeige-Properties.</summary>
+    /// <param name="item">Der Listeneintrag.</param>
+    /// <returns>Der Anzeigetext oder <c>null</c>.</returns>
     private static string? ItemText(object? item)
     {
         if (item is null)
@@ -461,6 +525,9 @@ public static class DevApiVisualTree
     }
 
     /// <summary>Liest eine benannte String-Property per Reflection (für Item-Modelle ohne gemeinsame Schnittstelle).</summary>
+    /// <param name="item">Der Listeneintrag.</param>
+    /// <param name="propertyName">Der Name der gesuchten String-Property.</param>
+    /// <returns>Der Property-Wert oder <c>null</c>.</returns>
     private static string? ItemProperty(object? item, string propertyName)
     {
         var property = item?.GetType().GetProperty(propertyName, BindingFlags.Public | BindingFlags.Instance);

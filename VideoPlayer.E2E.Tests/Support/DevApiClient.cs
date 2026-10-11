@@ -28,6 +28,7 @@ public sealed class DevApiClient : IDisposable
     }
 
     /// <summary>Liest den Modell-Snapshot (<c>GET /model</c>).</summary>
+    /// <param name="cancellationToken">Abbruchtoken.</param>
     /// <returns>Der aktuelle Modellzustand.</returns>
     public async Task<DevApiModel> GetModelAsync(CancellationToken cancellationToken = default)
     {
@@ -37,6 +38,7 @@ public sealed class DevApiClient : IDisposable
     }
 
     /// <summary>Liest den Elementbaum der aktuellen Seite (<c>GET /tree</c>).</summary>
+    /// <param name="cancellationToken">Abbruchtoken.</param>
     /// <returns>Der Wurzelknoten des Baums.</returns>
     public async Task<DevApiTreeNode> GetTreeAsync(CancellationToken cancellationToken = default)
     {
@@ -60,6 +62,24 @@ public sealed class DevApiClient : IDisposable
             ? new Dictionary<string, object> { ["automationId"] = automationId }
             : new Dictionary<string, object> { ["automationId"] = automationId, ["itemIndex"] = itemIndex.Value };
         await PostAsync("invoke", payload, cancellationToken);
+    }
+
+    /// <summary>
+    /// Löst die Long-Press-Auswahl eines Listeneintrags aus
+    /// (<c>POST /invoke</c> mit <c>gesture: "longpress"</c>) — dieselbe
+    /// App-seitige Ereigniskette wie das 2-s-Halten auf dem Eintrag.
+    /// </summary>
+    /// <param name="automationId">AutomationId des Container-Elements.</param>
+    /// <param name="itemIndex">Index des Eintrags.</param>
+    /// <param name="cancellationToken">Abbruchtoken.</param>
+    public async Task LongPressAsync(string automationId, int itemIndex, CancellationToken cancellationToken = default)
+    {
+        await PostAsync("invoke", new
+        {
+            automationId,
+            itemIndex,
+            gesture = "longpress"
+        }, cancellationToken);
     }
 
     /// <summary>Setzt den Text eines Eingabefelds (<c>POST /set-text</c>).</summary>
