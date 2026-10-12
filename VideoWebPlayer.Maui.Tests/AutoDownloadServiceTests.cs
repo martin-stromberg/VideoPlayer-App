@@ -1,6 +1,7 @@
 #pragma warning disable xUnit1051 // Kurzlebige Unit-Tests: TestContext-CancellationToken nicht erforderlich
 using System.Net;
 using System.Text.Json;
+using Microsoft.Extensions.Logging;
 using VideoPlayer.ApiClient.Models;
 using VideoPlayer.Mvu;
 using VideoPlayer.Storage;
@@ -632,6 +633,41 @@ public class AutoDownloadServiceTests : IDisposable
         Assert.Equal(33, entry.VideoId);
         Assert.Null(entry.PlaylistId);
         Assert.DoesNotContain(handler.Requests, r => r.PathAndQuery.Contains("api/playlists/"));
+    }
+
+    /// <summary>Prüft die Protokolleinträge: Lauf-Ergebnis und Mindestabstand-Auslassung landen als Information.</summary>
+    [Fact]
+    public async Task RunAsync_LogsOutcome()
+    {
+        var logging = new RecordingLoggerProvider();
+        var loggedService = new AutoDownloadService(
+            authSession, new HomeListService(cache), downloadService, networkMonitor, cache,
+            logging.CreateLogger<AutoDownloadService>());
+        await LoginAsync();
+        await CacheContinueWatchingAsync(
+            new ContinueWatchingEntry
+            {
+                MediaType = "movie",
+                PositionSeconds = 60,
+                Entry = new Movie { Id = 7, Name = "Film Sieben" }
+            });
+        handler.Enqueue(_ => new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new ByteArrayContent([1, 2, 3])
+        });
+
+        await loggedService.RunAsync(settings);
+        Assert.Contains(logging.Entries, e =>
+            e.Level == LogLevel.Information
+            && e.Category.Contains(nameof(AutoDownloadService), StringComparison.Ordinal)
+            && e.Message.Contains("abgeschlossen", StringComparison.Ordinal));
+
+        // Sofortiger Zweitlauf ohne force → Mindestabstand-Auslassung.
+        await loggedService.RunAsync(settings);
+        Assert.Contains(logging.Entries, e =>
+            e.Level == LogLevel.Information
+            && e.Category.Contains(nameof(AutoDownloadService), StringComparison.Ordinal)
+            && e.Message.Contains("Mindestabstand", StringComparison.Ordinal));
     }
 
     private sealed class FakeNetworkMonitor : INetworkStatusMonitor

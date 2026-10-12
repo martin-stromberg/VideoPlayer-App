@@ -1,4 +1,6 @@
 using System.Text.Json;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using VideoPlayer.ApiClient.Models;
 using VideoPlayer.Storage;
 using VideoPlayer.Storage.Entities;
@@ -30,16 +32,19 @@ public sealed class OfflineContinueWatchingService
     private readonly BackupDatabase backup;
     private readonly HomeListService homeLists;
     private readonly Func<string, bool> fileExists;
+    private readonly ILogger<OfflineContinueWatchingService> logger;
 
     /// <summary>Erstellt den Dienst.</summary>
     /// <param name="cache">Cache-Ablage mit Download-Manifest und gecachten Listen.</param>
     /// <param name="backup">Backup-Ablage mit der Fortschritts-Outbox (<c>pending_progress</c>).</param>
     /// <param name="homeLists">Lesedienst der gecachten Favoriten- und Neuheiten-Listen.</param>
+    /// <param name="logger">Optionaler Logger für das Programmprotokoll.</param>
     public OfflineContinueWatchingService(
         CacheDatabase cache,
         BackupDatabase backup,
-        HomeListService homeLists)
-        : this(cache, backup, homeLists, null)
+        HomeListService homeLists,
+        ILogger<OfflineContinueWatchingService>? logger = null)
+        : this(cache, backup, homeLists, null, logger)
     {
     }
 
@@ -48,16 +53,19 @@ public sealed class OfflineContinueWatchingService
     /// <param name="backup">Backup-Ablage mit der Fortschritts-Outbox.</param>
     /// <param name="homeLists">Lesedienst der gecachten Favoriten- und Neuheiten-Listen.</param>
     /// <param name="fileExists">Dateiprüfung; <c>null</c> = <see cref="File.Exists(string?)"/>.</param>
+    /// <param name="logger">Optionaler Logger für das Programmprotokoll.</param>
     internal OfflineContinueWatchingService(
         CacheDatabase cache,
         BackupDatabase backup,
         HomeListService homeLists,
-        Func<string, bool>? fileExists)
+        Func<string, bool>? fileExists,
+        ILogger<OfflineContinueWatchingService>? logger = null)
     {
         this.cache = cache ?? throw new ArgumentNullException(nameof(cache));
         this.backup = backup ?? throw new ArgumentNullException(nameof(backup));
         this.homeLists = homeLists ?? throw new ArgumentNullException(nameof(homeLists));
         this.fileExists = fileExists ?? File.Exists;
+        this.logger = logger ?? NullLogger<OfflineContinueWatchingService>.Instance;
     }
 
     /// <summary>
@@ -99,7 +107,7 @@ public sealed class OfflineContinueWatchingService
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"[OfflineContinueWatchingService] Manifest nicht lesbar: {ex.Message}");
+            logger.LogWarning(ex, "Download-Manifest nicht lesbar.");
             return [];
         }
 
@@ -176,7 +184,7 @@ public sealed class OfflineContinueWatchingService
         HashSet<long> downloadedEpisodeIds,
         CancellationToken cancellationToken)
     {
-        var show = await ShowDetailsCache.ReadAsync(cache, row.ShowId!.Value, cancellationToken);
+        var show = await ShowDetailsCache.ReadAsync(cache, row.ShowId!.Value, logger, cancellationToken);
         if (show is null)
         {
             return null;
@@ -216,7 +224,7 @@ public sealed class OfflineContinueWatchingService
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"[OfflineContinueWatchingService] Fortschritts-Outbox nicht lesbar: {ex.Message}");
+            logger.LogWarning(ex, "Fortschritts-Outbox nicht lesbar.");
         }
 
         return result;
@@ -258,7 +266,7 @@ public sealed class OfflineContinueWatchingService
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"[OfflineContinueWatchingService] Weiterschauen-Cache nicht lesbar: {ex.Message}");
+            logger.LogWarning(ex, "Weiterschauen-Cache nicht lesbar.");
         }
 
         return result;

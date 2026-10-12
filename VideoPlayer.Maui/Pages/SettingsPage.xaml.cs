@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging;
 using VideoPlayer.Mvu;
 using VideoPlayer.Storage;
 
@@ -12,14 +13,17 @@ namespace VideoPlayer.Maui.Pages;
 public partial class SettingsPage : ContentPage
 {
     private readonly MvuHost mvuHost;
+    private readonly ILogger<SettingsPage> logger;
     private bool suppressEvents;
 
     /// <summary>Initialisiert eine neue Instanz der <see cref="SettingsPage"/>-Klasse.</summary>
     /// <param name="mvuHost">MVU-Host; dient als <see cref="BindableObject.BindingContext"/> und Dispatch-Ziel der Speicher-Nachrichten.</param>
-    public SettingsPage(MvuHost mvuHost)
+    /// <param name="logger">Logger für das Programmprotokoll.</param>
+    public SettingsPage(MvuHost mvuHost, ILogger<SettingsPage> logger)
     {
         InitializeComponent();
         this.mvuHost = mvuHost;
+        this.logger = logger;
         BindingContext = mvuHost;
 
         HomeHeroSwitch.Toggled += OnHomeHeroToggled;
@@ -207,7 +211,7 @@ public partial class SettingsPage : ContentPage
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"[SettingsPage] Einstellung speichern fehlgeschlagen: {ex.Message}");
+            logger.LogWarning(ex, "Einstellung speichern fehlgeschlagen.");
         }
     }
 }

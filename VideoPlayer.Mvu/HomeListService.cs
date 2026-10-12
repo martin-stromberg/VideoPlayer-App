@@ -1,4 +1,6 @@
 using System.Text.Json;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using VideoPlayer.ApiClient.Models;
 using VideoPlayer.Storage;
 using VideoPlayer.Storage.Entities;
@@ -22,12 +24,15 @@ public sealed class HomeListService
     };
 
     private readonly CacheDatabase cache;
+    private readonly ILogger<HomeListService> logger;
 
     /// <summary>Erstellt den Dienst.</summary>
     /// <param name="cache">Lokale Cache-Ablage mit den synchronisierten Listen.</param>
-    public HomeListService(CacheDatabase cache)
+    /// <param name="logger">Optionaler Logger für das Programmprotokoll.</param>
+    public HomeListService(CacheDatabase cache, ILogger<HomeListService>? logger = null)
     {
         this.cache = cache ?? throw new ArgumentNullException(nameof(cache));
+        this.logger = logger ?? NullLogger<HomeListService>.Instance;
     }
 
     /// <summary>
@@ -145,7 +150,7 @@ public sealed class HomeListService
             // Beschädigter oder nicht lesbarer Cache → Eintrag verwerfen
             // und leere Liste zurückgeben; die Neu-Synchronisation baut
             // den Cache bei bestehender Verbindung wieder auf.
-            System.Diagnostics.Debug.WriteLine($"[HomeListService] Lesen der Liste '{key}' fehlgeschlagen: {ex.Message}");
+            logger.LogWarning(ex, "Lesen der Liste '{CacheKey}' fehlgeschlagen.", key);
             var discarded = await DiscardListEntryAsync(key);
             return ([], discarded);
         }
@@ -170,7 +175,7 @@ public sealed class HomeListService
                 }
                 catch (JsonException ex)
                 {
-                    System.Diagnostics.Debug.WriteLine($"[HomeListService] Favorit '{row.Key}' nicht lesbar — wird verworfen: {ex.Message}");
+                    logger.LogWarning(ex, "Favorit '{CacheKey}' nicht lesbar — wird verworfen.", row.Key);
                     discarded |= await DiscardRowAsync(row);
                 }
             }
@@ -179,7 +184,7 @@ public sealed class HomeListService
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"[HomeListService] Lesen der Favoriten fehlgeschlagen: {ex.Message}");
+            logger.LogWarning(ex, "Lesen der Favoriten fehlgeschlagen.");
             return ([], false);
         }
     }
@@ -199,7 +204,7 @@ public sealed class HomeListService
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"[HomeListService] Verwerfen der Liste '{key}' fehlgeschlagen: {ex.Message}");
+            logger.LogWarning(ex, "Verwerfen der Liste '{CacheKey}' fehlgeschlagen.", key);
             return false;
         }
     }
@@ -217,7 +222,7 @@ public sealed class HomeListService
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"[HomeListService] Verwerfen des Favoriten '{row.Key}' fehlgeschlagen: {ex.Message}");
+            logger.LogWarning(ex, "Verwerfen des Favoriten '{CacheKey}' fehlgeschlagen.", row.Key);
             return false;
         }
     }

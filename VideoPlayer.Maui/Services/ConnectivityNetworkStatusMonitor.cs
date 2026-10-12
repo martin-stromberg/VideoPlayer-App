@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging;
 using VideoPlayer.Mvu;
 
 namespace VideoPlayer.Maui.Services;
@@ -13,7 +14,15 @@ namespace VideoPlayer.Maui.Services;
 /// </summary>
 public sealed class ConnectivityNetworkStatusMonitor : INetworkStatusMonitor
 {
+    private readonly ILogger<ConnectivityNetworkStatusMonitor> logger;
     private bool started;
+
+    /// <summary>Initialisiert eine neue Instanz der <see cref="ConnectivityNetworkStatusMonitor"/>-Klasse.</summary>
+    /// <param name="logger">Logger für das Programmprotokoll.</param>
+    public ConnectivityNetworkStatusMonitor(ILogger<ConnectivityNetworkStatusMonitor> logger)
+    {
+        this.logger = logger;
+    }
 
     /// <inheritdoc/>
     public bool IsOnline =>
@@ -44,6 +53,11 @@ public sealed class ConnectivityNetworkStatusMonitor : INetworkStatusMonitor
 
     private void OnConnectivityChanged(object? sender, ConnectivityChangedEventArgs e)
     {
-        AvailabilityChanged?.Invoke(this, IsOnline);
+        var isOnline = IsOnline;
+        logger.LogInformation(
+            "Netzverfügbarkeit geändert: {IsOnline} (WLAN/Ethernet: {IsWifi}).",
+            isOnline ? "online" : "offline",
+            IsWifi);
+        AvailabilityChanged?.Invoke(this, isOnline);
     }
 }

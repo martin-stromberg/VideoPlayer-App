@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging;
 using VideoPlayer.Mvu;
 using VideoPlayer.Storage;
 
@@ -14,6 +15,7 @@ public sealed class PosterImageService
 {
     private readonly AuthSessionService authSession;
     private readonly AppStorageLayout layout;
+    private readonly ILogger<PosterImageService> logger;
     private readonly System.Collections.Concurrent.ConcurrentDictionary<long, ImageSource> memoryCache = new();
     private readonly System.Collections.Concurrent.ConcurrentDictionary<long, ImageSource> iconMemoryCache = new();
     private readonly System.Collections.Concurrent.ConcurrentDictionary<long, ImageSource> playlistCoverMemoryCache = new();
@@ -21,10 +23,15 @@ public sealed class PosterImageService
     /// <summary>Initialisiert eine neue Instanz der <see cref="PosterImageService"/>-Klasse.</summary>
     /// <param name="authSession">Sitzungsdienst; liefert den angemeldeten API-Client für Bildabrufe.</param>
     /// <param name="layout">Ablage-Layout mit dem nicht backup-pflichtigen Vorschaubild-Verzeichnis.</param>
-    public PosterImageService(AuthSessionService authSession, AppStorageLayout layout)
+    /// <param name="logger">Logger für das Programmprotokoll (nur Warn-/Fehlerpfade).</param>
+    public PosterImageService(
+        AuthSessionService authSession,
+        AppStorageLayout layout,
+        ILogger<PosterImageService> logger)
     {
         this.authSession = authSession ?? throw new ArgumentNullException(nameof(authSession));
         this.layout = layout ?? throw new ArgumentNullException(nameof(layout));
+        this.logger = logger;
     }
 
     /// <summary>
@@ -79,7 +86,7 @@ public sealed class PosterImageService
         {
             // Fehlende Vorschaubilder sind kein Fehlerzustand der Seite —
             // die Karte zeigt den Titel als Fallback.
-            System.Diagnostics.Debug.WriteLine($"[PosterImageService] Bild {pictureId} nicht ladbar: {ex.Message}");
+            logger.LogWarning(ex, "Bild {PictureId} nicht ladbar.", pictureId);
             return null;
         }
     }
@@ -137,7 +144,7 @@ public sealed class PosterImageService
         {
             // Fehlende Icons sind kein Fehlerzustand — der Quellenname
             // bleibt als Fallback sichtbar.
-            System.Diagnostics.Debug.WriteLine($"[PosterImageService] Quellen-Icon {pictureId} nicht ladbar: {ex.Message}");
+            logger.LogWarning(ex, "Quellen-Icon {PictureId} nicht ladbar.", pictureId);
             return null;
         }
     }
@@ -200,7 +207,7 @@ public sealed class PosterImageService
         {
             // Fehlende Cover sind kein Fehlerzustand — der Playlist-Name
             // bleibt als Fallback sichtbar.
-            System.Diagnostics.Debug.WriteLine($"[PosterImageService] Playlist-Cover {playlistId} nicht ladbar: {ex.Message}");
+            logger.LogWarning(ex, "Playlist-Cover {PlaylistId} nicht ladbar.", playlistId);
             return null;
         }
     }

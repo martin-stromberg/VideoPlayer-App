@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Microsoft.Extensions.Logging;
 using VideoPlayer.ApiClient.Models;
 using VideoPlayer.Storage;
 using VideoPlayer.Storage.Entities;
@@ -97,9 +98,14 @@ public static class ShowDetailsCache
     /// </summary>
     /// <param name="cache">Die Cache-Ablage.</param>
     /// <param name="show">Die geladene Serie (Serverantwort).</param>
+    /// <param name="logger">Optionaler Logger für das Programmprotokoll (Fehlerpfad).</param>
     /// <param name="cancellationToken">Bricht das Schreiben ab.</param>
     /// <returns>Eine abgeschlossene Aufgabe nach dem Schreiben.</returns>
-    public static async Task WriteAsync(CacheDatabase cache, TvShow show, CancellationToken cancellationToken = default)
+    public static async Task WriteAsync(
+        CacheDatabase cache,
+        TvShow show,
+        ILogger? logger = null,
+        CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(cache);
         ArgumentNullException.ThrowIfNull(show);
@@ -144,7 +150,7 @@ public static class ShowDetailsCache
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"[ShowDetailsCache] Schreiben von '{KeyFor(show.Id)}' fehlgeschlagen: {ex.Message}");
+            logger?.LogWarning(ex, "Schreiben des Serien-Caches '{CacheKey}' fehlgeschlagen.", KeyFor(show.Id));
         }
     }
 
@@ -154,9 +160,14 @@ public static class ShowDetailsCache
     /// </summary>
     /// <param name="cache">Die Cache-Ablage.</param>
     /// <param name="showId">Id der Serie.</param>
+    /// <param name="logger">Optionaler Logger für das Programmprotokoll (Fehlerpfad).</param>
     /// <param name="cancellationToken">Bricht das Lesen ab.</param>
     /// <returns>Die gecachte Serienstruktur; <c>null</c> bei Fehlen oder Lesefehler.</returns>
-    public static async Task<CachedShowEntry?> ReadAsync(CacheDatabase cache, long showId, CancellationToken cancellationToken = default)
+    public static async Task<CachedShowEntry?> ReadAsync(
+        CacheDatabase cache,
+        long showId,
+        ILogger? logger = null,
+        CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(cache);
         // Den Schlüssel vorab berechnen: sqlite-net kann den Methodenaufruf
@@ -177,7 +188,7 @@ public static class ShowDetailsCache
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"[ShowDetailsCache] Lesen von '{KeyFor(showId)}' fehlgeschlagen: {ex.Message}");
+            logger?.LogWarning(ex, "Lesen des Serien-Caches '{CacheKey}' fehlgeschlagen.", KeyFor(showId));
             return null;
         }
     }

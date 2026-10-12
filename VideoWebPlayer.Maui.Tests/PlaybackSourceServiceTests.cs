@@ -1,5 +1,6 @@
 ﻿using System.Net;
 using System.Text.Json;
+using Microsoft.Extensions.Logging;
 using VideoPlayer.ApiClient.Models;
 using VideoPlayer.Mvu;
 using VideoPlayer.Storage;
@@ -274,6 +275,28 @@ public class PlaybackSourceServiceTests : IDisposable
 
         Assert.NotNull(fromStart);
         Assert.Equal(TimeSpan.Zero, fromStart.ResumePosition);
+    }
+
+    /// <summary>Prüft ResolveAsync: der Protokolleintrag trägt Medientyp/-Id und Quellart — nie die Quell-Adresse (access_token).</summary>
+    [Fact]
+    public async Task ResolveAsync_LogsKind_NotLocation()
+    {
+        var logging = new RecordingLoggerProvider();
+        await LoginAsync();
+        handler.EnqueueJson(HttpStatusCode.OK, Array.Empty<ContinueWatchingEntry>());
+        var service = new PlaybackSourceService(
+            authSession, secrets, cache, _ => false, logging.CreateLogger<PlaybackSourceService>());
+
+        var source = await service.ResolveAsync("movie", 42, TestContext.Current.CancellationToken);
+
+        Assert.NotNull(source);
+        var entry = Assert.Single(logging.Entries, e =>
+            e.Category.Contains(nameof(PlaybackSourceService), StringComparison.Ordinal));
+        Assert.Equal(LogLevel.Information, entry.Level);
+        Assert.Contains("movie/42", entry.Message, StringComparison.Ordinal);
+        Assert.Contains(nameof(PlaybackSourceKind.ServerStream), entry.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("access_token", entry.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain(source.Location, entry.Message, StringComparison.Ordinal);
     }
 
     /// <summary>Prüft ResolveAsync: weder Datei noch Server → keine Quelle.</summary>

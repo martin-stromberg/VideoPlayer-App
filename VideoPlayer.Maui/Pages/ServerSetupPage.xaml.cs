@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging;
 using VideoPlayer.ApiClient.Discovery;
 using VideoPlayer.Mvu;
 using VideoPlayer.Storage;
@@ -13,15 +14,18 @@ namespace VideoPlayer.Maui.Pages;
 public partial class ServerSetupPage : ContentPage
 {
     private readonly MvuHost mvuHost;
+    private readonly ILogger<ServerSetupPage> logger;
     private string? lastBootstrapError;
     private bool usernamePrefilled;
 
     /// <summary>Initialisiert eine neue Instanz der <see cref="ServerSetupPage"/>-Klasse.</summary>
     /// <param name="mvuHost">MVU-Host; liefert den Einrichtungszustand und nimmt die Benutzer-Nachrichten entgegen.</param>
-    public ServerSetupPage(MvuHost mvuHost)
+    /// <param name="logger">Logger für das Programmprotokoll.</param>
+    public ServerSetupPage(MvuHost mvuHost, ILogger<ServerSetupPage> logger)
     {
         InitializeComponent();
         this.mvuHost = mvuHost;
+        this.logger = logger;
         // BindingContext für die XAML-Trigger des Status-Badges
         // (Model.ServerHealth); MvuHost meldet PropertyChanged("Model").
         BindingContext = mvuHost;
@@ -231,7 +235,7 @@ public partial class ServerSetupPage : ContentPage
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"[ServerSetupPage] QR-Scan konnte nicht gestartet werden: {ex.Message}");
+            logger.LogWarning(ex, "QR-Scan konnte nicht gestartet werden.");
             await DisplayAlert(
                 "Scan nicht möglich",
                 "Der QR-Scan konnte nicht gestartet werden. Bitte die Ticket-Adresse oder den Kurzcode eingeben.",

@@ -1,4 +1,6 @@
 using System.Text.Json;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using VideoPlayer.ApiClient;
 using VideoPlayer.ApiClient.Models;
 using VideoPlayer.Storage;
@@ -41,19 +43,23 @@ public sealed class ServerSyncService
     private readonly AuthSessionService authSession;
     private readonly PendingProgressSyncService pendingProgress;
     private readonly CacheDatabase cache;
+    private readonly ILogger<ServerSyncService> logger;
 
     /// <summary>Erstellt den Dienst.</summary>
     /// <param name="authSession">Sitzungsdienst mit dem angemeldeten API-Client.</param>
     /// <param name="pendingProgress">Persistente Warteschlange der Fortschrittsmeldungen.</param>
     /// <param name="cache">Lokale Cache-Ablage für die Metadaten.</param>
+    /// <param name="logger">Optionaler Logger für das Programmprotokoll.</param>
     public ServerSyncService(
         AuthSessionService authSession,
         PendingProgressSyncService pendingProgress,
-        CacheDatabase cache)
+        CacheDatabase cache,
+        ILogger<ServerSyncService>? logger = null)
     {
         this.authSession = authSession ?? throw new ArgumentNullException(nameof(authSession));
         this.pendingProgress = pendingProgress ?? throw new ArgumentNullException(nameof(pendingProgress));
         this.cache = cache ?? throw new ArgumentNullException(nameof(cache));
+        this.logger = logger ?? NullLogger<ServerSyncService>.Instance;
     }
 
     /// <summary>
@@ -76,12 +82,20 @@ public sealed class ServerSyncService
         var continueWatching = await SyncContinueWatchingAsync(cancellationToken);
         var favorites = await SyncFavoritesAsync(cancellationToken);
 
-        return new SyncResult(
+        var result = new SyncResult(
             sent,
             await pendingProgress.CountAsync(),
             metadata,
             continueWatching,
             favorites);
+        logger.LogInformation(
+            "Synchronisation abgeschlossen: {SentProgressReports} Fortschritte nachgesendet, {RemainingProgressReports} ausstehend; Metadaten={MetadataSynced}, Weiterschauen={ContinueWatchingSynced}, Favoriten={FavoritesSynced}.",
+            result.SentProgressReports,
+            result.RemainingProgressReports,
+            result.MetadataSynced,
+            result.ContinueWatchingSynced,
+            result.FavoritesSynced);
+        return result;
     }
 
     /// <summary>
@@ -119,18 +133,29 @@ public sealed class ServerSyncService
             }
             catch (ApiException ex) when (ProgressReportService.IsPermanentClientError(ex))
             {
-                System.Diagnostics.Debug.WriteLine(
-                    $"[ServerSyncService] Fortschritt {entry.VideoType}/{entry.VideoId} verworfen (Status {(int?)ex.StatusCode}).");
+                logger.LogWarning(
+                    ex,
+                    "Fortschritt {VideoType}/{VideoId} verworfen (Status {StatusCode}).",
+                    entry.VideoType,
+                    entry.VideoId,
+                    (int?)ex.StatusCode);
             }
             catch (Exception ex) when (ex is ApiException or HttpRequestException or TaskCanceledException)
             {
                 // Server wieder weg o. ä. — Rest bleibt in der Warteschlange.
-                System.Diagnostics.Debug.WriteLine(
-                    $"[ServerSyncService] Nachsenden abgebrochen: {ex.Message}");
+                logger.LogWarning(ex, "Nachsenden der Fortschritte abgebrochen.");
                 break;
             }
 
             await pendingProgress.RemoveForMediaAsync(entry.VideoType, entry.VideoId);
+        }
+
+        // Nur bei tatsächlich nachgesendeten Meldungen ein Ereignis —
+        // der Zähler steht ohnehin im Aggregat-Eintrag des Voll-Syncs;
+        // „0 nachgesendet" wäre ein Eintrag ohne Ereignis.
+        if (sent > 0)
+        {
+            logger.LogInformation("{SentCount} wartende Fortschritte nachgesendet.", sent);
         }
 
         return sent;
@@ -206,7 +231,7 @@ public sealed class ServerSyncService
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"[ServerSyncService] Synchronisation fehlgeschlagen: {ex.Message}");
+            logger.LogWarning(ex, "Synchronisation fehlgeschlagen.");
             return false;
         }
     }

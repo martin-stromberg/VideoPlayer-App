@@ -58,7 +58,9 @@ namespace VideoPlayer.Maui
             // Einstellungs-/Geheimnisdienste und getrennte Datenbanken.
             builder.Services.AddSingleton(_ => AppProfile.FromEnvironment());
             builder.Services.AddSingleton<ISettingsStore>(_ => new PreferencesSettingsStore(Preferences.Default));
-            builder.Services.AddSingleton<ISecretStore>(_ => new SecureStorageSecretStore(SecureStorage.Default));
+            builder.Services.AddSingleton<ISecretStore>(sp => new SecureStorageSecretStore(
+                SecureStorage.Default,
+                sp.GetRequiredService<ILogger<SecureStorageSecretStore>>()));
             builder.Services.AddSingleton<AppSettingsService>();
             builder.Services.AddSingleton<AppSecretsService>();
             builder.Services.AddSingleton(sp =>
@@ -85,7 +87,8 @@ namespace VideoPlayer.Maui
             // Netzwerkstatus, Ereignisverbindung (SignalR) und Synchronisation.
             builder.Services.AddSingleton<INetworkStatusMonitor, ConnectivityNetworkStatusMonitor>();
             builder.Services.AddSingleton<Func<IServerEventsConnection>>(
-                _ => () => new SignalRServerEventsConnection());
+                sp => () => new SignalRServerEventsConnection(
+                    sp.GetRequiredService<ILogger<SignalRServerEventsConnection>>()));
             builder.Services.AddSingleton<ServerEventsService>();
             builder.Services.AddSingleton<PendingProgressSyncService>();
             builder.Services.AddSingleton<ProgressReportService>();

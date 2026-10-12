@@ -1,4 +1,6 @@
 using System.Text.Json;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using VideoPlayer.ApiClient.Models;
 using VideoPlayer.Storage;
 using VideoPlayer.Storage.Entities;
@@ -27,19 +29,23 @@ public sealed class ContinueWatchingMutationService
     private readonly AuthSessionService authSession;
     private readonly ServerSyncService syncService;
     private readonly CacheDatabase cache;
+    private readonly ILogger<ContinueWatchingMutationService> logger;
 
     /// <summary>Erstellt den Dienst.</summary>
     /// <param name="authSession">Sitzungsdienst mit dem angemeldeten API-Client.</param>
     /// <param name="syncService">Synchronisationsdienst für die Cache-Kopie.</param>
     /// <param name="cache">Lokale Cache-Ablage mit der Weiterschauen-Liste.</param>
+    /// <param name="logger">Optionaler Logger für das Programmprotokoll.</param>
     public ContinueWatchingMutationService(
         AuthSessionService authSession,
         ServerSyncService syncService,
-        CacheDatabase cache)
+        CacheDatabase cache,
+        ILogger<ContinueWatchingMutationService>? logger = null)
     {
         this.authSession = authSession ?? throw new ArgumentNullException(nameof(authSession));
         this.syncService = syncService ?? throw new ArgumentNullException(nameof(syncService));
         this.cache = cache ?? throw new ArgumentNullException(nameof(cache));
+        this.logger = logger ?? NullLogger<ContinueWatchingMutationService>.Instance;
     }
 
     /// <summary>
@@ -57,9 +63,11 @@ public sealed class ContinueWatchingMutationService
         long mediaId,
         CancellationToken cancellationToken = default)
     {
-        return await MutateAsync(
+        var mutated = await MutateAsync(
             client => client.HideContinueWatchingEntryAsync(mediaType, mediaId, cancellationToken),
             mediaType, mediaId, cancellationToken);
+        LogMutationOutcome(mediaType, mediaId, mutated, "ausgeblendet");
+        return mutated;
     }
 
     /// <summary>
@@ -77,9 +85,11 @@ public sealed class ContinueWatchingMutationService
         long mediaId,
         CancellationToken cancellationToken = default)
     {
-        return await MutateAsync(
+        var mutated = await MutateAsync(
             client => client.SkipContinueWatchingEntryAsync(mediaType, mediaId, cancellationToken),
             mediaType, mediaId, cancellationToken);
+        LogMutationOutcome(mediaType, mediaId, mutated, "übersprungen");
+        return mutated;
     }
 
     /// <summary>
@@ -112,6 +122,27 @@ public sealed class ContinueWatchingMutationService
         // Server-Antwort entscheidet, ob der Eintrag verschwindet.
         await syncService.SyncContinueWatchingAsync(cancellationToken);
         return true;
+    }
+
+    /// <summary>
+    /// Protokolliert das Mutationsergebnis beider Aktionen: Erfolg als
+    /// Verlaufseintrag, ein nicht geänderter Eintrag als überholbare
+    /// Warnung (z. B. kein passender Cache-Eintrag im Offline-Pfad).
+    /// </summary>
+    /// <param name="mediaType">Medientyp des Eintrags.</param>
+    /// <param name="mediaId">Id des Mediums.</param>
+    /// <param name="mutated"><c>true</c>, wenn die Liste aktualisiert wurde.</param>
+    /// <param name="verb">Das Partizip der Aktion (<c>ausgeblendet</c>/<c>übersprungen</c>).</param>
+    private void LogMutationOutcome(string mediaType, long mediaId, bool mutated, string verb)
+    {
+        if (mutated)
+        {
+            logger.LogInformation("Weiterschauen-Eintrag {MediaType}/{MediaId} {Verb}.", mediaType, mediaId, verb);
+        }
+        else
+        {
+            logger.LogWarning("Weiterschauen-Eintrag {MediaType}/{MediaId} konnte nicht {Verb} werden.", mediaType, mediaId, verb);
+        }
     }
 
     /// <summary>

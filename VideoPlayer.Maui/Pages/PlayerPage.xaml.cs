@@ -1,7 +1,9 @@
 using CommunityToolkit.Maui.Core;
 using CommunityToolkit.Maui.Views;
+using Microsoft.Extensions.Logging;
 using VideoPlayer.Maui.Services;
 using VideoPlayer.Mvu;
+using VideoPlayer.Storage;
 #if WINDOWS
 using Microsoft.UI.Xaml.Controls;
 #endif
@@ -31,6 +33,7 @@ public partial class PlayerPage : ContentPage
 
     private readonly MvuHost mvuHost;
     private readonly IPictureInPictureService pictureInPicture;
+    private readonly ILogger<PlayerPage> logger;
     private string? appliedLocation;
     // Gesetzt, wenn der letzte Quellenwechsel fehlschlug: erzwingt, dass
     // UpdateUi den Setz-/Leerpfad erneut durchläuft — auch wenn das Modell
@@ -50,11 +53,13 @@ public partial class PlayerPage : ContentPage
     /// <summary>Initialisiert eine neue Instanz der <see cref="PlayerPage"/>-Klasse.</summary>
     /// <param name="mvuHost">MVU-Host; liefert den Player-Zustand und nimmt die Nachrichten entgegen.</param>
     /// <param name="pictureInPicture">Plattformbezogener PiP-/Mini-Player-Dienst (Schalter-Sichtbarkeit).</param>
-    public PlayerPage(MvuHost mvuHost, IPictureInPictureService pictureInPicture)
+    /// <param name="logger">Logger für das Programmprotokoll.</param>
+    public PlayerPage(MvuHost mvuHost, IPictureInPictureService pictureInPicture, ILogger<PlayerPage> logger)
     {
         InitializeComponent();
         this.mvuHost = mvuHost;
         this.pictureInPicture = pictureInPicture;
+        this.logger = logger;
         BindingContext = mvuHost;
         PipButton.IsVisible = pictureInPicture.IsToggleSupported;
 #if IOS
@@ -152,7 +157,7 @@ public partial class PlayerPage : ContentPage
                 // Wie ReportPosition: ein Fehler am nativen Element darf im
                 // Dispatcher-Timer-Callback nicht unbehandelt bleiben (nur
                 // protokollieren; der nächste Takt versucht es erneut).
-                System.Diagnostics.Debug.WriteLine($"[PlayerPage] Zustandsabfrage im Fortschrittstakt fehlgeschlagen: {ex.Message}");
+                logger.LogWarning(ex, "Zustandsabfrage im Fortschrittstakt fehlgeschlagen.");
             }
 
             return true;
@@ -175,7 +180,7 @@ public partial class PlayerPage : ContentPage
             // Der Aufruf läuft aus dem Dispatcher-Timer-Callback — ein
             // Fehler am nativen Element darf nicht unbehandelt bleiben
             // (nur protokollieren; der nächste Takt versucht es erneut).
-            System.Diagnostics.Debug.WriteLine($"[PlayerPage] Positionsmeldung fehlgeschlagen: {ex.Message}");
+            logger.LogWarning(ex, "Positionsmeldung fehlgeschlagen.");
         }
     }
 
@@ -229,7 +234,7 @@ public partial class PlayerPage : ContentPage
             }
             catch (Exception ex)
             {
-                FailPlaybackStart($"Zurücksetzen der Quelle fehlgeschlagen: {ex.Message}");
+                FailPlaybackStart($"Zurücksetzen der Quelle fehlgeschlagen: {SanitizeForLog(ex.Message)}");
             }
 
             return;
@@ -237,7 +242,9 @@ public partial class PlayerPage : ContentPage
 
         if (!IsValidSourceLocation(player.Source, location))
         {
-            FailPlaybackStart($"Ungültige Quell-Adresse ({player.Source.Kind}): '{location}'");
+            // Die Quell-Adresse selbst bleibt unprotokolliert — sie
+            // enthält bei ServerStream die access_token-Query.
+            FailPlaybackStart($"Ungültige Quell-Adresse ({player.Source.Kind}).");
             return;
         }
 
@@ -249,7 +256,7 @@ public partial class PlayerPage : ContentPage
         }
         catch (Exception ex)
         {
-            FailPlaybackStart($"Setzen der Quelle fehlgeschlagen: {ex.Message}");
+            FailPlaybackStart($"Setzen der Quelle fehlgeschlagen: {SanitizeForLog(ex.Message)}");
         }
     }
 
@@ -283,10 +290,10 @@ public partial class PlayerPage : ContentPage
     /// unabhängig davon, ob das Modell dieselbe Adresse erneut liefert
     /// oder die Quelle leert.
     /// </summary>
-    /// <param name="logMessage">Diagnosemeldung für das Protokoll.</param>
+    /// <param name="logMessage">Diagnosemeldung für das Protokoll (bereits bereinigt).</param>
     private void FailPlaybackStart(string logMessage)
     {
-        System.Diagnostics.Debug.WriteLine($"[PlayerPage] {logMessage}");
+        logger.LogError("Wiedergabestart fehlgeschlagen: {LogMessage}", logMessage);
         sourceApplyFailed = true;
         if (subscribed)
         {
@@ -294,8 +301,28 @@ public partial class PlayerPage : ContentPage
         }
     }
 
+    /// <summary>
+    /// Bereinigt plattform- oder ausnahmegenerierte Meldungen vor dem
+    /// Protokollieren: eine enthaltene Quell-URL kann die
+    /// access_token-Query tragen — der Token-Wert wird maskiert. Die
+    /// Maskierung teilt sich die Seite mit dem Sinkenpunkt
+    /// (<see cref="AppLogService.MaskAccessToken"/>) — eine
+    /// Implementierung für beide Schreiber.
+    /// </summary>
+    /// <param name="message">Die rohe Diagnosemeldung.</param>
+    /// <returns>Die Meldung mit maskiertem access_token-Wert.</returns>
+    private static string SanitizeForLog(string? message)
+    {
+        return message is null ? string.Empty : AppLogService.MaskAccessToken(message);
+    }
+
     private void OnMediaOpened(object? sender, EventArgs e)
     {
+        logger.LogInformation(
+            "Wiedergabe geöffnet: {Title} (Fortsetzung {ResumePosition}).",
+            mvuHost.Model.Player.Title,
+            mvuHost.Model.Player.Source?.ResumePosition);
+
         // Fortsetzungsposition der Quelle lediglich merken: auf iOS feuert
         // MediaOpened noch vor AVPlayerItemStatus.ReadyToPlay (Toolkit-
         // Issue #3249) — ein sofortiger Seek wirft im async-void-Handler
@@ -347,7 +374,7 @@ public partial class PlayerPage : ContentPage
             // Wurf des nativen Elements darf dem Lambda nicht entkommen.
             // Der Seek-Wunsch bleibt liegen und wird beim nächsten
             // Zustandswechsel erneut geprüft.
-            System.Diagnostics.Debug.WriteLine($"[PlayerPage] Bereitschaftsprüfung des Fortsetzungs-Seeks fehlgeschlagen: {ex.Message}");
+            logger.LogWarning(ex, "Bereitschaftsprüfung des Fortsetzungs-Seeks fehlgeschlagen.");
             return;
         }
 
@@ -375,10 +402,11 @@ public partial class PlayerPage : ContentPage
         {
             using var timeout = new CancellationTokenSource(ResumeSeekTimeout);
             await VideoElement.SeekTo(position, timeout.Token);
+            logger.LogInformation("Fortsetzungs-Seek auf {Position} angewendet.", position);
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"[PlayerPage] Fortsetzungs-Seek auf {position} fehlgeschlagen: {ex.Message}");
+            logger.LogWarning(ex, "Fortsetzungs-Seek auf {Position} fehlgeschlagen.", position);
             if (subscribed)
             {
                 _ = mvuHost.DispatchAsync(new PlaybackFailedMessage());
@@ -388,6 +416,7 @@ public partial class PlayerPage : ContentPage
 
     private void OnMediaEnded(object? sender, EventArgs e)
     {
+        logger.LogInformation("Wiedergabe beendet: {Title}.", mvuHost.Model.Player.Title);
         if (subscribed)
         {
             _ = mvuHost.DispatchAsync(new PlaybackEndedMessage());
@@ -396,6 +425,7 @@ public partial class PlayerPage : ContentPage
 
     private void OnMediaFailed(object? sender, MediaFailedEventArgs e)
     {
+        logger.LogError("Wiedergabe fehlgeschlagen: {LogMessage}", SanitizeForLog(e.ErrorMessage));
         if (subscribed)
         {
             _ = mvuHost.DispatchAsync(new PlaybackFailedMessage());

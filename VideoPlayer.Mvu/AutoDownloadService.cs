@@ -1,3 +1,5 @@
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using VideoPlayer.ApiClient;
 using VideoPlayer.ApiClient.Models;
 using VideoPlayer.Storage;
@@ -40,6 +42,7 @@ public sealed class AutoDownloadService
     private readonly INetworkStatusMonitor networkMonitor;
     private readonly CacheDatabase cache;
     private readonly Func<DateTime> utcNow;
+    private readonly ILogger<AutoDownloadService> logger;
 
     private DateTime lastRunUtc = DateTime.MinValue;
     private int runInProgress;
@@ -50,13 +53,15 @@ public sealed class AutoDownloadService
     /// <param name="downloads">Download-Verwaltung (Einreihen/Dedup).</param>
     /// <param name="networkMonitor">Netzwerkstatus-Erkennung (WLAN-Bedingung).</param>
     /// <param name="cache">Cache-Ablage für die Serienstruktur (Offline-Serienkontext).</param>
+    /// <param name="logger">Optionaler Logger für das Programmprotokoll.</param>
     public AutoDownloadService(
         AuthSessionService authSession,
         HomeListService homeLists,
         DownloadService downloads,
         INetworkStatusMonitor networkMonitor,
-        CacheDatabase cache)
-        : this(authSession, homeLists, downloads, networkMonitor, cache, null)
+        CacheDatabase cache,
+        ILogger<AutoDownloadService>? logger = null)
+        : this(authSession, homeLists, downloads, networkMonitor, cache, null, logger)
     {
     }
 
@@ -67,13 +72,15 @@ public sealed class AutoDownloadService
     /// <param name="networkMonitor">Netzwerkstatus-Erkennung (WLAN-Bedingung).</param>
     /// <param name="cache">Cache-Ablage für die Serienstruktur.</param>
     /// <param name="utcNow">Zeitquelle für den Throttle; <c>null</c> = <see cref="DateTime.UtcNow"/>.</param>
+    /// <param name="logger">Optionaler Logger für das Programmprotokoll.</param>
     internal AutoDownloadService(
         AuthSessionService authSession,
         HomeListService homeLists,
         DownloadService downloads,
         INetworkStatusMonitor networkMonitor,
         CacheDatabase cache,
-        Func<DateTime>? utcNow)
+        Func<DateTime>? utcNow,
+        ILogger<AutoDownloadService>? logger = null)
     {
         this.authSession = authSession ?? throw new ArgumentNullException(nameof(authSession));
         this.homeLists = homeLists ?? throw new ArgumentNullException(nameof(homeLists));
@@ -81,6 +88,7 @@ public sealed class AutoDownloadService
         this.networkMonitor = networkMonitor ?? throw new ArgumentNullException(nameof(networkMonitor));
         this.cache = cache ?? throw new ArgumentNullException(nameof(cache));
         this.utcNow = utcNow ?? (() => DateTime.UtcNow);
+        this.logger = logger ?? NullLogger<AutoDownloadService>.Instance;
     }
 
     /// <summary>
@@ -115,11 +123,13 @@ public sealed class AutoDownloadService
             var now = utcNow();
             if (!force && now - lastRunUtc < MinRunInterval)
             {
+                logger.LogInformation("Auto-Download-Lauf ausgelassen (Mindestabstand nicht erreicht).");
                 return;
             }
 
             lastRunUtc = now;
             var lists = await homeLists.LoadHomeListsAsync(cancellationToken);
+            var enqueued = 0;
             foreach (var item in lists.ContinueWatching)
             {
                 cancellationToken.ThrowIfCancellationRequested();
@@ -129,24 +139,34 @@ public sealed class AutoDownloadService
                 {
                     if (type == "movie")
                     {
-                        await downloads.EnqueueAsync(
+                        var movieResult = await downloads.EnqueueAsync(
                             "movie", item.Id, item.Title, settings,
                             playlistContext: hasPlaylistBinding
                                 ? new DownloadPlaylistContext(item.PlaylistId, item.PlaylistEntryId, null)
                                 : null,
                             cancellationToken: cancellationToken);
+                        if (movieResult.Notice == DownloadService.NoticeEnqueued)
+                        {
+                            enqueued++;
+                        }
+
                         if (hasPlaylistBinding)
                         {
-                            await EnqueueNextPlaylistEntriesAsync(item, settings, cancellationToken);
+                            enqueued += await EnqueueNextPlaylistEntriesAsync(item, settings, cancellationToken) ?? 0;
                         }
                     }
                     else if (type == "tvshowepisode")
                     {
-                        var playlistHandled = hasPlaylistBinding
-                            && await EnqueueNextPlaylistEntriesAsync(item, settings, cancellationToken);
-                        if (!playlistHandled && item.ShowId is > 0)
+                        var playlistResult = hasPlaylistBinding
+                            ? await EnqueueNextPlaylistEntriesAsync(item, settings, cancellationToken)
+                            : null;
+                        if (playlistResult is { } playlistEnqueued)
                         {
-                            await EnqueueNextEpisodesAsync(item, settings, cancellationToken);
+                            enqueued += playlistEnqueued;
+                        }
+                        else if (item.ShowId is > 0)
+                        {
+                            enqueued += await EnqueueNextEpisodesAsync(item, settings, cancellationToken);
                         }
                     }
                 }
@@ -157,9 +177,11 @@ public sealed class AutoDownloadService
                 catch (Exception ex) when (ex is ApiException or HttpRequestException or TaskCanceledException or InvalidOperationException)
                 {
                     // Fehler eines Eintrags stoppen den Lauf nicht.
-                    System.Diagnostics.Debug.WriteLine($"[AutoDownloadService] Vorlauf für '{item.Title}' fehlgeschlagen: {ex.Message}");
+                    logger.LogWarning(ex, "Vorlauf für {MediaType}/{MediaId} fehlgeschlagen.", type, item.Id);
                 }
             }
+
+            logger.LogInformation("Auto-Download-Lauf abgeschlossen: {EnqueuedCount} Aufträge eingeplant.", enqueued);
         }
         finally
         {
@@ -175,8 +197,8 @@ public sealed class AutoDownloadService
     /// <param name="item">Der Weiterschauen-Eintrag (Episode).</param>
     /// <param name="settings">Aktuelle App-Einstellungen.</param>
     /// <param name="cancellationToken">Bricht den Lauf ab.</param>
-    /// <returns>Eine abgeschlossene Aufgabe nach dem Einreihen.</returns>
-    private async Task EnqueueNextEpisodesAsync(
+    /// <returns>Anzahl der eingereihten Folge-Episoden.</returns>
+    private async Task<int> EnqueueNextEpisodesAsync(
         HomeMediaItem item,
         AppSettings settings,
         CancellationToken cancellationToken)
@@ -184,14 +206,14 @@ public sealed class AutoDownloadService
         var client = authSession.Client;
         if (client is null || item.ShowId is not > 0)
         {
-            return;
+            return 0;
         }
 
         var show = await client.GetTvShowAsync(item.ShowId.Value, cancellationToken);
 
         // Die Serienstruktur im Cache ablegen — Grundlage der
         // Offline-Platzhalter fehlender Folge-Episoden.
-        await ShowDetailsCache.WriteAsync(cache, show, cancellationToken);
+        await ShowDetailsCache.WriteAsync(cache, show, logger, cancellationToken);
 
         var episodes = show.Seasons
             .OrderBy(s => s.Number)
@@ -200,20 +222,35 @@ public sealed class AutoDownloadService
         var index = episodes.FindIndex(e => e.Episode.Id == item.Id);
         if (index < 0)
         {
-            return;
+            return 0;
         }
 
+        var enqueued = 0;
         var showName = show.Name;
         foreach (var (season, episode) in episodes.Skip(index + 1).Take(settings.PreloadEpisodeCount))
         {
             var title = string.IsNullOrWhiteSpace(episode.Name)
                 ? $"{showName} – Episode {episode.Number}"
                 : $"{showName} – {episode.Name}";
-            await downloads.EnqueueAsync(
+            var enqueueResult = await downloads.EnqueueAsync(
                 "tvshowepisode", episode.Id, title, settings,
                 new DownloadSeriesContext(show.Id, showName, season.Number, episode.Number),
                 cancellationToken: cancellationToken);
+            if (enqueueResult.Notice == DownloadService.NoticeEnqueued)
+            {
+                enqueued++;
+            }
         }
+
+        if (enqueued > 0)
+        {
+            logger.LogInformation(
+                "{EnqueuedCount} Folge-Episoden für Episode {MediaId} eingeplant.",
+                enqueued,
+                item.Id);
+        }
+
+        return enqueued;
     }
 
     /// <summary>
@@ -231,11 +268,12 @@ public sealed class AutoDownloadService
     /// <param name="settings">Aktuelle App-Einstellungen.</param>
     /// <param name="cancellationToken">Bricht den Lauf ab.</param>
     /// <returns>
-    /// <c>true</c>, wenn der aktuelle Eintrag in der Playlist gefunden
-    /// wurde (Playlist-Pfad greift — auch ohne verbleibende Folge-
-    /// Einträge); <c>false</c> = Rückfall auf den Serien-Pfad.
+    /// Anzahl der eingereihten Folge-Einträge, wenn der aktuelle Eintrag
+    /// in der Playlist gefunden wurde (Playlist-Pfad greift — auch ohne
+    /// verbleibende Folge-Einträge); <c>null</c> = Rückfall auf den
+    /// Serien-Pfad.
     /// </returns>
-    private async Task<bool> EnqueueNextPlaylistEntriesAsync(
+    private async Task<int?> EnqueueNextPlaylistEntriesAsync(
         HomeMediaItem item,
         AppSettings settings,
         CancellationToken cancellationToken)
@@ -243,11 +281,12 @@ public sealed class AutoDownloadService
         var client = authSession.Client;
         if (client is null || item.PlaylistId is not > 0 || item.PlaylistEntryId is not > 0)
         {
-            return false;
+            return null;
         }
 
         var currentEntryId = item.PlaylistEntryId.Value;
         var found = false;
+        var enqueued = 0;
         var remaining = settings.PreloadEpisodeCount;
         for (var page = 1; remaining > 0; page++)
         {
@@ -261,9 +300,8 @@ public sealed class AutoDownloadService
             {
                 // Playlist nicht erreichbar/entfernt/unlesbar → Rückfall
                 // auf den Serien-Pfad (bzw. nur die Selbst-Einreihung bei Filmen).
-                System.Diagnostics.Debug.WriteLine(
-                    $"[AutoDownloadService] Playlist-Einträge nicht ladbar (Playlist {item.PlaylistId}): {ex.Message}");
-                return false;
+                logger.LogWarning(ex, "Playlist-Einträge nicht ladbar (Playlist {PlaylistId}).", item.PlaylistId);
+                return null;
             }
 
             foreach (var entry in result.Entries)
@@ -285,11 +323,16 @@ public sealed class AutoDownloadService
                     continue;
                 }
 
-                await downloads.EnqueueAsync(
+                var enqueueResult = await downloads.EnqueueAsync(
                     type, entry.MediaId, PlaylistEntryTitle(entry), settings,
                     SeriesContextOf(entry),
                     new DownloadPlaylistContext(item.PlaylistId, entry.Id, entry.SortOrder),
                     cancellationToken);
+                if (enqueueResult.Notice == DownloadService.NoticeEnqueued)
+                {
+                    enqueued++;
+                }
+
                 remaining--;
             }
 
@@ -299,7 +342,20 @@ public sealed class AutoDownloadService
             }
         }
 
-        return found;
+        if (!found)
+        {
+            return null;
+        }
+
+        if (enqueued > 0)
+        {
+            logger.LogInformation(
+                "{EnqueuedCount} Playlist-Folge-Einträge für Playlist {PlaylistId} eingeplant.",
+                enqueued,
+                item.PlaylistId);
+        }
+
+        return enqueued;
     }
 
     /// <summary>

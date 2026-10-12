@@ -158,7 +158,7 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
                 await RunFullSyncAsync(cancellationToken);
                 break;
             case SyncContinueWatchingEffect:
-                await RunPartialSyncAsync(s => s.SyncContinueWatchingAsync(cancellationToken));
+                await RunPartialSyncAsync("Weiterschauen", s => s.SyncContinueWatchingAsync(cancellationToken));
                 break;
             case HideContinueWatchingEntryEffect hide:
                 await MutateContinueWatchingAsync(s => s.HideAsync(hide.MediaType, hide.MediaId, cancellationToken));
@@ -167,10 +167,10 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
                 await MutateContinueWatchingAsync(s => s.SkipAsync(skip.MediaType, skip.MediaId, cancellationToken));
                 break;
             case SyncFavoritesEffect:
-                await RunPartialSyncAsync(s => s.SyncFavoritesAsync(cancellationToken));
+                await RunPartialSyncAsync("Favoriten", s => s.SyncFavoritesAsync(cancellationToken));
                 break;
             case SyncMetadataEffect:
-                await RunPartialSyncAsync(s => s.SyncMetadataAsync(cancellationToken));
+                await RunPartialSyncAsync("Metadaten", s => s.SyncMetadataAsync(cancellationToken));
                 break;
             case LoadHomeListsEffect:
                 await LoadHomeListsAsync();
@@ -305,7 +305,7 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
                 await EnqueueDownloadAsync(enqueue, cancellationToken);
                 break;
             case CancelDownloadEffect cancel:
-                await downloads.CancelAsync(cancel.MediaType, cancel.MediaId, cancellationToken);
+                await CancelDownloadAsync(cancel, cancellationToken);
                 break;
             case DeleteDownloadEffect delete:
                 await DeleteDownloadAsync(delete.MediaType, delete.MediaId, cancellationToken);
@@ -314,7 +314,7 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
                 await ResumeDownloadsAsync(resume.Settings, cancellationToken);
                 break;
             case RunAutoDownloadsEffect autoRun:
-                await autoDownloads.RunAsync(autoRun.Settings, autoRun.Force, cancellationToken);
+                await RunAutoDownloadsAsync(autoRun, cancellationToken);
                 break;
             case DeleteWatchedDownloadEffect deleteWatched:
                 await DeleteDownloadAsync(deleteWatched.MediaType, deleteWatched.MediaId, cancellationToken, completedOnly: true);
@@ -427,6 +427,19 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
             {
                 error = AppUpdate.PlaybackUnavailableError;
             }
+            else
+            {
+                // Anzeigetitel aus dem Player-State — gesetzt vor dem
+                // Effekt (StartPlayback); die Quell-Adresse bleibt
+                // absichtlich unprotokolliert (access_token-Query).
+                var player = services.GetRequiredService<MvuHost>().Model.Player;
+                logger.LogInformation(
+                    "Wiedergabe gestartet: {MediaType}/{MediaId} ({Title}) über {Kind}.",
+                    resolve.MediaType,
+                    resolve.MediaId,
+                    player.MediaId == resolve.MediaId ? player.Title : null,
+                    source.Kind);
+            }
         }
         catch (Exception ex)
         {
@@ -492,6 +505,8 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
             logger.LogError(ex, "PiP-Umschaltung fehlgeschlagen");
         }
 
+        // Der Ergebnis-Eintrag obliegt IPictureInPictureService
+        // (eine Schicht pro Ereignis) — hier nur der Fehlerpfad.
         await DispatchMessageAsync(new PictureInPictureChangedMessage(isActive));
     }
 
@@ -516,6 +531,8 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
         try
         {
             await serverEvents.ConnectAsync(new Uri(serverAddress), cancellationToken);
+            // Der Erfolgs-Eintrag obliegt ServerEventsService (eine
+            // Schicht pro Ereignis) — hier nur der Fehlerpfad.
         }
         catch (Exception ex)
         {
@@ -530,6 +547,8 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
         try
         {
             await serverEvents.DisconnectAsync();
+            // Der Eintrag obliegt ServerEventsService (eine Schicht
+            // pro Ereignis) — hier nur der Fehlerpfad.
         }
         catch (Exception ex)
         {
@@ -550,14 +569,23 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
             result = new SyncResult(0, 0, false, false, false);
         }
 
+        // Der Ergebnis-Eintrag mit den SyncResult-Zählern obliegt
+        // ServerSyncService (eine Schicht pro Ereignis) — hier nur
+        // der Fehlerpfad.
         await DispatchMessageAsync(new SynchronizationCompletedMessage(result));
     }
 
-    private async Task RunPartialSyncAsync(Func<ServerSyncService, Task> sync)
+    private async Task RunPartialSyncAsync(string listName, Func<ServerSyncService, Task> sync)
     {
         try
         {
             await sync(services.GetRequiredService<ServerSyncService>());
+            // Debug statt eines Verlaufseintrags: die Teil-Syncs folgen
+            // den Hub-Ereignissen — ContinueWatchingUpdated kann im Takt
+            // eingehender Fortschrittsmeldungen feuern und würde den
+            // Fortschrittstakt als Einträge ins Protokoll spiegeln
+            // (Muster: Hub-Ereignisse in SignalRServerEventsConnection).
+            logger.LogDebug("Teil-Synchronisation {List} abgeschlossen.", listName);
         }
         catch (Exception ex)
         {
@@ -1413,6 +1441,8 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
         try
         {
             await authSession.LogoutAsync();
+            // Der Erfolgs-Eintrag obliegt AuthSessionService (eine
+            // Schicht pro Ereignis) — hier nur der Fehlerpfad.
         }
         catch (Exception ex)
         {
@@ -1462,6 +1492,9 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
             };
         }
 
+        // Der Einplanungs-Eintrag mit dem Notice-Text obliegt
+        // DownloadService (eine Schicht pro Ereignis) — hier nur
+        // der Fehlerpfad.
         await DispatchMessageAsync(new DownloadEnqueueCompletedMessage(
             result.Item, result.Notice, result.IsError,
             MediaTypeNames.Normalize(enqueue.MediaType), enqueue.MediaId));
@@ -1486,10 +1519,28 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
             {
                 await downloads.DeleteAsync(mediaType, mediaId, cancellationToken);
             }
+
+            // Der Lösch-Eintrag obliegt DownloadService (eine Schicht
+            // pro Ereignis) — hier nur der Fehlerpfad.
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "Download löschen fehlgeschlagen");
+        }
+    }
+
+    private async Task CancelDownloadAsync(CancelDownloadEffect cancel, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await downloads.CancelAsync(cancel.MediaType, cancel.MediaId, cancellationToken);
+            // Der Abbruch-Eintrag (Zustand Cancelled) obliegt
+            // DownloadService (eine Schicht pro Ereignis) — hier nur
+            // der Fehlerpfad.
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Download-Abbruch fehlgeschlagen");
         }
     }
 
@@ -1498,10 +1549,28 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
         try
         {
             await downloads.ResumeInterruptedAsync(settings, cancellationToken);
+            // Der Wiederaufnahme-Eintrag mit der Anzahl obliegt
+            // DownloadService (eine Schicht pro Ereignis) — hier nur
+            // der Fehlerpfad.
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "Download-Wiederaufnahme fehlgeschlagen");
+        }
+    }
+
+    private async Task RunAutoDownloadsAsync(RunAutoDownloadsEffect autoRun, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await autoDownloads.RunAsync(autoRun.Settings, autoRun.Force, cancellationToken);
+            // Der Lauf-Eintrag mit der Einplanungszahl obliegt
+            // AutoDownloadService (eine Schicht pro Ereignis) — hier
+            // nur der Fehlerpfad.
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Auto-Download-Lauf fehlgeschlagen");
         }
     }
 
@@ -1511,8 +1580,13 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
     private void OnDownloadItemRemoved(object? sender, DownloadRemovedEventArgs e) =>
         _ = DispatchMessageAsync(new DownloadDeletedMessage(e.MediaType, e.MediaId));
 
-    private void OnNetworkAvailabilityChanged(object? sender, bool isOnline) =>
+    private void OnNetworkAvailabilityChanged(object? sender, bool isOnline)
+    {
+        // Der Wechsel-Eintrag (inkl. WLAN-Kontext) obliegt dem
+        // INetworkStatusMonitor (eine Schicht pro Ereignis) — hier
+        // nur der Dispatch.
         _ = DispatchMessageAsync(new NetworkAvailabilityChangedMessage(isOnline));
+    }
 
     private void OnServerEventReceived(object? sender, ServerEventReceivedEventArgs e) =>
         _ = DispatchMessageAsync(new ServerEventReceivedMessage(e.Kind, e.SourceId));
@@ -1546,6 +1620,8 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
             attempt = new AuthAttempt(AuthAttemptStatus.Failed);
         }
 
+        // Der Anmelde-Eintrag mit Status obliegt AuthSessionService
+        // (eine Schicht pro Ereignis) — hier nur der Fehlerpfad.
         var host = services.GetRequiredService<MvuHost>();
         await MainThread.InvokeOnMainThreadAsync(
             () => host.DispatchAsync(new AutoLoginCompletedMessage(attempt.Status, attempt.Username)));
@@ -1564,6 +1640,8 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
             attempt = new AuthAttempt(AuthAttemptStatus.Failed);
         }
 
+        // Der Anmelde-Eintrag mit Status obliegt AuthSessionService
+        // (eine Schicht pro Ereignis) — hier nur der Fehlerpfad.
         var host = services.GetRequiredService<MvuHost>();
         await MainThread.InvokeOnMainThreadAsync(
             () => host.DispatchAsync(new LoginCompletedMessage(attempt.Status)));
@@ -1590,8 +1668,10 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
 
     private void OnSessionExpired(object? sender, EventArgs e)
     {
-        // Der API-Client läuft auf beliebigen Threads — die Message muss über
-        // den MainThread in den MVU-Zyklus.
+        // Der Eintrag obliegt AuthSessionService.OnSessionExpired (eine
+        // Schicht pro Ereignis) — hier nur der Dispatch.
+        // Der API-Client läuft auf beliebigen Threads — die Message muss
+        // über den MainThread in den MVU-Zyklus.
         _ = DispatchSessionExpiredAsync();
     }
 
@@ -1640,6 +1720,9 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
             logger.LogError(ex, "Cache-Ablage-Initialisierung fehlgeschlagen");
         }
 
+        logger.LogInformation(
+            "Ablage initialisiert (Wiederherstellung: {Recovered}).",
+            recovered);
         if (recovered)
         {
             await DispatchMessageAsync(new StorageRecoveredMessage(
@@ -1845,6 +1928,8 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
             }
         }
 
+        // Der Ergebnis-Eintrag obliegt ServerHealthProbe (eine Schicht
+        // pro Ereignis) — hier nur der Fehlerpfad.
         var pairingRequired = result == HealthCheckResult.Reachable
             && await IsPairingRequiredAsync(services.GetRequiredService<MvuHost>().Model.ActiveServerAddress);
 
@@ -2096,8 +2181,12 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
         return trimmed.Length > 200 ? trimmed[..200] : trimmed;
     }
 
-    private void OnDeviceTokenRejected(object? sender, EventArgs e) =>
+    private void OnDeviceTokenRejected(object? sender, EventArgs e)
+    {
+        // Der Ablehnungs-Eintrag obliegt DeviceTokenService.NotifyRejected
+        // (eine Schicht pro Ereignis) — hier nur der Dispatch.
         _ = DispatchMessageAsync(new DeviceTokenRevokedMessage());
+    }
 
     private async Task NavigateAsync(AppPage page)
     {

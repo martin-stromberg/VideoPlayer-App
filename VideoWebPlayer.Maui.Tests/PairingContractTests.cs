@@ -274,8 +274,9 @@ public class PairingContractTests
         var program = MauiFile("MauiProgram.cs");
 
         Assert.Contains(
-            "AddSingleton<ISecretStore>(_ => new SecureStorageSecretStore(SecureStorage.Default))",
+            "AddSingleton<ISecretStore>(sp => new SecureStorageSecretStore(",
             program, StringComparison.Ordinal);
+        Assert.Contains("SecureStorage.Default", program, StringComparison.Ordinal);
     }
 
     /// <summary>

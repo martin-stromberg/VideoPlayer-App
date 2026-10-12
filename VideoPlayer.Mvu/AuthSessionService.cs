@@ -1,4 +1,6 @@
 using System.Net;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using VideoPlayer.ApiClient;
 using VideoPlayer.ApiClient.Models;
 using VideoPlayer.Storage;
@@ -21,11 +23,19 @@ public sealed class AuthSessionService
     private readonly DeviceTokenService deviceTokens;
     private readonly Func<Uri, HttpClient> httpClientFactory;
     private readonly Func<TimeSpan, CancellationToken, Task>? delayAsync;
+    private readonly ILoggerFactory? loggerFactory;
+    private readonly ILogger<AuthSessionService> logger;
 
     /// <summary>Erstellt den Dienst mit der produktiven <see cref="HttpClient"/>-Erzeugung.</summary>
     /// <param name="secrets">Ablage der Zugangsdaten und Anmelde-Token.</param>
-    public AuthSessionService(AppSecretsService secrets)
-        : this(secrets, new DeviceTokenService(secrets), null, null)
+    /// <param name="loggerFactory">Optionale Logger-Fabrik für das Programmprotokoll und den API-Client-Logger-Haken.</param>
+    public AuthSessionService(AppSecretsService secrets, ILoggerFactory? loggerFactory = null)
+        : this(
+              secrets,
+              new DeviceTokenService(secrets, loggerFactory?.CreateLogger<DeviceTokenService>()),
+              null,
+              null,
+              loggerFactory)
     {
     }
 
@@ -39,11 +49,18 @@ public sealed class AuthSessionService
     /// <param name="secrets">Ablage der Zugangsdaten und Anmelde-Token.</param>
     /// <param name="httpClientFactory">Fabrik für <see cref="HttpClient"/> pro Serveradresse; <c>null</c> = produktive Erzeugung mit Timeout.</param>
     /// <param name="delayAsync">Optionale Warte-Implementierung der Wiederholungsstrategie (Tests); <c>null</c> = <see cref="Task.Delay(TimeSpan, CancellationToken)"/>.</param>
+    /// <param name="loggerFactory">Optionale Logger-Fabrik für das Programmprotokoll und den API-Client-Logger-Haken.</param>
     public AuthSessionService(
         AppSecretsService secrets,
         Func<Uri, HttpClient>? httpClientFactory,
-        Func<TimeSpan, CancellationToken, Task>? delayAsync = null)
-        : this(secrets, new DeviceTokenService(secrets, httpClientFactory), httpClientFactory, delayAsync)
+        Func<TimeSpan, CancellationToken, Task>? delayAsync = null,
+        ILoggerFactory? loggerFactory = null)
+        : this(
+              secrets,
+              new DeviceTokenService(secrets, httpClientFactory, loggerFactory?.CreateLogger<DeviceTokenService>()),
+              httpClientFactory,
+              delayAsync,
+              loggerFactory)
     {
     }
 
@@ -55,16 +72,21 @@ public sealed class AuthSessionService
     /// <param name="deviceTokens">Verwaltung der gepaarten Geräte-Tokens (Gate-Probe, Widerruf).</param>
     /// <param name="httpClientFactory">Fabrik für <see cref="HttpClient"/> pro Serveradresse; <c>null</c> = produktive Erzeugung mit Timeout.</param>
     /// <param name="delayAsync">Optionale Warte-Implementierung der Wiederholungsstrategie (Tests); <c>null</c> = <see cref="Task.Delay(TimeSpan, CancellationToken)"/>.</param>
+    /// <param name="loggerFactory">Optionale Logger-Fabrik für das Programmprotokoll und den API-Client-Logger-Haken.</param>
     public AuthSessionService(
         AppSecretsService secrets,
         DeviceTokenService deviceTokens,
         Func<Uri, HttpClient>? httpClientFactory = null,
-        Func<TimeSpan, CancellationToken, Task>? delayAsync = null)
+        Func<TimeSpan, CancellationToken, Task>? delayAsync = null,
+        ILoggerFactory? loggerFactory = null)
     {
         this.secrets = secrets ?? throw new ArgumentNullException(nameof(secrets));
         this.deviceTokens = deviceTokens ?? throw new ArgumentNullException(nameof(deviceTokens));
         this.httpClientFactory = httpClientFactory ?? CreateHttpClient;
         this.delayAsync = delayAsync;
+        this.loggerFactory = loggerFactory;
+        logger = loggerFactory?.CreateLogger<AuthSessionService>()
+            ?? NullLogger<AuthSessionService>.Instance;
     }
 
     /// <summary>
@@ -112,18 +134,24 @@ public sealed class AuthSessionService
             var tokenAttempt = await TryStoredTokenAsync(serverAddress, storedToken, cancellationToken);
             if (tokenAttempt is not null)
             {
-                return tokenAttempt with { Username = EmptyToNull(username) };
+                var tokenResult = tokenAttempt with { Username = EmptyToNull(username) };
+                LogLoginOutcome(serverAddress, tokenResult.Status);
+                return tokenResult;
             }
         }
 
         if (!await secrets.HasCredentialsAsync())
         {
-            return new AuthAttempt(AuthAttemptStatus.MissingCredentials, EmptyToNull(username));
+            var missing = new AuthAttempt(AuthAttemptStatus.MissingCredentials, EmptyToNull(username));
+            LogLoginOutcome(serverAddress, missing.Status);
+            return missing;
         }
 
         var password = await secrets.GetPasswordAsync();
         var attempt = await LoginCoreAsync(serverAddress, username, password, cancellationToken);
-        return attempt with { Username = EmptyToNull(username) };
+        var result = attempt with { Username = EmptyToNull(username) };
+        LogLoginOutcome(serverAddress, result.Status);
+        return result;
     }
 
     /// <summary>
@@ -145,7 +173,9 @@ public sealed class AuthSessionService
         ArgumentException.ThrowIfNullOrWhiteSpace(username);
         ArgumentException.ThrowIfNullOrWhiteSpace(password);
 
-        return await LoginCoreAsync(serverAddress, username.Trim(), password, cancellationToken);
+        var attempt = await LoginCoreAsync(serverAddress, username.Trim(), password, cancellationToken);
+        LogLoginOutcome(serverAddress, attempt.Status);
+        return attempt;
     }
 
     /// <summary>
@@ -165,13 +195,14 @@ public sealed class AuthSessionService
         try
         {
             await secrets.ClearCredentialsAsync();
+            logger.LogInformation("Abmeldung durchgeführt.");
         }
         catch (Exception ex)
         {
             // Ein Fehler der sicheren Ablage verhindert die Abmeldung
             // nicht — der Client ist bereits freigegeben; Reste werden
             // bei der nächsten Anmeldung überschrieben.
-            System.Diagnostics.Debug.WriteLine($"[AuthSessionService] Zugangsdaten entfernen fehlgeschlagen: {ex.Message}");
+            logger.LogWarning(ex, "Zugangsdaten entfernen fehlgeschlagen.");
         }
     }
 
@@ -198,7 +229,8 @@ public sealed class AuthSessionService
             var client = new VideoPlayerApiClient(http, new VideoPlayerApiClientOptions
             {
                 BaseAddress = new Uri(normalized),
-                DelayAsync = delayAsync
+                DelayAsync = delayAsync,
+                Logger = loggerFactory?.CreateLogger<VideoPlayerApiClient>()
             });
             await client.LogoutSessionAsync(refreshToken, CancellationToken.None);
         }
@@ -206,7 +238,7 @@ public sealed class AuthSessionService
         {
             // Best effort: ein unerreichbarer Server oder ein bereits
             // ungültiges Token verhindert die lokale Abmeldung nicht.
-            System.Diagnostics.Debug.WriteLine($"[AuthSessionService] Refresh-Token-Widerruf fehlgeschlagen: {ex.Message}");
+            logger.LogWarning(ex, "Refresh-Token-Widerruf fehlgeschlagen.");
         }
     }
 
@@ -261,7 +293,7 @@ public sealed class AuthSessionService
         {
             // Transport-/Serverfehler → der Aufrufer erhält
             // „nicht erreichbar" und weicht auf den Offline-Pfad aus.
-            System.Diagnostics.Debug.WriteLine($"[AuthSessionService] Token-Validierung fehlgeschlagen: {ex.Message}");
+            logger.LogWarning(ex, "Token-Validierung fehlgeschlagen.");
             return new AuthAttempt(AuthAttemptStatus.ServerUnreachable);
         }
     }
@@ -323,7 +355,8 @@ public sealed class AuthSessionService
         {
             BaseAddress = serverAddress,
             DelayAsync = delayAsync,
-            TokenRefresher = cancellationToken => SilentReloginAsync(serverAddress, cancellationToken)
+            TokenRefresher = cancellationToken => SilentReloginAsync(serverAddress, cancellationToken),
+            Logger = loggerFactory?.CreateLogger<VideoPlayerApiClient>()
         });
     }
 
@@ -341,6 +374,8 @@ public sealed class AuthSessionService
     /// <returns>Das neue Anmelde-Token; <c>null</c> bei Fehlschlag.</returns>
     private async Task<AuthToken?> SilentReloginAsync(Uri serverAddress, CancellationToken cancellationToken)
     {
+        logger.LogInformation("Stille Neuanmeldung für {ServerHost} gestartet.", serverAddress.Host);
+
         // Erneuerung ohne Zugangsdaten: das rotierte Paket wird
         // vollständig persistiert; ein endgültig abgelehnter Refresh-Token
         // wird verworfen und der Zugangsdaten-Pfad greift danach.
@@ -365,7 +400,8 @@ public sealed class AuthSessionService
             var refreshClient = new VideoPlayerApiClient(http, new VideoPlayerApiClientOptions
             {
                 BaseAddress = serverAddress,
-                DelayAsync = delayAsync
+                DelayAsync = delayAsync,
+                Logger = loggerFactory?.CreateLogger<VideoPlayerApiClient>()
             });
             var token = await refreshClient.LoginAsync(username, password, cancellationToken);
             await secrets.SetAuthTokenAsync(token.Token);
@@ -393,7 +429,7 @@ public sealed class AuthSessionService
         {
             // Vorübergehender Fehler: die ursprüngliche Anfrage scheitert
             // regulär — kein falscher Anmeldezwang bei Netzproblemen.
-            System.Diagnostics.Debug.WriteLine($"[AuthSessionService] Stille Neuanmeldung fehlgeschlagen: {ex.Message}");
+            logger.LogWarning(ex, "Stille Neuanmeldung fehlgeschlagen.");
             return null;
         }
     }
@@ -418,7 +454,7 @@ public sealed class AuthSessionService
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"[AuthSessionService] Refresh-Token nicht lesbar: {ex.Message}");
+            logger.LogWarning(ex, "Refresh-Token nicht lesbar.");
             return null;
         }
 
@@ -433,7 +469,8 @@ public sealed class AuthSessionService
             var refreshClient = new VideoPlayerApiClient(http, new VideoPlayerApiClientOptions
             {
                 BaseAddress = serverAddress,
-                DelayAsync = delayAsync
+                DelayAsync = delayAsync,
+                Logger = loggerFactory?.CreateLogger<VideoPlayerApiClient>()
             });
             var session = await refreshClient.RefreshSessionAsync(refreshToken, cancellationToken);
             if (string.IsNullOrWhiteSpace(session.Token) || string.IsNullOrWhiteSpace(session.RefreshToken))
@@ -465,7 +502,7 @@ public sealed class AuthSessionService
             }
             catch (Exception clearEx)
             {
-                System.Diagnostics.Debug.WriteLine($"[AuthSessionService] Refresh-Token konnte nicht verworfen werden: {clearEx.Message}");
+                logger.LogWarning(clearEx, "Refresh-Token konnte nicht verworfen werden.");
             }
 
             return null;
@@ -478,7 +515,7 @@ public sealed class AuthSessionService
         {
             // Vorübergehender Fehler: der Zugangsdaten-Pfad darf es noch
             // versuchen — schadet nicht und erhöht die Erfolgschance.
-            System.Diagnostics.Debug.WriteLine($"[AuthSessionService] Sitzungserneuerung per Refresh-Token fehlgeschlagen: {ex.Message}");
+            logger.LogWarning(ex, "Sitzungserneuerung per Refresh-Token fehlgeschlagen.");
             return null;
         }
     }
@@ -512,7 +549,7 @@ public sealed class AuthSessionService
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"[AuthSessionService] Geräte-Token konnte nicht verworfen werden: {ex.Message}");
+            logger.LogWarning(ex, "Geräte-Token konnte nicht verworfen werden.");
         }
 
         if (await deviceTokens.DiscardIfCurrentAsync(address))
@@ -523,15 +560,28 @@ public sealed class AuthSessionService
         return true;
     }
 
+    /// <summary>
+    /// Protokolliert das Ergebnis eines Anmeldeversuchs — Server-Host
+    /// und Status, niemals Zugangsdaten, Benutzernamen oder Token-Werte.
+    /// </summary>
+    /// <param name="serverAddress">Adresse des Servers, an dem angemeldet wurde.</param>
+    /// <param name="status">Das Ergebnis des Anmeldeversuchs.</param>
+    private void LogLoginOutcome(Uri serverAddress, AuthAttemptStatus status)
+    {
+        logger.LogInformation("Anmeldung an {ServerHost}: {Status}.", serverAddress.Host, status);
+    }
+
     private void OnSessionExpired()
     {
+        logger.LogWarning("Sitzung abgelaufen — neue Anmeldung erforderlich.");
+
         try
         {
             SessionExpired?.Invoke(this, EventArgs.Empty);
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"[AuthSessionService] SessionExpired-Handler fehlgeschlagen: {ex.Message}");
+            logger.LogWarning(ex, "SessionExpired-Handler fehlgeschlagen.");
         }
     }
 

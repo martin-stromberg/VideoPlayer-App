@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging;
 using VideoPlayer.Storage;
 
 namespace VideoPlayer.Maui.Services;
@@ -11,12 +12,17 @@ namespace VideoPlayer.Maui.Services;
 public sealed class SecureStorageSecretStore : ISecretStore
 {
     private readonly ISecureStorage secureStorage;
+    private readonly ILogger<SecureStorageSecretStore> logger;
 
     /// <summary>Initialisiert eine neue Instanz der <see cref="SecureStorageSecretStore"/>-Klasse.</summary>
     /// <param name="secureStorage">Sichere Plattformablage (<c>SecureStorage.Default</c>).</param>
-    public SecureStorageSecretStore(ISecureStorage secureStorage)
+    /// <param name="logger">Logger für das Programmprotokoll.</param>
+    public SecureStorageSecretStore(
+        ISecureStorage secureStorage,
+        ILogger<SecureStorageSecretStore> logger)
     {
         this.secureStorage = secureStorage ?? throw new ArgumentNullException(nameof(secureStorage));
+        this.logger = logger;
     }
 
     /// <inheritdoc/>
@@ -30,7 +36,7 @@ public sealed class SecureStorageSecretStore : ISecretStore
         {
             // SecureStorage kann auf manchen Plattformen/Laufzeiten nicht
             // verfügbar sein — dann verhält sich die Ablage wie „leer".
-            System.Diagnostics.Debug.WriteLine($"[SecureStorageSecretStore] Lesen von '{key}' fehlgeschlagen: {ex.Message}");
+            logger.LogWarning(ex, "Lesen von '{Key}' fehlgeschlagen.", key);
             return null;
         }
     }

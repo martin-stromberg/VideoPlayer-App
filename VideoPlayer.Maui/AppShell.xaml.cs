@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging;
 using VideoPlayer.Maui.Services;
 using VideoPlayer.Mvu;
 
@@ -19,6 +20,7 @@ namespace VideoPlayer.Maui
     {
         private readonly MvuHost mvuHost;
         private readonly PosterImageService posterImageService;
+        private readonly ILogger<AppShell> logger;
         private readonly List<ShellItem> sourceMenuItems = [];
         private readonly DataTemplate sourceSectionTemplate;
         private readonly DataTemplate sourceErrorTemplate;
@@ -48,11 +50,13 @@ namespace VideoPlayer.Maui
         /// <summary>Initialisiert eine neue Instanz der <see cref="AppShell"/>-Klasse.</summary>
         /// <param name="mvuHost">MVU-Host für den Dispatch der Navigations-Nachrichten und die Quellen des Menüs.</param>
         /// <param name="posterImageService">Dienst zur Auflösung der Quellen-Icons (<c>api/sourceicons/{id}</c>).</param>
-        public AppShell(MvuHost mvuHost, PosterImageService posterImageService)
+        /// <param name="logger">Logger für das Programmprotokoll.</param>
+        public AppShell(MvuHost mvuHost, PosterImageService posterImageService, ILogger<AppShell> logger)
         {
             InitializeComponent();
             this.mvuHost = mvuHost;
             this.posterImageService = posterImageService;
+            this.logger = logger;
 
             // Server-Einrichtung/-verwaltung: kein FlyoutItem, sondern eine
             // auf den Navigationsstack geschobene Route („Server wechseln").
@@ -120,7 +124,7 @@ namespace VideoPlayer.Maui
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"[AppShell] Navigated-Dispatch fehlgeschlagen: {ex.Message}");
+                logger.LogWarning(ex, "Navigated-Dispatch fehlgeschlagen.");
             }
         }
 
@@ -141,7 +145,7 @@ namespace VideoPlayer.Maui
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"[AppShell] Quellen-Menü-Aufbau fehlgeschlagen: {ex.Message}");
+                logger.LogWarning(ex, "Quellen-Menü-Aufbau fehlgeschlagen.");
             }
         }
 
@@ -293,7 +297,7 @@ namespace VideoPlayer.Maui
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"[AppShell] Quellen-Neuladen-Dispatch fehlgeschlagen: {ex.Message}");
+                logger.LogWarning(ex, "Quellen-Neuladen-Dispatch fehlgeschlagen.");
             }
         }
 
@@ -301,11 +305,12 @@ namespace VideoPlayer.Maui
         {
             try
             {
+                logger.LogInformation("Quelle gewechselt: {SourceName}.", source.Name);
                 await mvuHost.DispatchAsync(new SourceSelectedMessage(source));
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"[AppShell] Quellenauswahl-Dispatch fehlgeschlagen: {ex.Message}");
+                logger.LogWarning(ex, "Quellenauswahl-Dispatch fehlgeschlagen.");
             }
         }
 
@@ -323,7 +328,7 @@ namespace VideoPlayer.Maui
             {
                 // Fehlende Icons sind kein Fehlerzustand — der Quellenname
                 // bleibt als Fallback sichtbar.
-                System.Diagnostics.Debug.WriteLine($"[AppShell] Quellen-Icon nicht ladbar: {ex.Message}");
+                logger.LogWarning(ex, "Quellen-Icon nicht ladbar.");
             }
         }
     }

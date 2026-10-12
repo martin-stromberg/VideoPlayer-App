@@ -1,5 +1,6 @@
 #pragma warning disable xUnit1051 // Kurzlebige Unit-Tests: TestContext-CancellationToken nicht erforderlich
 using System.Net;
+using Microsoft.Extensions.Logging;
 using VideoPlayer.Mvu;
 using VideoPlayer.Storage;
 using VideoPlayer.Storage.Entities;
@@ -143,6 +144,97 @@ public class DownloadServiceTests : IDisposable
         Assert.Equal("Ein Film", entry.Title);
         Assert.Contains(changed, i => i.State == DownloadState.Downloading);
         Assert.Equal(DownloadState.Completed, changed.Last().State);
+    }
+
+    /// <summary>Prüft die Protokolleinträge: Auftragseingang und Transfer-Abschluss tragen Medientyp/-Id und Anzeigetitel.</summary>
+    [Fact]
+    public async Task EnqueueAsync_TransferOutcome_Logged()
+    {
+        var logging = new RecordingLoggerProvider();
+        await LoginAsync();
+        EnqueueStream(64);
+        var service = new DownloadService(
+            authSession, secrets, cache, layout, networkMonitor,
+            () => new HttpClient(handler, disposeHandler: false) { Timeout = Timeout.InfiniteTimeSpan },
+            File.Exists, null,
+            logging.CreateLogger<DownloadService>());
+
+        var result = await service.EnqueueAsync("movie", 42, "Ein Film", Settings());
+        Assert.Equal(DownloadService.NoticeEnqueued, result.Notice);
+        await WaitForStateAsync(() => ReadEntryAsync("movie", 42), "completed");
+
+        // Eintrag des Auftragseingangs: Medientyp/-Id, Titel und Notice.
+        Assert.Contains(logging.Entries, e =>
+            e.Level == LogLevel.Information
+            && e.Category.Contains(nameof(DownloadService), StringComparison.Ordinal)
+            && e.Message.Contains("movie/42", StringComparison.Ordinal)
+            && e.Message.Contains("Ein Film", StringComparison.Ordinal)
+            && e.Message.Contains(DownloadService.NoticeEnqueued, StringComparison.Ordinal));
+        // Eintrag des Zustandswechsels auf abgeschlossen.
+        Assert.Contains(logging.Entries, e =>
+            e.Level == LogLevel.Information
+            && e.Category.Contains(nameof(DownloadService), StringComparison.Ordinal)
+            && e.Message.Contains("movie/42", StringComparison.Ordinal)
+            && e.Message.Contains("Completed", StringComparison.Ordinal));
+    }
+
+    /// <summary>
+    /// Prüft die Protokollierung des Einreih-Ergebnisses: ein Dedup-
+    /// Hinweis ohne Zustandsänderung („wartet bereits") erzeugt keinen
+    /// Information-Eintrag — Auto-Download-Läufe prüfen pro Kandidat
+    /// und würden sonst pro Eintrag loggen, ohne dass etwas geschah.
+    /// </summary>
+    [Fact]
+    public async Task EnqueueAsync_DedupNotice_LogsBelowInformation()
+    {
+        var logging = new RecordingLoggerProvider();
+        await LoginAsync();
+        // WLAN-Bedingung hält den Auftrag wartend — die zweite
+        // Einplanung trifft die Dedup.
+        networkMonitor.IsWifi = false;
+        var service = new DownloadService(
+            authSession, secrets, cache, layout, networkMonitor,
+            () => new HttpClient(handler, disposeHandler: false) { Timeout = Timeout.InfiniteTimeSpan },
+            File.Exists, null,
+            logging.CreateLogger<DownloadService>());
+        var settings = Settings(wifiOnly: true);
+        await service.EnqueueAsync("movie", 42, "Ein Film", settings);
+
+        var result = await service.EnqueueAsync("movie", 42, "Ein Film", settings);
+
+        Assert.Equal(DownloadService.NoticeAlreadyQueued, result.Notice);
+        Assert.DoesNotContain(logging.Entries, e =>
+            e.Level == LogLevel.Information
+            && e.Category.Contains(nameof(DownloadService), StringComparison.Ordinal)
+            && e.Message.Contains(DownloadService.NoticeAlreadyQueued, StringComparison.Ordinal));
+    }
+
+    /// <summary>
+    /// Prüft die Protokollierung des Quota-Pfads: der Zustandswechsel
+    /// auf „failed" trägt das Ereignis bereits — kein zweiter
+    /// Warn-Eintrag mit dem Hinweistext für denselben Vorgang.
+    /// </summary>
+    [Fact]
+    public async Task EnqueueAsync_QuotaExceeded_LogsSingleWarning()
+    {
+        var logging = new RecordingLoggerProvider();
+        await LoginAsync();
+        var occupying = Path.Combine(layout.VideosDirectory, "belegt.bin");
+        await File.WriteAllBytesAsync(occupying, new byte[200]);
+        var service = new DownloadService(
+            authSession, secrets, cache, layout, networkMonitor,
+            () => new HttpClient(handler, disposeHandler: false) { Timeout = Timeout.InfiniteTimeSpan },
+            File.Exists, 100,
+            logging.CreateLogger<DownloadService>());
+
+        var result = await service.EnqueueAsync("movie", 42, "Ein Film", Settings());
+
+        Assert.True(result.IsError);
+        Assert.Equal(DownloadService.NoticeQuotaExceeded, result.Notice);
+        Assert.Single(logging.Entries, e =>
+            e.Level == LogLevel.Warning
+            && e.Category.Contains(nameof(DownloadService), StringComparison.Ordinal)
+            && e.Message.Contains("movie/42", StringComparison.Ordinal));
     }
 
     /// <summary>Prüft Enqueue: der Serienkontext einer Episode landet im Manifest.</summary>

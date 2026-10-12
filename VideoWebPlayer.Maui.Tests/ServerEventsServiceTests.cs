@@ -1,5 +1,6 @@
 #pragma warning disable xUnit1051 // Kurzlebige Unit-Tests: TestContext-CancellationToken nicht erforderlich
 using System.Net;
+using Microsoft.Extensions.Logging;
 using VideoPlayer.Mvu;
 using VideoPlayer.Storage;
 using VideoWebPlayer.Maui.Tests.Stubs;
@@ -142,6 +143,44 @@ public class ServerEventsServiceTests
         // Trennen ohne Verbindung ist ein No-Op.
         await service.DisconnectAsync();
         Assert.Equal(1, connection.DisconnectCalls);
+    }
+
+    /// <summary>Prüft die Protokolleinträge: Verbindungsauf-/-abbau, StatusChanged und ConnectionClosed landen als Information.</summary>
+    [Fact]
+    public async Task ConnectAsync_DisconnectAsync_StatusChanged_Logged()
+    {
+        var logging = new RecordingLoggerProvider();
+        var authSession = CreateAuthSession(new StubHttpMessageHandler());
+        var connection = new FakeServerEventsConnection();
+        var service = new ServerEventsService(
+            authSession, () => connection, logging.CreateLogger<ServerEventsService>());
+
+        await service.ConnectAsync(Server);
+        Assert.Contains(logging.Entries, e =>
+            e.Level == LogLevel.Information
+            && e.Category.Contains(nameof(ServerEventsService), StringComparison.Ordinal)
+            && e.Message.Contains("aufgebaut", StringComparison.Ordinal));
+
+        connection.RaiseStatus("Server bereit");
+        Assert.Contains(logging.Entries, e =>
+            e.Level == LogLevel.Information
+            && e.Category.Contains(nameof(ServerEventsService), StringComparison.Ordinal)
+            && e.Message.Contains("Server bereit", StringComparison.Ordinal));
+
+        // Closed muss an der aktiven Verbindung eintreffen — ein
+        // nachgereichtes Ereignis einer ersetzten Verbindung ist belanglos.
+        connection.RaiseClosed();
+        Assert.Contains(logging.Entries, e =>
+            e.Level == LogLevel.Information
+            && e.Category.Contains(nameof(ServerEventsService), StringComparison.Ordinal)
+            && e.Message.Contains("geschlossen", StringComparison.Ordinal));
+
+        await service.ConnectAsync(Server);
+        await service.DisconnectAsync();
+        Assert.Contains(logging.Entries, e =>
+            e.Level == LogLevel.Information
+            && e.Category.Contains(nameof(ServerEventsService), StringComparison.Ordinal)
+            && e.Message.Contains("getrennt", StringComparison.Ordinal));
     }
 
     private sealed class FakeServerEventsConnection : IServerEventsConnection
