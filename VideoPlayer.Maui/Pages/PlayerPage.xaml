@@ -31,12 +31,23 @@
              VerticalOptions="Start" ist Pflicht: Ohne Angabe füllt das Layout
              (Default Fill) das gesamte Grid und fängt als Hit-Test-Blocker
              alle Eingaben auf dem MediaElement ab. Das Kopfband selbst ist
-             eingabedurchlässig. Achtung: Ein interaktives Element darf sich
-             nicht in diesem Border befinden — unter Windows deaktiviert
-             InputTransparent auf dem Elternelement den gesamten Teilbaum,
-             ein InputTransparent="False" am Kind reaktiviert es nicht. -->
+             eingabedurchlässig — InputTransparent steht dafür am
+             Elternlayout, nicht nur am inneren Border: Unter iOS hit-testet
+             ein Layout auch bei eingabedurchlässigem Inhalt in den eigenen
+             Bounds weiter und fing dort die Eingaben der nativen
+             Transportleiste (Vollbild-/PiP-Buttons) ab. Unter iOS
+             verschiebt das Code-Behind das Band zusätzlich per Margin
+             unter die native Top-Leiste, damit Scrim und WatchedBadge
+             die eingeblendeten nativen Buttons auch visuell nicht
+             überdecken (der Margin hier bleibt der Windows-/Standard-
+             pfad). Achtung: Ein interaktives Element darf sich nicht in
+             diesem Band befinden — unter Windows deaktiviert
+             InputTransparent auf dem Elternelement den gesamten
+             Teilbaum, ein InputTransparent="False" am Kind reaktiviert
+             es nicht. -->
         <VerticalStackLayout x:Name="OverlayChrome"
                              VerticalOptions="Start"
+                             InputTransparent="True"
                              Spacing="0">
             <Border Padding="14"
                     InputTransparent="True">
@@ -79,7 +90,9 @@
         <!-- Playlist-Navigation (nur bei Playlist-Wiedergabe sichtbar):
              liegt wie der Mini-Player-Schalter als eigenes Element über
              dem Video, damit sie nicht vom eingabedurchlässigen Kopfband
-             blockiert wird. -->
+             blockiert wird. Unter iOS versetzt das Code-Behind den
+             Top-Margin unter die native Top-Leiste — relativ zum
+             ebenfalls verschobenen Kopfband bleibt der Abstand gleich. -->
         <HorizontalStackLayout x:Name="PlaylistNavigationBar"
                                Spacing="10"
                                Margin="0,64,16,0"

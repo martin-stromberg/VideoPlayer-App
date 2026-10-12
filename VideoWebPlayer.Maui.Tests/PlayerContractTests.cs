@@ -15,9 +15,32 @@ namespace VideoWebPlayer.Maui.Tests;
 public class PlayerContractTests
 {
     private static readonly string Root = RepositoryRoot.Find();
+    private static readonly XNamespace MauiNs =
+        XNamespace.Get("http://schemas.microsoft.com/dotnet/2021/maui");
+    private static readonly XNamespace XNs =
+        XNamespace.Get("http://schemas.microsoft.com/winfx/2009/xaml");
 
     private static string Read(params string[] parts) =>
         File.ReadAllText(Path.Combine(new[] { Root }.Concat(parts).ToArray()));
+
+    /// <summary>Liest das XAML der PlayerPage als Dokument.</summary>
+    /// <returns>Das geparste PlayerPage-XAML.</returns>
+    private static XDocument PlayerPageXaml() =>
+        XDocument.Parse(Read("VideoPlayer.Maui", "Pages", "PlayerPage.xaml"));
+
+    /// <summary>Liest den Code-Behind der PlayerPage.</summary>
+    /// <returns>Quelltext der PlayerPage.xaml.cs.</returns>
+    private static string PlayerPageCode() =>
+        Read("VideoPlayer.Maui", "Pages", "PlayerPage.xaml.cs");
+
+    /// <summary>Findet das eindeutig benannte XAML-Element mit dem gegebenen <c>x:Name</c>.</summary>
+    /// <param name="parent">Elternknoten, unterhalb dessen gesucht wird.</param>
+    /// <param name="element">Elementname (inkl. MAUI-Namespace).</param>
+    /// <param name="name">Der gesuchte <c>x:Name</c>.</param>
+    /// <returns>Das gefundene Element oder <see langword="null"/>.</returns>
+    private static XElement? Named(XContainer parent, XName element, string name) =>
+        parent.Descendants(element)
+            .SingleOrDefault(e => (string?)e.Attribute(XNs + "Name") == name);
 
     /// <summary>Prüft AppShell: die Route „player" ist registriert.</summary>
     [Fact]
@@ -72,7 +95,7 @@ public class PlayerContractTests
     [Fact]
     public void PlayerPage_DispatchesPlaybackMessages()
     {
-        var code = Read("VideoPlayer.Maui", "Pages", "PlayerPage.xaml.cs");
+        var code = PlayerPageCode();
 
         Assert.Contains("PlayerPageOpenedMessage", code, StringComparison.Ordinal);
         Assert.Contains("PlaybackProgressMessage", code, StringComparison.Ordinal);
@@ -92,25 +115,31 @@ public class PlayerContractTests
     /// Videofläche — es füllt nicht das gesamte Grid (kein Default `Fill`)
     /// und ist außerhalb seines Mini-Player-Schalters eingabedurchlässig.
     /// Pinnt die Korrektur des Hit-Test-Blockers, der die nativen
-    /// Transportsteuerungen in der Vollansicht unbedienbar machte.
+    /// Transportsteuerungen in der Vollansicht unbedienbar machte — unter
+    /// iOS hit-testet das Elternlayout auch bei eingabedurchlässigem Inhalt
+    /// in den eigenen Bounds weiter, daher steht InputTransparent am
+    /// Elternlayout selbst (Issue #45).
     /// </summary>
     [Fact]
     public void PlayerPage_OverlayChromeDoesNotCoverPlaybackSurface()
     {
-        var document = XDocument.Parse(Read("VideoPlayer.Maui", "Pages", "PlayerPage.xaml"));
-        var mauiNs = XNamespace.Get("http://schemas.microsoft.com/dotnet/2021/maui");
-        var xNs = XNamespace.Get("http://schemas.microsoft.com/winfx/2009/xaml");
+        var document = PlayerPageXaml();
 
-        var overlay = document.Descendants(mauiNs + "VerticalStackLayout")
-            .SingleOrDefault(e => (string?)e.Attribute(xNs + "Name") == "OverlayChrome");
+        var overlay = Named(document, MauiNs + "VerticalStackLayout", "OverlayChrome");
         Assert.NotNull(overlay);
 
         // Ohne VerticalOptions gilt der LayoutOptions-Default Fill:
         // das Layout belegt das gesamte Grid über dem MediaElement.
         Assert.Equal("Start", (string?)overlay.Attribute("VerticalOptions"));
 
+        // Das Elternlayout selbst ist eingabedurchlässig — unter iOS
+        // hit-testet ein Layout trotz transparentem Inhalt in den eigenen
+        // Bounds und würde sonst die Eingaben der nativen Transportleiste
+        // (Vollbild-/PiP-Buttons) abfangen.
+        Assert.Equal("True", (string?)overlay.Attribute("InputTransparent"));
+
         // Das sichtbare Kopfband bleibt für Eingaben durchlässig.
-        var band = overlay.Element(mauiNs + "Border");
+        var band = overlay.Element(MauiNs + "Border");
         Assert.NotNull(band);
         Assert.Equal("True", (string?)band.Attribute("InputTransparent"));
 
@@ -119,15 +148,62 @@ public class PlayerContractTests
         // IsHitTestVisible=false am Elternelement den gesamten Teilbaum —
         // ein InputTransparent="False" am Kind reaktiviert ihn nicht.
         // Der Schalter ist deshalb eigenes Grid-Element über dem Band.
-        Assert.Empty(band.Descendants(mauiNs + "Button"));
+        Assert.Empty(band.Descendants(MauiNs + "Button"));
 
-        var rootGrid = document.Descendants(mauiNs + "Grid")
-            .SingleOrDefault(e => (string?)e.Attribute(xNs + "Name") == "PlayerRoot");
+        var rootGrid = Named(document, MauiNs + "Grid", "PlayerRoot");
         Assert.NotNull(rootGrid);
-        var pipButton = rootGrid.Elements(mauiNs + "Button")
-            .SingleOrDefault(e => (string?)e.Attribute(xNs + "Name") == "PipButton");
+        var pipButton = Named(rootGrid, MauiNs + "Button", "PipButton");
         Assert.NotNull(pipButton);
         Assert.Equal("OnPipClicked", (string?)pipButton.Attribute("Clicked"));
+    }
+
+    /// <summary>
+    /// Prüft PlayerPage: Kopfband und Playlist-Navigation bleiben der
+    /// nativen iOS-Transportleiste nicht im Weg — unter iOS schiebt ein
+    /// <c>#if IOS</c>-Block im Konstruktor beide um den benannten Versatz
+    /// <c>IosNativeControlsClearance</c> unter die eingeblendete Top-Leiste
+    /// mit den Vollbild-/PiP-Buttons (das eingabedurchlässige Band überdeckt
+    /// sie damit auch visuell nicht). Die Bar ist ein direktes
+    /// <c>PlayerRoot</c>-Kind außerhalb des eingabedurchlässigen Kopfbands
+    /// und trägt selbst kein <c>InputTransparent</c> — sie bleibt damit
+    /// garantiert bedienbar (Issue #45).
+    /// </summary>
+    [Fact]
+    public void PlayerPage_PlaylistNavigationBarClearsNativeControlsOnIos()
+    {
+        var code = PlayerPageCode();
+        var document = PlayerPageXaml();
+
+        // Unter iOS werden Kopfband und Bar unter die native Top-Leiste
+        // des AVPlayerViewController geschoben — der Versatz ist benannt
+        // (keine Magic Number) und der XAML-Wert bleibt der
+        // Standard-/Windows-Pfad.
+        var ctor = MethodBody(code, "public PlayerPage(");
+        Assert.Contains("#if IOS", ctor, StringComparison.Ordinal);
+        Assert.Contains("IosNativeControlsClearance", ctor, StringComparison.Ordinal);
+        Assert.Contains("OverlayChrome.Margin", ctor, StringComparison.Ordinal);
+        Assert.Contains("PlaylistNavigationBar.Margin", ctor, StringComparison.Ordinal);
+        Assert.Contains("private const double IosNativeControlsClearance",
+            code, StringComparison.Ordinal);
+        Assert.DoesNotContain("new Thickness(0, 96, 16, 0)", code, StringComparison.Ordinal);
+
+        // Die Bar bleibt interaktiv: sie liegt als eigenes PlayerRoot-Kind
+        // außerhalb des eingabedurchlässigen Kopfbands und ist selbst nicht
+        // eingabedurchlässig.
+        var rootGrid = Named(document, MauiNs + "Grid", "PlayerRoot");
+        Assert.NotNull(rootGrid);
+        var navBar = Named(rootGrid, MauiNs + "HorizontalStackLayout", "PlaylistNavigationBar");
+        Assert.NotNull(navBar);
+        Assert.Equal("0,64,16,0", (string?)navBar.Attribute("Margin"));
+        Assert.Null(navBar.Attribute("InputTransparent"));
+
+        // Das Kopfband trägt im XAML keinen Margin — der iOS-Versatz gilt
+        // nur im Code-Behind, der Windows-/Standardpfad bleibt unverändert.
+        var overlay = Named(document, MauiNs + "VerticalStackLayout", "OverlayChrome");
+        Assert.NotNull(overlay);
+        Assert.Null(overlay.Attribute("Margin"));
+        Assert.DoesNotContain(overlay.Descendants(MauiNs + "HorizontalStackLayout"),
+            e => (string?)e.Attribute(XNs + "Name") == "PlaylistNavigationBar");
     }
 
     /// <summary>
@@ -141,7 +217,7 @@ public class PlayerContractTests
     [Fact]
     public void PlayerPage_TapShowsTransportControlsOnWindows()
     {
-        var code = Read("VideoPlayer.Maui", "Pages", "PlayerPage.xaml.cs");
+        var code = PlayerPageCode();
         var xaml = Read("VideoPlayer.Maui", "Pages", "PlayerPage.xaml");
 
         Assert.Contains("x:Name=\"PlayerRoot\"", xaml, StringComparison.Ordinal);
@@ -188,7 +264,7 @@ public class PlayerContractTests
     [Fact]
     public void PlayerPage_UnsubscribesModelChangedOnDisappearing()
     {
-        var code = Read("VideoPlayer.Maui", "Pages", "PlayerPage.xaml.cs");
+        var code = PlayerPageCode();
 
         Assert.Contains("mvuHost.ModelChanged -= OnModelChanged", code, StringComparison.Ordinal);
         Assert.Contains("ModelChanged -= OnModelChanged",
@@ -214,7 +290,7 @@ public class PlayerContractTests
     [Fact]
     public void PlayerPage_MarshalsNativeElementAccessOnMainThread()
     {
-        var code = Read("VideoPlayer.Maui", "Pages", "PlayerPage.xaml.cs");
+        var code = PlayerPageCode();
 
         Assert.Contains("BeginInvokeOnMainThread",
             MethodBody(code, "private void OnMediaOpened"), StringComparison.Ordinal);
@@ -246,7 +322,7 @@ public class PlayerContractTests
     [Fact]
     public void PlayerPage_ResumeSeek_WaitsForReadyState()
     {
-        var code = Read("VideoPlayer.Maui", "Pages", "PlayerPage.xaml.cs");
+        var code = PlayerPageCode();
 
         // Kein direkter Seek im MediaOpened-Handler — nur das Merken
         // des Seek-Wunsches und der Gate-Aufruf.
@@ -277,7 +353,7 @@ public class PlayerContractTests
     [Fact]
     public void PlayerPage_NativeAccessesAreFailureIsolated()
     {
-        var code = Read("VideoPlayer.Maui", "Pages", "PlayerPage.xaml.cs");
+        var code = PlayerPageCode();
 
         var updateUi = MethodBody(code, "private void UpdateUi");
         Assert.Contains("try", updateUi, StringComparison.Ordinal);
@@ -328,7 +404,7 @@ public class PlayerContractTests
     [Fact]
     public void PlayerPage_FailedSourceApply_KeepsStopPathReachable()
     {
-        var code = Read("VideoPlayer.Maui", "Pages", "PlayerPage.xaml.cs");
+        var code = PlayerPageCode();
 
         var fail = MethodBody(code, "private void FailPlaybackStart");
         Assert.DoesNotContain("appliedLocation = null", fail, StringComparison.Ordinal);
@@ -347,7 +423,7 @@ public class PlayerContractTests
     [Fact]
     public void PlayerPage_IgnoresModelChangesAfterDisappearing()
     {
-        var code = Read("VideoPlayer.Maui", "Pages", "PlayerPage.xaml.cs");
+        var code = PlayerPageCode();
 
         Assert.Contains("subscribed = false",
             MethodBody(code, "protected override void OnDisappearing"), StringComparison.Ordinal);

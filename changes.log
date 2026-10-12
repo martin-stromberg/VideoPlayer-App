@@ -1,5 +1,12 @@
 # Änderungsprotokoll
 
+## 2026-10-12 — iPad: Vollbild- und PiP-Schaltflächen der nativen Wiedergabesteuerung frei erreichbar (Issue #45)
+
+- **Eingabedurchlässiges Kopfband-Elternlayout:** `OverlayChrome` in `PlayerPage.xaml` trägt jetzt `InputTransparent="True"` am umschließenden `VerticalStackLayout` (nicht nur am inneren `Border`) — unter iOS hit-testete das Layout trotz transparentem Inhalt in den eigenen Bounds und fing die Eingaben der vom `AVPlayerViewController` eingeblendeten Transportleiste ab.
+- **Überlagerungen unter die native Top-Leiste gerückt:** Ein `#if IOS`-Block im `PlayerPage`-Konstruktor versetzt `OverlayChrome` und `PlaylistNavigationBar` um den benannten Versatz `IosNativeControlsClearance` (96 pt) nach unten — die Vollbild- und PiP-Schaltflächen der nativen Leiste werden auf dem iPad weder überdeckt (Scrim, „Angesehen"-Badge) noch in der Eingabe blockiert, und die interaktive Playlist-Navigation bleibt voll bedienbar. Die XAML-Werte bleiben der Windows-/Standardpfad; das Windows-Verhalten ist unverändert.
+- **Verifikationsgrenze:** Kein iOS-UI-Automatisierungsnachweis möglich — die Hit-Test-Anordnung ist quelltextbasiert in `PlayerContractTests` gepinnt (`InputTransparent` am Elternlayout, `#if IOS`-Versatzblock, Bar außerhalb des eingabedurchlässigen Bands); die Geräteverifikation erfolgt als dokumentierter manueller TestFlight-Prüfschritt, Grenze in `docs/help/wiedergabe-pip.md` festgehalten.
+- **Doku:** `docs/help/wiedergabe-pip.md` (Abschnitte „Bedienung in der Vollansicht", „Playlist-Navigation", „Picture-in-Picture/Mini-Player"), `docs/RELEASE_NOTES.md`.
+
 ## 2026-10-11 — iOS-Bugfix Serienansicht: Episodenliste und Staffelauswahl (Issue #43, Schritt 8)
 
 - **Episodenliste ohne CollectionView-im-ScrollView:** `EpisodesCollection` wurde durch `EpisodesList` (`VerticalStackLayout` + `BindableLayout`, Muster `MediaCarousel`) ersetzt — unter iOS wurde die virtualisierte Liste im `ScrollView` mit Höhe 0 gemessen. Episodenkarten öffnen per `TapGestureRecognizer` (`OnEpisodeTapped`) weiterhin die Episoden-Detailseite; Optik und Platzhalter-Logik unverändert.

@@ -28,11 +28,14 @@ Die nativen Transportsteuerungen des `MediaElement`
 die übrigen Transportfunktionen) sind in der normalen Vollansicht
 direkt bedienbar. Das App-Kopfband `OverlayChrome` (Titel,
 „Angesehen"-Hinweis) liegt nur am oberen Rand
-(`VerticalOptions="Start"`) und ist eingabedurchlässig
-(`InputTransparent`); der Mini-Player-Schalter liegt als eigenes
-Element über dem Kopfband, da `InputTransparent` unter Windows den
-gesamten Teilbaum vom Hit-Test ausnimmt — ein eingebetteter Button
-wäre sonst unbedienbar.
+(`VerticalOptions="Start"`) und ist eingabedurchlässig — das
+`InputTransparent` steht dabei am Elternlayout selbst, nicht nur am
+inneren `Border`: Unter iOS hit-testet ein Layout auch bei
+eingabedurchlässigem Inhalt in den eigenen Bounds weiter und hätte
+sonst die Eingaben der nativen Transportleiste abgefangen. Der
+Mini-Player-Schalter liegt als eigenes Element über dem Kopfband,
+da `InputTransparent` unter Windows den gesamten Teilbaum vom
+Hit-Test ausnimmt — ein eingebetteter Button wäre sonst unbedienbar.
 
 **Windows-Besonderheit:** Das `MediaPlayerElement` blendet die
 Steuerung nach dem Timeout zwar zuverlässig aus, aber in dieser
@@ -40,6 +43,38 @@ Kombination nicht über eigene Zeiger-Ereignisse wieder ein. Ein Tip
 auf die Videofläche ruft daher `TransportControls.Show()`; das
 Ausblenden übernimmt weiterhin der Auto-Timer. Auf iOS/Android
 regelt der Plattform-Player das Einblenden nativ bei Berührung.
+
+**iOS — native Vollbild-/PiP-Schaltflächen frei erreichbar
+(Issue #45):** iOS blendet die native Top-Leiste des
+`AVPlayerViewController` mit den Vollbild- und PiP-Schaltflächen im
+oberen Randbereich ein — genau dort lagen die App-Überlagerungen,
+die auf dem iPad deren Bedienung blockierten. Neben der
+Eingabedurchlässigkeit des Kopfband-Elternlayouts (s. o.) verschiebt
+die Seite unter iOS (`#if IOS` im Konstruktor) `OverlayChrome` und
+`PlaylistNavigationBar` um den benannten Versatz
+`IosNativeControlsClearance` (96 pt) unter die native Leiste: Das
+eingabedurchlässige Kopfband würde die nativen Schaltflächen sonst
+weiterhin visuell überdecken (Scrim-Abdunklung, „Angesehen"-Badge
+oben rechts), und die interaktive Playlist-Navigation darf nicht
+eingabedurchlässig sein — sie muss physisch darunter liegen und
+hält ihren XAML-Abstand zum mitverschobenen Kopfband. Die XAML-Werte
+bleiben der Windows-/Standardpfad; das Windows-Verhalten ist
+unverändert.
+
+**iOS-Verifikationsgrenze:** Der Fehler war iOS-/iPad-spezifisch;
+eine iOS-UI-Automatisierung existiert im Repository nicht, und die
+Windows-E2E-Suite erreicht die native `AVPlayerViewController`-
+Ebene grundsätzlich nicht. Der Nachweis stützt sich auf die
+quelltextbasierten Contract-Tests (`PlayerContractTests` pinnen
+`InputTransparent` am Elternlayout, den `#if IOS`-Versatzblock und
+die Lage der Playlist-Navigation außerhalb des eingabedurchlässigen
+Bands) sowie den dokumentierten manuellen TestFlight-Prüfschritt
+auf dem iPad (Vollbild antippen, PiP starten, Playlist-Navigation
+bedienen). Der Versatz von 96 pt ist eine konservative Schätzung
+der Leistenhöhe inklusive Safe-Area — zeigt die Geräteprüfung eine
+Restüberdeckung, ist er feinzujustieren; als letzter
+Eskalationspfad wäre ein eigener iOS-Mapper am
+`AVPlayerViewController` des Toolkit-`MediaElement` denkbar.
 
 ## Quellen
 
@@ -96,7 +131,9 @@ und **„Weiter"** (serverseitige `previous`-/`next`-Endpunkte) sowie
 unter dem Titel eine Kontextzeile „„Playlist-Name" · Eintrag n/m".
 Die Schaltflächen erscheinen nur im Playlist-Kontext und werden am
 Listenrand deaktiviert; im Mini-Player sind sie wie das Kopfband
-ausgeblendet.
+ausgeblendet. Unter iOS liegt die Zeile etwas tiefer — sie wird mit
+dem Kopfband unter die eingeblendete native Top-Leiste gerückt,
+bleibt aber voll bedienbar (siehe „Bedienung in der Vollansicht").
 
 ## Fehlerfall
 
@@ -120,7 +157,11 @@ Fehlerhinweis; die Anwendung wird dadurch nicht beendet.
 - **iOS:** die PiP-Schaltfläche ist Teil der nativen
   Transportsteuerung des Players (`AVPlayerViewController`); der
   dafür nötige Hintergrund-Audio-Modus ist in der `Info.plist`
-  deklariert — kein eigener Schalter nötig.
+  deklariert — ein eigener Schalter ist nicht nötig und erscheint
+  unter iOS nicht. Die Vollbild- und PiP-Schaltflächen der
+  eingeblendeten nativen Leiste sind seit der Overlay-Korrektur
+  auf dem iPad wieder frei erreichbar (siehe „Bedienung in der
+  Vollansicht").
 
 ## Stabilität bei wiederholter Wiedergabe
 
