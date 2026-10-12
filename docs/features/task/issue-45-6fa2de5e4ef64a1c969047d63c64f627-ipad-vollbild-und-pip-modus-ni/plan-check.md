@@ -1,0 +1,31 @@
+# Plan-Gegenprüfung
+
+## Ergebnis
+
+**Status:** Plan vollständig
+
+## Abgleich Akzeptanzkriterien
+
+| Akzeptanzkriterium | Umsetzung im Plan | Testnachweis im Plan | Status |
+|--------------------|-------------------|----------------------|--------|
+| AK 1: iPad — Vollbild-/PiP-Buttons der nativen Transportsteuerung frei erreichbar und bedienbar; Titel-Overlay überdeckt nicht / fängt Eingaben nicht ab | Schritt 1: `InputTransparent="True"` am `OverlayChrome`-`VerticalStackLayout` (Elternlayout) + Kommentarblock-Erweiterung; Schritt 2: `#if IOS`-Block im Konstruktor setzt `PlaylistNavigationBar.Margin = new Thickness(0, 96, 16, 0)`; `PipButton` unter iOS unsichtbar (`IsToggleSupported == false`), hit-testet nicht; `ShouldShowPlaybackControls="True"` bleibt | Erweiterter Contract-Test `PlayerPage_OverlayChromeDoesNotCoverPlaybackSurface` (`InputTransparent`-Assertion am Elternlayout), neuer Contract-Test `PlayerPage_PlaylistNavigationBarClearsNativeControlsOnIos`, manueller TestFlight-Pflichtschritt (Vollbild-Button, PiP-Button antippen) | Abgedeckt |
+| AK 2: `OverlayChrome` (Titel, `PlaylistContextLabel`, `WatchedBadge`) sichtbar in Vollansicht, ausgeblendet im Mini-Player | `UpdateUi`-Sichtbarkeitsregeln explizit unverändert (`OverlayChrome.IsVisible = !player.IsPictureInPicture`); `InputTransparent` ändert nur Hit-Testing, nicht Sichtbarkeit; Band enthält weiterhin alle drei `Label`s | Manueller Prüfschritt (Pflicht): Titel, `PlaylistContextLabel`, `WatchedBadge` sichtbar; bestehender Contract-Pin (Band-Inhalte, kein `Button` im Band) bleibt gültig | Abgedeckt |
+| AK 3: `PlaylistNavigationBar` („Zurück"/„Weiter") bei Playlist-Wiedergabe sichtbar und bedienbar, blockiert native Buttons nicht | Bleibt direktes `PlayerRoot`-Kind außerhalb des eingabedurchlässigen Bands, trägt kein `InputTransparent`; unter iOS per `#if IOS`-Margin unter die native Leiste verschoben; Sichtbarkeitsregel unverändert | Neuer Contract-Test `PlayerPage_PlaylistNavigationBarClearsNativeControlsOnIos` (pinnt `#if IOS`-Block, direkte `PlayerRoot`-Kindschaft, fehlendes `InputTransparent`); manueller Prüfschritt (Pflicht): Buttons auslösbar | Abgedeckt |
+| AK 4: Windows-Verhalten unverändert (Mini-Player-Schalter, Transportsteuerung, bestehender Contract-Pin nicht verletzt) | Änderungen sind iOS-Additiv (`#if IOS`-Block) bzw. für Windows funktionsneutral (`InputTransparent` am Elternlayout eines Bandes ohne interaktive Kinder — Teilbaum war über den `Border` bereits eingabedurchlässig); `#if WINDOWS`-Tap-Workaround und `PipButton` unberührt | Bestehender Contract-Pin wird erweitert, nicht gebrochen; alle Bestands-Assertions bleiben gültig; manueller Prüfschritt (Pflicht): Windows Mini-Player-Schalter und Transportsteuerung unverändert; Risikoabschnitt benennt Windows-Hit-Test-Analyse | Abgedeckt |
+| AK 5: Contract-Tests pinnen korrigierte Anordnung; `dotnet test` grün; `dotnet build` Debug und Release fehlerfrei | Schritt 3 (Contract-Tests anpassen/ergänzen) und Schritt 4 (`dotnet test VideoWebPlayer.Maui.Tests --configuration Release` + `dotnet build VideoPlayer.App.sln` Debug/Release) als ausführbare Schritte in der Umsetzungsreihenfolge | Beide neuen/erweiterten Tests in `PlayerContractTests` benannt inkl. Assertion-Umfang; Build-/Test-Verifikation explizit als Schritt 4 | Abgedeckt |
+| AK 6: Manuelle iPad-Verifikation (TestFlight) als dokumentierter Prüfschritt mit dokumentierter iOS-Verifikationsgrenze | Schritt 5: dokumentierter TestFlight-Prüfschritt mit Pflicht-Szenarien (Vollbild, PiP, Playlist-Navigation, Windows-Regression); Schritt 6: `docs/help/wiedergabe-pip.md` um iOS-Eingabedurchlässigkeit, Bar-Positionierung und Verifikationsgrenze ergänzen | Manueller E2E-Prüfschritt-Tabelle mit Priorität „Pflicht" und AK-Zuordnung; Begründung der fehlenden Automatisierbarkeit im Abschnitt „E2E-Tests" (keine iOS-UI-Automatisierung im Repository, Windows-E2E erreicht native iOS-Ebene nicht) | Abgedeckt |
+
+## E2E-Abdeckung
+
+| Benutzerfluss / Akzeptanzkriterium | Geplanter E2E-Test | Status |
+|------------------------------------|--------------------|--------|
+| iPad: Native Leiste einblenden → Vollbild-Button antippen → Vollbild öffnet/zurück (AK 1) | Manueller TestFlight-Prüfschritt (Pflicht, Schritt 5) | Abgedeckt — automatisierter E2E-Test nicht planbar (keine iOS-UI-Automatisierung im Repository); manueller Pflichtschritt mit konkretem Szenario, wie von AK 6 gefordert |
+| iPad: PiP-Button der nativen Leiste antippen → PiP startet (AK 1) | Manueller TestFlight-Prüfschritt (Pflicht, Schritt 5) | Abgedeckt — gleiche Begründung |
+| iPad: Playlist-Wiedergabe → „Zurück"/„Weiter" auslösen; Overlay-Inhalte sichtbar (AK 2, 3) | Manueller TestFlight-Prüfschritt (Pflicht, Schritt 5); zusätzlich Contract-Pin `PlayerPage_PlaylistNavigationBarClearsNativeControlsOnIos` | Abgedeckt — gleiche Begründung |
+| Windows: Mini-Player-Schalter und Transportsteuerung unverändert (AK 4) | Manueller Prüfschritt (Pflicht, Schritt 5); bestehender Contract-Pin bleibt gültig; Windows-E2E-Suite (`PlaylistPlaybackTests`) begründet unberührt (steuert per `DevApi.InvokeAsync` statt physischer Zeiger; Positionsänderung gilt nur iOS) | Abgedeckt — Windows-Layout unverändert, kein neuer automatisierter E2E-Test erforderlich |
+
+## Hinweise
+
+- Der einzige offene Punkt des Plans (geschätzter iOS-Top-Margin `96` für `PlaylistNavigationBar`, ohne Gerät nicht verifizierbar) wurde mit dem Anwender abgestimmt: Umsetzung wie geplant, Feinjustage nach der TestFlight-Prüfung (Schritt 5); bei ausbleibendem Erfolg greift der dokumentierte Eskalationspfad (eigener iOS-Mapper am `AVPlayerViewController`) als separates Follow-up.
+- Der neue Contract-Test `PlayerPage_PlaylistNavigationBarClearsNativeControlsOnIos` benötigt keine neuen Testdaten oder Fixtures — die vorhandenen quelltextbasierten Hilfsmethoden von `PlayerContractTests` (`Read`, `MethodBody`, `RepositoryRoot.Find()`) decken den geplanten Assertion-Umfang ab.
+- Betroffene bestehende Tests sind vollständig benannt: `PlayerPage_OverlayChromeDoesNotCoverPlaybackSurface` (Erweiterung); die Nicht-Betroffenheit der Windows-E2E-Suite und aller übrigen Contract-Tests ist plausibel begründet (keine Windows-Codeänderung, rein additive iOS-Änderung).
