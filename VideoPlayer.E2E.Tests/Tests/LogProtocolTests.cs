@@ -101,7 +101,7 @@ public sealed class LogProtocolTests : E2ETestBase
         await restarted.DevApi.WaitForModelAsync(
             m => m.CurrentPage == "Settings",
             description: "Einstellungsseite geöffnet", cancellationToken: Ct);
-        
+
         Assert.True(restarted.Ui.WaitForVisible("SendLogButton"));
         Assert.NotNull(restarted.FindLogFile());
     }

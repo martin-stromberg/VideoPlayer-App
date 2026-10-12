@@ -394,23 +394,23 @@ public class AutoDownloadServiceTests : IDisposable
         bool isAccessible = true,
         long? sortOrder = null,
         int? episodeNumber = null) => new
-    {
-        id,
-        playlistId = 5L,
-        mediaType,
-        mediaId,
-        mediaTitle = title,
-        parentMediaType,
-        parentMediaId,
-        parentMediaTitle,
-        addedAt = "2026-01-01T00:00:00Z",
-        resolvedPictureId = (long?)null,
-        isAccessible,
-        sortOrder,
-        releaseDate = (string?)null,
-        plot = (string?)null,
-        episodeNumber
-    };
+        {
+            id,
+            playlistId = 5L,
+            mediaType,
+            mediaId,
+            mediaTitle = title,
+            parentMediaType,
+            parentMediaId,
+            parentMediaTitle,
+            addedAt = "2026-01-01T00:00:00Z",
+            resolvedPictureId = (long?)null,
+            isAccessible,
+            sortOrder,
+            releaseDate = (string?)null,
+            plot = (string?)null,
+            episodeNumber
+        };
 
     /// <summary>Prüft Auto-Downloads: ein Weiterschauen-Eintrag mit Playlist-Bezug reiht die Folge-Einträge in Playlist- statt Serienreihenfolge ein.</summary>
     [Fact]
