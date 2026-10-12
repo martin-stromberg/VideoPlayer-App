@@ -59,6 +59,26 @@ public class PageLifecycleContractTests
     public void FavoritesPage_IgnoresModelChangesAfterDisappearing() =>
         AssertIgnoresModelChangesAfterDisappearing("FavoritesPage");
 
+    /// <summary>Prüft PlaylistsPage: Abo im Sichtbarkeitszyklus statt im Konstruktor.</summary>
+    [Fact]
+    public void PlaylistsPage_UnsubscribesModelChangedOnDisappearing() =>
+        AssertUnsubscribesModelChangedOnDisappearing("PlaylistsPage");
+
+    /// <summary>Prüft PlaylistsPage: gemarshallte Callbacks laufen nur bei aktivem Abo.</summary>
+    [Fact]
+    public void PlaylistsPage_IgnoresModelChangesAfterDisappearing() =>
+        AssertIgnoresModelChangesAfterDisappearing("PlaylistsPage");
+
+    /// <summary>Prüft PlaylistDetailsPage: Abo im Sichtbarkeitszyklus statt im Konstruktor.</summary>
+    [Fact]
+    public void PlaylistDetailsPage_UnsubscribesModelChangedOnDisappearing() =>
+        AssertUnsubscribesModelChangedOnDisappearing("PlaylistDetailsPage");
+
+    /// <summary>Prüft PlaylistDetailsPage: gemarshallte Callbacks laufen nur bei aktivem Abo.</summary>
+    [Fact]
+    public void PlaylistDetailsPage_IgnoresModelChangesAfterDisappearing() =>
+        AssertIgnoresModelChangesAfterDisappearing("PlaylistDetailsPage");
+
     /// <summary>Prüft SourceOverviewPage: Abo im Sichtbarkeitszyklus statt im Konstruktor.</summary>
     [Fact]
     public void SourceOverviewPage_UnsubscribesModelChangedOnDisappearing() =>
@@ -84,6 +104,7 @@ public class PageLifecycleContractTests
     /// <c>OnDisappearing</c>, Anmeldung in <c>OnAppearing</c>, kein Abo im
     /// Konstruktor.
     /// </summary>
+    /// <param name="page">Seitenname ohne Dateierweiterung.</param>
     private static void AssertUnsubscribesModelChangedOnDisappearing(string page)
     {
         var code = Read("VideoPlayer.Maui", "Pages", $"{page}.xaml.cs");
@@ -104,6 +125,7 @@ public class PageLifecycleContractTests
     /// <c>UpdateUi</c>-Callback darf auf der losgelösten Seite nicht mehr
     /// rendern (Muster: PlayerPage).
     /// </summary>
+    /// <param name="page">Seitenname ohne Dateierweiterung.</param>
     private static void AssertIgnoresModelChangesAfterDisappearing(string page)
     {
         var code = Read("VideoPlayer.Maui", "Pages", $"{page}.xaml.cs");

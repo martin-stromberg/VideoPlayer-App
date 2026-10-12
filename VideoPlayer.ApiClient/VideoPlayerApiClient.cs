@@ -521,6 +521,473 @@ public class VideoPlayerApiClient
 
     #endregion
 
+    #region Playlists
+
+    /// <summary>
+    /// Liefert die Playlists des angemeldeten Benutzers
+    /// (<c>GET api/playlists</c>), optional auf Playlists mit einem
+    /// bestimmten Genre eingeschränkt.
+    /// </summary>
+    /// <param name="genreId">Optionaler Genre-Filter (ID des Genres).</param>
+    /// <param name="cancellationToken">Abbruchtoken.</param>
+    /// <returns>Liste der eigenen Playlists (ggf. leer).</returns>
+    public async Task<IReadOnlyList<Playlist>> GetPlaylistsAsync(
+        long? genreId = null,
+        CancellationToken cancellationToken = default)
+    {
+        var url = "api/playlists";
+        if (genreId is > 0)
+        {
+            url += $"?genreId={genreId}";
+        }
+
+        return await GetJsonAsync<Playlist[]>(url, cancellationToken) ?? [];
+    }
+
+    /// <summary>
+    /// Liefert alle als öffentlich markierten Playlists
+    /// (<c>GET api/playlists/public</c>), optional auf Playlists mit
+    /// einem bestimmten Genre eingeschränkt.
+    /// </summary>
+    /// <param name="genreId">Optionaler Genre-Filter (ID des Genres).</param>
+    /// <param name="cancellationToken">Abbruchtoken.</param>
+    /// <returns>Liste der öffentlichen Playlists (ggf. leer).</returns>
+    public async Task<IReadOnlyList<Playlist>> GetPublicPlaylistsAsync(
+        long? genreId = null,
+        CancellationToken cancellationToken = default)
+    {
+        var url = "api/playlists/public";
+        if (genreId is > 0)
+        {
+            url += $"?genreId={genreId}";
+        }
+
+        return await GetJsonAsync<Playlist[]>(url, cancellationToken) ?? [];
+    }
+
+    /// <summary>
+    /// Liefert eine einzelne Playlist (<c>GET api/playlists/{id}</c>).
+    /// </summary>
+    /// <param name="playlistId">ID der Playlist.</param>
+    /// <param name="cancellationToken">Abbruchtoken.</param>
+    /// <returns>Die angeforderte Playlist bzw. <c>null</c>, wenn sie nicht existiert (HTTP 404).</returns>
+    public async Task<Playlist?> GetPlaylistAsync(long playlistId, CancellationToken cancellationToken = default)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(playlistId);
+        try
+        {
+            return await GetJsonAsync<Playlist>($"api/playlists/{playlistId}", cancellationToken);
+        }
+        catch (ApiException ex) when (ex.StatusCode == HttpStatusCode.NotFound)
+        {
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Liefert eine sortierte, paginierte Seite der Einträge einer
+    /// Playlist (<c>GET api/playlists/{id}/entries/paged</c>). Die
+    /// Einträge kommen in der serverseitigen Reihenfolge — der Client
+    /// sortiert nicht um.
+    /// </summary>
+    /// <param name="playlistId">ID der Playlist.</param>
+    /// <param name="pageNumber">1-basierte Nummer der zu ladenden Seite.</param>
+    /// <param name="pageSize">Maximale Einträge pro Seite.</param>
+    /// <param name="cancellationToken">Abbruchtoken.</param>
+    /// <returns>Die angeforderte Eintragsseite.</returns>
+    public async Task<PlaylistEntriesPagedResult> GetPlaylistEntriesPagedAsync(
+        long playlistId,
+        int pageNumber,
+        int pageSize,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(playlistId);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(pageNumber);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(pageSize);
+
+        return await GetJsonAsync<PlaylistEntriesPagedResult>(
+            $"api/playlists/{playlistId}/entries/paged?pageNumber={pageNumber}&pageSize={pageSize}",
+            cancellationToken);
+    }
+
+    /// <summary>
+    /// Lädt das Cover-Bild einer Playlist (<c>GET api/playlists/{id}/cover</c>).
+    /// </summary>
+    /// <param name="playlistId">ID der Playlist.</param>
+    /// <param name="cancellationToken">Abbruchtoken.</param>
+    /// <returns>Die Bilddaten als Byte-Array bzw. <c>null</c>, wenn die Playlist kein Cover hat (HTTP 404).</returns>
+    public async Task<byte[]?> GetPlaylistCoverAsync(long playlistId, CancellationToken cancellationToken = default)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(playlistId);
+        try
+        {
+            using var response = await SendWithPolicyAsync(
+                $"api/playlists/{playlistId}/cover",
+                () => new HttpRequestMessage(HttpMethod.Get, $"api/playlists/{playlistId}/cover"),
+                allowReauth: true,
+                cancellationToken);
+            return await response.Content.ReadAsByteArrayAsync(cancellationToken);
+        }
+        catch (ApiException ex) when (ex.StatusCode == HttpStatusCode.NotFound)
+        {
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Startet die Wiedergabe einer Playlist (<c>POST api/playlists/{id}/play</c>)
+    /// ab dem angegebenen Eintrag bzw. ab dem ersten abspielbaren und
+    /// zugänglichen Eintrag, wenn <paramref name="entryId"/> nicht gesetzt ist.
+    /// </summary>
+    /// <param name="playlistId">ID der Playlist.</param>
+    /// <param name="entryId">ID des Starteintrags; <c>null</c> = erster abspielbarer und zugänglicher Eintrag.</param>
+    /// <param name="cancellationToken">Abbruchtoken.</param>
+    /// <returns>Die Wiedergabe-Startinformationen.</returns>
+    public async Task<PlaylistPlaybackStart> StartPlaylistPlaybackAsync(
+        long playlistId,
+        long? entryId = null,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(playlistId);
+
+        var url = $"api/playlists/{playlistId}/play";
+        if (entryId is > 0)
+        {
+            url += $"?entryId={entryId}";
+        }
+
+        return await PostJsonAsync<PlaylistPlaybackStart>(url, cancellationToken)
+            ?? throw new InvalidOperationException($"Antwort von {url} konnte nicht deserialisiert werden.");
+    }
+
+    /// <summary>
+    /// Liefert den nächsten abspielbaren und zugänglichen Eintrag nach
+    /// <paramref name="currentEntryId"/> samt seiner Position
+    /// (<c>POST api/playlists/{id}/play/next</c>) — manuelle
+    /// Vorwärts-Navigation innerhalb der Playlist.
+    /// </summary>
+    /// <param name="playlistId">ID der Playlist.</param>
+    /// <param name="currentEntryId">ID des aktuell gespielten Playlist-Eintrags.</param>
+    /// <param name="cancellationToken">Abbruchtoken.</param>
+    /// <returns>Das Navigationsergebnis bzw. <c>null</c>, wenn es keinen Folgeeintrag gibt (HTTP 204).</returns>
+    public async Task<PlaylistNavigationResult?> GetNextPlaylistEntryAsync(
+        long playlistId,
+        long currentEntryId,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(playlistId);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(currentEntryId);
+
+        return await PostJsonAsync<PlaylistNavigationResult>(
+            $"api/playlists/{playlistId}/play/next?currentEntryId={currentEntryId}",
+            cancellationToken);
+    }
+
+    /// <summary>
+    /// Liefert den vorherigen abspielbaren und zugänglichen Eintrag vor
+    /// <paramref name="currentEntryId"/> samt seiner Position
+    /// (<c>POST api/playlists/{id}/play/previous</c>) — manuelle
+    /// Rückwärts-Navigation innerhalb der Playlist.
+    /// </summary>
+    /// <param name="playlistId">ID der Playlist.</param>
+    /// <param name="currentEntryId">ID des aktuell gespielten Playlist-Eintrags.</param>
+    /// <param name="cancellationToken">Abbruchtoken.</param>
+    /// <returns>Das Navigationsergebnis bzw. <c>null</c>, wenn es keinen vorherigen Eintrag gibt (HTTP 204).</returns>
+    public async Task<PlaylistNavigationResult?> GetPreviousPlaylistEntryAsync(
+        long playlistId,
+        long currentEntryId,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(playlistId);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(currentEntryId);
+
+        return await PostJsonAsync<PlaylistNavigationResult>(
+            $"api/playlists/{playlistId}/play/previous?currentEntryId={currentEntryId}",
+            cancellationToken);
+    }
+
+    /// <summary>
+    /// Liefert den Folgeeintrag für das automatische Weiterschalten am
+    /// Titelende (<c>POST api/playlists/{id}/play/advance</c>) — semantisch
+    /// die automatische Fortsetzung der Playlist-Wiedergabe.
+    /// </summary>
+    /// <param name="playlistId">ID der Playlist.</param>
+    /// <param name="currentEntryId">ID des gerade zu Ende gespielten Playlist-Eintrags.</param>
+    /// <param name="cancellationToken">Abbruchtoken.</param>
+    /// <returns>Das Navigationsergebnis bzw. <c>null</c>, wenn es keinen Folgeeintrag gibt (HTTP 204).</returns>
+    public async Task<PlaylistNavigationResult?> AdvancePlaylistAsync(
+        long playlistId,
+        long currentEntryId,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(playlistId);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(currentEntryId);
+
+        return await PostJsonAsync<PlaylistNavigationResult>(
+            $"api/playlists/{playlistId}/play/advance?currentEntryId={currentEntryId}",
+            cancellationToken);
+    }
+
+    /// <summary>
+    /// Legt eine Playlist an (<c>POST api/playlists</c>).
+    /// </summary>
+    /// <param name="request">Name, Beschreibung und Sortiermodus der neuen Playlist.</param>
+    /// <param name="cancellationToken">Abbruchtoken.</param>
+    /// <returns>Die angelegte Playlist.</returns>
+    public async Task<Playlist> CreatePlaylistAsync(
+        CreatePlaylistRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        return await PostJsonAsync<Playlist>("api/playlists", request, cancellationToken)
+            ?? throw new InvalidOperationException("Antwort von api/playlists konnte nicht deserialisiert werden.");
+    }
+
+    /// <summary>
+    /// Aktualisiert Name und Beschreibung einer Playlist (<c>PUT api/playlists/{id}</c>).
+    /// </summary>
+    /// <param name="playlistId">ID der Playlist.</param>
+    /// <param name="request">Neuer Name und neue Beschreibung.</param>
+    /// <param name="cancellationToken">Abbruchtoken.</param>
+    /// <returns>Die aktualisierte Playlist.</returns>
+    public async Task<Playlist> UpdatePlaylistAsync(
+        long playlistId,
+        UpdatePlaylistRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(playlistId);
+        ArgumentNullException.ThrowIfNull(request);
+        return await PutJsonAsync<Playlist>($"api/playlists/{playlistId}", request, cancellationToken)
+            ?? throw new InvalidOperationException($"Antwort von api/playlists/{playlistId} konnte nicht deserialisiert werden.");
+    }
+
+    /// <summary>
+    /// Löscht eine Playlist (<c>DELETE api/playlists/{id}</c>).
+    /// </summary>
+    /// <param name="playlistId">ID der Playlist.</param>
+    /// <param name="cancellationToken">Abbruchtoken.</param>
+    public async Task DeletePlaylistAsync(long playlistId, CancellationToken cancellationToken = default)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(playlistId);
+        await DeleteAsync($"api/playlists/{playlistId}", cancellationToken);
+    }
+
+    /// <summary>
+    /// Fügt ein Medium zu einer Playlist hinzu (<c>POST api/playlists/{id}/entries</c>);
+    /// Serien, Staffeln und Kollektionen kaskadiert der Server auf ihre Einträge.
+    /// </summary>
+    /// <param name="playlistId">ID der Playlist.</param>
+    /// <param name="request">Medientyp (CLR-Enum-Name) und Id des Mediums.</param>
+    /// <param name="cancellationToken">Abbruchtoken.</param>
+    /// <returns>Das Hinzufüge-Ergebnis inklusive serverseitigem Hinweistext.</returns>
+    public async Task<PlaylistAddResult> AddPlaylistEntryAsync(
+        long playlistId,
+        AddPlaylistEntryRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(playlistId);
+        ArgumentNullException.ThrowIfNull(request);
+        return await PostJsonAsync<PlaylistAddResult>($"api/playlists/{playlistId}/entries", request, cancellationToken)
+            ?? throw new InvalidOperationException($"Antwort von api/playlists/{playlistId}/entries konnte nicht deserialisiert werden.");
+    }
+
+    /// <summary>
+    /// Entfernt einen Eintrag aus einer Playlist
+    /// (<c>DELETE api/playlists/{id}/entries/{mediaType}/{mediaId}</c>).
+    /// Beantwortet der Server den Aufruf mit HTTP 409 (Weiterschauen-Bezug),
+    /// liegt eine <see cref="ApiException"/> mit
+    /// <see cref="ApiException.ResponseBody"/> des
+    /// <see cref="PlaylistConflictResponse"/>-Typs vor — die Anfrage kann
+    /// mit <paramref name="confirmContinueWatchingRemoval"/> erneut werden.
+    /// </summary>
+    /// <param name="playlistId">ID der Playlist.</param>
+    /// <param name="mediaType">Medientyp als CLR-Enum-Name.</param>
+    /// <param name="mediaId">Id des Mediums.</param>
+    /// <param name="confirmContinueWatchingRemoval"><c>true</c> = Bestätigung des Weiterschauen-Entfernens mitsenden.</param>
+    /// <param name="cancellationToken">Abbruchtoken.</param>
+    public async Task RemovePlaylistEntryAsync(
+        long playlistId,
+        string mediaType,
+        long mediaId,
+        bool confirmContinueWatchingRemoval = false,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(playlistId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(mediaType);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(mediaId);
+
+        var url = $"api/playlists/{playlistId}/entries/{Uri.EscapeDataString(mediaType)}/{mediaId}";
+        if (confirmContinueWatchingRemoval)
+        {
+            url += "?confirmContinueWatchingRemoval=true";
+        }
+
+        await DeleteAsync(url, cancellationToken);
+    }
+
+    /// <summary>
+    /// Verschiebt einen Playlist-Eintrag an den Anfang
+    /// (<c>POST api/playlists/{id}/entries/{entryId}/move-to-beginning</c>).
+    /// </summary>
+    /// <param name="playlistId">ID der Playlist.</param>
+    /// <param name="entryId">ID des Playlist-Eintrags.</param>
+    /// <param name="cancellationToken">Abbruchtoken.</param>
+    /// <returns>Der verschobene Eintrag.</returns>
+    public async Task<PlaylistEntry> MovePlaylistEntryToBeginningAsync(
+        long playlistId,
+        long entryId,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(playlistId);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(entryId);
+
+        return await PostJsonAsync<PlaylistEntry>(
+            $"api/playlists/{playlistId}/entries/{entryId}/move-to-beginning",
+            cancellationToken)
+            ?? throw new InvalidOperationException("Antwort von move-to-beginning konnte nicht deserialisiert werden.");
+    }
+
+    /// <summary>
+    /// Verschiebt einen Playlist-Eintrag zwischen Positionen
+    /// (<c>POST api/playlists/{id}/entries/{entryId}/move-between</c>) — die
+    /// Einträge zwischen alter und neuer Position werden verschoben.
+    /// </summary>
+    /// <param name="playlistId">ID der Playlist.</param>
+    /// <param name="entryId">ID des Playlist-Eintrags.</param>
+    /// <param name="request">Ziel-Sortierreihenfolge (SortOrder des Ziel-Nachbarn).</param>
+    /// <param name="cancellationToken">Abbruchtoken.</param>
+    public async Task MovePlaylistEntryBetweenAsync(
+        long playlistId,
+        long entryId,
+        ReorderPlaylistEntryRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(playlistId);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(entryId);
+        ArgumentNullException.ThrowIfNull(request);
+        await PostJsonAsync($"api/playlists/{playlistId}/entries/{entryId}/move-between", request, cancellationToken);
+    }
+
+    /// <summary>
+    /// Setzt die Sortierreihenfolge eines Playlist-Eintrags direkt
+    /// (<c>PUT api/playlists/{id}/entries/{entryId}/order</c>) — ohne
+    /// serverseitige Kollisionsprüfung; Grundlage des „Ans Ende"-Verschiebens
+    /// (<see cref="GetPlaylistMaxSortOrderAsync"/> + 1).
+    /// </summary>
+    /// <param name="playlistId">ID der Playlist.</param>
+    /// <param name="entryId">ID des Playlist-Eintrags.</param>
+    /// <param name="request">Neue Sortierreihenfolge.</param>
+    /// <param name="cancellationToken">Abbruchtoken.</param>
+    public async Task ReorderPlaylistEntryAsync(
+        long playlistId,
+        long entryId,
+        ReorderPlaylistEntryRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(playlistId);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(entryId);
+        ArgumentNullException.ThrowIfNull(request);
+        await PutJsonAsync($"api/playlists/{playlistId}/entries/{entryId}/order", request, cancellationToken);
+    }
+
+    /// <summary>
+    /// Ermittelt die größte belegte Sortierreihenfolge einer Playlist
+    /// (<c>GET api/playlists/{id}/entries/max-sort-order</c>).
+    /// </summary>
+    /// <param name="playlistId">ID der Playlist.</param>
+    /// <param name="cancellationToken">Abbruchtoken.</param>
+    /// <returns>Die größte SortOrder bzw. <c>null</c> bei leerer Playlist.</returns>
+    public async Task<long?> GetPlaylistMaxSortOrderAsync(long playlistId, CancellationToken cancellationToken = default)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(playlistId);
+        var result = await GetJsonAsync<PlaylistMaxSortOrderResult>(
+            $"api/playlists/{playlistId}/entries/max-sort-order", cancellationToken);
+        return result?.MaxSortOrder;
+    }
+
+    /// <summary>
+    /// Schaltet den Sortiermodus einer Playlist um
+    /// (<c>PATCH api/playlists/{id}/sort-mode</c>). Verlässt die Playlist
+    /// den manuellen Modus ohne Bestätigung, antwortet der Server mit
+    /// HTTP 409 (<see cref="PlaylistConflictResponse"/>
+    /// <c>IsLossOfDataConfirmationRequired</c>) — die Anfrage kann mit
+    /// <see cref="ChangeSortModeRequest.ConfirmLossOfManualOrder"/>
+    /// erneut werden.
+    /// </summary>
+    /// <param name="playlistId">ID der Playlist.</param>
+    /// <param name="request">Neuer Sortiermodus und Bestätigungsflagge.</param>
+    /// <param name="cancellationToken">Abbruchtoken.</param>
+    /// <returns>Die aktualisierte Playlist.</returns>
+    public async Task<Playlist> ChangePlaylistSortModeAsync(
+        long playlistId,
+        ChangeSortModeRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(playlistId);
+        ArgumentNullException.ThrowIfNull(request);
+        return await PatchJsonAsync<Playlist>($"api/playlists/{playlistId}/sort-mode", request, cancellationToken)
+            ?? throw new InvalidOperationException($"Antwort von api/playlists/{playlistId}/sort-mode konnte nicht deserialisiert werden.");
+    }
+
+    /// <summary>
+    /// Setzt die Anzeige-Genres einer Playlist
+    /// (<c>PUT api/playlists/{id}/genres</c>) — markiert die Genres
+    /// serverseitig als manuell übersteuert.
+    /// </summary>
+    /// <param name="playlistId">ID der Playlist.</param>
+    /// <param name="request">Ids der gewählten Genres.</param>
+    /// <param name="cancellationToken">Abbruchtoken.</param>
+    /// <returns>Die aktualisierte Playlist.</returns>
+    public async Task<Playlist> SetPlaylistGenresAsync(
+        long playlistId,
+        SetPlaylistGenresRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(playlistId);
+        ArgumentNullException.ThrowIfNull(request);
+        return await PutJsonAsync<Playlist>($"api/playlists/{playlistId}/genres", request, cancellationToken)
+            ?? throw new InvalidOperationException($"Antwort von api/playlists/{playlistId}/genres konnte nicht deserialisiert werden.");
+    }
+
+    /// <summary>
+    /// Setzt die Genres einer Playlist auf die berechneten Werte zurück
+    /// (<c>POST api/playlists/{id}/genres/reset</c>).
+    /// </summary>
+    /// <param name="playlistId">ID der Playlist.</param>
+    /// <param name="cancellationToken">Abbruchtoken.</param>
+    /// <returns>Die aktualisierte Playlist.</returns>
+    public async Task<Playlist> ResetPlaylistGenresAsync(long playlistId, CancellationToken cancellationToken = default)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(playlistId);
+        return await PostJsonAsync<Playlist>(
+            $"api/playlists/{playlistId}/genres/reset",
+            new { },
+            cancellationToken)
+            ?? throw new InvalidOperationException($"Antwort von api/playlists/{playlistId}/genres/reset konnte nicht deserialisiert werden.");
+    }
+
+    /// <summary>
+    /// Setzt das Öffentlich-Flag einer Playlist
+    /// (<c>PUT api/playlists/{id}/public</c>) — serverseitig nur
+    /// Administrator:innen mit eigener Playlist (sonst HTTP 403).
+    /// </summary>
+    /// <param name="playlistId">ID der Playlist.</param>
+    /// <param name="request">Der neue Öffentlich-Zustand.</param>
+    /// <param name="cancellationToken">Abbruchtoken.</param>
+    /// <returns>Die aktualisierte Playlist.</returns>
+    public async Task<Playlist> SetPlaylistPublicAsync(
+        long playlistId,
+        SetPlaylistPublicRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(playlistId);
+        ArgumentNullException.ThrowIfNull(request);
+        return await PutJsonAsync<Playlist>($"api/playlists/{playlistId}/public", request, cancellationToken)
+            ?? throw new InvalidOperationException($"Antwort von api/playlists/{playlistId}/public konnte nicht deserialisiert werden.");
+    }
+
+    #endregion
+
     #region Send pipeline
 
     private async Task<T> GetJsonAsync<T>(string endpoint, CancellationToken cancellationToken)
@@ -530,6 +997,31 @@ public class VideoPlayerApiClient
             () => new HttpRequestMessage(HttpMethod.Get, endpoint),
             allowReauth: true,
             cancellationToken);
+        return await DeserializeAsync<T>(endpoint, response, cancellationToken);
+    }
+
+    /// <summary>
+    /// Sendet eine POST-Anfrage ohne Anfragekörper (Parameter laufen über
+    /// die Query) und deserialisiert die Antwort. Eine leere Erfolgsantwort
+    /// (HTTP 204) ergibt <c>default</c> — die Playlist-Navigations-Endpunkte
+    /// signalisieren damit „kein Folgeeintrag".
+    /// </summary>
+    /// <typeparam name="T">Der erwartete Antworttyp.</typeparam>
+    /// <param name="endpoint">Relativer Endpunktpfad inkl. Query-Parametern.</param>
+    /// <param name="cancellationToken">Abbruchtoken.</param>
+    /// <returns>Die deserialisierte Antwort bzw. <c>default</c> bei HTTP 204.</returns>
+    private async Task<T?> PostJsonAsync<T>(string endpoint, CancellationToken cancellationToken)
+    {
+        using var response = await SendWithPolicyAsync(
+            endpoint,
+            () => new HttpRequestMessage(HttpMethod.Post, endpoint),
+            allowReauth: true,
+            cancellationToken);
+        if (response.StatusCode == HttpStatusCode.NoContent)
+        {
+            return default;
+        }
+
         return await DeserializeAsync<T>(endpoint, response, cancellationToken);
     }
 
@@ -552,9 +1044,80 @@ public class VideoPlayerApiClient
             cancellationToken);
     }
 
+    /// <summary>
+    /// Sendet eine PUT-Anfrage mit JSON-Body und deserialisiert die Antwort.
+    /// </summary>
+    /// <typeparam name="T">Der erwartete Antworttyp.</typeparam>
+    /// <param name="endpoint">Relativer Endpunktpfad.</param>
+    /// <param name="payload">Der Anfragekörper.</param>
+    /// <param name="cancellationToken">Abbruchtoken.</param>
+    /// <returns>Die deserialisierte Antwort.</returns>
+    private async Task<T?> PutJsonAsync<T>(string endpoint, object payload, CancellationToken cancellationToken)
+    {
+        using var response = await SendWithPolicyAsync(
+            endpoint,
+            () => CreateJsonRequest(HttpMethod.Put, endpoint, payload),
+            allowReauth: true,
+            cancellationToken);
+        return await DeserializeAsync<T>(endpoint, response, cancellationToken);
+    }
+
+    private async Task PutJsonAsync(string endpoint, object payload, CancellationToken cancellationToken)
+    {
+        using var response = await SendWithPolicyAsync(
+            endpoint,
+            () => CreateJsonRequest(HttpMethod.Put, endpoint, payload),
+            allowReauth: true,
+            cancellationToken);
+    }
+
+    /// <summary>
+    /// Sendet eine PATCH-Anfrage mit JSON-Body und deserialisiert die Antwort.
+    /// </summary>
+    /// <typeparam name="T">Der erwartete Antworttyp.</typeparam>
+    /// <param name="endpoint">Relativer Endpunktpfad.</param>
+    /// <param name="payload">Der Anfragekörper.</param>
+    /// <param name="cancellationToken">Abbruchtoken.</param>
+    /// <returns>Die deserialisierte Antwort.</returns>
+    private async Task<T?> PatchJsonAsync<T>(string endpoint, object payload, CancellationToken cancellationToken)
+    {
+        using var response = await SendWithPolicyAsync(
+            endpoint,
+            () => CreateJsonRequest(HttpMethod.Patch, endpoint, payload),
+            allowReauth: true,
+            cancellationToken);
+        return await DeserializeAsync<T>(endpoint, response, cancellationToken);
+    }
+
+    /// <summary>
+    /// Sendet eine DELETE-Anfrage ohne Anfragekörper.
+    /// </summary>
+    /// <param name="endpoint">Relativer Endpunktpfad inkl. Query-Parametern.</param>
+    /// <param name="cancellationToken">Abbruchtoken.</param>
+    private async Task DeleteAsync(string endpoint, CancellationToken cancellationToken)
+    {
+        using var response = await SendWithPolicyAsync(
+            endpoint,
+            () => new HttpRequestMessage(HttpMethod.Delete, endpoint),
+            allowReauth: true,
+            cancellationToken);
+    }
+
     private static HttpRequestMessage CreateJsonPost(string endpoint, object payload)
     {
         var request = new HttpRequestMessage(HttpMethod.Post, endpoint)
+        {
+            Content = new StringContent(
+                JsonSerializer.Serialize(payload, JsonOptions),
+                Encoding.UTF8,
+                "application/json")
+        };
+        return request;
+    }
+
+    private static HttpRequestMessage CreateJsonRequest(HttpMethod method, string endpoint, object payload)
+    {
+        var request = new HttpRequestMessage(method, endpoint)
         {
             Content = new StringContent(
                 JsonSerializer.Serialize(payload, JsonOptions),

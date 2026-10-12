@@ -5,14 +5,14 @@ namespace VideoWebPlayer.Maui.Tests;
 /// <summary>Tests für <c>AppRoutes</c>.</summary>
 public class AppRoutesTests
 {
-    /// <summary>Prüft MenuPages: enthält alle fünf Menüeinträge in definierter Reihenfolge.</summary>
+    /// <summary>Prüft MenuPages: enthält alle sechs Menüeinträge in definierter Reihenfolge.</summary>
     [Fact]
-    public void MenuPages_ContainsAllFiveMenuEntriesInOrder()
+    public void MenuPages_ContainsAllMenuEntriesInOrder()
     {
         // Die Quellen sind dynamische Menüeinträge (je freigegebener
         // Quelle) und keine eigene Menüseite mehr.
         Assert.Equal(
-            [AppPage.Home, AppPage.Favorites, AppPage.Downloads, AppPage.Profile, AppPage.Settings],
+            [AppPage.Home, AppPage.Favorites, AppPage.Playlists, AppPage.Downloads, AppPage.Profile, AppPage.Settings],
             AppRoutes.MenuPages);
     }
 

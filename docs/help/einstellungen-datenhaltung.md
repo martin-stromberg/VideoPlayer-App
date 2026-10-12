@@ -38,6 +38,22 @@ sofort übernommen und bleiben nach dem Neustart der App erhalten.
   wenn das Ende abzüglich dieses Fensters erreicht ist (30–3600,
   Standard 300).
 
+### Protokoll
+
+- **Protokollierung** — schreibt ein Programmprotokoll (Diagnoseausgaben
+  und Fehler der App) in die Protokolldatei `videoplayer.log` im
+  Protokollverzeichnis (`logs/` innerhalb der nicht backup-pflichtigen
+  Ablage; Standard: aus). Das Schalten wirkt sofort — beim Ein- und
+  Ausschalten wird eine Marker-Zeile ins Protokoll geschrieben. Ab
+  1 MiB wird die Datei nach `videoplayer.previous.log` rotiert; beide
+  Dateien werden beim Versand angehängt.
+- **Protokoll senden** — nur sichtbar, solange die Protokollierung aktiv
+  ist: öffnet einen E-Mail-Entwurf an `mstromberg84+heimkino@gmail.com`
+  mit dem Protokoll als Anhang. Kann kein Mailentwurf geöffnet werden
+  (kein Mail-Client, unpackaged Windows), greift der Teilen-Dialog als
+  Fallback; schlägt auch dieser fehl, erscheint ein verständlicher
+  Hinweis in der Karte.
+
 Zahlenfelder werden beim Verlassen oder Bestätigen übernommen. Ungültige
 Eingaben werden nicht gespeichert — ein Hinweis erscheint und der letzte
 gültige Wert wird wieder angezeigt. Werte außerhalb der zulässigen Bereiche
@@ -56,7 +72,8 @@ Die App trennt ihre Daten in drei Bereiche:
   - Windows: im servergespeicherten (Roaming-)Profilverzeichnis
     `%APPDATA%\VideoPlayer` — das Windows-Äquivalent zum Geräte-Backup.
 - **Nicht backup-pflichtig** — Offline-Videos (`videos/`), Vorschaubilder
-  (`previews/`), Startseiten-Metadaten, Episodenlisten, Download-Manifest und
+  (`previews/`), Programmprotokolle (`logs/`), Startseiten-Metadaten,
+  Episodenlisten, Download-Manifest und
   die lokale Favoriten-Kopie in `videoplayer-cache.db3`. Diese Daten sind
   jederzeit vom Server neu aufbaubar und werden vom Backup ausgeschlossen:
   - iOS/MacCatalyst: `nobackup`-Verzeichnis mit

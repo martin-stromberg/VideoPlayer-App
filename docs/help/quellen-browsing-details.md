@@ -110,6 +110,41 @@ markierte Episode ein **rundes Angesehen-Badge** nach Web-Vorbild
 - Der Offline-Snapshot übernimmt den Stand aus `CachedShowEpisode`
   (alte Cache-Einträge ohne das Feld gelten als ungesehen).
 
+### Serienansicht — Stabilität und iOS-Verifikationsgrenze
+
+Die Serienansicht (`SeasonSection` der `MediaDetailsPage`) wurde für
+die iOS-Plattform gehärtet — drei plausibilisierte Fehlerquellen des
+gemeinsamen UI-Codes sind behoben:
+
+- **Episodenliste:** Die Liste wird nicht mehr als virtualisierte
+  `CollectionView` innerhalb des `ScrollView` gerendert — unter iOS
+  konnte sie dort mit Höhe 0 gemessen werden (keine sichtbaren
+  Episoden). Stattdessen nutzt sie ein `VerticalStackLayout` mit
+  `BindableLayout`-Template nach dem Muster des `MediaCarousel`;
+  die Episodenkarte öffnet per `TapGestureRecognizer` weiterhin die
+  Episoden-Detailseite. Aussehen und Bedienung bleiben identisch.
+- **Staffel-Reihenfolge:** `SeasonPicker.ItemsSource` wird nur noch
+  neu gesetzt, wenn sich die Staffel-Id-Sequenz tatsächlich ändert —
+  der Picker baut seine Anzeige nicht mehr bei jeder
+  Modell-Aktualisierung neu auf. Die Reihenfolge bleibt die
+  aufsteigende Modell-Sortierung (`OrderBy(s.Number)`).
+- **Bestehende Auswahl:** `SelectedItem` wird nur bei Abweichung
+  gesetzt, und `OnSeasonSelected` ignoriert zusätzlich zum
+  `updatingSeasonPicker`-Flag Echo-Events, die die bereits
+  angewendete Modell-Auswahl erneut melden würden — verzögerte
+  `SelectedIndexChanged`-Aufrufe (iOS) können die Staffelwahl nicht
+  mehr auf „Staffel 01" zurücksetzen.
+
+**iOS-Verifikationsgrenze:** Die Fehler waren iOS-spezifisch; ein
+iOS-Build/-Testlauf (`scripts/iOS-Deployment.ps1`, erfordert
+macOS/Xcode) stand bei der Umsetzung nicht zur Verfügung. Die
+Ursachenbehebung ist plausibilisiert und im gemeinsamen Code wirksam;
+der auf dieser Maschine geführte Nachweis umfasst die unverändert
+korrekte Windows-Serienansicht (E2E-Tests `SeriesDetailsTests`:
+Episodenliste sichtbar, Staffeln aufsteigend, Staffelwechsel bleibt
+bestehen). Die abschließende iOS-Laufzeitverifikation ist einem
+späteren iOS-Testlauf vorbehalten.
+
 ## Favoriten
 
 - Der Stern-Schalter `☆`/`★` auf der Detailseite schaltet die

@@ -87,16 +87,58 @@ Neustart ohne Serveranfrage verfügbar und belastet keine Backups.
 Das Control `CachedPosterImage` bindet die Bild-Id und weist
 nachgereichte Ergebnisse nur zu, wenn die Id noch stimmt.
 
-## Auswahl und Detailseite
+## Auswahl: Direkte Wiedergabe aus der Weiterschauen-Liste
 
-Das Antippen einer Karte dispatcht `MediaItemSelectedMessage`; das
-MVU-Update erzeugt daraus — nur bei identifizierbarem Medium — den
-`NavigateToMediaDetailsEffect`. Die Navigation führt per Shell-Route
-`mediadetails?mediaType=…&id=…&title=…` auf die Platzhalter-Seite
-`MediaDetailsPage`, die Titel und übersetzten Medientyp anzeigt. Die
-vollständige Detailseite folgt in Entwicklungsschritt 8; die
-Medien-Identität steht der Seite bereits als `MediaId`/`MediaType` zur
-Verfügung.
+Das Antippen einer Karte führt je nach Liste unterschiedlich weit:
+
+- **„Weiterschauen":** Abspielbare Einträge (Filme und Episoden)
+  starten **direkt die Wiedergabe** an der gespeicherten
+  Fortsetzungsposition — ohne Umweg über die Detailseite
+  (`ContinueWatchingItemSelectedMessage` → gemeinsamer Wiedergabe-Start
+  mit „Abspielen" auf der Detailseite). Einträge, die nicht direkt
+  abspielbar sind (Serie, Staffel, Kollektion), öffnen wie bisher die
+  Detailansicht.
+- **„Favoriten" und „Neu im Programm":** Ein Antippen öffnet
+  weiterhin ausschließlich die Detailseite
+  (`MediaItemSelectedMessage` → `NavigateToMediaDetailsEffect` per
+  Shell-Route `mediadetails?mediaType=…&id=…&title=…`).
+
+Die Fortsetzungsposition kommt beim Direktstart über denselben
+Auflösungspfad wie beim Wiedergabestart von der Detailseite — der
+Eintrag muss dafür keine weiteren Angaben mitbringen.
+
+## Kontextmenü der Weiterschauen-Liste
+
+Ein **2-Sekunden-Long-Press** auf einen Eintrag der
+Weiterschauen-Liste öffnet ein Kontextmenü mit den Aktionen
+**„Ausblenden"** und **„Überspringen"** sowie **„Abbrechen"** — analog
+zur Serveranwendung. Der kurze Tap bleibt davon unberührt und startet
+weiterhin die direkte Wiedergabe bzw. die Detailansicht.
+
+- **„Ausblenden"** ruft den Server-Endpunkt
+  `api/continue-watching/hide` auf, **„Überspringen"**
+  `api/continue-watching/skip` — danach wird die Cache-Kopie der
+  Liste autoritativ vom Serverstand erneuert
+  (`SyncContinueWatchingAsync` + `CachedListsChangedMessage`) und der
+  Eintrag verschwindet gemäß Server-Antwort aus der Anzeige.
+- **Offline** (ohne angemeldeten Client) wird der Eintrag lokal aus
+  dem `cached_lists`-Eintrag `continue_watching` entfernt; die Liste
+  aktualisiert sich über dieselbe Cache-Geändert-Kette.
+- Technisch trägt das `MediaCarousel` einen
+  `PointerGestureRecognizer` mit 2-s-Timer, der nur bei gesetztem
+  `LongPressEnabled` aktiv ist — das Kontextmenü bleibt auf die
+  Weiterschauen-Liste beschränkt; „Favoriten" und „Neu im Programm"
+  bieten kein Menü.
+
+Damit das **Folgevideo** (Auto-Fortsetzung bzw. Fehler-Rückfall auf
+die nächste Episode) auch beim Direktstart einer Episode funktioniert,
+lädt die App den Serienkontext unabhängig von der Detailseite: online
+über `api/items/tvshow/{showId}` (die Serien-Id steckt als
+Kontext-Hinweis im Weiterschauen-Eintrag), offline aus der gecachten
+Serienstruktur (`ShowDetailsCache`). Die Folge-Episoden werden dem
+Player nachträglich zugeordnet, solange derselbe Titel läuft — ein
+Ladefehlschlag entfällt die Fortsetzungsfunktion still, die Wiedergabe
+bleibt davon unberührt.
 
 ## Offline-Verhalten
 

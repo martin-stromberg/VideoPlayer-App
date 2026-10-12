@@ -42,6 +42,32 @@ public sealed record MediaDetailsState
     /// <summary><c>true</c>, wenn <see cref="DownloadNotice"/> einen Fehler/eine Ablehnung beschreibt.</summary>
     public bool DownloadNoticeIsError { get; init; }
 
+    /// <summary>
+    /// Eigene Playlists als Ziel der Aktion „Zu Playlist hinzufügen";
+    /// <c>null</c> = noch nicht geladen (wird bei erster Anforderung
+    /// vom Server geholt und danach wiederverwendet).
+    /// </summary>
+    public IReadOnlyList<PlaylistListItem>? PlaylistTargets { get; init; }
+
+    /// <summary>Die Playlist-Auswahlziele werden gerade geladen.</summary>
+    public bool IsLoadingPlaylistTargets { get; init; }
+
+    /// <summary>
+    /// Die Playlist-Auswahl soll geöffnet werden, sobald die Ziele
+    /// vorliegen (seitennah als Aktionsblatt umgesetzt); die Seite
+    /// quittiert die Anzeige über <c>PlaylistPickerDismissedMessage</c>.
+    /// </summary>
+    public bool PlaylistPickerPending { get; init; }
+
+    /// <summary>Ein Hinzufügen zu einer Playlist läuft gerade.</summary>
+    public bool IsAddingToPlaylist { get; init; }
+
+    /// <summary>Hinweistext der letzten Playlist-Hinzufügung; <c>null</c> = kein Hinweis.</summary>
+    public string? AddToPlaylistNotice { get; init; }
+
+    /// <summary><c>true</c>, wenn <see cref="AddToPlaylistNotice"/> einen Fehler beschreibt.</summary>
+    public bool AddToPlaylistNoticeIsError { get; init; }
+
     /// <summary>Geladenes Anzeigemodell; <c>null</c> während des Ladens oder bei Fehler.</summary>
     public MediaDetailsView? Details { get; init; }
 

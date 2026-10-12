@@ -1,4 +1,5 @@
 using System.Net;
+using Microsoft.Extensions.Logging;
 using VideoPlayer.ApiClient;
 using VideoPlayer.ApiClient.Discovery;
 using VideoPlayer.Mvu;
@@ -26,6 +27,11 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
     private readonly ServerEventsService serverEvents;
     private readonly DownloadService downloads;
     private readonly AutoDownloadService autoDownloads;
+    private readonly AppLogService appLog;
+    private readonly ILogger<ShellAppEffectHandler> logger;
+
+    /// <summary>Empfängeradresse des Protokollversands per Mail.</summary>
+    private const string LogProtocolRecipient = "mstromberg84+heimkino@gmail.com";
 
     /// <summary>Initialisiert eine neue Instanz der <see cref="ShellAppEffectHandler"/>-Klasse.</summary>
     /// <param name="services">Dienstanbieter zum Auflösen der am Effekt beteiligten Dienste (inkl. <see cref="MvuHost"/>).</param>
@@ -38,6 +44,8 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
     /// <param name="serverEvents">Server-Ereignisverbindung; meldet Ereignisse und Trennung in den MVU-Zyklus.</param>
     /// <param name="downloads">Download-Verwaltung; meldet Zustands-/Fortschrittsänderungen in den MVU-Zyklus.</param>
     /// <param name="autoDownloads">Automatischer Vorlauf der Weiterschauen-Liste.</param>
+    /// <param name="appLog">Datei-Protokoll-Dienst (Schaltzustand und Versand-Dateien).</param>
+    /// <param name="logger">Logger des Handlers — Diagnosemeldungen laufen ins Programmprotokoll.</param>
     public ShellAppEffectHandler(
         IServiceProvider services,
         IServerHealthProbe healthProbe,
@@ -48,7 +56,9 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
         INetworkStatusMonitor networkMonitor,
         ServerEventsService serverEvents,
         DownloadService downloads,
-        AutoDownloadService autoDownloads)
+        AutoDownloadService autoDownloads,
+        AppLogService appLog,
+        ILogger<ShellAppEffectHandler> logger)
     {
         this.services = services;
         this.healthProbe = healthProbe;
@@ -60,6 +70,8 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
         this.serverEvents = serverEvents;
         this.downloads = downloads;
         this.autoDownloads = autoDownloads;
+        this.appLog = appLog;
+        this.logger = logger;
 
         // Endgültig abgelehnte stille Neuanmeldung (401 ohne gültige
         // Zugangsdaten) → die App wechselt in den Anmeldezustand.
@@ -148,6 +160,12 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
             case SyncContinueWatchingEffect:
                 await RunPartialSyncAsync(s => s.SyncContinueWatchingAsync(cancellationToken));
                 break;
+            case HideContinueWatchingEntryEffect hide:
+                await MutateContinueWatchingAsync(s => s.HideAsync(hide.MediaType, hide.MediaId, cancellationToken));
+                break;
+            case SkipContinueWatchingEntryEffect skip:
+                await MutateContinueWatchingAsync(s => s.SkipAsync(skip.MediaType, skip.MediaId, cancellationToken));
+                break;
             case SyncFavoritesEffect:
                 await RunPartialSyncAsync(s => s.SyncFavoritesAsync(cancellationToken));
                 break;
@@ -190,6 +208,75 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
             case RemoveFavoriteEffect remove:
                 await RemoveFavoriteAsync(remove.FavoriteId, cancellationToken);
                 break;
+            case LoadPlaylistsEffect:
+                await LoadPlaylistsAsync(cancellationToken);
+                break;
+            case NavigateToPlaylistDetailsEffect details:
+                await MainThread.InvokeOnMainThreadAsync(() => NavigateToPlaylistDetailsAsync(details));
+                break;
+            case LoadPlaylistDetailsEffect details:
+                await LoadPlaylistDetailsAsync(details, cancellationToken);
+                break;
+            case LoadPlaylistEntriesEffect entries:
+                await LoadPlaylistEntriesAsync(entries, cancellationToken);
+                break;
+            case StartPlaylistPlaybackEffect start:
+                await StartPlaylistPlaybackAsync(start, cancellationToken);
+                break;
+            case LoadNextPlaylistEntryEffect next:
+                await NavigatePlaylistEntryAsync(
+                    next.PlaylistId, next.CurrentEntryId, forward: true, advance: false, cancellationToken);
+                break;
+            case LoadPreviousPlaylistEntryEffect previous:
+                await NavigatePlaylistEntryAsync(
+                    previous.PlaylistId, previous.CurrentEntryId, forward: false, advance: false, cancellationToken);
+                break;
+            case AdvancePlaylistEntryEffect advance:
+                await NavigatePlaylistEntryAsync(
+                    advance.PlaylistId, advance.CurrentEntryId, forward: true, advance: true, cancellationToken);
+                break;
+            case SavePlaylistEffect save:
+                await SavePlaylistAsync(save, cancellationToken);
+                break;
+            case DeletePlaylistEffect delete:
+                await DeletePlaylistAsync(delete.PlaylistId, cancellationToken);
+                break;
+            case RemovePlaylistEntryEffect remove:
+                await RemovePlaylistEntryAsync(remove, cancellationToken);
+                break;
+            case MovePlaylistEntryToBeginningEffect move:
+                await MovePlaylistEntryToBeginningAsync(move, cancellationToken);
+                break;
+            case MovePlaylistEntryToEndEffect move:
+                await MovePlaylistEntryToEndAsync(move, cancellationToken);
+                break;
+            case MovePlaylistEntryBetweenEffect move:
+                await MovePlaylistEntryBetweenAsync(move, cancellationToken);
+                break;
+            case ChangePlaylistSortModeEffect sortMode:
+                await ChangePlaylistSortModeAsync(sortMode, cancellationToken);
+                break;
+            case LoadGenreOptionsEffect options:
+                await LoadGenreOptionsAsync(options, cancellationToken);
+                break;
+            case SetPlaylistGenresEffect genres:
+                await SetPlaylistGenresAsync(genres, cancellationToken);
+                break;
+            case ResetPlaylistGenresEffect reset:
+                await ResetPlaylistGenresAsync(reset, cancellationToken);
+                break;
+            case SetPlaylistPublicEffect publish:
+                await SetPlaylistPublicAsync(publish, cancellationToken);
+                break;
+            case LoadPlaylistTargetsEffect:
+                await LoadPlaylistTargetsAsync(cancellationToken);
+                break;
+            case AddPlaylistEntryEffect add:
+                await AddPlaylistEntryAsync(add, cancellationToken);
+                break;
+            case NavigateBackEffect:
+                await MainThread.InvokeOnMainThreadAsync(NavigateBackAsync);
+                break;
             case LoadProfileInfoEffect:
                 await LoadProfileInfoAsync(cancellationToken);
                 break;
@@ -198,6 +285,9 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
                 break;
             case ResolvePlaybackSourceEffect resolve:
                 await ResolvePlaybackSourceAsync(resolve, cancellationToken);
+                break;
+            case LoadUpcomingEpisodesEffect loadUpcoming:
+                await LoadUpcomingEpisodesAsync(loadUpcoming, cancellationToken);
                 break;
             case ReportPlaybackProgressEffect report:
                 await ReportPlaybackProgressAsync(report, cancellationToken);
@@ -229,7 +319,77 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
             case DeleteWatchedDownloadEffect deleteWatched:
                 await DeleteDownloadAsync(deleteWatched.MediaType, deleteWatched.MediaId, cancellationToken, completedOnly: true);
                 break;
+            case SendLogProtocolEffect:
+                await SendLogProtocolAsync();
+                break;
         }
+    }
+
+    /// <summary>
+    /// Protokollversand: das Programmprotokoll als Anhang eines
+    /// Mailentwurfs an <see cref="LogProtocolRecipient"/> öffnen
+    /// (<see cref="Email.ComposeAsync(EmailMessage)"/>). Kann kein
+    /// Mailentwurf geöffnet werden (kein Mail-Client, unpackaged
+    /// Windows), greift der Teilen-Fallback
+    /// (<see cref="Share.RequestAsync(ShareFileRequest)"/>); schlägt auch
+    /// dieser fehl, erhält der Anwender einen verständlichen Hinweis über
+    /// <see cref="SendLogProtocolCompletedMessage"/>.
+    /// </summary>
+    /// <returns>Eine abgeschlossene Aufgabe nach dem Melden des Versandergebnisses.</returns>
+    private async Task SendLogProtocolAsync()
+    {
+        var attachments = appLog.GetAttachmentPaths();
+        if (!appLog.IsEnabled || attachments.Count == 0)
+        {
+            await DispatchMessageAsync(
+                new SendLogProtocolCompletedMessage(AppUpdate.LogProtocolEmptyError));
+            return;
+        }
+
+        try
+        {
+            await MainThread.InvokeOnMainThreadAsync(async () =>
+            {
+                var message = new EmailMessage
+                {
+                    Subject = "Heimkino – Programmprotokoll",
+                    Body = "Programmprotokoll der Heimkino-App (automatisch erzeugt).",
+                    BodyFormat = EmailBodyFormat.PlainText,
+                    To = new List<string> { LogProtocolRecipient },
+                    Attachments = attachments
+                        .Select(path => new EmailAttachment(path))
+                        .ToList()
+                };
+
+                try
+                {
+                    await Email.ComposeAsync(message);
+                }
+                catch (Exception mailException) when (mailException is FeatureNotSupportedException
+                    || mailException is System.Runtime.InteropServices.COMException
+                    || mailException is InvalidOperationException)
+                {
+                    // Kein Mail-Client verfügbar (unpackaged Windows:
+                    // ShowComposeNewEmailAsync ist dort nicht nutzbar) —
+                    // Teilen-Dialog als Fallback.
+                    logger.LogInformation(
+                        "Mailentwurf nicht verfügbar ({Detail}) — Teilen-Fallback.",
+                        mailException.Message);
+                    await Share.RequestAsync(new ShareFileRequest(
+                        "Heimkino – Programmprotokoll",
+                        new ShareFile(appLog.LogFilePath)));
+                }
+            });
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Protokollversand fehlgeschlagen");
+            await DispatchMessageAsync(
+                new SendLogProtocolCompletedMessage(AppUpdate.LogSendFailedError));
+            return;
+        }
+
+        await DispatchMessageAsync(new SendLogProtocolCompletedMessage(null));
     }
 
     private async Task NavigateToPlayerAsync()
@@ -245,7 +405,7 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"[ShellAppEffectHandler] Player-Navigation fehlgeschlagen: {ex.Message}");
+            logger.LogError(ex, "Player-Navigation fehlgeschlagen");
         }
     }
 
@@ -261,7 +421,8 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
             var allowServerStream = !services.GetRequiredService<MvuHost>().Model.IsOffline;
             source = await services.GetRequiredService<PlaybackSourceService>()
                 .ResolveAsync(resolve.MediaType, resolve.MediaId, cancellationToken,
-                    allowServerStream: allowServerStream);
+                    allowServerStream: allowServerStream,
+                    resumePositionSecondsOverride: resolve.StartPositionSeconds);
             if (source is null)
             {
                 error = AppUpdate.PlaybackUnavailableError;
@@ -269,12 +430,37 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"[ShellAppEffectHandler] Quellauflösung fehlgeschlagen: {ex.Message}");
+            logger.LogError(ex, "Quellauflösung fehlgeschlagen");
             error = AppUpdate.PlaybackUnavailableError;
         }
 
         await DispatchMessageAsync(new PlaybackSourceResolvedMessage(
             resolve.MediaType, resolve.MediaId, source, error));
+    }
+
+    /// <summary>
+    /// Serienkontext einer direkt gestarteten Episode laden (ohne
+    /// Detailseite) und die Folge-Episoden in den MVU-Zyklus melden —
+    /// ein Fehlschlag ergibt eine leere Fortsetzungsliste statt eines
+    /// Fehlerzustands (die Folgevideo-Funktion entfällt dann still).
+    /// </summary>
+    /// <param name="loadUpcoming">Der Effekt mit Episoden- und Serien-Id.</param>
+    /// <param name="cancellationToken">Bricht den Ladevorgang ab.</param>
+    /// <returns>Eine abgeschlossene Aufgabe nach dem Melden der Fortsetzungsliste.</returns>
+    private async Task LoadUpcomingEpisodesAsync(LoadUpcomingEpisodesEffect loadUpcoming, CancellationToken cancellationToken)
+    {
+        IReadOnlyList<PlayerEpisodeRef> episodes = [];
+        try
+        {
+            episodes = await services.GetRequiredService<UpcomingEpisodesService>()
+                .LoadAsync(loadUpcoming.MediaId, loadUpcoming.ShowId, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Folge-Episoden laden fehlgeschlagen");
+        }
+
+        await DispatchMessageAsync(new UpcomingEpisodesLoadedMessage(loadUpcoming.MediaId, episodes));
     }
 
     private async Task ReportPlaybackProgressAsync(ReportPlaybackProgressEffect report, CancellationToken cancellationToken)
@@ -289,7 +475,7 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
         catch (Exception ex)
         {
             // Ein Fehlschlag ist nicht fatal — der nächste Takt meldet erneut.
-            System.Diagnostics.Debug.WriteLine($"[ShellAppEffectHandler] Fortschrittsmeldung fehlgeschlagen: {ex.Message}");
+            logger.LogError(ex, "Fortschrittsmeldung fehlgeschlagen");
         }
     }
 
@@ -303,7 +489,7 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"[ShellAppEffectHandler] PiP-Umschaltung fehlgeschlagen: {ex.Message}");
+            logger.LogError(ex, "PiP-Umschaltung fehlgeschlagen");
         }
 
         await DispatchMessageAsync(new PictureInPictureChangedMessage(isActive));
@@ -317,7 +503,7 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"[ShellAppEffectHandler] Netzwerk-Monitoring fehlgeschlagen: {ex.Message}");
+            logger.LogError(ex, "Netzwerk-Monitoring fehlgeschlagen");
         }
 
         // Ist-Wert in den MVU-Zyklus melden (ConnectivityChanged meldet
@@ -335,7 +521,7 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
         {
             // Ein Fehlschlag ist nicht fatal — der nächste Netzwerkwechsel
             // oder das nächste Ereignis bietet eine neue Gelegenheit.
-            System.Diagnostics.Debug.WriteLine($"[ShellAppEffectHandler] Ereignisverbindung fehlgeschlagen: {ex.Message}");
+            logger.LogError(ex, "Ereignisverbindung fehlgeschlagen");
         }
     }
 
@@ -347,7 +533,7 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"[ShellAppEffectHandler] Trennen der Ereignisverbindung fehlgeschlagen: {ex.Message}");
+            logger.LogError(ex, "Trennen der Ereignisverbindung fehlgeschlagen");
         }
     }
 
@@ -360,7 +546,7 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"[ShellAppEffectHandler] Synchronisation fehlgeschlagen: {ex.Message}");
+            logger.LogError(ex, "Synchronisation fehlgeschlagen");
             result = new SyncResult(0, 0, false, false, false);
         }
 
@@ -375,12 +561,43 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"[ShellAppEffectHandler] Teil-Synchronisation fehlgeschlagen: {ex.Message}");
+            logger.LogError(ex, "Teil-Synchronisation fehlgeschlagen");
         }
 
         // Alle Teil-Synchronisationen betreffen Startseiten-Listen — die
         // Anzeige lädt danach den (ggf. unveränderten) Cache-Stand neu.
         await DispatchMessageAsync(new CachedListsChangedMessage());
+    }
+
+    /// <summary>
+    /// Weiterschauen-Kontextmenü-Mutation (Ausblenden/Überspringen):
+    /// führt den Server-Aufruf samt Cache-Erneuerung bzw. das lokale
+    /// Offline-Entfernen aus und meldet bei Erfolg die Cache-Änderung —
+    /// die Startseite lädt den neuen Stand ohne manuelle Aktualisierung
+    /// nach. Ein Fehlschlag lässt die Liste unverändert (der Eintrag
+    /// bleibt sichtbar).
+    /// </summary>
+    /// <param name="mutate">Die Mutation auf dem aufgelösten <see cref="ContinueWatchingMutationService"/>.</param>
+    /// <returns>Eine abgeschlossene Aufgabe nach der Mutation.</returns>
+    private async Task MutateContinueWatchingAsync(Func<ContinueWatchingMutationService, Task<bool>> mutate)
+    {
+        var success = false;
+        try
+        {
+            success = await mutate(services.GetRequiredService<ContinueWatchingMutationService>());
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Weiterschauen-Mutation fehlgeschlagen");
+        }
+
+        if (success)
+        {
+            // Die Cache-Kopie wurde aktualisiert (Server-Sync bzw.
+            // lokales Entfernen) — die Weiterschauen-Liste lädt den
+            // neuen Stand ohne manuelle Aktualisierung nach.
+            await DispatchMessageAsync(new CachedListsChangedMessage());
+        }
     }
 
     private async Task LoadHomeListsAsync()
@@ -399,7 +616,7 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
         {
             // Fehler beim Cache-Lesen → leere Listen, die Startseite bleibt
             // anzeigbar.
-            System.Diagnostics.Debug.WriteLine($"[ShellAppEffectHandler] Startseiten-Listen laden fehlgeschlagen: {ex.Message}");
+            logger.LogError(ex, "Startseiten-Listen laden fehlgeschlagen");
             lists = HomeLists.Empty;
         }
 
@@ -428,7 +645,7 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"[ShellAppEffectHandler] Hero-Hintergrund laden fehlgeschlagen: {ex.Message}");
+            logger.LogError(ex, "Hero-Hintergrund laden fehlgeschlagen");
         }
 
         await DispatchMessageAsync(new HeroBackgroundLoadedMessage(imageBytes));
@@ -464,7 +681,7 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"[ShellAppEffectHandler] Detail-Navigation fehlgeschlagen: {ex.Message}");
+            logger.LogError(ex, "Detail-Navigation fehlgeschlagen");
         }
     }
 
@@ -493,14 +710,25 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"[ShellAppEffectHandler] Quellen-Navigation fehlgeschlagen: {ex.Message}");
+            logger.LogError(ex, "Quellen-Navigation fehlgeschlagen");
         }
     }
 
     /// <summary>Prüft, ob die oberste Shell-Route bereits die Quellenübersicht der angegebenen Quelle ist.</summary>
     /// <param name="sourceId">Die Quellen-Id des anzusteuernden Ziels.</param>
     /// <returns><c>true</c>, wenn oben bereits „sourceoverview" mit derselben <c>id</c> liegt.</returns>
-    private static bool IsTopmostSourceOverview(long sourceId)
+    private static bool IsTopmostSourceOverview(long sourceId) =>
+        IsTopmostRouteWithId("sourceoverview", sourceId);
+
+    /// <summary>
+    /// Prüft, ob die oberste Shell-Route eine geschobene Seite der Form
+    /// <c>{route}?id={expectedId}</c> ist — Duplikat-Guard der
+    /// Detailnavigationen (<c>sourceoverview</c>, <c>playlistdetails</c>).
+    /// </summary>
+    /// <param name="route">Der Routenname der geschobenen Seite.</param>
+    /// <param name="expectedId">Der erwartete Wert des <c>id</c>-Parameters.</param>
+    /// <returns><c>true</c>, wenn oben bereits die Route mit derselben <c>id</c> liegt.</returns>
+    private static bool IsTopmostRouteWithId(string route, long expectedId)
     {
         var location = Shell.Current?.CurrentState?.Location?.OriginalString;
         if (string.IsNullOrEmpty(location))
@@ -514,7 +742,7 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
         var queryIndex = location.IndexOf('?', StringComparison.Ordinal);
         var path = queryIndex >= 0 ? location[..queryIndex] : location;
         var topmost = path.Split('/', StringSplitOptions.RemoveEmptyEntries).LastOrDefault();
-        if (!string.Equals(topmost, "sourceoverview", StringComparison.OrdinalIgnoreCase)
+        if (!string.Equals(topmost, route, StringComparison.OrdinalIgnoreCase)
             || queryIndex < 0)
         {
             return false;
@@ -527,7 +755,7 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
                 && string.Equals(parts[0], "id", StringComparison.OrdinalIgnoreCase))
             {
                 return long.TryParse(Uri.UnescapeDataString(parts[1]), out var id)
-                    && id == sourceId;
+                    && id == expectedId;
             }
         }
 
@@ -545,7 +773,7 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"[ShellAppEffectHandler] Quellen laden fehlgeschlagen: {ex.Message}");
+            logger.LogError(ex, "Quellen laden fehlgeschlagen");
             error = "Die Quellen konnten nicht geladen werden.";
         }
 
@@ -564,7 +792,7 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
         {
             // Genre-Ladefehler sind nicht fatal — die Leiste zeigt dann
             // nur „Alle" (kein Filter).
-            System.Diagnostics.Debug.WriteLine($"[ShellAppEffectHandler] Genres laden fehlgeschlagen: {ex.Message}");
+            logger.LogError(ex, "Genres laden fehlgeschlagen");
             items = [new SourceGenreItem { Id = 0, Name = SourceBrowserService.AllGenresName, IsSelected = true }];
         }
 
@@ -582,7 +810,7 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"[ShellAppEffectHandler] Quelleneinträge laden fehlgeschlagen: {ex.Message}");
+            logger.LogError(ex, "Quelleneinträge laden fehlgeschlagen");
             page = new SourceItemsPage(items.Page, [], HasMore: false);
             error = "Die Einträge konnten nicht geladen werden.";
         }
@@ -605,7 +833,7 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"[ShellAppEffectHandler] Detail-Ladung fehlgeschlagen: {ex.Message}");
+            logger.LogError(ex, "Detail-Ladung fehlgeschlagen");
             error = "Die Details konnten nicht geladen werden.";
         }
 
@@ -640,7 +868,7 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"[ShellAppEffectHandler] Detail-Kopfbild laden fehlgeschlagen: {ex.Message}");
+            logger.LogError(ex, "Detail-Kopfbild laden fehlgeschlagen");
         }
 
         await DispatchMessageAsync(new MediaDetailsHeaderImageLoadedMessage(
@@ -658,7 +886,7 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"[ShellAppEffectHandler] Favoriten-Umschaltung fehlgeschlagen: {ex.Message}");
+            logger.LogError(ex, "Favoriten-Umschaltung fehlgeschlagen");
         }
 
         await DispatchMessageAsync(new FavoriteToggleCompletedMessage(
@@ -695,7 +923,7 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"[ShellAppEffectHandler] Favoriten laden fehlgeschlagen: {ex.Message}");
+            logger.LogError(ex, "Favoriten laden fehlgeschlagen");
             error = "Die Favoriten konnten nicht geladen werden.";
         }
 
@@ -712,7 +940,7 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"[ShellAppEffectHandler] Favorit entfernen fehlgeschlagen: {ex.Message}");
+            logger.LogError(ex, "Favorit entfernen fehlgeschlagen");
         }
 
         await DispatchMessageAsync(new FavoriteRemoveCompletedMessage(favoriteId, success));
@@ -724,6 +952,441 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
             // manuelle Aktualisierung nach.
             await DispatchMessageAsync(new CachedListsChangedMessage());
         }
+    }
+
+    private async Task NavigateToPlaylistDetailsAsync(NavigateToPlaylistDetailsEffect details)
+    {
+        if (Shell.Current is null)
+        {
+            return;
+        }
+
+        try
+        {
+            if (IsTopmostPlaylistDetails(details.PlaylistId))
+            {
+                // Die Detailseite dieser Playlist liegt bereits oben auf
+                // dem Stack — ein erneuter Push würde eine identische
+                // Seite schieben.
+                return;
+            }
+
+            var route = $"playlistdetails?id={details.PlaylistId}" +
+                $"&name={Uri.EscapeDataString(details.Name ?? string.Empty)}";
+            await Shell.Current.GoToAsync(route);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Playlist-Navigation fehlgeschlagen");
+        }
+    }
+
+    /// <summary>Prüft, ob die oberste Shell-Route bereits die Playlist-Detailseite der angegebenen Playlist ist.</summary>
+    /// <param name="playlistId">Die Playlist-Id des anzusteuernden Ziels.</param>
+    /// <returns><c>true</c>, wenn oben bereits „playlistdetails" mit derselben <c>id</c> liegt.</returns>
+    private static bool IsTopmostPlaylistDetails(long playlistId) =>
+        IsTopmostRouteWithId("playlistdetails", playlistId);
+
+    private async Task LoadPlaylistsAsync(CancellationToken cancellationToken)
+    {
+        IReadOnlyList<PlaylistListItem> own = [];
+        IReadOnlyList<PlaylistListItem> publicPlaylists = [];
+        string? error = null;
+        try
+        {
+            var overview = await services.GetRequiredService<PlaylistService>()
+                .LoadPlaylistsAsync(cancellationToken);
+            own = overview.Own;
+            publicPlaylists = overview.Public;
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Playlists laden fehlgeschlagen");
+            error = AppUpdate.PlaylistsLoadError;
+        }
+
+        await DispatchMessageAsync(new PlaylistsLoadedMessage(own, publicPlaylists, error));
+    }
+
+    private async Task LoadPlaylistDetailsAsync(LoadPlaylistDetailsEffect details, CancellationToken cancellationToken)
+    {
+        PlaylistListItem? info = null;
+        var isAdmin = false;
+        try
+        {
+            var service = services.GetRequiredService<PlaylistService>();
+            info = await service.LoadPlaylistAsync(details.PlaylistId, cancellationToken);
+            // Der IsAdmin-Claim steuert die Sichtbarkeit des
+            // Öffentlich-Schalters; er ist nicht fatal — bei Fehlschlag
+            // bleibt er ausgeblendet.
+            isAdmin = await service.IsCurrentUserAdminAsync();
+        }
+        catch (Exception ex)
+        {
+            // Kopf-Nachschlag ist nicht fatal — die Detailseite zeigt
+            // dann die Felder der Listenauswahl bzw. den Pfad-Namen.
+            logger.LogError(ex, "Playlist-Kopfdaten laden fehlgeschlagen");
+        }
+
+        await DispatchMessageAsync(new PlaylistDetailsLoadedMessage(details.PlaylistId, info, isAdmin));
+    }
+
+    private async Task LoadPlaylistEntriesAsync(LoadPlaylistEntriesEffect entries, CancellationToken cancellationToken)
+    {
+        PlaylistEntriesPage page;
+        string? error = null;
+        try
+        {
+            page = await services.GetRequiredService<PlaylistService>()
+                .LoadEntriesAsync(entries.PlaylistId, entries.Page, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Playlist-Einträge laden fehlgeschlagen");
+            page = new PlaylistEntriesPage(entries.Page, [], HasMore: false, TotalCount: 0);
+            error = AppUpdate.PlaylistEntriesLoadError;
+        }
+
+        await DispatchMessageAsync(new PlaylistEntriesLoadedMessage(
+            entries.PlaylistId, page.Page, page.Items, page.HasMore, page.TotalCount, entries.Append, error));
+    }
+
+    // --- Playlist-Verwaltung (Schritt 6) ---
+
+    private async Task SavePlaylistAsync(SavePlaylistEffect save, CancellationToken cancellationToken)
+    {
+        PlaylistListItem? saved = null;
+        string? error = null;
+        try
+        {
+            var service = services.GetRequiredService<PlaylistService>();
+            saved = save.EditingPlaylistId is { } playlistId
+                ? await service.UpdatePlaylistAsync(
+                    playlistId, save.Name, save.Description, cancellationToken)
+                : await service.CreatePlaylistAsync(
+                    save.Name, save.Description, save.SortMode, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Playlist speichern fehlgeschlagen");
+            error = AppUpdate.PlaylistSaveError;
+        }
+
+        await DispatchMessageAsync(new PlaylistFormCompletedMessage(saved, error));
+    }
+
+    private async Task DeletePlaylistAsync(long playlistId, CancellationToken cancellationToken)
+    {
+        string? error = null;
+        try
+        {
+            await services.GetRequiredService<PlaylistService>()
+                .DeletePlaylistAsync(playlistId, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Playlist löschen fehlgeschlagen");
+            error = AppUpdate.PlaylistDeleteError;
+        }
+
+        await DispatchMessageAsync(new PlaylistDeletedMessage(playlistId, error));
+    }
+
+    private async Task RemovePlaylistEntryAsync(RemovePlaylistEntryEffect remove, CancellationToken cancellationToken)
+    {
+        var removed = false;
+        var requiresConfirmation = false;
+        string? error = null;
+        try
+        {
+            var outcome = await services.GetRequiredService<PlaylistService>()
+                .RemoveEntryAsync(
+                    remove.PlaylistId,
+                    remove.Entry.MediaType,
+                    remove.Entry.MediaId,
+                    remove.ConfirmContinueWatchingRemoval,
+                    cancellationToken);
+            removed = outcome.Succeeded;
+            requiresConfirmation = outcome.RequiresConfirmation;
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Playlist-Eintrag entfernen fehlgeschlagen");
+            error = AppUpdate.PlaylistEntryRemoveError;
+        }
+
+        await DispatchMessageAsync(new PlaylistEntryRemoveCompletedMessage(
+            remove.Entry, removed, requiresConfirmation, error));
+    }
+
+    private async Task MovePlaylistEntryToBeginningAsync(
+        MovePlaylistEntryToBeginningEffect move, CancellationToken cancellationToken)
+    {
+        string? error = null;
+        try
+        {
+            await services.GetRequiredService<PlaylistService>()
+                .MoveEntryToBeginningAsync(move.PlaylistId, move.Entry.EntryId, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Playlist-Eintrag an den Anfang verschieben fehlgeschlagen");
+            error = AppUpdate.PlaylistEntryMoveError;
+        }
+
+        await DispatchMessageAsync(new PlaylistEntryMoveCompletedMessage(move.Entry, error));
+    }
+
+    private async Task MovePlaylistEntryToEndAsync(
+        MovePlaylistEntryToEndEffect move, CancellationToken cancellationToken)
+    {
+        string? error = null;
+        try
+        {
+            await services.GetRequiredService<PlaylistService>()
+                .MoveEntryToEndAsync(move.PlaylistId, move.Entry.EntryId, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Playlist-Eintrag ans Ende verschieben fehlgeschlagen");
+            error = AppUpdate.PlaylistEntryMoveError;
+        }
+
+        await DispatchMessageAsync(new PlaylistEntryMoveCompletedMessage(move.Entry, error));
+    }
+
+    private async Task MovePlaylistEntryBetweenAsync(
+        MovePlaylistEntryBetweenEffect move, CancellationToken cancellationToken)
+    {
+        string? error = null;
+        try
+        {
+            await services.GetRequiredService<PlaylistService>()
+                .MoveEntryBetweenAsync(move.PlaylistId, move.Entry.EntryId, move.NewSortOrder, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Playlist-Eintrag verschieben fehlgeschlagen");
+            error = AppUpdate.PlaylistEntryMoveError;
+        }
+
+        await DispatchMessageAsync(new PlaylistEntryMoveCompletedMessage(move.Entry, error));
+    }
+
+    private async Task ChangePlaylistSortModeAsync(
+        ChangePlaylistSortModeEffect sortMode, CancellationToken cancellationToken)
+    {
+        PlaylistListItem? updated = null;
+        var requiresConfirmation = false;
+        string? error = null;
+        try
+        {
+            var result = await services.GetRequiredService<PlaylistService>()
+                .ChangeSortModeAsync(
+                    sortMode.PlaylistId,
+                    sortMode.NewSortMode,
+                    sortMode.ConfirmLossOfManualOrder,
+                    cancellationToken);
+            updated = result.Playlist;
+            requiresConfirmation = result.RequiresConfirmation;
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Playlist-Sortiermodus wechseln fehlgeschlagen");
+            error = AppUpdate.PlaylistSortModeError;
+        }
+
+        await DispatchMessageAsync(new PlaylistSortModeCompletedMessage(
+            sortMode.NewSortMode, updated, requiresConfirmation, error));
+    }
+
+    private async Task LoadGenreOptionsAsync(LoadGenreOptionsEffect options, CancellationToken cancellationToken)
+    {
+        IReadOnlyList<PlaylistGenreOptionItem> genreOptions = [];
+        string? error = null;
+        try
+        {
+            genreOptions = await services.GetRequiredService<PlaylistService>()
+                .LoadGenreOptionsAsync(cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Genre-Optionen laden fehlgeschlagen");
+            error = AppUpdate.PlaylistGenreOptionsLoadError;
+        }
+
+        await DispatchMessageAsync(new PlaylistGenreOptionsLoadedMessage(genreOptions, error));
+    }
+
+    private async Task SetPlaylistGenresAsync(SetPlaylistGenresEffect genres, CancellationToken cancellationToken)
+    {
+        PlaylistListItem? updated = null;
+        string? error = null;
+        try
+        {
+            updated = await services.GetRequiredService<PlaylistService>()
+                .SetGenresAsync(genres.PlaylistId, genres.GenreIds, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Playlist-Genres setzen fehlgeschlagen");
+            error = AppUpdate.PlaylistGenresError;
+        }
+
+        await DispatchMessageAsync(new PlaylistGenresCompletedMessage(updated, error));
+    }
+
+    private async Task ResetPlaylistGenresAsync(ResetPlaylistGenresEffect reset, CancellationToken cancellationToken)
+    {
+        PlaylistListItem? updated = null;
+        string? error = null;
+        try
+        {
+            updated = await services.GetRequiredService<PlaylistService>()
+                .ResetGenresAsync(reset.PlaylistId, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Playlist-Genres zurücksetzen fehlgeschlagen");
+            error = AppUpdate.PlaylistGenresError;
+        }
+
+        await DispatchMessageAsync(new PlaylistGenresCompletedMessage(updated, error));
+    }
+
+    private async Task SetPlaylistPublicAsync(SetPlaylistPublicEffect publish, CancellationToken cancellationToken)
+    {
+        PlaylistListItem? updated = null;
+        string? error = null;
+        try
+        {
+            updated = await services.GetRequiredService<PlaylistService>()
+                .SetPublicAsync(publish.PlaylistId, publish.IsPublic, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Playlist-Öffentlich-Flag setzen fehlgeschlagen");
+            error = AppUpdate.PlaylistPublicError;
+        }
+
+        await DispatchMessageAsync(new PlaylistPublicCompletedMessage(updated, error));
+    }
+
+    private async Task LoadPlaylistTargetsAsync(CancellationToken cancellationToken)
+    {
+        IReadOnlyList<PlaylistListItem>? targets = null;
+        string? error = null;
+        try
+        {
+            targets = await services.GetRequiredService<PlaylistService>()
+                .LoadOwnPlaylistsAsync(cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Playlist-Auswahlziele laden fehlgeschlagen");
+            error = AppUpdate.PlaylistTargetsLoadError;
+        }
+
+        await DispatchMessageAsync(new PlaylistTargetsLoadedMessage(targets, error));
+    }
+
+    private async Task AddPlaylistEntryAsync(AddPlaylistEntryEffect add, CancellationToken cancellationToken)
+    {
+        string? resultMessage = null;
+        string? error = null;
+        try
+        {
+            resultMessage = await services.GetRequiredService<PlaylistService>()
+                .AddMediaToPlaylistAsync(add.PlaylistId, add.MediaType, add.MediaId, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Medium zur Playlist hinzufügen fehlgeschlagen");
+            error = AppUpdate.PlaylistEntryAddError;
+        }
+
+        await DispatchMessageAsync(new PlaylistEntryAddedMessage(
+            add.PlaylistName, resultMessage, error));
+    }
+
+    /// <summary>
+    /// Zur vorherigen Shell-Route zurückkehren („..") — nach dem
+    /// Löschen einer Playlist aus ihrer Detailansicht.
+    /// </summary>
+    private async Task NavigateBackAsync()
+    {
+        if (Shell.Current is { } shell)
+        {
+            await shell.GoToAsync("..");
+        }
+    }
+
+    /// <summary>
+    /// Serverseitigen Wiedergabestart einer Playlist ausführen
+    /// (<c>POST api/playlists/{id}/play</c>) und den aufgelösten
+    /// Starteintrag in den MVU-Zyklus melden — ein Fehlschlag ergibt
+    /// eine Fehler-Nachricht, die der Player als Fehlerzustand zeigt.
+    /// </summary>
+    /// <param name="start">Der Effekt mit Playlist- und optionaler Eintrags-Id.</param>
+    /// <param name="cancellationToken">Bricht den Aufruf ab.</param>
+    /// <returns>Eine abgeschlossene Aufgabe nach dem Melden des Ergebnisses.</returns>
+    private async Task StartPlaylistPlaybackAsync(StartPlaylistPlaybackEffect start, CancellationToken cancellationToken)
+    {
+        PlaylistPlaybackStartInfo? info = null;
+        string? error = null;
+        try
+        {
+            info = await services.GetRequiredService<PlaylistService>()
+                .StartPlaybackAsync(start.PlaylistId, start.EntryId, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Playlist-Wiedergabestart fehlgeschlagen");
+            error = AppUpdate.PlaybackUnavailableError;
+        }
+
+        await DispatchMessageAsync(new PlaylistPlaybackStartedMessage(start.PlaylistId, info, error));
+    }
+
+    /// <summary>
+    /// Eine Playlist-Navigation ausführen — manuell next/previous oder
+    /// automatisches advance (<c>POST api/playlists/{id}/play/…</c>) —
+    /// und das aufgelöste Ergebnis in den MVU-Zyklus melden. „Kein
+    /// Eintrag" (Server-204) geht als <c>null</c>-Ergebnis, ein
+    /// Fehlschlag als Fehlertext in die Nachricht.
+    /// </summary>
+    /// <param name="playlistId">Id der Playlist.</param>
+    /// <param name="currentEntryId">Id des Eintrags, von dem aus navigiert wird.</param>
+    /// <param name="forward"><c>true</c> = Vorwärtsrichtung (next/advance); <c>false</c> = Rückwärts (previous).</param>
+    /// <param name="advance"><c>true</c> = automatisches Weiterschalten (<c>play/advance</c>) statt manuellem <c>play/next</c>.</param>
+    /// <param name="cancellationToken">Bricht den Aufruf ab.</param>
+    /// <returns>Eine abgeschlossene Aufgabe nach dem Melden des Ergebnisses.</returns>
+    private async Task NavigatePlaylistEntryAsync(
+        long playlistId,
+        long currentEntryId,
+        bool forward,
+        bool advance,
+        CancellationToken cancellationToken)
+    {
+        PlaylistNavigationItem? result = null;
+        string? error = null;
+        try
+        {
+            var service = services.GetRequiredService<PlaylistService>();
+            result = advance
+                ? await service.AdvanceAsync(playlistId, currentEntryId, cancellationToken)
+                : forward
+                    ? await service.GetNextEntryAsync(playlistId, currentEntryId, cancellationToken)
+                    : await service.GetPreviousEntryAsync(playlistId, currentEntryId, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Playlist-Navigation fehlgeschlagen");
+            error = AppUpdate.PlaybackUnavailableError;
+        }
+
+        await DispatchMessageAsync(new PlaylistNavigationCompletedMessage(
+            playlistId, currentEntryId, result, forward, error));
     }
 
     private async Task LoadProfileInfoAsync(CancellationToken cancellationToken)
@@ -738,7 +1401,7 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
         {
             // Ohne lesbare Ablage bleibt die Seite mit Platzhaltern
             // anzeigbar (Benutzername/E-Mail „—").
-            System.Diagnostics.Debug.WriteLine($"[ShellAppEffectHandler] Profilinformationen laden fehlgeschlagen: {ex.Message}");
+            logger.LogError(ex, "Profilinformationen laden fehlgeschlagen");
             info = new ProfileInfo(null, null, null);
         }
 
@@ -753,7 +1416,7 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"[ShellAppEffectHandler] Abmeldung fehlgeschlagen: {ex.Message}");
+            logger.LogError(ex, "Abmeldung fehlgeschlagen");
         }
     }
 
@@ -769,7 +1432,7 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"[ShellAppEffectHandler] Download-Liste laden fehlgeschlagen: {ex.Message}");
+            logger.LogError(ex, "Download-Liste laden fehlgeschlagen");
             error = "Die Downloads konnten nicht geladen werden.";
         }
 
@@ -785,11 +1448,12 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
                 ? null
                 : new DownloadSeriesContext(enqueue.ShowId, enqueue.ShowTitle, enqueue.SeasonNumber, enqueue.EpisodeNumber);
             result = await downloads.EnqueueAsync(
-                enqueue.MediaType, enqueue.MediaId, enqueue.Title, enqueue.Settings, seriesContext, cancellationToken);
+                enqueue.MediaType, enqueue.MediaId, enqueue.Title, enqueue.Settings, seriesContext,
+                cancellationToken: cancellationToken);
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"[ShellAppEffectHandler] Download einreihen fehlgeschlagen: {ex.Message}");
+            logger.LogError(ex, "Download einreihen fehlgeschlagen");
             result = new DownloadEnqueueResult
             {
                 Item = null,
@@ -825,7 +1489,7 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"[ShellAppEffectHandler] Download löschen fehlgeschlagen: {ex.Message}");
+            logger.LogError(ex, "Download löschen fehlgeschlagen");
         }
     }
 
@@ -837,7 +1501,7 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"[ShellAppEffectHandler] Download-Wiederaufnahme fehlgeschlagen: {ex.Message}");
+            logger.LogError(ex, "Download-Wiederaufnahme fehlgeschlagen");
         }
     }
 
@@ -865,7 +1529,7 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"[ShellAppEffectHandler] Dispatch von {message.GetType().Name} fehlgeschlagen: {ex.Message}");
+            logger.LogError(ex, "Dispatch von {MessageType} fehlgeschlagen", message.GetType().Name);
         }
     }
 
@@ -878,7 +1542,7 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"[ShellAppEffectHandler] Automatische Anmeldung fehlgeschlagen: {ex.Message}");
+            logger.LogError(ex, "Automatische Anmeldung fehlgeschlagen");
             attempt = new AuthAttempt(AuthAttemptStatus.Failed);
         }
 
@@ -896,7 +1560,7 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"[ShellAppEffectHandler] Anmeldung fehlgeschlagen: {ex.Message}");
+            logger.LogError(ex, "Anmeldung fehlgeschlagen");
             attempt = new AuthAttempt(AuthAttemptStatus.Failed);
         }
 
@@ -916,7 +1580,7 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"[ShellAppEffectHandler] Offline-Daten-Prüfung fehlgeschlagen: {ex.Message}");
+            logger.LogError(ex, "Offline-Daten-Prüfung fehlgeschlagen");
         }
 
         var host = services.GetRequiredService<MvuHost>();
@@ -941,7 +1605,7 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"[ShellAppEffectHandler] SessionExpired-Dispatch fehlgeschlagen: {ex.Message}");
+            logger.LogError(ex, "SessionExpired-Dispatch fehlgeschlagen");
         }
     }
 
@@ -963,7 +1627,7 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
         catch (Exception ex)
         {
             failed = true;
-            System.Diagnostics.Debug.WriteLine($"[ShellAppEffectHandler] Backup-Ablage-Initialisierung fehlgeschlagen: {ex.Message}");
+            logger.LogError(ex, "Backup-Ablage-Initialisierung fehlgeschlagen");
         }
 
         try
@@ -973,7 +1637,7 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
         catch (Exception ex)
         {
             failed = true;
-            System.Diagnostics.Debug.WriteLine($"[ShellAppEffectHandler] Cache-Ablage-Initialisierung fehlgeschlagen: {ex.Message}");
+            logger.LogError(ex, "Cache-Ablage-Initialisierung fehlgeschlagen");
         }
 
         if (recovered)
@@ -999,9 +1663,11 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"[ShellAppEffectHandler] Einstellungen laden fehlgeschlagen: {ex.Message}");
+            logger.LogError(ex, "Einstellungen laden fehlgeschlagen");
             settings = new AppSettings();
         }
+
+        appLog.SetEnabled(settings.LoggingEnabled);
 
         var host = services.GetRequiredService<MvuHost>();
         await MainThread.InvokeOnMainThreadAsync(
@@ -1013,10 +1679,13 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
         try
         {
             services.GetRequiredService<AppSettingsService>().Save(settings);
+            // Laufzeit-Umschaltung der Protokollierung unmittelbar nach dem
+            // erfolgreichen Schreiben — ohne Neustart wirksam.
+            appLog.SetEnabled(settings.LoggingEnabled);
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"[ShellAppEffectHandler] Einstellungen speichern fehlgeschlagen: {ex.Message}");
+            logger.LogError(ex, "Einstellungen speichern fehlgeschlagen");
         }
     }
 
@@ -1037,7 +1706,7 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"[ShellAppEffectHandler] Serververwaltung laden fehlgeschlagen: {ex.Message}");
+            logger.LogError(ex, "Serververwaltung laden fehlgeschlagen");
         }
 
         // Geräte-Token des aktiven Servers laden und den Gate-Provider
@@ -1062,7 +1731,7 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"[ShellAppEffectHandler] Server-Erkennung fehlgeschlagen: {ex.Message}");
+            logger.LogError(ex, "Server-Erkennung fehlgeschlagen");
         }
 
         var host = services.GetRequiredService<MvuHost>();
@@ -1093,7 +1762,7 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
                 }
                 catch (Exception ex)
                 {
-                    System.Diagnostics.Debug.WriteLine($"[ShellAppEffectHandler] Geräte-Token des Kandidaten konnte nicht verworfen werden: {ex.Message}");
+                    logger.LogError(ex, "Geräte-Token des Kandidaten konnte nicht verworfen werden");
                 }
 
                 // Provider-Rücksetzung nur, wenn der Kandidat der
@@ -1109,7 +1778,7 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"[ShellAppEffectHandler] Kandidatenprüfung fehlgeschlagen: {ex.Message}");
+            logger.LogError(ex, "Kandidatenprüfung fehlgeschlagen");
         }
 
         var host = services.GetRequiredService<MvuHost>();
@@ -1126,7 +1795,7 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"[ShellAppEffectHandler] Server speichern fehlgeschlagen: {ex.Message}");
+            logger.LogError(ex, "Server speichern fehlgeschlagen");
         }
 
         // Provider auf das Geräte-Token des neuen Servers umstellen, bevor
@@ -1146,7 +1815,7 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"[ShellAppEffectHandler] Erreichbarkeitsprüfung fehlgeschlagen: {ex.Message}");
+            logger.LogError(ex, "Erreichbarkeitsprüfung fehlgeschlagen");
         }
 
         if (result == HealthCheckResult.GateRejected)
@@ -1163,7 +1832,7 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"[ShellAppEffectHandler] Erreichbarkeits-Nachprüfung fehlgeschlagen: {ex.Message}");
+                logger.LogError(ex, "Erreichbarkeits-Nachprüfung fehlgeschlagen");
                 result = HealthCheckResult.Unreachable;
             }
 
@@ -1211,7 +1880,7 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"[ShellAppEffectHandler] Pairing-Erforderlichkeit fehlgeschlagen: {ex.Message}");
+            logger.LogError(ex, "Pairing-Erforderlichkeit fehlgeschlagen");
             return false;
         }
     }
@@ -1280,13 +1949,13 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
                 null => PairingStatus.ServerUnreachable,
                 _ => PairingStatus.Failed
             };
-            System.Diagnostics.Debug.WriteLine($"[ShellAppEffectHandler] Pairing-Austausch fehlgeschlagen: {ex.Message}");
+            logger.LogError(ex, "Pairing-Austausch fehlgeschlagen");
         }
         catch (Exception ex)
         {
             // Ungültige/nicht entschlüsselbare Antwort oder sonstiger
             // Fehler → allgemeiner Pairing-Fehler.
-            System.Diagnostics.Debug.WriteLine($"[ShellAppEffectHandler] Pairing-Austausch fehlgeschlagen: {ex.Message}");
+            logger.LogError(ex, "Pairing-Austausch fehlgeschlagen");
             status = PairingStatus.Failed;
         }
 
@@ -1313,7 +1982,7 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"[ShellAppEffectHandler] Bootstrap-Serverprüfung fehlgeschlagen: {ex.Message}");
+            logger.LogError(ex, "Bootstrap-Serverprüfung fehlgeschlagen");
         }
 
         var host = services.GetRequiredService<MvuHost>();
@@ -1391,13 +2060,13 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
                 null => BootstrapStatus.ServerUnreachable,
                 _ => BootstrapStatus.Failed
             };
-            System.Diagnostics.Debug.WriteLine($"[ShellAppEffectHandler] Bootstrap-Austausch fehlgeschlagen: {ex.Message}");
+            logger.LogError(ex, "Bootstrap-Austausch fehlgeschlagen");
         }
         catch (Exception ex)
         {
             // Ungültige/nicht entschlüsselbare Antwort oder sonstiger
             // Fehler → allgemeiner Bootstrap-Fehler.
-            System.Diagnostics.Debug.WriteLine($"[ShellAppEffectHandler] Bootstrap-Austausch fehlgeschlagen: {ex.Message}");
+            logger.LogError(ex, "Bootstrap-Austausch fehlgeschlagen");
             status = BootstrapStatus.Failed;
         }
 

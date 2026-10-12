@@ -23,6 +23,8 @@ public class AppSettingsTests
         // Positiv formulierte Einstellung: der Hero-Kopfbereich ist
         // standardmäßig aktiviert.
         Assert.True(settings.HomeHeroEnabled);
+        // Die Protokollierung ist standardmäßig deaktiviert.
+        Assert.False(settings.LoggingEnabled);
     }
 
     /// <summary>Prüft Normalize: begrenzt die Preload-Episodenanzahl.</summary>

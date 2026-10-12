@@ -83,6 +83,12 @@ public sealed class DevApiModel
     /// <summary>Hinweistext der Ablage.</summary>
     [JsonPropertyName("storageNotice")] public string? StorageNotice { get; set; }
 
+    /// <summary>Protokollierung ist aktiviert (Einstellung „Protokollierung").</summary>
+    [JsonPropertyName("settingsLoggingEnabled")] public bool SettingsLoggingEnabled { get; set; }
+
+    /// <summary>Fehlertext des Protokollversands.</summary>
+    [JsonPropertyName("logSendError")] public string? LogSendError { get; set; }
+
     /// <summary>Titel des Hero-Bereichs der Startseite.</summary>
     [JsonPropertyName("heroTitle")] public string? HeroTitle { get; set; }
 
@@ -98,14 +104,132 @@ public sealed class DevApiModel
     /// <summary>Eine Wiedergabe ist angefordert (Player-Seite belegt).</summary>
     [JsonPropertyName("playerIsActive")] public bool PlayerIsActive { get; set; }
 
+    /// <summary>Medien-Id des aktuell abzuspielenden Mediums (0 = keine).</summary>
+    [JsonPropertyName("playerMediaId")] public long PlayerMediaId { get; set; }
+
+    /// <summary>Anzahl der bereitstehenden Folge-Episoden.</summary>
+    [JsonPropertyName("playerUpcomingEpisodeCount")] public int PlayerUpcomingEpisodeCount { get; set; }
+
     /// <summary>Die Wiedergabe läuft gerade.</summary>
     [JsonPropertyName("playerIsPlaying")] public bool PlayerIsPlaying { get; set; }
 
     /// <summary>Zuletzt gemeldete Wiedergabeposition in Sekunden.</summary>
     [JsonPropertyName("playerPositionSeconds")] public double PlayerPositionSeconds { get; set; }
 
+    /// <summary>Id der Playlist der laufenden Playlist-Wiedergabe (0 = kein Kontext).</summary>
+    [JsonPropertyName("playerPlaylistId")] public long PlayerPlaylistId { get; set; }
+
+    /// <summary>Id des aktuell gespielten Playlist-Eintrags (0 = kein Kontext).</summary>
+    [JsonPropertyName("playerPlaylistEntryId")] public long PlayerPlaylistEntryId { get; set; }
+
+    /// <summary>1-basierte Position des aktuellen Eintrags in der Playlist (0 = unbekannt).</summary>
+    [JsonPropertyName("playerPlaylistPosition")] public int PlayerPlaylistPosition { get; set; }
+
     /// <summary>Fehlertext der letzten Wiedergabe-Störung.</summary>
     [JsonPropertyName("playerError")] public string? PlayerError { get; set; }
+
+    /// <summary>Anzahl der Playlist-Einträge der Übersichtsseite (ohne Sektionsüberschriften).</summary>
+    [JsonPropertyName("playlistsPageItemCount")] public int PlaylistsPageItemCount { get; set; }
+
+    /// <summary>Fehlertext der Playlists-Übersichtsseite.</summary>
+    [JsonPropertyName("playlistsPageError")] public string? PlaylistsPageError { get; set; }
+
+    /// <summary>Playlist-Id der geöffneten Detailseite (0 = keine).</summary>
+    [JsonPropertyName("playlistDetailsId")] public long PlaylistDetailsId { get; set; }
+
+    /// <summary>Anzahl geladener Einträge der Playlist-Detailseite.</summary>
+    [JsonPropertyName("playlistDetailsEntryCount")] public int PlaylistDetailsEntryCount { get; set; }
+
+    /// <summary>Fehlertext der Playlist-Detailseite.</summary>
+    [JsonPropertyName("playlistDetailsError")] public string? PlaylistDetailsError { get; set; }
+
+    /// <summary>Anzeigetitel der geladenen Playlist-Einträge (Anzeigereihenfolge).</summary>
+    [JsonPropertyName("playlistEntryTitles")] public List<string>? PlaylistEntryTitles { get; set; }
+
+    /// <summary>Eintrags-Ids der Playlist-Detailansicht (Anzeigereihenfolge).</summary>
+    [JsonPropertyName("playlistEntryIds")] public List<long>? PlaylistEntryIds { get; set; }
+
+    /// <summary>Verwaltungsaktionen der geöffneten Playlist sind sichtbar.</summary>
+    [JsonPropertyName("canManagePlaylist")] public bool CanManagePlaylist { get; set; }
+
+    /// <summary>Der angemeldete Benutzer ist Besitzer der geöffneten Playlist.</summary>
+    [JsonPropertyName("playlistIsOwner")] public bool PlaylistIsOwner { get; set; }
+
+    /// <summary>Das Anmelde-Token trägt den Administrator-Claim (Voraussetzung des Öffentlich-Schalters).</summary>
+    [JsonPropertyName("playlistIsAdmin")] public bool PlaylistIsAdmin { get; set; }
+
+    /// <summary>Die geöffnete Playlist ist öffentlich geschaltet.</summary>
+    [JsonPropertyName("playlistIsPublic")] public bool PlaylistIsPublic { get; set; }
+
+    /// <summary>Sortiermodus der geöffneten Playlist.</summary>
+    [JsonPropertyName("playlistSortMode")] public string? PlaylistSortMode { get; set; }
+
+    /// <summary>Kommaseparierte Anzeige-Genres der geöffneten Playlist.</summary>
+    [JsonPropertyName("playlistGenreText")] public string? PlaylistGenreText { get; set; }
+
+    /// <summary>Genres der geöffneten Playlist wurden manuell gesetzt.</summary>
+    [JsonPropertyName("playlistGenresManuallyOverridden")] public bool PlaylistGenresManuallyOverridden { get; set; }
+
+    /// <summary>Hinweistext der letzten Verwaltungsoperation.</summary>
+    [JsonPropertyName("playlistManageNotice")] public string? PlaylistManageNotice { get; set; }
+
+    /// <summary><c>true</c>, wenn der Hinweis einen Fehler beschreibt.</summary>
+    [JsonPropertyName("playlistManageNoticeIsError")] public bool PlaylistManageNoticeIsError { get; set; }
+
+    /// <summary>Id des Eintrags mit ausstehender Weiterschauen-Bestätigung; <c>null</c> = kein Konflikt.</summary>
+    [JsonPropertyName("pendingRemoveConflictEntryId")] public long? PendingRemoveConflictEntryId { get; set; }
+
+    /// <summary>Angeforderter Sortiermodus mit ausstehender Verlust-Bestätigung; <c>null</c> = kein Konflikt.</summary>
+    [JsonPropertyName("pendingSortModeConflict")] public string? PendingSortModeConflict { get; set; }
+
+    /// <summary>Das Playlist-Formular ist geöffnet.</summary>
+    [JsonPropertyName("playlistFormOpen")] public bool PlaylistFormOpen { get; set; }
+
+    /// <summary>Das Playlist-Formular speichert gerade.</summary>
+    [JsonPropertyName("playlistFormSaving")] public bool PlaylistFormSaving { get; set; }
+
+    /// <summary>Fehlertext des Playlist-Formulars.</summary>
+    [JsonPropertyName("playlistFormError")] public string? PlaylistFormError { get; set; }
+
+    /// <summary>Der Genre-Editor ist geöffnet.</summary>
+    [JsonPropertyName("playlistGenreEditorOpen")] public bool PlaylistGenreEditorOpen { get; set; }
+
+    /// <summary>Genres des Editors (Id, Name, Auswahlzustand).</summary>
+    [JsonPropertyName("playlistGenreOptions")] public List<DevApiGenreOption>? PlaylistGenreOptions { get; set; }
+
+    /// <summary>Namen der wählbaren Ziel-Playlists; <c>null</c> = noch nicht geladen.</summary>
+    [JsonPropertyName("playlistTargets")] public List<string>? PlaylistTargets { get; set; }
+
+    /// <summary>Die Playlist-Auswahl der Medien-Detailseite soll geöffnet sein.</summary>
+    [JsonPropertyName("playlistPickerPending")] public bool PlaylistPickerPending { get; set; }
+
+    /// <summary>Hinweistext der Playlist-Hinzufügung.</summary>
+    [JsonPropertyName("addToPlaylistNotice")] public string? AddToPlaylistNotice { get; set; }
+
+    /// <summary><c>true</c>, wenn der Hinweis einen Fehler beschreibt.</summary>
+    [JsonPropertyName("addToPlaylistNoticeIsError")] public bool AddToPlaylistNoticeIsError { get; set; }
+
+    /// <summary>Anzeigenamen der Staffeln der Serienansicht in Modellreihenfolge.</summary>
+    [JsonPropertyName("mediaDetailsSeasonNames")] public List<string>? MediaDetailsSeasonNames { get; set; }
+
+    /// <summary>Staffelnummer der gewählten Staffel der Serienansicht (0 = keine).</summary>
+    [JsonPropertyName("mediaDetailsSelectedSeasonNumber")] public int MediaDetailsSelectedSeasonNumber { get; set; }
+
+    /// <summary>Anzeigetitel der Episoden der gewählten Staffel.</summary>
+    [JsonPropertyName("mediaDetailsSeasonEpisodeTitles")] public List<string>? MediaDetailsSeasonEpisodeTitles { get; set; }
+}
+
+/// <summary>DTO einer Genre-Option des Playlist-Genre-Editors im Modell-Snapshot.</summary>
+public sealed class DevApiGenreOption
+{
+    /// <summary>Id des Genres.</summary>
+    [JsonPropertyName("id")] public long Id { get; set; }
+
+    /// <summary>Anzeigename des Genres.</summary>
+    [JsonPropertyName("name")] public string? Name { get; set; }
+
+    /// <summary>Das Genre ist gewählt.</summary>
+    [JsonPropertyName("isSelected")] public bool IsSelected { get; set; }
 }
 
 /// <summary>DTO eines bekannten Servers im Modell-Snapshot.</summary>

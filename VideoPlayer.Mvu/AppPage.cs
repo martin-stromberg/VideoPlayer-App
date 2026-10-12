@@ -15,6 +15,9 @@ public enum AppPage
     /// <summary>Menüseite „Favoriten".</summary>
     Favorites,
 
+    /// <summary>Menüseite „Playlists" (eigene und öffentliche Playlists).</summary>
+    Playlists,
+
     /// <summary>Menüseite „Downloads".</summary>
     Downloads,
 

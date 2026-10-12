@@ -65,7 +65,7 @@ public class MediaDetailsPageContractTests
         Assert.Contains("DownloadButton", xaml, StringComparison.Ordinal);
         // Bestehende Inhalte unterhalb des Headers bleiben erhalten.
         Assert.Contains("SeasonPicker", xaml, StringComparison.Ordinal);
-        Assert.Contains("EpisodesCollection", xaml, StringComparison.Ordinal);
+        Assert.Contains("EpisodesList", xaml, StringComparison.Ordinal);
         Assert.Contains("CollectionSection", xaml, StringComparison.Ordinal);
         Assert.Contains("DownloadNoticeLabel", xaml, StringComparison.Ordinal);
     }
@@ -128,6 +128,57 @@ public class MediaDetailsPageContractTests
         // clamp-Äquivalent der Web-Höhe (360px … 52vw … 620px).
         Assert.Contains("Math.Clamp(Width * 0.52, 360, 620)", code, StringComparison.Ordinal);
         Assert.Contains("SizeChanged", code, StringComparison.Ordinal);
+    }
+
+    /// <summary>Prüft MediaDetailsPage: rendert die Episodenliste als
+    /// BindableLayout statt CollectionView — eine virtualisierte Liste im
+    /// ScrollView wird unter iOS mit Höhe 0 gemessen (keine Episoden).</summary>
+    [Fact]
+    public void MediaDetailsPage_EpisodeList_BindableLayoutInSeasonSection()
+    {
+        var xaml = Read("VideoPlayer.Maui", "Pages", "MediaDetailsPage.xaml");
+
+        var seasonIndex = xaml.IndexOf("x:Name=\"SeasonSection\"", StringComparison.Ordinal);
+        var collectionIndex = xaml.IndexOf("x:Name=\"CollectionSection\"", StringComparison.Ordinal);
+        Assert.True(seasonIndex >= 0);
+        Assert.True(collectionIndex > seasonIndex);
+        var seasonSection = xaml[seasonIndex..collectionIndex];
+
+        // BindableLayout-Liste statt CollectionView (Muster: MediaCarousel);
+        // der Tap öffnet die Episoden-Detailseite.
+        Assert.Contains("x:Name=\"EpisodesList\"", seasonSection, StringComparison.Ordinal);
+        Assert.Contains("BindableLayout.ItemTemplate", seasonSection, StringComparison.Ordinal);
+        Assert.Contains("OnEpisodeTapped", seasonSection, StringComparison.Ordinal);
+        Assert.DoesNotContain("<CollectionView", seasonSection, StringComparison.Ordinal);
+    }
+
+    /// <summary>Prüft MediaDetailsPage-Code: setzt Picker-ItemsSource/SelectedItem
+    /// nur bei tatsächlicher Änderung und ignoriert Echo-Events der bereits
+    /// angewendeten Auswahl (iOS-Stabilität der Staffelbox).</summary>
+    [Fact]
+    public void MediaDetailsPage_SeasonPicker_StableItemsSourceAndEchoGuard()
+    {
+        var code = Read("VideoPlayer.Maui", "Pages", "MediaDetailsPage.xaml.cs");
+
+        var update = MethodBody(code, "private void UpdateSeasonSection(MediaDetailsView details)");
+        // Kein ItemsSource-Neuaufbau je Model-Tick — Änderungsvergleich
+        // der Staffelliste.
+        Assert.Contains("SeasonsEqual", update, StringComparison.Ordinal);
+        Assert.Contains("appliedSeasonItems", update, StringComparison.Ordinal);
+        Assert.Contains("BindableLayout.SetItemsSource(EpisodesList", update, StringComparison.Ordinal);
+
+        var compare = MethodBody(code, "private static bool SeasonsEqual");
+        // Record-Gleichheit (nicht nur Ids): In-place-Neubauten der
+        // Staffelliste (z. B. MarkEpisodeWatchedInDetails, Reload)
+        // müssen als Änderung erkannt werden — sonst verliert der
+        // Picker per IndexOf-Auflösung die sichtbare Auswahl.
+        Assert.Contains("SequenceEqual", compare, StringComparison.Ordinal);
+        Assert.DoesNotContain(".Id", compare, StringComparison.Ordinal);
+
+        var handler = MethodBody(code, "private void OnSeasonSelected(object? sender, EventArgs e)");
+        // Echo-Guard: kein Dispatch für die bereits angewendete Modell-Auswahl.
+        Assert.Contains("updatingSeasonPicker", handler, StringComparison.Ordinal);
+        Assert.Contains("SelectedSeason?.Id", handler, StringComparison.Ordinal);
     }
 
     /// <summary>Prüft ShellAppEffectHandler: führt den Kopfbereichs-Ladeeffekt je Quelle aus.</summary>

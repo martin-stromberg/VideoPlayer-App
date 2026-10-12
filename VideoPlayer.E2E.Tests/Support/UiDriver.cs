@@ -75,26 +75,67 @@ public sealed class UiDriver : IDisposable
     /// <summary>
     /// Setzt den Text eines Eingabefelds über das UIA-Value-Pattern
     /// (echte UI-Eingabekette — der MAUI-Handler feuert
-    /// <c>TextChanged</c> wie eine Tastatureingabe).
+    /// <c>TextChanged</c> wie eine Tastatureingabe). Danach wird der
+    /// Feldwert zurückgelesen; ist er nicht gelandet (Seite noch im
+    /// Aufbau / Fokus verloren), wird die Eingabe bis zum
+    /// <paramref name="timeout"/> wiederholt.
     /// </summary>
     /// <param name="automationId">AutomationId des Eingabefelds.</param>
     /// <param name="text">Der einzugebende Text.</param>
-    public void EnterText(string automationId, string text)
+    /// <param name="timeout">Maximale Wartezeit (Standard 15 s).</param>
+    public void EnterText(string automationId, string text, TimeSpan? timeout = null)
     {
-        var element = FindByAutomationId(automationId);
-        var textBox = element.AsTextBox();
-        textBox.Focus();
-        // ValuePattern setzt den Text atomar — simulierte Tasten gehen
-        // unter Last gelegentlich verloren (Truncated-Input-Flakes wie
-        // „server" statt „ftp://server"). Feuert TextChanged ebenso.
-        if (textBox.Patterns.Value.IsSupported)
+        var deadline = DateTime.UtcNow + (timeout ?? TimeSpan.FromSeconds(15));
+        while (DateTime.UtcNow < deadline)
         {
-            textBox.Patterns.Value.Pattern.SetValue(text);
+            var element = window.FindFirstDescendant(Conditions.ByAutomationId(automationId));
+            if (element is not null)
+            {
+                try
+                {
+                    var textBox = element.AsTextBox();
+                    textBox.Focus();
+                    if (element.Properties.IsPassword.ValueOrDefault)
+                    {
+                        // Passwortboxen blenden den Wert aus (ValuePattern
+                        // liefert nie den Klartext) — dort bleibt reine
+                        // Tastatureingabe ohne Rücklesen.
+                        textBox.Enter(text);
+                        return;
+                    }
+
+                    // ValuePattern setzt den Text atomar — simulierte Tasten
+                    // gehen unter Last gelegentlich verloren (Truncated-Input-
+                    // Flakes wie „server" statt „ftp://server"). Feuert
+                    // TextChanged ebenso.
+                    if (textBox.Patterns.Value.IsSupported)
+                    {
+                        textBox.Patterns.Value.Pattern.SetValue(text);
+                        Thread.Sleep(150);
+                        var current = textBox.Patterns.Value.Pattern.Value.ValueOrDefault;
+                        if (string.Equals(current, text, StringComparison.Ordinal))
+                        {
+                            return;
+                        }
+                    }
+                    else
+                    {
+                        textBox.Enter(text);
+                        return;
+                    }
+                }
+                catch (Exception)
+                {
+                    // Element-Referenz veraltet oder noch nicht bereit —
+                    // erneut suchen bis zum Timeout.
+                }
+            }
+
+            Thread.Sleep(200);
         }
-        else
-        {
-            textBox.Enter(text);
-        }
+
+        throw new TimeoutException(
+            $"Element mit AutomationId '{automationId}' nahm den Text nicht auf.");
     }
 
     /// <summary>
@@ -107,6 +148,29 @@ public sealed class UiDriver : IDisposable
         var element = FindByAutomationId(automationId);
         var button = element.AsButton();
         button.Invoke();
+    }
+
+    /// <summary>
+    /// Schaltet einen Schalter (<c>Switch</c>) per UIA-TogglePattern um;
+    /// ist das Muster nicht verfügbar, greifen Invoke bzw. Klick als
+    /// Fallback.
+    /// </summary>
+    /// <param name="automationId">AutomationId des Schalters.</param>
+    public void Toggle(string automationId)
+    {
+        var element = FindByAutomationId(automationId);
+        if (element.Patterns.Toggle.IsSupported)
+        {
+            element.Patterns.Toggle.Pattern.Toggle();
+        }
+        else if (element.Patterns.Invoke.IsSupported)
+        {
+            element.Patterns.Invoke.Pattern.Invoke();
+        }
+        else
+        {
+            element.Click();
+        }
     }
 
     /// <summary>
@@ -201,12 +265,213 @@ public sealed class UiDriver : IDisposable
                 string.Equals(b.AutomationId, "OK", StringComparison.Ordinal));
     }
 
+    /// <summary>
+    /// Wartet, bis ein Element mit der AutomationId sichtbar im Fenster
+    /// existiert; rollt es dabei über <c>ScrollItemPattern</c> in den
+    /// sichtbaren Bereich (Elemente in einer ScrollView meldet UIA erst
+    /// als sichtbar, wenn sie eingerollt sind). Liefert <c>false</c>,
+    /// wenn das Element bis zum Timeout nicht sichtbar wird — damit
+    /// taugt es auch für Negativ-Behauptungen.
+    /// </summary>
+    /// <param name="automationId">Die gesuchte AutomationId.</param>
+    /// <param name="timeout">Maximale Wartezeit (Standard 15 s).</param>
+    /// <returns><c>true</c>, wenn das Element sichtbar wurde.</returns>
+    public bool WaitForVisible(string automationId, TimeSpan? timeout = null)
+    {
+        var deadline = DateTime.UtcNow + (timeout ?? TimeSpan.FromSeconds(15));
+        while (DateTime.UtcNow < deadline)
+        {
+            var element = window.FindFirstDescendant(Conditions.ByAutomationId(automationId));
+            if (element is not null)
+            {
+                if (element.Patterns.ScrollItem.IsSupported)
+                {
+                    try
+                    {
+                        element.Patterns.ScrollItem.Pattern.ScrollIntoView();
+                    }
+                    catch (Exception)
+                    {
+                        // ScrollIntoView kann auf nicht scrollbar gehosteten
+                        // Elementen fehlschlagen — Sichtbarkeit dennoch prüfen.
+                    }
+                }
+
+                if (!element.Properties.IsOffscreen.ValueOrDefault)
+                {
+                    return true;
+                }
+            }
+
+            Thread.Sleep(200);
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// Wählt einen Eintrag einer ComboBox (MAUI-<c>Picker</c> meldet sich
+    /// auf Windows als ComboBox) per Anzeigetext aus: aufklappen,
+    /// Listeneintrag per Name suchen und per SelectionItem/Invoke wählen.
+    /// </summary>
+    /// <param name="automationId">AutomationId der ComboBox.</param>
+    /// <param name="itemText">Anzeigetext des zu wählenden Eintrags.</param>
+    public void SelectComboBoxItem(string automationId, string itemText)
+    {
+        var combo = FindByAutomationId(automationId).AsComboBox();
+        combo.Expand();
+        var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(15);
+        while (true)
+        {
+            var item = combo.Items.FirstOrDefault(i =>
+                string.Equals(i.Name, itemText, StringComparison.Ordinal));
+            if (item is not null)
+            {
+                if (item.Patterns.SelectionItem.IsSupported)
+                {
+                    item.Patterns.SelectionItem.Pattern.Select();
+                }
+                else if (item.Patterns.Invoke.IsSupported)
+                {
+                    item.Patterns.Invoke.Pattern.Invoke();
+                }
+                else
+                {
+                    item.Click();
+                }
+
+                return;
+            }
+
+            if (DateTime.UtcNow >= deadline)
+            {
+                throw new TimeoutException(
+                    $"Kein ComboBox-Eintrag '{itemText}' unter '{automationId}' gefunden "
+                    + $"({string.Join(", ", combo.Items.Select(i => i.Name))}).");
+            }
+
+            Thread.Sleep(200);
+        }
+    }
+
+    /// <summary>
+    /// Liest die Anzeigenamen der Einträge einer ComboBox in
+    /// Reihenfolge (klappt die Liste dafür auf und wieder zu).
+    /// </summary>
+    /// <param name="automationId">AutomationId der ComboBox.</param>
+    /// <returns>Die Eintragsnamen in Anzeigereihenfolge.</returns>
+    public IReadOnlyList<string> GetComboBoxItemNames(string automationId)
+    {
+        var combo = FindByAutomationId(automationId).AsComboBox();
+        combo.Expand();
+        try
+        {
+            var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(15);
+            while (combo.Items.Length == 0 && DateTime.UtcNow < deadline)
+            {
+                Thread.Sleep(200);
+            }
+
+            return combo.Items.Select(i => i.Name ?? string.Empty).ToList();
+        }
+        finally
+        {
+            combo.Collapse();
+        }
+    }
+
+    /// <summary>
+    /// Löst die Zurück-Navigation der Shell aus: der WinUI-Back-Button
+    /// der NavigationView (sichtbar bei geschobener Seite) wird per
+    /// AutomationId/Name gesucht und per Invoke/Klick betätigt; fehlt
+    /// er, gilt Alt+Links als Systemzurück-Fallback.
+    /// </summary>
+    /// <param name="timeout">Maximale Wartezeit (Standard 15 s).</param>
+    public void GoBack(TimeSpan? timeout = null)
+    {
+        var deadline = DateTime.UtcNow + (timeout ?? TimeSpan.FromSeconds(15));
+        while (DateTime.UtcNow < deadline)
+        {
+            var element = window.FindFirstDescendant(
+                Conditions.ByAutomationId("NavigationViewBackButton"))
+                ?? window
+                    .FindAllDescendants(Conditions.ByControlType(ControlType.Button))
+                    .FirstOrDefault(b =>
+                        b.Name is "Back" or "Zurück" or "Navigate back");
+            if (element is not null)
+            {
+                if (element.Patterns.Invoke.IsSupported)
+                {
+                    element.Patterns.Invoke.Pattern.Invoke();
+                }
+                else
+                {
+                    element.Click();
+                }
+
+                return;
+            }
+
+            Thread.Sleep(200);
+        }
+
+        // Fallback: Alt+Links (Systemzurück der Shell-Navigation).
+        FlaUI.Core.Input.Keyboard.Press(FlaUI.Core.WindowsAPI.VirtualKeyShort.ALT);
+        FlaUI.Core.Input.Keyboard.Press(FlaUI.Core.WindowsAPI.VirtualKeyShort.LEFT);
+        FlaUI.Core.Input.Keyboard.Release(FlaUI.Core.WindowsAPI.VirtualKeyShort.LEFT);
+        FlaUI.Core.Input.Keyboard.Release(FlaUI.Core.WindowsAPI.VirtualKeyShort.ALT);
+    }
+
     /// <summary>Sucht ein Element per Anzeigename (einmalig, ohne Retry).</summary>
     /// <param name="name">Der gesuchte Name.</param>
     /// <returns>Das Element oder <c>null</c>.</returns>
     public AutomationElement? FindByName(string name)
     {
         return window.FindFirstDescendant(Conditions.ByName(name));
+    }
+
+    /// <summary>
+    /// Löst ein Element per Anzeigename aus — für Dialog-Schaltflächen
+    /// (z. B. <c>DisplayActionSheet</c>), die als Popup außerhalb des
+    /// Fenster-Teilbaums liegen können: zuerst im Fenster, danach auf
+    /// Desktop-Ebene eingeschränkt auf den App-Prozess (Retry bis
+    /// Timeout).
+    /// </summary>
+    /// <param name="name">Der Anzeigename des Elements.</param>
+    /// <param name="timeout">Maximale Wartezeit (Standard 15 s).</param>
+    /// <returns>Das gefundene und ausgelöste Element.</returns>
+    public AutomationElement ClickByName(string name, TimeSpan? timeout = null)
+    {
+        var deadline = DateTime.UtcNow + (timeout ?? TimeSpan.FromSeconds(15));
+        var processId = window.Properties.ProcessId.ValueOrDefault;
+        while (true)
+        {
+            var element = window.FindFirstDescendant(Conditions.ByName(name))
+                ?? automation.GetDesktop()
+                    .FindAllDescendants(Conditions.ByName(name))
+                    .FirstOrDefault(e => e.Properties.ProcessId.ValueOrDefault == processId);
+            if (element is not null)
+            {
+                if (element.Patterns.Invoke.IsSupported)
+                {
+                    element.Patterns.Invoke.Pattern.Invoke();
+                }
+                else
+                {
+                    element.Click();
+                }
+
+                return element;
+            }
+
+            if (DateTime.UtcNow >= deadline)
+            {
+                throw new TimeoutException(
+                    $"Kein Element mit dem Namen '{name}' im Fenster oder als Popup des Prozesses gefunden.");
+            }
+
+            Thread.Sleep(200);
+        }
     }
 
     /// <summary>

@@ -39,13 +39,40 @@ public class AppSettingsServiceTests
             WatchedEndWindowSeconds = 120,
             DownloadQuotaGb = 42,
             AutoDeleteWatchedEpisodes = true,
-            HomeHeroEnabled = false
+            HomeHeroEnabled = false,
+            LoggingEnabled = true
         };
 
         service.Save(settings);
         var loaded = service.Load();
 
         Assert.Equal(settings, loaded);
+    }
+
+    /// <summary>Prüft Save/Load: eine aktivierte Protokollierung übersteht das erneute Laden (Neustart).</summary>
+    [Fact]
+    public void Save_LoggingEnabled_PersistsAcrossLoad()
+    {
+        var store = new InMemorySettingsStore();
+        var service = CreateService(store);
+
+        service.Save(new AppSettings { LoggingEnabled = true });
+        var loaded = service.Load();
+
+        Assert.True(loaded.LoggingEnabled);
+        // Der Schlüssel wurde tatsächlich in der Ablage geschrieben.
+        Assert.True(store.GetBool(AppSettingsService.LoggingEnabledKey, false));
+    }
+
+    /// <summary>Prüft Load: ohne gespeicherten Protokoll-Schlüssel → die Protokollierung bleibt deaktiviert.</summary>
+    [Fact]
+    public void Load_WithoutLoggingKey_KeepsLoggingDisabled()
+    {
+        var service = CreateService(new InMemorySettingsStore());
+
+        var loaded = service.Load();
+
+        Assert.False(loaded.LoggingEnabled);
     }
 
     /// <summary>Prüft Load: ohne gespeicherten Hero-Schlüssel → der Kopfbereich bleibt aktiviert (positiver Standard).</summary>

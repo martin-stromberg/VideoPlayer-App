@@ -126,6 +126,46 @@ public class HomeListServiceTests : IDisposable
         Assert.False(movie.ShowProgress);
     }
 
+    /// <summary>Prüft LoadHomeLists: der Playlist-Bezug des Weiterschauen-Eintrags wird auf das HomeMediaItem übertragen.</summary>
+    [Fact]
+    public async Task LoadHomeLists_MapsContinueWatchingPlaylistContext()
+    {
+        await WriteCachedListAsync(ServerSyncService.ContinueWatchingCacheKey, new[]
+        {
+            new ContinueWatchingEntry
+            {
+                MediaType = "episode",
+                PositionSeconds = 120,
+                DurationSeconds = 600,
+                Title = "Folge 4",
+                Entry = new TvShowEpisode { Id = 7, Name = "Folge 4" },
+                PlaylistId = 42,
+                PlaylistName = "Abendliste",
+                PlaylistEntryId = 55
+            },
+            new ContinueWatchingEntry
+            {
+                MediaType = "movie",
+                PositionSeconds = 0,
+                Title = "Film ohne Bezug",
+                Entry = new Movie { Id = 3, Name = "Film" }
+            }
+        });
+
+        var lists = await service.LoadHomeListsAsync();
+
+        var bound = lists.ContinueWatching[0];
+        Assert.Equal(42, bound.PlaylistId);
+        Assert.Equal("Abendliste", bound.PlaylistName);
+        Assert.Equal(55, bound.PlaylistEntryId);
+
+        // Ohne Playlist-Bezug bleiben die Felder leer (Serienpfad).
+        var unbound = lists.ContinueWatching[1];
+        Assert.Null(unbound.PlaylistId);
+        Assert.Null(unbound.PlaylistName);
+        Assert.Null(unbound.PlaylistEntryId);
+    }
+
     /// <summary>Prüft LoadHomeLists: bildet Favoriten ab.</summary>
     [Fact]
     public async Task LoadHomeLists_MapsFavorites()

@@ -358,6 +358,282 @@ public class AutoDownloadServiceTests : IDisposable
         Assert.Empty(handler.Requests);
     }
 
+    /// <summary>Hilfsmethode: baut die JSON-Antwort einer <c>entries/paged</c>-Seite (Server-Reihenfolge = Array-Reihenfolge).</summary>
+    /// <param name="hasNextPage"><c>true</c> = weitere Seite folgt.</param>
+    /// <param name="entries">Die Einträge der Seite (siehe <see cref="PlaylistEntryJson"/>).</param>
+    /// <returns>Das serialisierbare Antwortobjekt der Seite.</returns>
+    private static object PlaylistPageJson(bool hasNextPage, params object[] entries) => new
+    {
+        entries,
+        totalCount = entries.Length,
+        hasNextPage,
+        pageNumber = 1,
+        pageSize = 50
+    };
+
+    /// <summary>Hilfsmethode: baut den JSON-Eintrag einer Playlist (Felder wie der Server).</summary>
+    /// <param name="id">Id des Playlist-Eintrags.</param>
+    /// <param name="mediaType">Medientyp der Referenz (Server-Konvention, z. B. <c>Movie</c>, <c>TVShowEpisode</c>).</param>
+    /// <param name="mediaId">Id des referenzierten Mediums.</param>
+    /// <param name="title">Anzeigetitel des Mediums.</param>
+    /// <param name="parentMediaType">Medientyp des Elternelements; <c>null</c> = kein Elternkontext.</param>
+    /// <param name="parentMediaId">Id des Elternelements; <c>null</c> = kein Elternkontext.</param>
+    /// <param name="parentMediaTitle">Titel des Elternelements; <c>null</c> = kein Elternkontext.</param>
+    /// <param name="isAccessible"><c>false</c> = kein Zugriffsrecht des Benutzers.</param>
+    /// <param name="sortOrder">Sortierposition in der Playlist; <c>null</c> = nicht zugewiesen.</param>
+    /// <param name="episodeNumber">Episodennummer bei Episoden-Einträgen; <c>null</c> sonst.</param>
+    /// <returns>Das serialisierbare Eintragsobjekt.</returns>
+    private static object PlaylistEntryJson(
+        long id,
+        string mediaType,
+        long mediaId,
+        string title,
+        string? parentMediaType = null,
+        long? parentMediaId = null,
+        string? parentMediaTitle = null,
+        bool isAccessible = true,
+        long? sortOrder = null,
+        int? episodeNumber = null) => new
+        {
+            id,
+            playlistId = 5L,
+            mediaType,
+            mediaId,
+            mediaTitle = title,
+            parentMediaType,
+            parentMediaId,
+            parentMediaTitle,
+            addedAt = "2026-01-01T00:00:00Z",
+            resolvedPictureId = (long?)null,
+            isAccessible,
+            sortOrder,
+            releaseDate = (string?)null,
+            plot = (string?)null,
+            episodeNumber
+        };
+
+    /// <summary>Prüft Auto-Downloads: ein Weiterschauen-Eintrag mit Playlist-Bezug reiht die Folge-Einträge in Playlist- statt Serienreihenfolge ein.</summary>
+    [Fact]
+    public async Task Run_PlaylistEpisode_EnqueuesPlaylistOrder()
+    {
+        await LoginAsync();
+        await CacheContinueWatchingAsync(
+            new ContinueWatchingEntry
+            {
+                MediaType = "episode",
+                PositionSeconds = 60,
+                PlaylistId = 5,
+                PlaylistName = "Mix",
+                PlaylistEntryId = 101,
+                Entry = new TvShowEpisode
+                {
+                    Id = 32,
+                    Name = "Pilot",
+                    Season = new TvShowSeason { Id = 21, Show = new TvShow { Id = 11 } }
+                }
+            });
+        // Playlist-Reihenfolge weicht absichtlich von der Serienreihenfolge
+        // ab: Film 99 liegt zwischen den Episoden 33 und 34.
+        handler.EnqueueJson(HttpStatusCode.OK, PlaylistPageJson(false,
+            PlaylistEntryJson(100, "TVShowEpisode", 30, "Alt"),
+            PlaylistEntryJson(101, "TVShowEpisode", 32, "Pilot"),
+            PlaylistEntryJson(102, "Movie", 99, "Film Neunundneunzig"),
+            PlaylistEntryJson(103, "TVShowEpisode", 33, "Folge B",
+                parentMediaType: "TVShow", parentMediaId: 11, parentMediaTitle: "Probe",
+                sortOrder: 3, episodeNumber: 2)));
+
+        await service.RunAsync(settings);
+
+        var entries = (await EntriesAsync()).OrderBy(e => e.Id).ToList();
+        Assert.Equal(2, entries.Count);
+        Assert.Equal(99, entries[0].VideoId);
+        Assert.Equal("movie", entries[0].VideoType);
+        Assert.Equal(33, entries[1].VideoId);
+        Assert.Equal("tvshowepisode", entries[1].VideoType);
+        // Playlist-Bezug am Manifest; die Serienstruktur wird nicht abgefragt.
+        Assert.Equal(5, entries[0].PlaylistId);
+        Assert.Equal(102, entries[0].PlaylistEntryId);
+        Assert.Equal(5, entries[1].PlaylistId);
+        Assert.Equal(103, entries[1].PlaylistEntryId);
+        Assert.Equal(3, entries[1].PlaylistSortOrder);
+        Assert.DoesNotContain(handler.Requests, r => r.PathAndQuery.Contains("api/items/tvshow/"));
+        Assert.Contains(handler.Requests, r => r.PathAndQuery.Contains("api/playlists/5/entries/paged"));
+    }
+
+    /// <summary>Prüft Auto-Downloads: nicht ladbare und nicht zugängliche Playlist-Einträge werden übersprungen.</summary>
+    [Fact]
+    public async Task Run_PlaylistEpisode_SkipsNonDownloadableEntries()
+    {
+        await LoginAsync();
+        await CacheContinueWatchingAsync(
+            new ContinueWatchingEntry
+            {
+                MediaType = "episode",
+                PositionSeconds = 60,
+                PlaylistId = 5,
+                PlaylistName = "Mix",
+                PlaylistEntryId = 101,
+                Entry = new TvShowEpisode
+                {
+                    Id = 32,
+                    Name = "Pilot",
+                    Season = new TvShowSeason { Id = 21, Show = new TvShow { Id = 11 } }
+                }
+            });
+        handler.EnqueueJson(HttpStatusCode.OK, PlaylistPageJson(false,
+            PlaylistEntryJson(101, "TVShowEpisode", 32, "Pilot"),
+            PlaylistEntryJson(102, "TVShow", 60, "Ganze Serie"),
+            PlaylistEntryJson(103, "TVShowEpisode", 61, "Gesperrt", isAccessible: false),
+            PlaylistEntryJson(104, "TVShowEpisode", 62, "Folge Eins",
+                parentMediaType: "TVShow", parentMediaId: 11, parentMediaTitle: "Probe"),
+            PlaylistEntryJson(105, "TVShowEpisode", 63, "Folge Zwei",
+                parentMediaType: "TVShow", parentMediaId: 11, parentMediaTitle: "Probe")));
+
+        await service.RunAsync(settings);
+
+        var entries = (await EntriesAsync()).OrderBy(e => e.Id).ToList();
+        Assert.Equal(2, entries.Count);
+        Assert.Equal(62, entries[0].VideoId);
+        Assert.Equal(63, entries[1].VideoId);
+    }
+
+    /// <summary>Prüft Auto-Downloads: Serien-Hints der Playlist-Einträge werden aus den Parent-Angaben ins Manifest übernommen.</summary>
+    [Fact]
+    public async Task Run_PlaylistEpisode_PersistsSeriesHints()
+    {
+        await LoginAsync();
+        await CacheContinueWatchingAsync(
+            new ContinueWatchingEntry
+            {
+                MediaType = "episode",
+                PositionSeconds = 60,
+                PlaylistId = 5,
+                PlaylistName = "Mix",
+                PlaylistEntryId = 101,
+                Entry = new TvShowEpisode
+                {
+                    Id = 32,
+                    Name = "Pilot",
+                    Season = new TvShowSeason { Id = 21, Show = new TvShow { Id = 11 } }
+                }
+            });
+        handler.EnqueueJson(HttpStatusCode.OK, PlaylistPageJson(false,
+            PlaylistEntryJson(101, "TVShowEpisode", 32, "Pilot"),
+            PlaylistEntryJson(102, "TVShowEpisode", 33, "Folge B",
+                parentMediaType: "TVShow", parentMediaId: 11, parentMediaTitle: "Probe",
+                episodeNumber: 2)));
+
+        var oneEpisode = settings with { PreloadEpisodeCount = 1 };
+        await service.RunAsync(oneEpisode);
+
+        var entry = Assert.Single(await EntriesAsync());
+        Assert.Equal(33, entry.VideoId);
+        Assert.Equal(11, entry.ShowId);
+        Assert.Equal("Probe", entry.ShowTitle);
+        Assert.Equal(2, entry.EpisodeNumber);
+        Assert.Null(entry.SeasonNumber);
+        Assert.Equal("Probe – Folge B", entry.Title);
+    }
+
+    /// <summary>Prüft Auto-Downloads: ein playlist-gebundener Film lädt sich selbst plus die Folge-Einträge der Playlist.</summary>
+    [Fact]
+    public async Task Run_PlaylistMovie_EnqueuesSelfAndNextEntries()
+    {
+        await LoginAsync();
+        await CacheContinueWatchingAsync(
+            new ContinueWatchingEntry
+            {
+                MediaType = "movie",
+                PositionSeconds = 60,
+                PlaylistId = 5,
+                PlaylistName = "Filmabend",
+                PlaylistEntryId = 101,
+                Entry = new Movie { Id = 7, Name = "Film Sieben" }
+            });
+        handler.EnqueueJson(HttpStatusCode.OK, PlaylistPageJson(false,
+            PlaylistEntryJson(101, "Movie", 7, "Film Sieben"),
+            PlaylistEntryJson(102, "Movie", 8, "Film Acht"),
+            PlaylistEntryJson(103, "Movie", 9, "Film Neun")));
+
+        await service.RunAsync(settings);
+
+        var entries = (await EntriesAsync()).OrderBy(e => e.Id).ToList();
+        Assert.Equal(3, entries.Count);
+        Assert.Equal(7, entries[0].VideoId);
+        Assert.Equal(8, entries[1].VideoId);
+        Assert.Equal(9, entries[2].VideoId);
+        Assert.All(entries, e => Assert.Equal(5, e.PlaylistId));
+    }
+
+    /// <summary>Prüft Auto-Downloads: ein nicht mehr in der Playlist gefundener Eintrag fällt auf den Serien-Pfad zurück.</summary>
+    [Fact]
+    public async Task Run_PlaylistEntryNotFound_FallsBackToSeries()
+    {
+        await LoginAsync();
+        await CacheContinueWatchingAsync(
+            new ContinueWatchingEntry
+            {
+                MediaType = "episode",
+                PositionSeconds = 60,
+                PlaylistId = 5,
+                PlaylistName = "Mix",
+                PlaylistEntryId = 101,
+                Entry = new TvShowEpisode
+                {
+                    Id = 32,
+                    Name = "Pilot",
+                    Season = new TvShowSeason { Id = 21, Show = new TvShow { Id = 11 } }
+                }
+            });
+        // Der Eintrag 101 ist nicht mehr Teil der Playlist.
+        handler.EnqueueJson(HttpStatusCode.OK, PlaylistPageJson(false,
+            PlaylistEntryJson(100, "TVShowEpisode", 30, "Alt"),
+            PlaylistEntryJson(105, "TVShowEpisode", 40, "Anderes")));
+        handler.EnqueueJson(HttpStatusCode.OK,
+            ShowWithEpisodes(11, "Probe", (1, 1, 32, "A"), (1, 2, 33, "B"), (1, 3, 34, "C")));
+
+        await service.RunAsync(settings);
+
+        var entries = (await EntriesAsync()).OrderBy(e => e.Id).ToList();
+        Assert.Equal(2, entries.Count);
+        Assert.Equal(33, entries[0].VideoId);
+        Assert.Equal(34, entries[1].VideoId);
+        Assert.All(entries, e => Assert.Null(e.PlaylistId));
+        Assert.Contains(handler.Requests, r => r.PathAndQuery.Contains("api/items/tvshow/11"));
+    }
+
+    /// <summary>Prüft Auto-Downloads: Playlist-Bezug ohne gültige Eintrags-Id (<c>PlaylistEntryId == null</c>) bleibt beim Serien-Pfad.</summary>
+    [Fact]
+    public async Task Run_PlaylistEntryMissing_FallsBackToSeries()
+    {
+        await LoginAsync();
+        await CacheContinueWatchingAsync(
+            new ContinueWatchingEntry
+            {
+                MediaType = "episode",
+                PositionSeconds = 60,
+                PlaylistId = 5,
+                PlaylistName = "Mix",
+                PlaylistEntryId = null,
+                Entry = new TvShowEpisode
+                {
+                    Id = 32,
+                    Name = "Pilot",
+                    Season = new TvShowSeason { Id = 21, Show = new TvShow { Id = 11 } }
+                }
+            });
+        handler.EnqueueJson(HttpStatusCode.OK,
+            ShowWithEpisodes(11, "Probe", (1, 1, 32, "A"), (1, 2, 33, "B")));
+
+        var oneEpisode = settings with { PreloadEpisodeCount = 1 };
+        await service.RunAsync(oneEpisode);
+
+        var entry = Assert.Single(await EntriesAsync());
+        Assert.Equal(33, entry.VideoId);
+        Assert.Null(entry.PlaylistId);
+        Assert.DoesNotContain(handler.Requests, r => r.PathAndQuery.Contains("api/playlists/"));
+    }
+
     private sealed class FakeNetworkMonitor : INetworkStatusMonitor
     {
         public bool IsOnline { get; set; } = true;

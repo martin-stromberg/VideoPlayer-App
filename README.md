@@ -8,9 +8,10 @@ Die App koppelt sich beim Erststart über einen vom Server erzeugten Einmal-QR-C
 
 - **QR-/Kurzcode-Onboarding** — Kopplung über den QR-Code der Server-Verwaltung oder 8-stelligen Kurzcode; alternativ klassisches Pairing per Einmal-Code. Erzeugt Geräte-, Anmelde- und Refresh-Token in einem Schritt.
 - **Server-Entdeckung** — automatische Erkennung der Server im lokalen Netz (UDP-Broadcast, mDNS).
-- **Wiedergabe** — Server-Stream oder lokale Datei mit Fortsetzungsposition, „angesehen"-Markierung, automatischem Fortsetzen und Picture-in-Picture (Windows: kompaktes Overlay-Fenster; iOS: nativer PiP der Transportsteuerung).
+- **Wiedergabe** — Server-Stream oder lokale Datei mit Fortsetzungsposition, „angesehen"-Markierung, automatischem Fortsetzen und Picture-in-Picture (Windows: kompaktes Overlay-Fenster; iOS: nativer PiP der Transportsteuerung); bei Playlist-Wiedergabe steuern „Zurück"/„Weiter"-Schaltflächen die serverseitige Reihenfolge.
 - **Offline-Betrieb** — Downloads mit GB-Kontingent und WLAN-Bedingung; die Startseite, Serienstruktur und Detail-Snapshots bleiben ohne Serververbindung nutzbar, fehlende Kopfbereichs-Bilder der Detailseite werden nach der Wiederverbindung automatisch nachgeladen.
-- **Startseite** — „Weiterschauen", „Favoriten" und „Neu im Programm" mit Hero-Kopfbereich im Erscheinungsbild der Web-Oberfläche.
+- **Startseite** — „Weiterschauen", „Favoriten" und „Neu im Programm" mit Hero-Kopfbereich im Erscheinungsbild der Web-Oberfläche; abspielbare Weiterschauen-Einträge (Filme/Episoden) starten direkt an der Fortsetzungsposition, ein 2-s-Long-Press öffnet das Kontextmenü „Ausblenden"/„Überspringen".
+- **Playlists** — Menüseite „Playlists" mit eigenen und öffentlichen Playlists des Servers (Cover, Sortiermodus, Genres), Detailansicht mit Einträgen in Server-Reihenfolge und seitenweisem Nachladen sowie direkter Wiedergabe aus der Playlist-Reihenfolge (Vor-/Zurück-Navigation, Auto-Fortsetzung und Fehler-Rückfall über die serverseitigen Play-Endpunkte); eigene Playlists lassen sich auf dem Gerät verwalten — Anlage/Bearbeitung/Löschung über Formular und Verwaltungsmenü, Einträge hinzufügen (von der Medien-Detailseite) und entfernen (inkl. Weiterschauen-Bestätigung bei HTTP 409), Reihenfolge und Sortiermodus ändern, Genres setzen/zurücksetzen und für Administrator:innen öffentlich schalten; reines Online-Feature mit verständlicher Fehleranzeige. Der Download-Vorlauf playlist-gebundener Weiterschauen-Einträge folgt der Playlist-Reihenfolge.
 - **Verbindungs-Workflow** — Anmelde- und Servermaske mit Offline-Modus, automatischer Wiederverbindung und SignalR-Ereignisverbindung.
 
 ## Plattformen
@@ -49,7 +50,7 @@ dotnet build .\VideoPlayer.Maui\VideoPlayer.Maui.csproj -f net10.0-windows10.0.1
 | `VideoPlayer.Maui` | Die App (MVU-Architektur): Seitenmenü, Serververwaltung, Startseite, Quellen-Browsing, Detailseiten, Wiedergabe/PiP, Downloads, Offline-Modus |
 | `VideoPlayer.Mvu` | Plattformneutrale MVU-Schicht: Modell, Update, Effekte; Authentifizierung, Synchronisation, Ereignisverbindung, Pairing-Flows |
 | `VideoPlayer.ApiClient` | Zugriff auf die öffentliche Server-API: Pairing/Bootstrap (ECDH-nistP256 + AES-256-GCM), Refresh/Logout, Server-Discovery |
-| `VideoPlayer.Storage` | Lokale Datenhaltung: SQLite-Cache, Einstellungen, Geheimnis-Ablage (`SecureStorage`), Download-Manifest |
+| `VideoPlayer.Storage` | Lokale Datenhaltung: SQLite-Cache, Einstellungen, Geheimnis-Ablage (`SecureStorage`), Download-Manifest, schaltbares Programmprotokoll (Datei-Logging) |
 | `VideoWebPlayer.Maui` | Altbestand der bisherigen App — wird schrittweise durch `VideoPlayer.Maui` abgelöst |
 | `msTools.DeveloperApi` | Wiederverwendbarer Kern der lokalen Developer-API (Loopback-HTTP-Server, Routing, `devapi.json`, Snapshot-Provider) — plattformneutral, nur Debug/`DEV_API` |
 | `msTools.DeveloperApi.Maui` | MAUI-Handler der Developer-API (`/tree`, `/invoke`, `/set-text`, Elementbaum) — baut auf `msTools.DeveloperApi` auf |

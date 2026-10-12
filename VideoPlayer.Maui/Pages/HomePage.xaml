@@ -148,10 +148,13 @@
                  Vorschaubilder (16:9-Stills der Videos) — die Karten
                  folgen dem Querformat statt dem Posterformat 2:3. -->
             <controls:MediaCarousel Title="Weiterschauen"
+                                    AutomationId="ContinueWatchingCarousel"
                                     ItemWidth="256"
                                     ItemHeight="144"
                                     Items="{Binding Model.ContinueWatching}"
-                                    ItemTapped="OnMediaItemTapped" />
+                                    ItemTapped="OnContinueWatchingItemTapped"
+                                    LongPressEnabled="True"
+                                    ItemLongPressed="OnContinueWatchingItemLongPressed" />
             <controls:MediaCarousel Title="Favoriten"
                                     Items="{Binding Model.Favorites}"
                                     ItemTapped="OnMediaItemTapped" />

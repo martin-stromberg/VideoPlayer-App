@@ -106,7 +106,7 @@ public class SourcesContractTests
         Assert.Contains("x:Key=\"SourceInfoTemplate\"", xaml, StringComparison.Ordinal);
     }
 
-    /// <summary>Prüft AppShell: enthält keinen statischen Quellen-Eintrag mehr — nur fünf FlyoutItems.</summary>
+    /// <summary>Prüft AppShell: enthält keinen statischen Quellen-Eintrag mehr — nur die sechs Menü-FlyoutItems.</summary>
     [Fact]
     public void AppShell_HasNoStaticSourcesFlyoutItem()
     {
@@ -117,7 +117,7 @@ public class SourcesContractTests
 
         var document = System.Xml.Linq.XDocument.Parse(xaml);
         var ns = System.Xml.Linq.XNamespace.Get("http://schemas.microsoft.com/dotnet/2021/maui");
-        Assert.Equal(5, document.Root!.Elements(ns + "FlyoutItem").Count());
+        Assert.Equal(6, document.Root!.Elements(ns + "FlyoutItem").Count());
     }
 
     /// <summary>Prüft MauiProgram/Shell: der PosterImageService ist für die Icon-Auflösung des Menüs verdrahtet.</summary>
@@ -170,7 +170,7 @@ public class SourcesContractTests
         // Serienansicht (Staffel-Picker + Episodenliste), Kollektionsansicht
         // und der Favoriten-Schalter.
         Assert.Contains("SeasonPicker", xaml, StringComparison.Ordinal);
-        Assert.Contains("EpisodesCollection", xaml, StringComparison.Ordinal);
+        Assert.Contains("EpisodesList", xaml, StringComparison.Ordinal);
         Assert.Contains("CollectionCollection", xaml, StringComparison.Ordinal);
         Assert.Contains("FavoriteButton", xaml, StringComparison.Ordinal);
     }

@@ -187,6 +187,18 @@ public sealed record AppModel
     /// <summary>Zustand der Favoriten-Seite (Menüseite „Favoriten").</summary>
     public FavoritesPageState FavoritesPage { get; init; } = FavoritesPageState.Initial;
 
+    /// <summary>Zustand der Playlists-Übersichtsseite (Menüseite „Playlists").</summary>
+    public PlaylistsPageState PlaylistsPage { get; init; } = PlaylistsPageState.Initial;
+
+    /// <summary>Zustand der Playlist-Detailseite (Shell-Route „playlistdetails").</summary>
+    public PlaylistDetailsState PlaylistDetails { get; init; } = PlaylistDetailsState.Empty;
+
+    /// <summary>Zustand des Playlist-Formulars (Anlage/Bearbeitung als Overlay-Panel).</summary>
+    public PlaylistFormState PlaylistForm { get; init; } = PlaylistFormState.Closed;
+
+    /// <summary>Zustand des Playlist-Genre-Editors (Overlay-Panel der Detailseite).</summary>
+    public PlaylistGenreEditorState PlaylistGenreEditor { get; init; } = PlaylistGenreEditorState.Closed;
+
     /// <summary>Zustand der Downloads-Seite (Menüseite „Downloads").</summary>
     public DownloadsPageState Downloads { get; init; } = DownloadsPageState.Initial;
 
@@ -221,4 +233,11 @@ public sealed record AppModel
     /// Startseite als Banner angezeigt.
     /// </summary>
     public string? StorageNotice { get; init; }
+
+    /// <summary>
+    /// Inline-Fehlertext des Protokollversands auf der Einstellungsseite
+    /// (kein Protokoll vorhanden / Versand nicht möglich);
+    /// <c>null</c> = kein Fehler.
+    /// </summary>
+    public string? LogSendError { get; init; }
 }

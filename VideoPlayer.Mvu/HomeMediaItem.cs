@@ -49,6 +49,23 @@ public sealed record HomeMediaItem
     public long? EpisodeId { get; init; }
 
     /// <summary>
+    /// Id der Playlist, aus deren Wiedergabekontext der Weiterschauen-Eintrag
+    /// entstand; <c>null</c> ohne Playlist-Bezug (nur Weiterschauen-Liste).
+    /// </summary>
+    public long? PlaylistId { get; init; }
+
+    /// <summary>Name der zugehörigen Playlist; <c>null</c> ohne Playlist-Bezug.</summary>
+    public string? PlaylistName { get; init; }
+
+    /// <summary>
+    /// Id des Playlist-Eintrags, dem das Medium innerhalb der Playlist
+    /// entspricht; <c>null</c> ohne Playlist-Bezug oder wenn das Medium
+    /// nicht mehr Teil der Playlist ist — dann gilt der Serienkontext-
+    /// Pfad der Wiedergabe.
+    /// </summary>
+    public long? PlaylistEntryId { get; init; }
+
+    /// <summary>
     /// Platzhalter-Eintrag der Offline-„Weiterschauen"-Liste: das Medium
     /// ist nicht heruntergeladen und damit nicht abspielbar — die Karte
     /// wird abgedunkelt und mit einem Hinweis markiert.

@@ -74,6 +74,72 @@ public static class AppUpdate
     /// <summary>Fehlertext der Wiedergabeseite bei nicht verfügbarer/abspielbarer Quelle.</summary>
     public const string PlaybackUnavailableError = "Das Video kann nicht abgespielt werden.";
 
+    /// <summary>Fehlertext des Protokollversands, wenn noch keine Protokolldatei vorhanden ist.</summary>
+    public const string LogProtocolEmptyError = "Es ist noch kein Protokoll vorhanden.";
+
+    /// <summary>Fehlertext des Protokollversands, wenn weder ein Mailentwurf geöffnet noch die Datei geteilt werden kann.</summary>
+    public const string LogSendFailedError = "Der Protokollversand ist auf diesem Gerät nicht möglich — es konnte weder ein E-Mail-Entwurf geöffnet noch die Datei geteilt werden.";
+
+    /// <summary>Fehlertext der Playlists-Seite ohne Serververbindung (reines Online-Feature, kein Cache-Stand).</summary>
+    public const string PlaylistsOfflineError = "Playlists stehen nur bei bestehender Serververbindung zur Verfügung.";
+
+    /// <summary>Fehlertext der Playlists-Seite bei fehlgeschlagenem Serverabruf.</summary>
+    public const string PlaylistsLoadError = "Die Playlists konnten nicht geladen werden.";
+
+    /// <summary>Fehlertext der Playlist-Detailseite bei fehlgeschlagenem Eintragsabruf.</summary>
+    public const string PlaylistEntriesLoadError = "Die Einträge konnten nicht geladen werden.";
+
+    /// <summary>Validierungstext des Playlist-Formulars bei leerem Namen.</summary>
+    public const string PlaylistNameRequiredError = "Bitte einen Namen für die Playlist eingeben.";
+
+    /// <summary>Fehlertext des Playlist-Formulars bei fehlgeschlagenem Speichern.</summary>
+    public const string PlaylistSaveError = "Die Playlist konnte nicht gespeichert werden.";
+
+    /// <summary>Fehlertext der Detailseite bei fehlgeschlagenem Löschen der Playlist.</summary>
+    public const string PlaylistDeleteError = "Die Playlist konnte nicht gelöscht werden.";
+
+    /// <summary>Fehlertext der Detailseite bei fehlgeschlagenem Entfernen eines Eintrags.</summary>
+    public const string PlaylistEntryRemoveError = "Der Eintrag konnte nicht entfernt werden.";
+
+    /// <summary>Fehlertext der Detailseite bei fehlgeschlagenem Verschieben eines Eintrags.</summary>
+    public const string PlaylistEntryMoveError = "Der Eintrag konnte nicht verschoben werden.";
+
+    /// <summary>Fehlertext der Detailseite bei fehlgeschlagenem Sortiermodus-Wechsel.</summary>
+    public const string PlaylistSortModeError = "Der Sortiermodus konnte nicht geändert werden.";
+
+    /// <summary>Fehlertext des Genre-Editors bei fehlgeschlagenem Laden oder Speichern.</summary>
+    public const string PlaylistGenresError = "Die Genres konnten nicht gespeichert werden.";
+
+    /// <summary>Fehlertext des Genre-Editors bei fehlgeschlagenem Optionsabruf.</summary>
+    public const string PlaylistGenreOptionsLoadError = "Die Genres konnten nicht geladen werden.";
+
+    /// <summary>Fehlertext der Detailseite bei fehlgeschlagener Öffentlich-Umschaltung (z. B. fehlende Administrator-Rechte).</summary>
+    public const string PlaylistPublicError = "Das Öffentlich-Flag konnte nicht geändert werden.";
+
+    /// <summary>Fehlertext der Medien-Detailseite bei fehlgeschlagenem Laden der Playlist-Auswahl.</summary>
+    public const string PlaylistTargetsLoadError = "Die Playlists konnten nicht geladen werden.";
+
+    /// <summary>Fehlertext der Medien-Detailseite bei fehlgeschlagenem Hinzufügen zu einer Playlist.</summary>
+    public const string PlaylistEntryAddError = "Das Medium konnte nicht zur Playlist hinzugefügt werden.";
+
+    /// <summary>Erfolgstext der Eintrags-Entfernung (Hinweiszeile der Detailseite).</summary>
+    public const string PlaylistEntryRemovedNotice = "Der Eintrag wurde entfernt.";
+
+    /// <summary>Erfolgstext eines Eintrags-Verschiebens (Hinweiszeile der Detailseite).</summary>
+    public const string PlaylistEntryMovedNotice = "Der Eintrag wurde verschoben.";
+
+    /// <summary>Erfolgstext der Genre-Aktualisierung (Hinweiszeile der Detailseite).</summary>
+    public const string PlaylistGenresSavedNotice = "Die Genres wurden aktualisiert.";
+
+    /// <summary>Erfolgstext der Öffentlich-Umschaltung (Hinweiszeile der Detailseite).</summary>
+    public const string PlaylistPublicSavedNotice = "Die Sichtbarkeit wurde geändert.";
+
+    /// <summary>Erfolgstext des Sortiermodus-Wechsels (Hinweiszeile der Detailseite).</summary>
+    public const string PlaylistSortModeSavedNotice = "Der Sortiermodus wurde geändert.";
+
+    /// <summary>Hinweistext der Playlist-Auswahl ohne eigene Playlist (Klartext-Alternative zur Auswahl).</summary>
+    public const string PlaylistNoTargetsNotice = "Es gibt noch keine eigene Playlist — lege sie zuerst im Bereich „Playlists“ an.";
+
     /// <summary>
     /// Wendet eine Nachricht auf das übergebene Model an und liefert den
     /// Übergang: das neue Model plus die daraus resultierenden Effekte.
@@ -124,6 +190,10 @@ public static class AppUpdate
             HeroBackgroundLoadedMessage loaded => UpdateHeroBackgroundLoaded(model, loaded),
             StorageRecoveredMessage recovered => UpdateStorageRecovered(model, recovered),
             MediaItemSelectedMessage selected => UpdateMediaItemSelected(model, selected),
+            ContinueWatchingItemSelectedMessage selected => UpdateContinueWatchingItemSelected(model, selected),
+            ContinueWatchingHideRequestedMessage requested => UpdateContinueWatchingHideRequested(model, requested),
+            ContinueWatchingSkipRequestedMessage requested => UpdateContinueWatchingSkipRequested(model, requested),
+            UpcomingEpisodesLoadedMessage loaded => UpdateUpcomingEpisodesLoaded(model, loaded),
             SourcesLoadedMessage loaded => UpdateSourcesLoaded(model, loaded),
             SourcesReloadRequestedMessage => UpdateSourcesReloadRequested(model),
             SourceSelectedMessage selected => UpdateSourceSelected(model, selected),
@@ -145,6 +215,53 @@ public static class AppUpdate
             FavoritesPageLoadedMessage loaded => UpdateFavoritesPageLoaded(model, loaded),
             FavoriteRemoveRequestedMessage requested => UpdateFavoriteRemoveRequested(model, requested),
             FavoriteRemoveCompletedMessage completed => UpdateFavoriteRemoveCompleted(model, completed),
+            PlaylistsPageOpenedMessage => UpdatePlaylistsPageOpened(model),
+            PlaylistsLoadedMessage loaded => UpdatePlaylistsLoaded(model, loaded),
+            PlaylistSelectedMessage selected => UpdatePlaylistSelected(model, selected),
+            PlaylistDetailsOpenedMessage opened => UpdatePlaylistDetailsOpened(model, opened),
+            PlaylistDetailsLoadedMessage loaded => UpdatePlaylistDetailsLoaded(model, loaded),
+            PlaylistEntriesLoadedMessage loaded => UpdatePlaylistEntriesLoaded(model, loaded),
+            PlaylistEntriesNextPageRequestedMessage => UpdatePlaylistEntriesNextPageRequested(model),
+            PlaylistEntriesRetryRequestedMessage => UpdatePlaylistEntriesRetryRequested(model),
+            PlaylistEntrySelectedMessage selected => UpdatePlaylistEntrySelected(model, selected),
+            PlaylistPlaybackStartRequestedMessage requested => UpdatePlaylistPlaybackStartRequested(model, requested),
+            PlaylistPlaybackStartedMessage started => UpdatePlaylistPlaybackStarted(model, started),
+            PlaylistNextRequestedMessage => UpdatePlaylistNextRequested(model),
+            PlaylistPreviousRequestedMessage => UpdatePlaylistPreviousRequested(model),
+            PlaylistNavigationCompletedMessage completed => UpdatePlaylistNavigationCompleted(model, completed),
+            PlaylistCreateRequestedMessage => UpdatePlaylistCreateRequested(model),
+            PlaylistEditRequestedMessage => UpdatePlaylistEditRequested(model),
+            PlaylistFormNameChangedMessage changed => UpdatePlaylistFormNameChanged(model, changed),
+            PlaylistFormDescriptionChangedMessage changed => UpdatePlaylistFormDescriptionChanged(model, changed),
+            PlaylistFormSortModeSelectedMessage selected => UpdatePlaylistFormSortModeSelected(model, selected),
+            PlaylistFormCancelMessage => UpdatePlaylistFormCancel(model),
+            PlaylistFormSaveRequestedMessage => UpdatePlaylistFormSaveRequested(model),
+            PlaylistFormCompletedMessage completed => UpdatePlaylistFormCompleted(model, completed),
+            PlaylistDeleteConfirmedMessage confirmed => UpdatePlaylistDeleteConfirmed(model, confirmed),
+            PlaylistDeletedMessage deleted => UpdatePlaylistDeleted(model, deleted),
+            PlaylistEntryRemoveRequestedMessage requested => UpdatePlaylistEntryRemoveRequested(model, requested),
+            PlaylistEntryRemoveCompletedMessage completed => UpdatePlaylistEntryRemoveCompleted(model, completed),
+            PlaylistEntryRemoveConfirmedMessage confirmed => UpdatePlaylistEntryRemoveConfirmed(model, confirmed),
+            PlaylistEntryMoveToBeginningRequestedMessage requested => UpdatePlaylistEntryMoveToBeginningRequested(model, requested),
+            PlaylistEntryMoveToEndRequestedMessage requested => UpdatePlaylistEntryMoveToEndRequested(model, requested),
+            PlaylistEntryMoveBetweenRequestedMessage requested => UpdatePlaylistEntryMoveBetweenRequested(model, requested),
+            PlaylistEntryMoveCompletedMessage completed => UpdatePlaylistEntryMoveCompleted(model, completed),
+            PlaylistSortModeRequestedMessage requested => UpdatePlaylistSortModeRequested(model, requested),
+            PlaylistSortModeCompletedMessage completed => UpdatePlaylistSortModeCompleted(model, completed),
+            PlaylistSortModeConfirmedMessage confirmed => UpdatePlaylistSortModeConfirmed(model, confirmed),
+            PlaylistGenreEditorRequestedMessage => UpdatePlaylistGenreEditorRequested(model),
+            PlaylistGenreOptionsLoadedMessage loaded => UpdatePlaylistGenreOptionsLoaded(model, loaded),
+            PlaylistGenreToggledMessage toggled => UpdatePlaylistGenreToggled(model, toggled),
+            PlaylistGenresSaveRequestedMessage => UpdatePlaylistGenresSaveRequested(model),
+            PlaylistGenresResetRequestedMessage => UpdatePlaylistGenresResetRequested(model),
+            PlaylistGenresCompletedMessage completed => UpdatePlaylistGenresCompleted(model, completed),
+            PlaylistGenreEditorCancelMessage => UpdatePlaylistGenreEditorCancel(model),
+            PlaylistPublicToggledMessage toggled => UpdatePlaylistPublicToggled(model, toggled),
+            PlaylistPublicCompletedMessage completed => UpdatePlaylistPublicCompleted(model, completed),
+            PlaylistAddTargetsRequestedMessage => UpdatePlaylistAddTargetsRequested(model),
+            PlaylistTargetsLoadedMessage loaded => UpdatePlaylistTargetsLoaded(model, loaded),
+            PlaylistPickerDismissedMessage dismissed => UpdatePlaylistPickerDismissed(model, dismissed),
+            PlaylistEntryAddedMessage added => UpdatePlaylistEntryAdded(model, added),
             ProfilePageOpenedMessage => UpdateProfilePageOpened(model),
             ProfileInfoLoadedMessage loaded => UpdateProfileInfoLoaded(model, loaded),
             PlayRequestedMessage play => UpdatePlayRequested(model, play),
@@ -165,6 +282,8 @@ public static class AppUpdate
             DownloadCancelRequestedMessage requested => UpdateDownloadCancelRequested(model, requested),
             DownloadRetryRequestedMessage requested => UpdateDownloadRetryRequested(model, requested),
             DownloadDeleteRequestedMessage requested => UpdateDownloadDeleteRequested(model, requested),
+            SendLogProtocolRequestedMessage => UpdateSendLogProtocolRequested(model),
+            SendLogProtocolCompletedMessage completed => UpdateSendLogProtocolCompleted(model, completed),
             LogoutRequestedMessage => UpdateLogoutRequested(model),
             _ => AppTransition.Unchanged(model)
         };
@@ -220,6 +339,28 @@ public static class AppUpdate
         // Hero-Bild nachgeladen — nur bei bestehender Verbindung.
         var updated = WithHeroLoad(model with { Settings = normalized }, effects);
         return new AppTransition(updated, effects);
+    }
+
+    private static AppTransition UpdateSendLogProtocolRequested(AppModel model)
+    {
+        // Der Versand ist nur bei aktivierter Protokollierung zulässig —
+        // der Button ist dann auch nur sichtbar; der Guard fängt
+        // veraltete/externe Dispatches ab.
+        if (!model.Settings.LoggingEnabled)
+        {
+            return AppTransition.Unchanged(model);
+        }
+
+        return new AppTransition(
+            model with { LogSendError = null },
+            [new SendLogProtocolEffect()]);
+    }
+
+    private static AppTransition UpdateSendLogProtocolCompleted(AppModel model, SendLogProtocolCompletedMessage message)
+    {
+        return new AppTransition(
+            model with { LogSendError = message.Error },
+            []);
     }
 
     private static AppTransition UpdateServersLoaded(AppModel model, ServersLoadedMessage message)
@@ -1202,6 +1343,143 @@ public static class AppUpdate
                 item.ShowId, item.SeasonId, item.EpisodeId)]);
     }
 
+    /// <summary>
+    /// Auswahl eines Weiterschauen-Eintrags: abspielbare Medientypen
+    /// (<c>movie</c>/<c>tvshowepisode</c>) starten direkt die Wiedergabe
+    /// über den gemeinsamen Startpfad — ohne Detailansicht; bei einer
+    /// Episode mit bekanntem Serienkontext wird die Fortsetzungsliste
+    /// zusätzlich per Datenabruf nachgeladen. Alle übrigen Einträge
+    /// öffnen weiterhin die Detailseite.
+    /// </summary>
+    /// <param name="model">Aktuelles App-Model.</param>
+    /// <param name="message">Die Auswahl-Nachricht.</param>
+    /// <returns>Übergang zum Wiedergabestart bzw. zur Detailseite.</returns>
+    private static AppTransition UpdateContinueWatchingItemSelected(AppModel model, ContinueWatchingItemSelectedMessage message)
+    {
+        var item = message.Item;
+        if (!IsSelectableEntry(item))
+        {
+            // Ohne identifizierbares Medium keine Aktion; Platzhalter
+            // fehlender Offline-Episoden sind nicht auswählbar.
+            return AppTransition.Unchanged(model);
+        }
+
+        var mediaType = MediaTypeNames.Normalize(item.MediaType);
+        if (mediaType is not ("movie" or "tvshowepisode"))
+        {
+            // Nicht direkt abspielbare Typen (Serie, Staffel, Kollektion)
+            // behalten die Detail-Navigation.
+            return new AppTransition(
+                model,
+                [new NavigateToMediaDetailsEffect(
+                    item.MediaType, item.Id, item.Title,
+                    item.ShowId, item.SeasonId, item.EpisodeId)]);
+        }
+
+        if (item.PlaylistId is > 0 && item.PlaylistEntryId is > 0)
+        {
+            // Playlist-gebundener Weiterschauen-Eintrag: Wiedergabe und
+            // Folgevideo laufen über den serverseitigen Playlist-Kontext
+            // (Reihenfolge der Playlist) statt über den Serienkontext.
+            return new AppTransition(
+                model,
+                [new StartPlaylistPlaybackEffect(item.PlaylistId.Value, item.PlaylistEntryId.Value)]);
+        }
+
+        var transition = StartPlayback(model, mediaType, item.Id, item.Title);
+        if (mediaType == "tvshowepisode" && item.ShowId is > 0)
+        {
+            // Der Serienkontext für die Folgevideo-Funktion fehlt ohne
+            // Detailseite — er wird unabhängig per Datenabruf geladen.
+            return transition with
+            {
+                Effects = [.. transition.Effects, new LoadUpcomingEpisodesEffect(item.Id, item.ShowId.Value)]
+            };
+        }
+
+        return transition;
+    }
+
+    /// <summary>
+    /// Kontextmenü „Ausblenden" auf einem Weiterschauen-Eintrag: der
+    /// Eintrag wird über den Mutations-Effekt ausgeblendet (online
+    /// Server-Endpunkt + Cache-Erneuerung, offline lokales Entfernen) —
+    /// dieselben Guards wie die Eintragsauswahl.
+    /// </summary>
+    /// <param name="model">Aktuelles App-Model.</param>
+    /// <param name="message">Die Ausblenden-Anforderung.</param>
+    /// <returns>Übergang mit dem Hide-Effekt bzw. unverändertem Model.</returns>
+    private static AppTransition UpdateContinueWatchingHideRequested(AppModel model, ContinueWatchingHideRequestedMessage message)
+    {
+        var item = message.Item;
+        if (!IsSelectableEntry(item))
+        {
+            // Ohne identifizierbares Medium keine Aktion; Platzhalter
+            // fehlender Offline-Episoden sind nicht ausblendbar.
+            return AppTransition.Unchanged(model);
+        }
+
+        return new AppTransition(
+            model,
+            [new HideContinueWatchingEntryEffect(item.MediaType, item.Id)]);
+    }
+
+    /// <summary>
+    /// Kontextmenü „Überspringen" auf einem Weiterschauen-Eintrag: der
+    /// Eintrag wird über den Mutations-Effekt übersprungen (online
+    /// Server-Endpunkt + Cache-Erneuerung, offline lokales Entfernen) —
+    /// dieselben Guards wie die Eintragsauswahl.
+    /// </summary>
+    /// <param name="model">Aktuelles App-Model.</param>
+    /// <param name="message">Die Überspringen-Anforderung.</param>
+    /// <returns>Übergang mit dem Skip-Effekt bzw. unverändertem Model.</returns>
+    private static AppTransition UpdateContinueWatchingSkipRequested(AppModel model, ContinueWatchingSkipRequestedMessage message)
+    {
+        var item = message.Item;
+        if (!IsSelectableEntry(item))
+        {
+            return AppTransition.Unchanged(model);
+        }
+
+        return new AppTransition(
+            model,
+            [new SkipContinueWatchingEntryEffect(item.MediaType, item.Id)]);
+    }
+
+    /// <summary>
+    /// Verwertbarer Weiterschauen-Eintrag für Auswahl und Kontextmenü-
+    /// Mutationen: identifizierbares Medium (Id + Typ), kein Platzhalter
+    /// fehlender Offline-Episoden.
+    /// </summary>
+    /// <param name="item">Der zu prüfende Eintrag.</param>
+    /// <returns><c>true</c>, wenn der Eintrag eine Aktion zulässt.</returns>
+    private static bool IsSelectableEntry(HomeMediaItem item) =>
+        item.Id > 0 && !string.IsNullOrWhiteSpace(item.MediaType) && item.IsSelectable;
+
+    /// <summary>
+    /// Übernimmt die nachgeladenen Folge-Episoden in den Player-Zustand —
+    /// nur wenn der Player noch dieselbe Episode spielt (Antworten
+    /// abgelösender Identitäten werden wie bei
+    /// <see cref="UpdatePlaybackSourceResolved"/> verworfen).
+    /// </summary>
+    /// <param name="model">Aktuelles App-Model.</param>
+    /// <param name="message">Die Ergebnisnachricht der Serienkontext-Ladung.</param>
+    /// <returns>Übergang mit befüllter Fortsetzungsliste bzw. unverändertem Model.</returns>
+    private static AppTransition UpdateUpcomingEpisodesLoaded(AppModel model, UpcomingEpisodesLoadedMessage message)
+    {
+        var player = model.Player;
+        if (!player.IsActive
+            || player.MediaId != message.MediaId
+            || player.MediaType != "tvshowepisode")
+        {
+            return AppTransition.Unchanged(model);
+        }
+
+        return new AppTransition(
+            model with { Player = player with { UpcomingEpisodes = message.Episodes } },
+            []);
+    }
+
     private static AppTransition UpdateSourcesLoaded(AppModel model, SourcesLoadedMessage message)
     {
         // Verspätete Antworten eines abgelösten Ladevorgangs (Offline-
@@ -1805,6 +2083,1378 @@ public static class AppUpdate
             []);
     }
 
+    private static AppTransition UpdatePlaylistsPageOpened(AppModel model)
+    {
+        var state = model.PlaylistsPage;
+        if (state.IsLoading)
+        {
+            return AppTransition.Unchanged(model);
+        }
+
+        // Reines Online-Feature: ohne Serververbindung gibt es keinen
+        // anzeigbaren Stand — die Seite bekommt eine verständliche
+        // Fehleranzeige (kein Cache, keine veraltete Liste).
+        if (model.ConnectionState != ConnectionState.Connected)
+        {
+            return new AppTransition(
+                model with
+                {
+                    PlaylistsPage = state with
+                    {
+                        Attempted = true,
+                        Error = PlaylistsOfflineError
+                    }
+                },
+                []);
+        }
+
+        return new AppTransition(
+            model with
+            {
+                PlaylistsPage = state with
+                {
+                    IsLoading = true,
+                    Attempted = true,
+                    Error = null
+                }
+            },
+            [new LoadPlaylistsEffect()]);
+    }
+
+    private static AppTransition UpdatePlaylistsLoaded(AppModel model, PlaylistsLoadedMessage message)
+    {
+        return new AppTransition(
+            model with
+            {
+                PlaylistsPage = model.PlaylistsPage with
+                {
+                    Items = message.Error is null
+                        ? PlaylistsPageState.BuildItems(message.Own, message.Public)
+                        : model.PlaylistsPage.Items,
+                    IsLoading = false,
+                    Error = message.Error
+                }
+            },
+            []);
+    }
+
+    private static PlaylistDetailsState NewPlaylistDetails(PlaylistListItem item) => new()
+    {
+        PlaylistId = item.PlaylistId,
+        Name = item.Name,
+        Description = item.Description,
+        SortMode = item.SortMode,
+        CoverPictureId = item.CoverPictureId,
+        IsOwner = item.IsOwner,
+        IsPublic = item.IsPublic,
+        GenresManuallyOverridden = item.GenresManuallyOverridden,
+        AllGenreIds = item.AllGenreIds,
+        GenreText = item.GenreText,
+        IsLoading = true,
+        HasMore = true
+    };
+
+    private static AppTransition UpdatePlaylistSelected(AppModel model, PlaylistSelectedMessage message)
+    {
+        var item = message.Item;
+        if (item.PlaylistId <= 0)
+        {
+            return AppTransition.Unchanged(model);
+        }
+
+        // Die Auswahl ist nur online wirksam — ohne Verbindung würde die
+        // Detailseite sofort im Fehlerzustand landen.
+        if (model.ConnectionState != ConnectionState.Connected)
+        {
+            return AppTransition.Unchanged(model);
+        }
+
+        // Der Kopf-Nachschlag läuft mit: er frischt Besitzer-/Genre-/
+        // Öffentlich-Felder auf und liefert den IsAdmin-Claim — Grundlage
+        // der Verwaltungs-Schalter.
+        return new AppTransition(
+            model with { PlaylistDetails = NewPlaylistDetails(item) },
+            [
+                new NavigateToPlaylistDetailsEffect(item.PlaylistId, item.Name),
+                new LoadPlaylistDetailsEffect(item.PlaylistId),
+                new LoadPlaylistEntriesEffect(item.PlaylistId, 1, Append: false)
+            ]);
+    }
+
+    private static AppTransition UpdatePlaylistDetailsOpened(AppModel model, PlaylistDetailsOpenedMessage message)
+    {
+        if (message.PlaylistId <= 0)
+        {
+            return AppTransition.Unchanged(model);
+        }
+
+        // Rückkehr auf die bereits geöffnete Playlist (z. B. zurück von
+        // der Medien-Detailseite): Zustand und Listenposition bleiben
+        // erhalten.
+        if (model.PlaylistDetails.PlaylistId == message.PlaylistId)
+        {
+            return AppTransition.Unchanged(model);
+        }
+
+        // Wiederherstellungspfad: Seite ohne passenden Zustand geöffnet →
+        // Kopfdaten und erste Eintragsseite laden (ohne erneute
+        // Navigation). Der Kopf-Nachschlag ist nicht fatal — schlägt er
+        // fehl, bleibt der Pfad-Name als Titel stehen.
+        return new AppTransition(
+            model with
+            {
+                PlaylistDetails = new PlaylistDetailsState
+                {
+                    PlaylistId = message.PlaylistId,
+                    Name = message.Name,
+                    IsLoading = true,
+                    HasMore = true
+                }
+            },
+            [
+                new LoadPlaylistDetailsEffect(message.PlaylistId),
+                new LoadPlaylistEntriesEffect(message.PlaylistId, 1, Append: false)
+            ]);
+    }
+
+    private static AppTransition UpdatePlaylistDetailsLoaded(AppModel model, PlaylistDetailsLoadedMessage message)
+    {
+        var details = model.PlaylistDetails;
+        if (!details.IsActive || details.PlaylistId != message.PlaylistId)
+        {
+            return AppTransition.Unchanged(model);
+        }
+
+        // Der Admin-Claim gehört zur Nachricht auch ohne Kopfdaten —
+        // er steuert die Sichtbarkeit des Öffentlich-Schalters.
+        if (message.Info is null)
+        {
+            return new AppTransition(
+                model with { PlaylistDetails = details with { IsAdmin = message.IsAdmin } },
+                []);
+        }
+
+        return new AppTransition(
+            model with
+            {
+                PlaylistDetails = details with
+                {
+                    Name = message.Info.Name,
+                    Description = message.Info.Description,
+                    SortMode = message.Info.SortMode,
+                    CoverPictureId = message.Info.CoverPictureId,
+                    IsOwner = message.Info.IsOwner,
+                    IsPublic = message.Info.IsPublic,
+                    IsAdmin = message.IsAdmin,
+                    GenresManuallyOverridden = message.Info.GenresManuallyOverridden,
+                    AllGenreIds = message.Info.AllGenreIds,
+                    GenreText = message.Info.GenreText
+                }
+            },
+            []);
+    }
+
+    private static AppTransition UpdatePlaylistEntriesLoaded(AppModel model, PlaylistEntriesLoadedMessage message)
+    {
+        var details = model.PlaylistDetails;
+        if (!details.IsActive || details.PlaylistId != message.PlaylistId)
+        {
+            // Antwort einer inzwischen verlassenen Playlist verwerfen.
+            return AppTransition.Unchanged(model);
+        }
+
+        if (message.Error is not null)
+        {
+            // Fehler beim Anhängen lassen die bestehende Liste stehen
+            // (HasMore bleibt — der nächste Scroll versucht es erneut);
+            // Fehler des Ersetz-Laufs werden als Fehlerzustand gezeigt.
+            var failed = details with
+            {
+                IsLoading = false,
+                IsLoadingMore = false,
+                Attempted = true
+            };
+            return new AppTransition(
+                model with
+                {
+                    PlaylistDetails = message.Append ? failed : failed with { Error = message.Error }
+                },
+                []);
+        }
+
+        if (message.Append && message.Page != details.NextPage)
+        {
+            // Veraltete Anhänge-Antwort — nicht an die Liste hängen.
+            return AppTransition.Unchanged(model);
+        }
+
+        var entries = message.Append
+            ? details.Entries.Concat(message.Items).ToList()
+            : (IReadOnlyList<PlaylistEntryItem>)message.Items;
+
+        return new AppTransition(
+            model with
+            {
+                PlaylistDetails = details with
+                {
+                    Entries = entries,
+                    NextPage = message.Page + 1,
+                    HasMore = message.HasMore,
+                    TotalCount = message.TotalCount,
+                    IsLoading = false,
+                    IsLoadingMore = false,
+                    Attempted = true,
+                    Error = null
+                }
+            },
+            []);
+    }
+
+    private static AppTransition UpdatePlaylistEntriesNextPageRequested(AppModel model)
+    {
+        var details = model.PlaylistDetails;
+        if (!details.IsActive || !details.HasMore || details.IsLoading || details.IsLoadingMore)
+        {
+            return AppTransition.Unchanged(model);
+        }
+
+        return new AppTransition(
+            model with { PlaylistDetails = details with { IsLoadingMore = true } },
+            [new LoadPlaylistEntriesEffect(details.PlaylistId, details.NextPage, Append: true)]);
+    }
+
+    private static AppTransition UpdatePlaylistEntriesRetryRequested(AppModel model)
+    {
+        var details = model.PlaylistDetails;
+        if (!details.IsActive || details.IsLoading || details.IsLoadingMore)
+        {
+            return AppTransition.Unchanged(model);
+        }
+
+        // Fehlerzustand einer leeren Liste → kompletter Neu-Lauf;
+        // sonst die ausstehende Folgeseite erneut versuchen.
+        if (details.HasItems)
+        {
+            return UpdatePlaylistEntriesNextPageRequested(model);
+        }
+
+        return new AppTransition(
+            model with
+            {
+                PlaylistDetails = details with
+                {
+                    NextPage = 1,
+                    HasMore = true,
+                    IsLoading = true,
+                    Error = null
+                }
+            },
+            [new LoadPlaylistEntriesEffect(details.PlaylistId, 1, Append: false)]);
+    }
+
+    private static AppTransition UpdatePlaylistEntrySelected(AppModel model, PlaylistEntrySelectedMessage message)
+    {
+        var item = message.Item;
+        if (item.MediaId <= 0 || string.IsNullOrWhiteSpace(item.MediaType))
+        {
+            return AppTransition.Unchanged(model);
+        }
+
+        // Abspielbare und zugängliche Einträge starten die Wiedergabe ab
+        // dem gewählten Eintrag über den serverseitigen Playlist-Kontext;
+        // alle übrigen Einträge (Serie, Staffel, Kollektion, nicht
+        // zugängliche Medien) öffnen weiterhin die Medien-Detailseite.
+        var mediaType = MediaTypeNames.Normalize(item.MediaType);
+        if (item.IsAccessible
+            && mediaType is "movie" or "tvshowepisode"
+            && model.PlaylistDetails.PlaylistId > 0)
+        {
+            return new AppTransition(
+                model,
+                [new StartPlaylistPlaybackEffect(model.PlaylistDetails.PlaylistId, item.EntryId)]);
+        }
+
+        // Der Elternkontext wird als Show-/Season-Hint an die
+        // Medien-Detailseite weitergereicht (Episode → Staffel bzw.
+        // Serie, Staffel → Serie).
+        var showId = item.ParentMediaType == "tvshow" ? item.ParentMediaId : null;
+        var seasonId = item.ParentMediaType == "tvshowseason" ? item.ParentMediaId : null;
+        return new AppTransition(
+            model,
+            [new NavigateToMediaDetailsEffect(
+                item.MediaType, item.MediaId, item.Title,
+                ShowId: showId, SeasonId: seasonId)]);
+    }
+
+    /// <summary>
+    /// Wiedergabe-Anforderung einer Playlist (Kopf-Schaltfläche der
+    /// Detailseite): der serverseitige Wiedergabestart löst den
+    /// Starteintrag auf — das Ergebnis kommt als
+    /// <see cref="PlaylistPlaybackStartedMessage"/> zurück.
+    /// </summary>
+    /// <param name="model">Aktuelles App-Model.</param>
+    /// <param name="message">Die Start-Anforderung.</param>
+    /// <returns>Übergang mit dem Start-Effekt bzw. unverändertem Model.</returns>
+    private static AppTransition UpdatePlaylistPlaybackStartRequested(AppModel model, PlaylistPlaybackStartRequestedMessage message)
+    {
+        return message.PlaylistId > 0
+            ? new AppTransition(model, [new StartPlaylistPlaybackEffect(message.PlaylistId, message.EntryId)])
+            : AppTransition.Unchanged(model);
+    }
+
+    /// <summary>
+    /// Ergebnis des Playlist-Wiedergabestarts: bei Erfolg wird der
+    /// Player-State mit dem aufgelösten Eintrag und dem Playlist-Kontext
+    /// belegt (die Folgevideo-Ermittlung läuft dann über die
+    /// Play-Endpunkte, nicht über die Serien-Fortsetzungsliste), zur
+    /// Wiedergabeseite navigiert und die Quelle mit der serverseitigen
+    /// Fortsetzungsposition aufgelöst; bei Fehlschlag zeigt die
+    /// Wiedergabeseite den Fehler.
+    /// </summary>
+    /// <param name="model">Aktuelles App-Model.</param>
+    /// <param name="message">Das Ergebnis des Wiedergabestarts.</param>
+    /// <returns>Übergang zum Player mit belegtem Zustand bzw. Fehlerzustand.</returns>
+    private static AppTransition UpdatePlaylistPlaybackStarted(AppModel model, PlaylistPlaybackStartedMessage message)
+    {
+        if (message.Start is { } start)
+        {
+            var mediaType = MediaTypeNames.Normalize(start.MediaType);
+            return new AppTransition(
+                model with
+                {
+                    Player = new PlayerState
+                    {
+                        MediaType = mediaType,
+                        MediaId = start.MediaId,
+                        Title = start.Title,
+                        PlaylistId = start.PlaylistId,
+                        PlaylistName = start.PlaylistName,
+                        PlaylistEntryId = start.CurrentEntryId,
+                        PlaylistPosition = start.CurrentPosition,
+                        PlaylistTotalCount = start.TotalCount,
+                        IsResolving = true,
+                        Attempted = true
+                    }
+                },
+                [new NavigateToPlayerEffect(),
+                 new ResolvePlaybackSourceEffect(mediaType, start.MediaId, start.StartPositionSeconds)]);
+        }
+
+        // Start fehlgeschlagen (z. B. kein abspielbarer Eintrag): die
+        // Wiedergabeseite zeigt den Fehler im Fehlerbanner.
+        return new AppTransition(
+            model with
+            {
+                Player = new PlayerState { Error = message.Error ?? PlaybackUnavailableError }
+            },
+            [new NavigateToPlayerEffect()]);
+    }
+
+    /// <summary>
+    /// Manuelle Vorwärts-Navigation der Playlist-Wiedergabe („Weiter"):
+    /// der Server löst den nächsten abspielbaren Eintrag auf — das
+    /// Ergebnis kommt als <see cref="PlaylistNavigationCompletedMessage"/>
+    /// zurück. Ein ausstehender Lauf (<see cref="PlayerState.IsResolving"/>)
+    /// unterbindet weitere Versendungen.
+    /// </summary>
+    /// <param name="model">Aktuelles App-Model.</param>
+    /// <returns>Übergang mit dem Navigations-Effekt bzw. unverändertem Model.</returns>
+    private static AppTransition UpdatePlaylistNextRequested(AppModel model)
+    {
+        var player = model.Player;
+        if (!player.IsPlaylistPlayback || player.IsResolving || player.PlaylistNextExhausted)
+        {
+            return AppTransition.Unchanged(model);
+        }
+
+        return new AppTransition(
+            model with { Player = player with { IsResolving = true, Error = null } },
+            [new LoadNextPlaylistEntryEffect(player.PlaylistId!.Value, player.PlaylistEntryId)]);
+    }
+
+    /// <summary>
+    /// Manuelle Rückwärts-Navigation der Playlist-Wiedergabe („Zurück"):
+    /// der Server löst den vorherigen abspielbaren Eintrag auf — das
+    /// Ergebnis kommt als <see cref="PlaylistNavigationCompletedMessage"/>
+    /// zurück.
+    /// </summary>
+    /// <param name="model">Aktuelles App-Model.</param>
+    /// <returns>Übergang mit dem Navigations-Effekt bzw. unverändertem Model.</returns>
+    private static AppTransition UpdatePlaylistPreviousRequested(AppModel model)
+    {
+        var player = model.Player;
+        if (!player.IsPlaylistPlayback || player.IsResolving)
+        {
+            return AppTransition.Unchanged(model);
+        }
+
+        return new AppTransition(
+            model with { Player = player with { IsResolving = true, Error = null } },
+            [new LoadPreviousPlaylistEntryEffect(player.PlaylistId!.Value, player.PlaylistEntryId)]);
+    }
+
+    /// <summary>
+    /// Übernimmt das Ergebnis einer Playlist-Navigation: der Player
+    /// wechselt auf den aufgelösten Eintrag (Medium, Titel, Position)
+    /// und löst dessen Quelle mit der serverseitigen Fortsetzungsposition
+    /// auf. Ein leeres Ergebnis meldet „kein Eintrag in dieser Richtung"
+    /// und erschöpft die Vorwärts-Versuche
+    /// (<see cref="PlayerState.PlaylistNextExhausted"/>); Antworten
+    /// abgelösender Identitäten werden verworfen.
+    /// </summary>
+    /// <param name="model">Aktuelles App-Model.</param>
+    /// <param name="message">Das Ergebnis der Navigation.</param>
+    /// <returns>Übergang zum Folgeeintrag, zum Erschöpfungs-/Fehlerstand bzw. unverändertem Model.</returns>
+    private static AppTransition UpdatePlaylistNavigationCompleted(AppModel model, PlaylistNavigationCompletedMessage message)
+    {
+        var player = model.Player;
+        if (!player.IsPlaylistPlayback
+            || player.PlaylistId != message.PlaylistId
+            || player.PlaylistEntryId != message.CurrentEntryId)
+        {
+            // Antwort einer inzwischen abgelösten Navigation verwerfen.
+            return AppTransition.Unchanged(model);
+        }
+
+        if (message.Error is { } error)
+        {
+            return new AppTransition(
+                model with { Player = player with { IsResolving = false, Error = error } },
+                []);
+        }
+
+        if (message.Result is not { } next)
+        {
+            // Kein Eintrag in dieser Richtung (204): bei Vorwärts-
+            // navigation weitere Versuche bis zum nächsten Medienwechsel
+            // unterdrücken; die Wiedergabe läuft unverändert weiter.
+            return new AppTransition(
+                model with
+                {
+                    Player = player with
+                    {
+                        IsResolving = false,
+                        PlaylistNextExhausted = message.Forward || player.PlaylistNextExhausted
+                    }
+                },
+                []);
+        }
+
+        var mediaType = MediaTypeNames.Normalize(next.MediaType);
+        return new AppTransition(
+            model with
+            {
+                Player = player with
+                {
+                    MediaType = mediaType,
+                    MediaId = next.MediaId,
+                    Title = next.Title,
+                    PlaylistEntryId = next.EntryId,
+                    PlaylistPosition = next.Position,
+                    PlaylistNextExhausted = false,
+                    Source = null,
+                    IsResolving = true,
+                    IsPlaying = false,
+                    IsBuffering = false,
+                    IsWatched = false,
+                    IsPictureInPicture = false,
+                    Position = TimeSpan.Zero,
+                    Duration = TimeSpan.Zero,
+                    LastReportedPositionSeconds = -1
+                }
+            },
+            [new ResolvePlaybackSourceEffect(mediaType, next.MediaId, next.StartPositionSeconds)]);
+    }
+
+    /// <summary>
+    /// Wechsel zum nächsten Eintrag der Playlist (Auto-Fortsetzung und
+    /// Fehler-Rückfall): <c>POST api/playlists/{id}/play/advance</c> wird
+    /// angefordert; der Ladezustand zeigt die Auflösung an und ein
+    /// etwaiger Fehlertext bleibt als Hinweis sichtbar — Gegenstück zu
+    /// <see cref="AdvanceToNextEpisode"/> im Playlist-Kontext.
+    /// </summary>
+    /// <param name="model">Aktuelles App-Model.</param>
+    /// <param name="player">Bisheriger Player-Zustand.</param>
+    /// <param name="error">Fehlertext; <c>null</c> beim regulären Weiterschalten.</param>
+    /// <returns>Übergang mit dem Advance-Effekt.</returns>
+    private static AppTransition AdvancePlaylistEntry(AppModel model, PlayerState player, string? error)
+    {
+        return new AppTransition(
+            model with
+            {
+                Player = player with
+                {
+                    Source = null,
+                    IsResolving = true,
+                    IsPlaying = false,
+                    IsBuffering = false,
+                    Error = error
+                }
+            },
+            [new AdvancePlaylistEntryEffect(player.PlaylistId!.Value, player.PlaylistEntryId)]);
+    }
+
+    // --- Playlist-Verwaltung (Schritt 6) ---
+
+    private static AppTransition UpdatePlaylistCreateRequested(AppModel model)
+    {
+        if (model.ConnectionState != ConnectionState.Connected || model.PlaylistForm.IsSaving)
+        {
+            return AppTransition.Unchanged(model);
+        }
+
+        return new AppTransition(
+            model with
+            {
+                PlaylistForm = new PlaylistFormState
+                {
+                    IsOpen = true,
+                    EditingPlaylistId = null,
+                    Name = string.Empty,
+                    Description = null,
+                    SortMode = ApiClient.Models.PlaylistSortModeValues.Manual
+                }
+            },
+            []);
+    }
+
+    private static AppTransition UpdatePlaylistEditRequested(AppModel model)
+    {
+        var details = model.PlaylistDetails;
+        if (!details.CanManage || model.PlaylistForm.IsSaving)
+        {
+            return AppTransition.Unchanged(model);
+        }
+
+        return new AppTransition(
+            model with
+            {
+                PlaylistForm = new PlaylistFormState
+                {
+                    IsOpen = true,
+                    EditingPlaylistId = details.PlaylistId,
+                    Name = details.Name,
+                    Description = details.Description,
+                    SortMode = details.SortMode
+                }
+            },
+            []);
+    }
+
+    private static AppTransition UpdatePlaylistFormNameChanged(AppModel model, PlaylistFormNameChangedMessage message)
+    {
+        if (!model.PlaylistForm.IsOpen)
+        {
+            return AppTransition.Unchanged(model);
+        }
+
+        return new AppTransition(
+            model with { PlaylistForm = model.PlaylistForm with { Name = message.Name, Error = null } },
+            []);
+    }
+
+    private static AppTransition UpdatePlaylistFormDescriptionChanged(AppModel model, PlaylistFormDescriptionChangedMessage message)
+    {
+        if (!model.PlaylistForm.IsOpen)
+        {
+            return AppTransition.Unchanged(model);
+        }
+
+        return new AppTransition(
+            model with { PlaylistForm = model.PlaylistForm with { Description = message.Description } },
+            []);
+    }
+
+    private static AppTransition UpdatePlaylistFormSortModeSelected(AppModel model, PlaylistFormSortModeSelectedMessage message)
+    {
+        var form = model.PlaylistForm;
+        // Der Sortiermodus ist wie in der Server-UI nur bei Neuanlage wählbar.
+        if (!form.IsOpen || form.IsEditing || form.IsSaving)
+        {
+            return AppTransition.Unchanged(model);
+        }
+
+        return new AppTransition(
+            model with { PlaylistForm = form with { SortMode = message.SortMode } },
+            []);
+    }
+
+    private static AppTransition UpdatePlaylistFormCancel(AppModel model)
+    {
+        if (!model.PlaylistForm.IsOpen || model.PlaylistForm.IsSaving)
+        {
+            return AppTransition.Unchanged(model);
+        }
+
+        return new AppTransition(
+            model with { PlaylistForm = PlaylistFormState.Closed },
+            []);
+    }
+
+    private static AppTransition UpdatePlaylistFormSaveRequested(AppModel model)
+    {
+        var form = model.PlaylistForm;
+        if (!form.IsOpen || form.IsSaving)
+        {
+            return AppTransition.Unchanged(model);
+        }
+
+        // Name ist serverseitig Pflicht — leere Eingaben bleiben mit
+        // Inline-Text im Formular (keine Serveranfrage).
+        if (string.IsNullOrWhiteSpace(form.Name))
+        {
+            return new AppTransition(
+                model with { PlaylistForm = form with { Error = PlaylistNameRequiredError } },
+                []);
+        }
+
+        if (model.ConnectionState != ConnectionState.Connected)
+        {
+            return new AppTransition(
+                model with { PlaylistForm = form with { Error = PlaylistsOfflineError } },
+                []);
+        }
+
+        return new AppTransition(
+            model with { PlaylistForm = form with { IsSaving = true, Error = null } },
+            [new SavePlaylistEffect(
+                form.EditingPlaylistId,
+                form.Name.Trim(),
+                string.IsNullOrWhiteSpace(form.Description) ? null : form.Description.Trim(),
+                form.SortMode)]);
+    }
+
+    private static AppTransition UpdatePlaylistFormCompleted(AppModel model, PlaylistFormCompletedMessage message)
+    {
+        if (message.Saved is not { } saved)
+        {
+            // Fehlschlag: das Formular bleibt mit dem Fehlertext geöffnet.
+            return new AppTransition(
+                model with
+                {
+                    PlaylistForm = model.PlaylistForm with
+                    {
+                        IsSaving = false,
+                        Error = message.Error ?? PlaylistSaveError
+                    }
+                },
+                []);
+        }
+
+        var effects = new List<AppEffect>();
+        var details = model.PlaylistDetails;
+        // Nach dem Speichern den aktuellen Kontext auffrischen: Übersicht
+        // neu laden (Anlage erscheint in der Liste) und — wenn die
+        // bearbeitete Playlist offen ist — ihre Kopfdaten übernehmen.
+        effects.Add(new LoadPlaylistsEffect());
+        if (details.IsActive && details.PlaylistId == saved.PlaylistId)
+        {
+            details = details with
+            {
+                Name = saved.Name,
+                Description = saved.Description,
+                SortMode = saved.SortMode,
+                GenresManuallyOverridden = saved.GenresManuallyOverridden,
+                AllGenreIds = saved.AllGenreIds,
+                GenreText = saved.GenreText,
+                ManageNotice = null,
+                ManageNoticeIsError = false
+            };
+        }
+
+        return new AppTransition(
+            model with
+            {
+                PlaylistForm = PlaylistFormState.Closed,
+                PlaylistDetails = details
+            },
+            effects);
+    }
+
+    private static AppTransition UpdatePlaylistDeleteConfirmed(AppModel model, PlaylistDeleteConfirmedMessage message)
+    {
+        var details = model.PlaylistDetails;
+        if (!details.CanManage
+            || details.PlaylistId != message.PlaylistId
+            || details.IsManaging)
+        {
+            return AppTransition.Unchanged(model);
+        }
+
+        return new AppTransition(
+            model with { PlaylistDetails = details with { IsManaging = true } },
+            [new DeletePlaylistEffect(message.PlaylistId)]);
+    }
+
+    private static AppTransition UpdatePlaylistDeleted(AppModel model, PlaylistDeletedMessage message)
+    {
+        var details = model.PlaylistDetails;
+        if (details.PlaylistId != message.PlaylistId)
+        {
+            return AppTransition.Unchanged(model);
+        }
+
+        if (message.Error is { } error)
+        {
+            return new AppTransition(
+                model with
+                {
+                    PlaylistDetails = details with
+                    {
+                        IsManaging = false,
+                        ManageNotice = error,
+                        ManageNoticeIsError = true
+                    }
+                },
+                []);
+        }
+
+        // Die Playlist existiert nicht mehr: Detail-Kontext leeren, zur
+        // Übersicht zurückkehren und ihre Liste auffrischen.
+        return new AppTransition(
+            model with { PlaylistDetails = PlaylistDetailsState.Empty },
+            [new NavigateBackEffect(), new LoadPlaylistsEffect()]);
+    }
+
+    /// <summary>Gemeinsame Wache der Eintrags-Verwaltung (Entfernen/Verschieben): eigene, aktive Playlist ohne laufende Operation.</summary>
+    /// <param name="model">Aktuelles App-Model.</param>
+    /// <param name="entry">Der betroffene Eintrag.</param>
+    /// <returns><c>true</c>, wenn die Aktion erlaubt ist.</returns>
+    private static bool CanManageEntry(AppModel model, PlaylistEntryItem entry)
+    {
+        var details = model.PlaylistDetails;
+        return details.CanManage
+            && !details.IsManaging
+            && entry.EntryId > 0;
+    }
+
+    private static AppTransition UpdatePlaylistEntryRemoveRequested(AppModel model, PlaylistEntryRemoveRequestedMessage message)
+    {
+        var details = model.PlaylistDetails;
+        if (!CanManageEntry(model, message.Entry) || details.IndexOfEntry(message.Entry) < 0)
+        {
+            return AppTransition.Unchanged(model);
+        }
+
+        return new AppTransition(
+            model with { PlaylistDetails = details with { IsManaging = true } },
+            [new RemovePlaylistEntryEffect(details.PlaylistId, message.Entry, ConfirmContinueWatchingRemoval: false)]);
+    }
+
+    private static AppTransition UpdatePlaylistEntryRemoveCompleted(AppModel model, PlaylistEntryRemoveCompletedMessage message)
+    {
+        var details = model.PlaylistDetails;
+        if (!details.IsActive)
+        {
+            return AppTransition.Unchanged(model);
+        }
+
+        if (message.RequiresConfirmation)
+        {
+            // Weiterschauen-Konflikt (409): der Eintrag bleibt vorerst —
+            // die Seite öffnet einmalig den Bestätigungsdialog.
+            return new AppTransition(
+                model with
+                {
+                    PlaylistDetails = details with
+                    {
+                        IsManaging = false,
+                        PendingRemoveConflict = message.Entry
+                    }
+                },
+                []);
+        }
+
+        if (message.Error is { } error)
+        {
+            return new AppTransition(
+                model with
+                {
+                    PlaylistDetails = details with
+                    {
+                        IsManaging = false,
+                        ManageNotice = error,
+                        ManageNoticeIsError = true
+                    }
+                },
+                []);
+        }
+
+        return new AppTransition(
+            model with
+            {
+                PlaylistDetails = details with
+                {
+                    IsManaging = false,
+                    PendingRemoveConflict = null,
+                    ManageNotice = PlaylistEntryRemovedNotice,
+                    ManageNoticeIsError = false,
+                    IsLoading = true
+                }
+            },
+            [new LoadPlaylistEntriesEffect(details.PlaylistId, 1, Append: false)]);
+    }
+
+    private static AppTransition UpdatePlaylistEntryRemoveConfirmed(AppModel model, PlaylistEntryRemoveConfirmedMessage message)
+    {
+        var details = model.PlaylistDetails;
+        var pending = details.PendingRemoveConflict;
+        if (!details.IsActive || pending is null)
+        {
+            return AppTransition.Unchanged(model);
+        }
+
+        if (!message.Confirmed)
+        {
+            // Abbruch: der Konflikt löst sich ohne Serveraufruf auf.
+            return new AppTransition(
+                model with
+                {
+                    PlaylistDetails = details with { PendingRemoveConflict = null }
+                },
+                []);
+        }
+
+        return new AppTransition(
+            model with
+            {
+                PlaylistDetails = details with
+                {
+                    IsManaging = true,
+                    PendingRemoveConflict = null
+                }
+            },
+            [new RemovePlaylistEntryEffect(details.PlaylistId, pending, ConfirmContinueWatchingRemoval: true)]);
+    }
+
+    private static AppTransition UpdatePlaylistEntryMoveToBeginningRequested(AppModel model, PlaylistEntryMoveToBeginningRequestedMessage message)
+    {
+        var details = model.PlaylistDetails;
+        if (!details.CanReorder || details.IsManaging || details.IsFirstEntry(message.Entry))
+        {
+            return AppTransition.Unchanged(model);
+        }
+
+        return new AppTransition(
+            model with { PlaylistDetails = details with { IsManaging = true } },
+            [new MovePlaylistEntryToBeginningEffect(details.PlaylistId, message.Entry)]);
+    }
+
+    private static AppTransition UpdatePlaylistEntryMoveToEndRequested(AppModel model, PlaylistEntryMoveToEndRequestedMessage message)
+    {
+        var details = model.PlaylistDetails;
+        if (!details.CanReorder || details.IsManaging || details.IsLastEntry(message.Entry))
+        {
+            return AppTransition.Unchanged(model);
+        }
+
+        return new AppTransition(
+            model with { PlaylistDetails = details with { IsManaging = true } },
+            [new MovePlaylistEntryToEndEffect(details.PlaylistId, message.Entry)]);
+    }
+
+    private static AppTransition UpdatePlaylistEntryMoveBetweenRequested(AppModel model, PlaylistEntryMoveBetweenRequestedMessage message)
+    {
+        var details = model.PlaylistDetails;
+        if (!details.CanReorder || details.IsManaging || details.IndexOfEntry(message.Entry) < 0)
+        {
+            return AppTransition.Unchanged(model);
+        }
+
+        return new AppTransition(
+            model with { PlaylistDetails = details with { IsManaging = true } },
+            [new MovePlaylistEntryBetweenEffect(details.PlaylistId, message.Entry, message.NewSortOrder)]);
+    }
+
+    private static AppTransition UpdatePlaylistEntryMoveCompleted(AppModel model, PlaylistEntryMoveCompletedMessage message)
+    {
+        var details = model.PlaylistDetails;
+        if (!details.IsActive)
+        {
+            return AppTransition.Unchanged(model);
+        }
+
+        if (message.Error is { } error)
+        {
+            return new AppTransition(
+                model with
+                {
+                    PlaylistDetails = details with
+                    {
+                        IsManaging = false,
+                        ManageNotice = error,
+                        ManageNoticeIsError = true
+                    }
+                },
+                []);
+        }
+
+        return new AppTransition(
+            model with
+            {
+                PlaylistDetails = details with
+                {
+                    IsManaging = false,
+                    ManageNotice = PlaylistEntryMovedNotice,
+                    ManageNoticeIsError = false,
+                    IsLoading = true
+                }
+            },
+            [new LoadPlaylistEntriesEffect(details.PlaylistId, 1, Append: false)]);
+    }
+
+    private static AppTransition UpdatePlaylistSortModeRequested(AppModel model, PlaylistSortModeRequestedMessage message)
+    {
+        var details = model.PlaylistDetails;
+        if (!details.CanManage
+            || details.IsManaging
+            || string.IsNullOrWhiteSpace(message.NewSortMode)
+            || message.NewSortMode == details.SortMode)
+        {
+            return AppTransition.Unchanged(model);
+        }
+
+        return new AppTransition(
+            model with { PlaylistDetails = details with { IsManaging = true } },
+            [new ChangePlaylistSortModeEffect(
+                details.PlaylistId, message.NewSortMode, ConfirmLossOfManualOrder: false)]);
+    }
+
+    private static AppTransition UpdatePlaylistSortModeCompleted(AppModel model, PlaylistSortModeCompletedMessage message)
+    {
+        var details = model.PlaylistDetails;
+        if (!details.IsActive)
+        {
+            return AppTransition.Unchanged(model);
+        }
+
+        if (message.RequiresConfirmation)
+        {
+            // Verlust-Konflikt (409): die Seite öffnet einmalig den
+            // Bestätigungsdialog zum Verwerfen der manuellen Reihenfolge.
+            return new AppTransition(
+                model with
+                {
+                    PlaylistDetails = details with
+                    {
+                        IsManaging = false,
+                        PendingSortModeConflict = message.NewSortMode
+                    }
+                },
+                []);
+        }
+
+        if (message.Error is { } error)
+        {
+            return new AppTransition(
+                model with
+                {
+                    PlaylistDetails = details with
+                    {
+                        IsManaging = false,
+                        ManageNotice = error,
+                        ManageNoticeIsError = true
+                    }
+                },
+                []);
+        }
+
+        if (message.Updated is null)
+        {
+            return AppTransition.Unchanged(model);
+        }
+
+        // Der Wechsel kann die Eintragsreihenfolge serverseitig ändern —
+        // Kopf übernehmen und die Liste neu laden.
+        return new AppTransition(
+            model with
+            {
+                PlaylistDetails = details with
+                {
+                    IsManaging = false,
+                    IsLoading = true,
+                    SortMode = message.Updated.SortMode,
+                    ManageNotice = PlaylistSortModeSavedNotice,
+                    ManageNoticeIsError = false
+                }
+            },
+            [new LoadPlaylistEntriesEffect(details.PlaylistId, 1, Append: false)]);
+    }
+
+    private static AppTransition UpdatePlaylistSortModeConfirmed(AppModel model, PlaylistSortModeConfirmedMessage message)
+    {
+        var details = model.PlaylistDetails;
+        var pending = details.PendingSortModeConflict;
+        if (!details.IsActive || pending is null)
+        {
+            return AppTransition.Unchanged(model);
+        }
+
+        if (!message.Confirmed)
+        {
+            return new AppTransition(
+                model with
+                {
+                    PlaylistDetails = details with { PendingSortModeConflict = null }
+                },
+                []);
+        }
+
+        return new AppTransition(
+            model with
+            {
+                PlaylistDetails = details with
+                {
+                    IsManaging = true,
+                    PendingSortModeConflict = null
+                }
+            },
+            [new ChangePlaylistSortModeEffect(
+                details.PlaylistId, pending, ConfirmLossOfManualOrder: true)]);
+    }
+
+    private static AppTransition UpdatePlaylistGenreEditorRequested(AppModel model)
+    {
+        var details = model.PlaylistDetails;
+        if (!details.CanManage || details.IsManaging || model.PlaylistGenreEditor.IsOpen)
+        {
+            return AppTransition.Unchanged(model);
+        }
+
+        return new AppTransition(
+            model with
+            {
+                PlaylistGenreEditor = new PlaylistGenreEditorState
+                {
+                    IsOpen = true,
+                    PlaylistId = details.PlaylistId,
+                    IsLoading = true
+                }
+            },
+            [new LoadGenreOptionsEffect(details.PlaylistId)]);
+    }
+
+    private static AppTransition UpdatePlaylistGenreOptionsLoaded(AppModel model, PlaylistGenreOptionsLoadedMessage message)
+    {
+        var editor = model.PlaylistGenreEditor;
+        if (!editor.IsOpen)
+        {
+            return AppTransition.Unchanged(model);
+        }
+
+        // Vorauswahl = aktuelle serverseitige Genre-Ids der Playlist.
+        var selected = model.PlaylistDetails.AllGenreIds.ToHashSet();
+        var options = message.Options
+            .Select(o => o with { IsSelected = selected.Contains(o.Id) })
+            .ToList();
+
+        return new AppTransition(
+            model with
+            {
+                PlaylistGenreEditor = editor with
+                {
+                    Options = options,
+                    IsLoading = false,
+                    Error = message.Error
+                }
+            },
+            []);
+    }
+
+    private static AppTransition UpdatePlaylistGenreToggled(AppModel model, PlaylistGenreToggledMessage message)
+    {
+        var editor = model.PlaylistGenreEditor;
+        if (!editor.IsOpen || editor.IsSaving)
+        {
+            return AppTransition.Unchanged(model);
+        }
+
+        var options = editor.Options
+            .Select(o => o.Id == message.GenreId ? o with { IsSelected = !o.IsSelected } : o)
+            .ToList();
+
+        return new AppTransition(
+            model with { PlaylistGenreEditor = editor with { Options = options } },
+            []);
+    }
+
+    private static AppTransition UpdatePlaylistGenresSaveRequested(AppModel model)
+    {
+        var editor = model.PlaylistGenreEditor;
+        var details = model.PlaylistDetails;
+        if (!editor.IsOpen || editor.IsLoading || editor.IsSaving
+            || !details.CanManage || details.IsManaging)
+        {
+            return AppTransition.Unchanged(model);
+        }
+
+        return new AppTransition(
+            model with
+            {
+                PlaylistGenreEditor = editor with { IsSaving = true, Error = null }
+            },
+            [new SetPlaylistGenresEffect(editor.PlaylistId, editor.SelectedIds)]);
+    }
+
+    private static AppTransition UpdatePlaylistGenresResetRequested(AppModel model)
+    {
+        var editor = model.PlaylistGenreEditor;
+        var details = model.PlaylistDetails;
+        if (!editor.IsOpen || editor.IsLoading || editor.IsSaving
+            || !details.CanManage || details.IsManaging
+            || !details.GenresManuallyOverridden)
+        {
+            return AppTransition.Unchanged(model);
+        }
+
+        return new AppTransition(
+            model with
+            {
+                PlaylistGenreEditor = editor with { IsSaving = true, Error = null }
+            },
+            [new ResetPlaylistGenresEffect(editor.PlaylistId)]);
+    }
+
+    private static AppTransition UpdatePlaylistGenresCompleted(AppModel model, PlaylistGenresCompletedMessage message)
+    {
+        var editor = model.PlaylistGenreEditor;
+        var details = model.PlaylistDetails;
+        if (!editor.IsOpen)
+        {
+            return AppTransition.Unchanged(model);
+        }
+
+        if (message.Updated is not { } updated)
+        {
+            return new AppTransition(
+                model with
+                {
+                    PlaylistGenreEditor = editor with
+                    {
+                        IsSaving = false,
+                        Error = message.Error ?? PlaylistGenresError
+                    }
+                },
+                []);
+        }
+
+        // Erfolg: Editor schließen und die Kopfdaten der Detailseite
+        // mit den neuen Genre-Feldern aktualisieren.
+        return new AppTransition(
+            model with
+            {
+                PlaylistGenreEditor = PlaylistGenreEditorState.Closed,
+                PlaylistDetails = details with
+                {
+                    GenresManuallyOverridden = updated.GenresManuallyOverridden,
+                    AllGenreIds = updated.AllGenreIds,
+                    GenreText = updated.GenreText,
+                    ManageNotice = PlaylistGenresSavedNotice,
+                    ManageNoticeIsError = false
+                }
+            },
+            []);
+    }
+
+    private static AppTransition UpdatePlaylistGenreEditorCancel(AppModel model)
+    {
+        if (!model.PlaylistGenreEditor.IsOpen || model.PlaylistGenreEditor.IsSaving)
+        {
+            return AppTransition.Unchanged(model);
+        }
+
+        return new AppTransition(
+            model with { PlaylistGenreEditor = PlaylistGenreEditorState.Closed },
+            []);
+    }
+
+    private static AppTransition UpdatePlaylistPublicToggled(AppModel model, PlaylistPublicToggledMessage message)
+    {
+        var details = model.PlaylistDetails;
+        if (!details.CanManage || !details.CanSetPublic || details.IsManaging
+            || message.IsPublic == details.IsPublic)
+        {
+            return AppTransition.Unchanged(model);
+        }
+
+        return new AppTransition(
+            model with { PlaylistDetails = details with { IsManaging = true } },
+            [new SetPlaylistPublicEffect(details.PlaylistId, message.IsPublic)]);
+    }
+
+    private static AppTransition UpdatePlaylistPublicCompleted(AppModel model, PlaylistPublicCompletedMessage message)
+    {
+        var details = model.PlaylistDetails;
+        if (!details.IsActive)
+        {
+            return AppTransition.Unchanged(model);
+        }
+
+        if (message.Updated is not { } updated)
+        {
+            return new AppTransition(
+                model with
+                {
+                    PlaylistDetails = details with
+                    {
+                        IsManaging = false,
+                        ManageNotice = message.Error ?? PlaylistPublicError,
+                        ManageNoticeIsError = true
+                    }
+                },
+                []);
+        }
+
+        return new AppTransition(
+            model with
+            {
+                PlaylistDetails = details with
+                {
+                    IsManaging = false,
+                    IsPublic = updated.IsPublic,
+                    ManageNotice = PlaylistPublicSavedNotice,
+                    ManageNoticeIsError = false
+                }
+            },
+            []);
+    }
+
+    private static AppTransition UpdatePlaylistAddTargetsRequested(AppModel model)
+    {
+        var details = model.MediaDetails;
+        if (details.Details is null
+            || details.IsLoadingPlaylistTargets
+            || details.IsAddingToPlaylist
+            || model.ConnectionState != ConnectionState.Connected)
+        {
+            return AppTransition.Unchanged(model);
+        }
+
+        // Die Ziele werden nur beim ersten Öffnen geladen — ein
+        // befüllter Stand wird wiederverwendet (eigene Playlists
+        // ändern sich selten zwischen zwei Öffnungen).
+        if (details.PlaylistTargets is not null)
+        {
+            return new AppTransition(
+                model with
+                {
+                    MediaDetails = details with { PlaylistPickerPending = true }
+                },
+                []);
+        }
+
+        return new AppTransition(
+            model with
+            {
+                MediaDetails = details with
+                {
+                    PlaylistPickerPending = true,
+                    IsLoadingPlaylistTargets = true,
+                    AddToPlaylistNotice = null,
+                    AddToPlaylistNoticeIsError = false
+                }
+            },
+            [new LoadPlaylistTargetsEffect()]);
+    }
+
+    private static AppTransition UpdatePlaylistTargetsLoaded(AppModel model, PlaylistTargetsLoadedMessage message)
+    {
+        var details = model.MediaDetails;
+        if (!details.IsLoadingPlaylistTargets)
+        {
+            return AppTransition.Unchanged(model);
+        }
+
+        if (message.Error is { } error)
+        {
+            return new AppTransition(
+                model with
+                {
+                    MediaDetails = details with
+                    {
+                        IsLoadingPlaylistTargets = false,
+                        PlaylistPickerPending = false,
+                        AddToPlaylistNotice = error,
+                        AddToPlaylistNoticeIsError = true
+                    }
+                },
+                []);
+        }
+
+        return new AppTransition(
+            model with
+            {
+                MediaDetails = details with
+                {
+                    IsLoadingPlaylistTargets = false,
+                    PlaylistTargets = message.Targets ?? []
+                }
+            },
+            []);
+    }
+
+    private static AppTransition UpdatePlaylistPickerDismissed(AppModel model, PlaylistPickerDismissedMessage message)
+    {
+        var details = model.MediaDetails;
+        if (!details.PlaylistPickerPending)
+        {
+            return AppTransition.Unchanged(model);
+        }
+
+        var target = details.PlaylistTargets
+            ?.FirstOrDefault(p => p.PlaylistId == message.PlaylistId);
+        var media = details.Details;
+        if (target is null || media is null || media.MediaId <= 0)
+        {
+            // Abbruch oder ungültige Wahl: die Auswahl löst sich auf.
+            return new AppTransition(
+                model with
+                {
+                    MediaDetails = details with { PlaylistPickerPending = false }
+                },
+                []);
+        }
+
+        return new AppTransition(
+            model with
+            {
+                MediaDetails = details with
+                {
+                    PlaylistPickerPending = false,
+                    IsAddingToPlaylist = true,
+                    AddToPlaylistNotice = null,
+                    AddToPlaylistNoticeIsError = false
+                }
+            },
+            [new AddPlaylistEntryEffect(
+                target.PlaylistId, target.Name, media.MediaType, media.MediaId)]);
+    }
+
+    private static AppTransition UpdatePlaylistEntryAdded(AppModel model, PlaylistEntryAddedMessage message)
+    {
+        var details = model.MediaDetails;
+        if (!details.IsAddingToPlaylist)
+        {
+            return AppTransition.Unchanged(model);
+        }
+
+        var notice = message.Error
+            ?? message.ResultMessage
+            ?? $"„{message.PlaylistName}“ wurde ergänzt.";
+
+        return new AppTransition(
+            model with
+            {
+                MediaDetails = details with
+                {
+                    IsAddingToPlaylist = false,
+                    AddToPlaylistNotice = notice,
+                    AddToPlaylistNoticeIsError = message.Error is not null
+                }
+            },
+            []);
+    }
+
     private static AppTransition UpdateProfilePageOpened(AppModel model)
     {
         if (model.IsOffline)
@@ -1928,20 +3578,37 @@ public static class AppUpdate
             return AppTransition.Unchanged(model);
         }
 
+        return StartPlayback(model, mediaType, message.MediaId, message.Title);
+    }
+
+    /// <summary>
+    /// Gemeinsamer Wiedergabe-Start der Aufrufe aus Detailseite und
+    /// Weiterschauen-Liste: Player-State mit dem Medium und der aus dem
+    /// Serienkontext ermittelten Fortsetzungsliste belegen, zur
+    /// Wiedergabeseite navigieren und die Quelle auflösen (die
+    /// Fortsetzungsposition ermittelt die Quellauflösung selbst).
+    /// </summary>
+    /// <param name="model">Aktuelles App-Model.</param>
+    /// <param name="mediaType">Medientyp (normalisiert, CLR-Konvention).</param>
+    /// <param name="mediaId">Id des Mediums.</param>
+    /// <param name="title">Anzeigetitel des Mediums.</param>
+    /// <returns>Übergang mit belegtem Player-State, Navigations- und Auflösungs-Effekt.</returns>
+    private static AppTransition StartPlayback(AppModel model, string mediaType, long mediaId, string? title)
+    {
         return new AppTransition(
             model with
             {
                 Player = new PlayerState
                 {
                     MediaType = mediaType,
-                    MediaId = message.MediaId,
-                    Title = message.Title,
+                    MediaId = mediaId,
+                    Title = title,
                     IsResolving = true,
                     Attempted = true,
-                    UpcomingEpisodes = NextEpisodeQueue(model, message.MediaId)
+                    UpcomingEpisodes = NextEpisodeQueue(model, mediaId)
                 }
             },
-            [new NavigateToPlayerEffect(), new ResolvePlaybackSourceEffect(mediaType, message.MediaId)]);
+            [new NavigateToPlayerEffect(), new ResolvePlaybackSourceEffect(mediaType, mediaId)]);
     }
 
     /// <summary>
@@ -2011,8 +3678,14 @@ public static class AppUpdate
                 []);
         }
 
-        // Quelle nicht verfügbar → Fehler anzeigen und auf die nächste
-        // Episode zurückfallen (ohne Folge-Episode bleibt der Fehlerzustand).
+        // Quelle nicht verfügbar → Fehler anzeigen und auf den nächsten
+        // Eintrag zurückfallen: im Playlist-Kontext über die serverseitige
+        // Playlist-Reihenfolge, sonst über die Serien-Fortsetzungsliste.
+        if (player.IsPlaylistPlayback && !player.PlaylistNextExhausted)
+        {
+            return AdvancePlaylistEntry(model, player, message.Error ?? PlaybackUnavailableError);
+        }
+
         return AdvanceToNextEpisode(model, player, message.Error ?? PlaybackUnavailableError);
     }
 
@@ -2130,9 +3803,27 @@ public static class AppUpdate
             }
 
             // Auto-Fortsetzung: Restlaufzeit unterschreitet das Fenster
-            // → die nächste Episode startet (bei aktiviertem Schalter).
+            // → der nächste Titel startet (bei aktiviertem Schalter).
             // Nur bei laufender Wiedergabe — ein Takt im Pausenzustand
             // (StateChanged) darf nicht zum nächsten Titel weiterschalten.
+            // Im Playlist-Kontext übernimmt der Server die Folge-Ermittlung
+            // (Reihenfolge der Playlist); ein ausstehender Lauf
+            // (IsResolving) bzw. ein erschöpftes Listenende
+            // (PlaylistNextExhausted) unterbinden weitere Versendungen.
+            if (model.Settings.AutoResumeEnabled
+                && message.IsPlaying
+                && updated.IsPlaylistPlayback
+                && !updated.PlaylistNextExhausted
+                && !updated.IsResolving
+                && remaining <= TimeSpan.FromSeconds(model.Settings.AutoResumeRemainingSeconds))
+            {
+                var transition = AdvancePlaylistEntry(
+                    MarkEpisodeWatchedInDetails(model, updated), updated, null);
+                return new AppTransition(
+                    transition.Model,
+                    [.. effects, .. transition.Effects]);
+            }
+
             if (model.Settings.AutoResumeEnabled
                 && message.IsPlaying
                 && updated.HasNextEpisode
@@ -2186,7 +3877,20 @@ public static class AppUpdate
         }
 
         // Am Ende liegt die Restlaufzeit bei 0 — die Auto-Fortsetzung
-        // greift damit wie im Takt (Fenster ist stets > 0).
+        // greift damit wie im Takt (Fenster ist stets > 0). Im
+        // Playlist-Kontext übernimmt der Server die Folge-Ermittlung.
+        if (model.Settings.AutoResumeEnabled
+            && updated.IsPlaylistPlayback
+            && !updated.PlaylistNextExhausted
+            && !updated.IsResolving)
+        {
+            var transition = AdvancePlaylistEntry(
+                MarkEpisodeWatchedInDetails(model, updated), updated, null);
+            return new AppTransition(
+                transition.Model,
+                [.. effects, .. transition.Effects]);
+        }
+
         if (model.Settings.AutoResumeEnabled && updated.HasNextEpisode)
         {
             var transition = AdvanceToNextEpisode(
@@ -2261,8 +3965,14 @@ public static class AppUpdate
             return AppTransition.Unchanged(model);
         }
 
-        // Abspielfehler → Fehlermeldung und Rückfall auf die nächste
-        // Episode (ohne Folge-Episode bleibt der Fehlerzustand stehen).
+        // Abspielfehler → Fehlermeldung und Rückfall auf den nächsten
+        // Eintrag: im Playlist-Kontext über die serverseitige Playlist-
+        // Reihenfolge, sonst über die Serien-Fortsetzungsliste.
+        if (player.IsPlaylistPlayback && !player.PlaylistNextExhausted)
+        {
+            return AdvancePlaylistEntry(model, player, PlaybackUnavailableError);
+        }
+
         return AdvanceToNextEpisode(model, player, PlaybackUnavailableError);
     }
 

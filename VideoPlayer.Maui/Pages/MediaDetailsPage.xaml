@@ -108,6 +108,13 @@
                                 HeightRequest="44"
                                 IsVisible="False"
                                 Clicked="OnDownloadClicked" />
+                        <Button x:Name="AddToPlaylistButton"
+                                AutomationId="AddToPlaylistButton"
+                                Text="Zu Playlist"
+                                FontSize="14"
+                                HeightRequest="44"
+                                IsVisible="False"
+                                Clicked="OnAddToPlaylistClicked" />
                         <Button x:Name="PlayButton"
                                 AutomationId="PlayButton"
                                 Text="Abspielen"
@@ -147,24 +154,40 @@
                            FontSize="12"
                            IsVisible="False" />
 
+                    <!-- Hinweis der Playlist-Hinzufügung (Erfolg/Fehler). -->
+                    <Label x:Name="AddToPlaylistNoticeLabel"
+                           AutomationId="AddToPlaylistNoticeLabel"
+                           FontSize="12"
+                           IsVisible="False" />
+
                     <!-- Serienansicht: Staffel-Picker + Episodenliste -->
                     <VerticalStackLayout x:Name="SeasonSection"
                                          Spacing="10"
                                          IsVisible="False">
                         <Border Style="{StaticResource InputFrame}">
                             <Picker x:Name="SeasonPicker"
+                                    AutomationId="SeasonPicker"
                                     Title="Staffel"
                                     ItemDisplayBinding="{Binding Name}"
                                     SelectedIndexChanged="OnSeasonSelected" />
                         </Border>
-                        <CollectionView x:Name="EpisodesCollection"
-                                        SelectionMode="Single"
-                                        SelectionChanged="OnEpisodeSelected">
-                            <CollectionView.ItemTemplate>
+                        <!-- Episodenliste als BindableLayout statt
+                             CollectionView: eine virtualisierte Liste im
+                             ScrollView wird unter iOS mit Höhe 0 gemessen
+                             (Muster: MediaCarousel). -->
+                        <VerticalStackLayout x:Name="EpisodesList"
+                                             AutomationId="EpisodesList">
+                            <BindableLayout.ItemTemplate>
                                 <DataTemplate x:DataType="mvu:EpisodeItem">
                                     <Border Style="{StaticResource Card}"
                                             Padding="12"
                                             Margin="0,0,0,10">
+                                        <Border.GestureRecognizers>
+                                            <!-- Antippen der Karte öffnet
+                                                 die Episoden-Detailseite
+                                                 (Muster: MediaCarousel). -->
+                                            <TapGestureRecognizer Tapped="OnEpisodeTapped" />
+                                        </Border.GestureRecognizers>
                                         <Border.Triggers>
                                             <!-- Platzhalter fehlender Offline-Episoden:
                                                  abgedunkelt, ohne Aktions-Schalter. -->
@@ -290,8 +313,8 @@
                                         </Grid>
                                     </Border>
                                 </DataTemplate>
-                            </CollectionView.ItemTemplate>
-                        </CollectionView>
+                            </BindableLayout.ItemTemplate>
+                        </VerticalStackLayout>
                     </VerticalStackLayout>
 
                     <!-- Sammelansicht: enthaltene Filme -->

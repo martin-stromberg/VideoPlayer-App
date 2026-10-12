@@ -63,6 +63,17 @@ namespace VideoPlayer.Maui
             builder.Services.AddSingleton<AppSecretsService>();
             builder.Services.AddSingleton(sp =>
                 AppStorageLayoutProvider.CreateLayout(sp.GetRequiredService<AppProfile>()));
+
+            // Programmprotokoll (Datei-Logging im Logs-Verzeichnis des
+            // Ablage-Layouts): der Startzustand wird synchron aus der
+            // persistenten Einstellung gelesen; Laufzeit-Umschaltungen
+            // laufen über ShellAppEffectHandler → AppLogService.SetEnabled.
+            builder.Services.AddSingleton(sp =>
+                new AppLogService(
+                    sp.GetRequiredService<AppStorageLayout>(),
+                    sp.GetRequiredService<AppSettingsService>().Load().LoggingEnabled));
+            builder.Services.AddSingleton<ILoggerProvider>(
+                sp => new FileLoggerProvider(sp.GetRequiredService<AppLogService>()));
             builder.Services.AddSingleton<BackupDatabase>();
             builder.Services.AddSingleton<CacheDatabase>();
 
@@ -92,6 +103,9 @@ namespace VideoPlayer.Maui
             builder.Services.AddSingleton<SourceBrowserService>();
             builder.Services.AddSingleton<MediaDetailsService>();
             builder.Services.AddSingleton<FavoritesService>();
+            // Playlists: Übersicht (eigene + öffentliche) und paginierte
+            // Einträge — reines Online-Feature ohne lokale Kopie.
+            builder.Services.AddSingleton<PlaylistService>();
             // Profil-Seite: Benutzerinfo aus Token-Claims/gespeicherter
             // Anmelde-Kennung plus aktives lokales Profil.
             builder.Services.AddSingleton<ProfileInfoService>();
@@ -101,6 +115,12 @@ namespace VideoPlayer.Maui
             // App-Fensters; iOS: nativer PiP der Transportsteuerung).
             builder.Services.AddSingleton<PlaybackSourceService>();
             builder.Services.AddSingleton<IPictureInPictureService, PictureInPictureService>();
+            // Folgevideo-Auflösung des Weiterschauen-Direktstarts:
+            // Serienkontext ohne Detailseite (Server bzw. Cache).
+            builder.Services.AddSingleton<UpcomingEpisodesService>();
+            // Weiterschauen-Kontextmenü: Ausblenden/Überspringen über die
+            // Server-Endpunkte bzw. lokales Entfernen aus dem Cache.
+            builder.Services.AddSingleton<ContinueWatchingMutationService>();
 
             // Download-Verwaltung: persistente Aufträge im Download-
             // Manifest, parallele Transfers mit Quota/WLAN-Bedingung —
@@ -113,6 +133,7 @@ namespace VideoPlayer.Maui
             builder.Services.AddTransient<Pages.LoadingPage>();
             builder.Services.AddTransient<Pages.HomePage>();
             builder.Services.AddTransient<Pages.FavoritesPage>();
+            builder.Services.AddTransient<Pages.PlaylistsPage>();
             builder.Services.AddTransient<Pages.DownloadsPage>();
             builder.Services.AddTransient<Pages.ProfilePage>();
             builder.Services.AddTransient<Pages.SettingsPage>();
@@ -122,6 +143,8 @@ namespace VideoPlayer.Maui
             // Quellen-Browsing-Seite (Shell-Route „sourceoverview").
             builder.Services.AddTransient<Pages.MediaDetailsPage>();
             builder.Services.AddTransient<Pages.SourceOverviewPage>();
+            // Playlist-Detailseite (Shell-Route „playlistdetails").
+            builder.Services.AddTransient<Pages.PlaylistDetailsPage>();
             // Wiedergabeseite (Shell-Route „player").
             builder.Services.AddTransient<Pages.PlayerPage>();
 

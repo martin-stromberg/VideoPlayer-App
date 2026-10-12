@@ -59,9 +59,60 @@ public sealed class ProfileInfoService
     /// <returns>Die gelesenen Claims als Tupel (Benutzername, E-Mail); beide Elemente <c>null</c>, wenn nicht lesbar.</returns>
     internal static (string?, string?) ReadTokenClaims(string? token)
     {
-        if (string.IsNullOrWhiteSpace(token))
+        using var document = ReadPayload(token);
+        if (document is null)
         {
             return (null, null);
+        }
+
+        var root = document.RootElement;
+        var username = Claim(
+            root,
+            "unique_name",
+            "name",
+            "preferred_username",
+            "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name");
+        var email = Claim(
+            root,
+            "email",
+            "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress");
+        return (username, email);
+    }
+
+    /// <summary>
+    /// Liest den <c>IsAdmin</c>-Claim des gespeicherten Anmelde-Tokens
+    /// (Server-Wert <c>"True"</c>/<c>"False"</c>). Fehlt der Claim oder
+    /// ist das Token nicht lesbar, gilt der Benutzer nicht als
+    /// Administrator — die Server-Prüfung bleibt ohnehin führend, die
+    /// Lesung steuert nur die Sichtbarkeit des Öffentlich-Schalters.
+    /// </summary>
+    /// <param name="token">Das gespeicherte Anmelde-Token; <c>null</c>/leer = kein Claim.</param>
+    /// <returns><c>true</c>, wenn der Claim den Administrator-Status meldet.</returns>
+    internal static bool ReadIsAdminClaim(string? token)
+    {
+        using var document = ReadPayload(token);
+        if (document is null)
+        {
+            return false;
+        }
+
+        var claim = Claim(document.RootElement, "IsAdmin");
+        return string.Equals(claim, "True", StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
+    /// Dekodiert die Payload eines JWT (Base64Url) und liefert das
+    /// geöffnete JSON-Dokument; der Aufrufer gibt es frei. Beschädigte
+    /// oder unkonventionelle Tokens liefern <c>null</c> — die Dekodierung
+    /// ist rein informativ, eine Signaturprüfung ist nicht erforderlich.
+    /// </summary>
+    /// <param name="token">Das zu dekodierende Token; <c>null</c>/leer = keine Payload.</param>
+    /// <returns>Das Payload-Dokument bzw. <c>null</c>, wenn nicht lesbar.</returns>
+    private static JsonDocument? ReadPayload(string? token)
+    {
+        if (string.IsNullOrWhiteSpace(token))
+        {
+            return null;
         }
 
         try
@@ -69,7 +120,7 @@ public sealed class ProfileInfoService
             var parts = token.Split('.');
             if (parts.Length != 3)
             {
-                return (null, null);
+                return null;
             }
 
             var base64 = parts[1].Replace('-', '+').Replace('_', '/');
@@ -79,26 +130,13 @@ public sealed class ProfileInfoService
                 case 3: base64 += "="; break;
             }
 
-            using var document = JsonDocument.Parse(
+            return JsonDocument.Parse(
                 Encoding.UTF8.GetString(Convert.FromBase64String(base64)));
-            var root = document.RootElement;
-
-            var username = Claim(
-                root,
-                "unique_name",
-                "name",
-                "preferred_username",
-                "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name");
-            var email = Claim(
-                root,
-                "email",
-                "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress");
-            return (username, email);
         }
         catch (Exception ex) when (ex is FormatException or JsonException or ArgumentException or InvalidOperationException)
         {
             System.Diagnostics.Debug.WriteLine($"[ProfileInfoService] Token-Claims nicht lesbar: {ex.Message}");
-            return (null, null);
+            return null;
         }
     }
 

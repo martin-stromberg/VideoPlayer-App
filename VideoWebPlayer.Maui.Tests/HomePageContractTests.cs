@@ -167,6 +167,67 @@ public class HomePageContractTests
         Assert.Contains("DispatchAsync", code, StringComparison.Ordinal);
     }
 
+    /// <summary>
+    /// Prüft HomePage: das Weiterschauen-Karussell hat einen eigenen
+    /// Tap-Handler mit eigener Nachricht (Direktstart) und eine
+    /// AutomationId für den E2E-Zugriff — die übrigen Listen bleiben
+    /// beim Detail-Navigationspfad.
+    /// </summary>
+    [Fact]
+    public void HomePage_ContinueWatchingCarousel_DispatchesOwnMessage()
+    {
+        var xaml = Read("VideoPlayer.Maui", "Pages", "HomePage.xaml");
+        var code = Read("VideoPlayer.Maui", "Pages", "HomePage.xaml.cs");
+
+        Assert.Contains("AutomationId=\"ContinueWatchingCarousel\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("ItemTapped=\"OnContinueWatchingItemTapped\"", xaml, StringComparison.Ordinal);
+        // Favoriten und „Neu im Programm" bleiben beim bestehenden Handler.
+        var continueWatchingIndex = xaml.IndexOf("OnContinueWatchingItemTapped", StringComparison.Ordinal);
+        var favoritesIndex = xaml.IndexOf("{Binding Model.Favorites}", StringComparison.Ordinal);
+        var recentIndex = xaml.IndexOf("{Binding Model.RecentEntries}", StringComparison.Ordinal);
+        Assert.True(favoritesIndex > continueWatchingIndex);
+        Assert.True(recentIndex > continueWatchingIndex);
+        Assert.Equal(2, xaml.Split("OnMediaItemTapped").Length - 1);
+
+        Assert.Contains("OnContinueWatchingItemTapped", code, StringComparison.Ordinal);
+        Assert.Contains("ContinueWatchingItemSelectedMessage", code, StringComparison.Ordinal);
+        Assert.Contains("MediaItemSelectedMessage", code, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// Prüft AppUpdate: die Weiterschauen-Auswahl verzweigt Direktstart
+    /// (abspielbare Typen) und Detail-Fallback über denselben
+    /// Startpfad wie <c>PlayRequested</c>.
+    /// </summary>
+    [Fact]
+    public void AppUpdate_ContinueWatchingSelection_BranchesPlaybackAndDetails()
+    {
+        var update = Read("VideoPlayer.Mvu", "AppUpdate.cs");
+
+        Assert.Contains("ContinueWatchingItemSelectedMessage", update, StringComparison.Ordinal);
+        Assert.Contains("UpcomingEpisodesLoadedMessage", update, StringComparison.Ordinal);
+        Assert.Contains("LoadUpcomingEpisodesEffect", update, StringComparison.Ordinal);
+        // Gemeinsamer Wiedergabe-Start beider Aufrufpfade.
+        Assert.Contains("StartPlayback(", update, StringComparison.Ordinal);
+        Assert.Contains("NavigateToMediaDetailsEffect", update, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// Prüft ShellAppEffectHandler + Dienste: der Serienkontext-Effekt
+    /// ist verdrahtet und der Folge-Episoden-Dienst registriert.
+    /// </summary>
+    [Fact]
+    public void ShellAppEffectHandler_HandlesLoadUpcomingEpisodesEffect()
+    {
+        var handler = Read("VideoPlayer.Maui", "Services", "ShellAppEffectHandler.cs");
+        var program = Read("VideoPlayer.Maui", "MauiProgram.cs");
+
+        Assert.Contains("LoadUpcomingEpisodesEffect", handler, StringComparison.Ordinal);
+        Assert.Contains("UpcomingEpisodesLoadedMessage", handler, StringComparison.Ordinal);
+        Assert.Contains("UpcomingEpisodesService", handler, StringComparison.Ordinal);
+        Assert.Contains("AddSingleton<UpcomingEpisodesService>", program, StringComparison.Ordinal);
+    }
+
     /// <summary>Prüft MediaDetails: bei <c>RouteRegistered</c> → die Seite liest die Query-Parameter.</summary>
     [Fact]
     public void MediaDetails_RouteRegistered_AndPageReadsQueryParameters()

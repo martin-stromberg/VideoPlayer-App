@@ -72,6 +72,11 @@ namespace VideoPlayer.Maui
             // „sourceoverview?id=…&name=…", geschoben auf den Stack.
             Routing.RegisterRoute("sourceoverview", typeof(Pages.SourceOverviewPage));
 
+            // Playlist-Detailseite (Einträge in Server-Reihenfolge,
+            // seitenweises Nachladen): „playlistdetails?id=…&name=…",
+            // geschoben auf den Stack.
+            Routing.RegisterRoute("playlistdetails", typeof(Pages.PlaylistDetailsPage));
+
             // Wiedergabeseite: „player", geschoben auf den Stack — der
             // Player-State wurde bereits durch PlayRequestedMessage belegt.
             Routing.RegisterRoute("player", typeof(Pages.PlayerPage));

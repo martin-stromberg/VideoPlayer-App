@@ -34,6 +34,9 @@ public sealed class AppSettingsService
     /// <summary>Ablageschlüssel für <see cref="AppSettings.HomeHeroEnabled"/>.</summary>
     public const string HomeHeroEnabledKey = "HomeHeroEnabled";
 
+    /// <summary>Ablageschlüssel für <see cref="AppSettings.LoggingEnabled"/>.</summary>
+    public const string LoggingEnabledKey = "LoggingEnabled";
+
     private readonly ISettingsStore store;
     private readonly AppProfile profile;
 
@@ -61,7 +64,8 @@ public sealed class AppSettingsService
             WatchedEndWindowSeconds = store.GetInt(Key(WatchedEndWindowSecondsKey), defaults.WatchedEndWindowSeconds),
             DownloadQuotaGb = store.GetInt(Key(DownloadQuotaGbKey), defaults.DownloadQuotaGb),
             AutoDeleteWatchedEpisodes = store.GetBool(Key(AutoDeleteWatchedEpisodesKey), defaults.AutoDeleteWatchedEpisodes),
-            HomeHeroEnabled = store.GetBool(Key(HomeHeroEnabledKey), defaults.HomeHeroEnabled)
+            HomeHeroEnabled = store.GetBool(Key(HomeHeroEnabledKey), defaults.HomeHeroEnabled),
+            LoggingEnabled = store.GetBool(Key(LoggingEnabledKey), defaults.LoggingEnabled)
         }.Normalize();
     }
 
@@ -81,6 +85,7 @@ public sealed class AppSettingsService
         store.Set(Key(DownloadQuotaGbKey), normalized.DownloadQuotaGb);
         store.Set(Key(AutoDeleteWatchedEpisodesKey), normalized.AutoDeleteWatchedEpisodes);
         store.Set(Key(HomeHeroEnabledKey), normalized.HomeHeroEnabled);
+        store.Set(Key(LoggingEnabledKey), normalized.LoggingEnabled);
     }
 
     private string Key(string key) => profile.PrefixKey(key);
