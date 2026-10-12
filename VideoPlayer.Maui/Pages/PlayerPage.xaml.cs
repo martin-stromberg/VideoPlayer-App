@@ -22,6 +22,12 @@ public partial class PlayerPage : ContentPage
 {
     private static readonly TimeSpan ProgressTickInterval = TimeSpan.FromSeconds(5);
     private static readonly TimeSpan ResumeSeekTimeout = TimeSpan.FromSeconds(10);
+    // Geschätzte Höhe der nativen iOS-Top-Leiste des
+    // AVPlayerViewController (Vollbild-/PiP-Buttons) inklusive Safe-Area
+    // und Sicherheitsabstand. Der Wert ist ohne Gerät nicht verifizierbar
+    // und in der TestFlight-Geräteprüfung zu bestätigen bzw.
+    // feinzujustieren.
+    private const double IosNativeControlsClearance = 96;
 
     private readonly MvuHost mvuHost;
     private readonly IPictureInPictureService pictureInPicture;
@@ -51,6 +57,25 @@ public partial class PlayerPage : ContentPage
         this.pictureInPicture = pictureInPicture;
         BindingContext = mvuHost;
         PipButton.IsVisible = pictureInPicture.IsToggleSupported;
+#if IOS
+        // iOS blendet die native Top-Leiste des AVPlayerViewController mit
+        // den Vollbild-/PiP-Buttons im oberen Randbereich ein.
+        // OverlayChrome und PlaylistNavigationBar werden um denselben
+        // Versatz unter die Leiste geschoben: das eingabedurchlässige
+        // Kopfband würde die nativen Buttons sonst weiterhin visuell
+        // überdecken (Scrim-Abdunklung, WatchedBadge in der oberen rechten
+        // Ecke), und die interaktive Bar darf nicht eingabedurchlässig
+        // sein — sie muss daher physisch darunter liegen und hält ihren
+        // XAML-Abstand zum (mitverschobenen) Kopfband. Die XAML-Werte
+        // bleiben der Standardpfad für Windows und andere Plattformen.
+        OverlayChrome.Margin = new Thickness(0, IosNativeControlsClearance, 0, 0);
+        var barMargin = PlaylistNavigationBar.Margin;
+        PlaylistNavigationBar.Margin = new Thickness(
+            barMargin.Left,
+            barMargin.Top + IosNativeControlsClearance,
+            barMargin.Right,
+            barMargin.Bottom);
+#endif
 #if WINDOWS
         // Unter Windows blenden die Transportsteuerungen des MediaElements
         // sich nach dem Timeout nicht mehr über eigene Pointer-Ereignisse ein
