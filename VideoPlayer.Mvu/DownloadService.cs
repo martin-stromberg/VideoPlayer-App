@@ -562,7 +562,11 @@ public sealed class DownloadService
             }
         }
 
-        logger.LogInformation("{RequeuedCount} unterbrochene Downloads wieder eingeplant.", toRequeue.Count);
+        if (toRequeue.Count > 0)
+        {
+            logger.LogInformation("{RequeuedCount} unterbrochene Downloads wieder eingeplant.", toRequeue.Count);
+        }
+
         PumpQueue(settings);
     }
 
@@ -748,11 +752,11 @@ public sealed class DownloadService
             TryDeleteFile(entry.FilePath);
             await SetStateIfPresentAsync(entry, DownloadState.Cancelled, null);
         }
-        catch (OperationCanceledException)
+        catch (OperationCanceledException ex)
         {
             // Zeitüberschreitung/abgebrochene Übertragung ohne Benutzerabbruch.
             TryDeleteFile(entry.FilePath);
-            await SetStateIfPresentAsync(entry, DownloadState.Failed, ErrorNetwork);
+            await SetStateIfPresentAsync(entry, DownloadState.Failed, ErrorNetwork, ex);
         }
         catch (HttpRequestException ex)
         {
@@ -760,27 +764,17 @@ public sealed class DownloadService
             var code = ex.StatusCode is { } statusCode
                 ? $"{ErrorHttpPrefix}{(int)statusCode}"
                 : ErrorNetwork;
-            await SetStateIfPresentAsync(entry, DownloadState.Failed, code);
+            await SetStateIfPresentAsync(entry, DownloadState.Failed, code, ex);
         }
         catch (IOException ex)
         {
             TryDeleteFile(entry.FilePath);
-            logger.LogWarning(
-                ex,
-                "Dateioperation des Downloads {VideoType}/{VideoId} fehlgeschlagen.",
-                entry.VideoType,
-                entry.VideoId);
-            await SetStateIfPresentAsync(entry, DownloadState.Failed, ErrorIo);
+            await SetStateIfPresentAsync(entry, DownloadState.Failed, ErrorIo, ex);
         }
         catch (Exception ex)
         {
             TryDeleteFile(entry.FilePath);
-            logger.LogWarning(
-                ex,
-                "Transfer des Downloads {VideoType}/{VideoId} fehlgeschlagen.",
-                entry.VideoType,
-                entry.VideoId);
-            await SetStateIfPresentAsync(entry, DownloadState.Failed, ErrorNetwork);
+            await SetStateIfPresentAsync(entry, DownloadState.Failed, ErrorNetwork, ex);
         }
         finally
         {
@@ -816,7 +810,7 @@ public sealed class DownloadService
         RaiseItemChanged(ToItem(entry));
     }
 
-    private async Task SetStateAsync(DownloadManifestEntry entry, DownloadState state, string? error)
+    private async Task SetStateAsync(DownloadManifestEntry entry, DownloadState state, string? error, Exception? exception = null)
     {
         entry.State = DownloadStateNames.ToPersisted(state);
         entry.Error = error;
@@ -834,6 +828,7 @@ public sealed class DownloadService
         if (state == DownloadState.Failed)
         {
             logger.LogWarning(
+                exception,
                 "Download {VideoType}/{VideoId} ({Title}): {State} ({Error}).",
                 entry.VideoType,
                 entry.VideoId,
@@ -862,15 +857,16 @@ public sealed class DownloadService
     /// <param name="entry">Der zuletzt bekannte Manifest-Eintrag.</param>
     /// <param name="state">Der zu setzende Zustand.</param>
     /// <param name="error">Der Fehlercode; <c>null</c> = kein Fehler.</param>
+    /// <param name="exception">Die auslösende Ausnahme; wird im Fehlerfall mitprotokolliert.</param>
     /// <returns>Eine abgeschlossene Aufgabe nach dem Schreiben.</returns>
-    private async Task SetStateIfPresentAsync(DownloadManifestEntry entry, DownloadState state, string? error)
+    private async Task SetStateIfPresentAsync(DownloadManifestEntry entry, DownloadState state, string? error, Exception? exception = null)
     {
         if (await FindEntryAsync(entry.VideoType, entry.VideoId) is null)
         {
             return;
         }
 
-        await SetStateAsync(entry, state, error);
+        await SetStateAsync(entry, state, error, exception);
     }
 
     private async Task<DownloadManifestEntry?> FindEntryAsync(string type, long mediaId)

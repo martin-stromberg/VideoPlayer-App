@@ -485,10 +485,15 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
                     report.MediaType, (int)report.MediaId,
                     report.Position, report.Duration, cancellationToken);
         }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            // Routinemäßiger Abbruch (z. B. Wiedergabeende) — kein Fehler.
+            throw;
+        }
         catch (Exception ex)
         {
             // Ein Fehlschlag ist nicht fatal — der nächste Takt meldet erneut.
-            logger.LogError(ex, "Fortschrittsmeldung fehlgeschlagen");
+            logger.LogWarning(ex, "Fortschrittsmeldung fehlgeschlagen");
         }
     }
 
