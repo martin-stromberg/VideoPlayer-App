@@ -1,6 +1,7 @@
 #pragma warning disable xUnit1051 // Kurzlebige Unit-Tests: TestContext-CancellationToken nicht erforderlich
 using System.Net;
 using System.Text.Json;
+using Microsoft.Extensions.Logging;
 using VideoPlayer.ApiClient.Models;
 using VideoPlayer.Mvu;
 using VideoPlayer.Storage;
@@ -135,6 +136,57 @@ public class ServerSyncServiceTests : IDisposable
         var favorite = Assert.Single(favorites);
         Assert.Equal("tvshowepisode:7", favorite.Key);
         Assert.Equal(7, favorite.VideoId);
+    }
+
+    /// <summary>Prüft SynchronizeAsync: der Ergebnis-Eintrag enthält die SyncResult-Zähler.</summary>
+    [Fact]
+    public async Task SynchronizeAsync_WritesResultCounters()
+    {
+        var logging = new RecordingLoggerProvider();
+        await LoginAsync();
+        await queue.EnqueueAsync("movie", 42, TimeSpan.FromMinutes(12), TimeSpan.FromMinutes(90));
+        handler.Enqueue(HttpStatusCode.OK); // Fortschritt
+        EnqueueMetadataResponses();
+
+        var result = await new ServerSyncService(
+                authSession, queue, cache, logging.CreateLogger<ServerSyncService>())
+            .SynchronizeAsync();
+
+        Assert.Equal(1, result.SentProgressReports);
+        Assert.Equal(0, result.RemainingProgressReports);
+        Assert.Contains(logging.Entries, e =>
+            e.Level == LogLevel.Information
+            && e.Category.Contains(nameof(ServerSyncService), StringComparison.Ordinal)
+            && e.Message.Contains("Synchronisation abgeschlossen", StringComparison.Ordinal)
+            && e.Message.Contains("1 Fortschritte", StringComparison.Ordinal)
+            && e.Message.Contains("0 ausstehend", StringComparison.Ordinal));
+    }
+
+    /// <summary>
+    /// Prüft FlushPendingProgress: der Nachsende-Eintrag läuft nur, wenn
+    /// tatsächlich Meldungen gesendet wurden — bei leerer Warteschlange
+    /// ist „0 nachgesendet" ein Eintrag ohne Ereignis (derselbe Zähler
+    /// steht bereits im Aggregat-Eintrag des Voll-Syncs).
+    /// </summary>
+    [Fact]
+    public async Task FlushPendingProgress_LogsSentCount_OnlyWhenSent()
+    {
+        var logging = new RecordingLoggerProvider();
+        await LoginAsync();
+        var service = new ServerSyncService(
+            authSession, queue, cache, logging.CreateLogger<ServerSyncService>());
+
+        Assert.Equal(0, await service.FlushPendingProgressAsync());
+        Assert.DoesNotContain(logging.Entries, e =>
+            e.Level == LogLevel.Information
+            && e.Message.Contains("nachgesendet", StringComparison.Ordinal));
+
+        await queue.EnqueueAsync("movie", 42, TimeSpan.FromMinutes(1), TimeSpan.FromMinutes(90));
+        handler.Enqueue(HttpStatusCode.OK);
+        Assert.Equal(1, await service.FlushPendingProgressAsync());
+        Assert.Single(logging.Entries, e =>
+            e.Level == LogLevel.Information
+            && e.Message.Contains("nachgesendet", StringComparison.Ordinal));
     }
 
     /// <summary>Prüft SynchronizeAsync: ohne Client → ist ein No-Op.</summary>

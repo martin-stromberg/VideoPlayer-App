@@ -1,4 +1,6 @@
 using System.Text.Json;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using VideoPlayer.ApiClient;
 using VideoPlayer.ApiClient.Models;
 using VideoPlayer.Storage;
@@ -28,16 +30,19 @@ public sealed class PlaybackSourceService
     private readonly AppSecretsService secrets;
     private readonly CacheDatabase cache;
     private readonly Func<string, bool> fileExists;
+    private readonly ILogger<PlaybackSourceService> logger;
 
     /// <summary>Erstellt den Dienst mit der produktiven Dateiprüfung.</summary>
     /// <param name="authSession">Sitzungsdienst mit dem angemeldeten API-Client und der Server-Basisadresse.</param>
     /// <param name="secrets">Ablage des Anmelde-Tokens (Fallback, wenn kein Client angemeldet ist).</param>
     /// <param name="cache">Cache-Ablage mit Download-Manifest und gecachten Listen.</param>
+    /// <param name="logger">Optionaler Logger für das Programmprotokoll.</param>
     public PlaybackSourceService(
         AuthSessionService authSession,
         AppSecretsService secrets,
-        CacheDatabase cache)
-        : this(authSession, secrets, cache, null)
+        CacheDatabase cache,
+        ILogger<PlaybackSourceService>? logger = null)
+        : this(authSession, secrets, cache, null, logger)
     {
     }
 
@@ -46,16 +51,19 @@ public sealed class PlaybackSourceService
     /// <param name="secrets">Ablage des Anmelde-Tokens.</param>
     /// <param name="cache">Cache-Ablage mit Download-Manifest und gecachten Listen.</param>
     /// <param name="fileExists">Existenzprüfung für lokale Dateien; <c>null</c> = <see cref="File.Exists(string?)"/>.</param>
+    /// <param name="logger">Optionaler Logger für das Programmprotokoll.</param>
     internal PlaybackSourceService(
         AuthSessionService authSession,
         AppSecretsService secrets,
         CacheDatabase cache,
-        Func<string, bool>? fileExists)
+        Func<string, bool>? fileExists,
+        ILogger<PlaybackSourceService>? logger = null)
     {
         this.authSession = authSession ?? throw new ArgumentNullException(nameof(authSession));
         this.secrets = secrets ?? throw new ArgumentNullException(nameof(secrets));
         this.cache = cache ?? throw new ArgumentNullException(nameof(cache));
         this.fileExists = fileExists ?? File.Exists;
+        this.logger = logger ?? NullLogger<PlaybackSourceService>.Instance;
     }
 
     /// <summary>
@@ -104,6 +112,12 @@ public sealed class PlaybackSourceService
         var localFile = await ResolveLocalFileAsync(type, mediaId);
         if (localFile is not null)
         {
+            logger.LogInformation(
+                "Wiedergabequelle für {MediaType}/{MediaId} aufgelöst: {Kind}, Fortsetzung {ResumePosition}.",
+                type,
+                mediaId,
+                PlaybackSourceKind.LocalFile,
+                resumePosition);
             return new PlaybackSource
             {
                 Kind = PlaybackSourceKind.LocalFile,
@@ -115,12 +129,20 @@ public sealed class PlaybackSourceService
         if (!allowServerStream)
         {
             // Offline: keine Stream-URL für einen unerreichbaren Server.
+            logger.LogInformation(
+                "Wiedergabequelle für {MediaType}/{MediaId} nicht auflösbar (offline, keine lokale Datei).",
+                type,
+                mediaId);
             return null;
         }
 
         var baseAddress = authSession.ClientBaseAddress?.TrimEnd('/');
         if (string.IsNullOrWhiteSpace(baseAddress))
         {
+            logger.LogInformation(
+                "Wiedergabequelle für {MediaType}/{MediaId} nicht auflösbar (keine Serververbindung).",
+                type,
+                mediaId);
             return null;
         }
 
@@ -131,6 +153,12 @@ public sealed class PlaybackSourceService
             streamUrl += $"?access_token={Uri.EscapeDataString(token)}";
         }
 
+        logger.LogInformation(
+            "Wiedergabequelle für {MediaType}/{MediaId} aufgelöst: {Kind}, Fortsetzung {ResumePosition}.",
+            type,
+            mediaId,
+            PlaybackSourceKind.ServerStream,
+            resumePosition);
         return new PlaybackSource
         {
             Kind = PlaybackSourceKind.ServerStream,
@@ -168,7 +196,7 @@ public sealed class PlaybackSourceService
             catch (Exception ex) when (ex is ApiException or HttpRequestException or TaskCanceledException)
             {
                 // Server nicht erreichbar/antwortet nicht → Cache-Stand.
-                System.Diagnostics.Debug.WriteLine($"[PlaybackSourceService] Weiterschauen-Liste nicht ladbar: {ex.Message}");
+                logger.LogWarning(ex, "Weiterschauen-Liste nicht ladbar.");
             }
         }
 
@@ -193,7 +221,7 @@ public sealed class PlaybackSourceService
         catch (Exception ex)
         {
             // Beschädigter Cache → kein Fortsetzungsstand statt Fehler.
-            System.Diagnostics.Debug.WriteLine($"[PlaybackSourceService] Weiterschauen-Cache nicht lesbar: {ex.Message}");
+            logger.LogWarning(ex, "Weiterschauen-Cache nicht lesbar.");
             return null;
         }
     }
@@ -237,7 +265,7 @@ public sealed class PlaybackSourceService
         catch (Exception ex)
         {
             // Manifest nicht lesbar → Stream-Versuch statt Fehler.
-            System.Diagnostics.Debug.WriteLine($"[PlaybackSourceService] Download-Manifest nicht lesbar: {ex.Message}");
+            logger.LogWarning(ex, "Download-Manifest nicht lesbar.");
             return null;
         }
     }

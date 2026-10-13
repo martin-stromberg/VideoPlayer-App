@@ -109,10 +109,14 @@ public sealed class AppLogService
             {
                 RotateIfNeeded();
                 var timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff", System.Globalization.CultureInfo.InvariantCulture);
-                var line = $"{timestamp} [{LevelName(level)}] {category}: {message}";
+                // Zentrale Geheimnis-Maskierung am Sinkenpunkt: Meldungen
+                // und angehängte Ausnahmen können eine Quell-URL mit
+                // access_token-Query enthalten — der Token-Wert darf
+                // nicht in die versendbare Protokolldatei gelangen.
+                var line = $"{timestamp} [{LevelName(level)}] {category}: {MaskAccessToken(message)}";
                 if (exception is not null)
                 {
-                    line += Environment.NewLine + exception;
+                    line += Environment.NewLine + MaskAccessToken(exception.ToString());
                 }
 
                 File.AppendAllText(LogFilePath, line + Environment.NewLine);
@@ -177,6 +181,21 @@ public sealed class AppLogService
 
             File.Move(LogFilePath, PreviousLogFilePath);
         }
+    }
+
+    /// <summary>
+    /// Maskiert den Wert eines <c>access_token</c>-Query-Parameters in
+    /// einem Text — die gemeinsame Geheimnis-Bereinigung aller
+    /// Protokoll-Schreiber (die Sinken-Maskierung in <see cref="Write"/>
+    /// bleibt als zweite Verteidigungslinie bestehen).
+    /// </summary>
+    /// <param name="text">Der zu bereinigende Text.</param>
+    /// <returns>Der Text mit maskierten <c>access_token</c>-Werten.</returns>
+    public static string MaskAccessToken(string text)
+    {
+        return System.Text.RegularExpressions.Regex.Replace(
+            text, @"(access_token=)[^&\s""'<>]*", "$1***",
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase);
     }
 
     private static string LevelName(LogLevel level) => level switch

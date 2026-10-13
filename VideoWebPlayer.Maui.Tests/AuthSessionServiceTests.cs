@@ -1,6 +1,7 @@
 #pragma warning disable xUnit1051 // Kurzlebige Unit-Tests: TestContext-CancellationToken nicht erforderlich
 using System.Net;
 using System.Text;
+using Microsoft.Extensions.Logging;
 using VideoPlayer.ApiClient;
 using VideoPlayer.ApiClient.Models;
 using VideoPlayer.Mvu;
@@ -39,6 +40,31 @@ public class AuthSessionServiceTests
             new RecordingDelays().Delay);
     }
 
+    /// <summary>
+    /// Erstellt den Dienst wie oben, zusätzlich mit aufzeichnender
+    /// <see cref="ILoggerFactory"/> (Programmprotokoll).
+    /// </summary>
+    /// <param name="handler">Der Stub-HTTP-Handler für Server-Antworten.</param>
+    /// <param name="logging">Der aufzeichnende Logger-Provider.</param>
+    /// <param name="secrets">Liefert den verwendeten Ablage-Dienst zurück.</param>
+    /// <returns>Der erstellte <see cref="AuthSessionService"/>.</returns>
+    private static AuthSessionService CreateService(
+        StubHttpMessageHandler handler,
+        RecordingLoggerProvider logging,
+        out AppSecretsService secrets)
+    {
+        var service = new AppSecretsService(
+            new InMemorySettingsStore(),
+            new InMemorySecretStore(),
+            AppProfile.Create(null));
+        secrets = service;
+        return new AuthSessionService(
+            service,
+            uri => new HttpClient(handler, disposeHandler: false) { BaseAddress = uri },
+            new RecordingDelays().Delay,
+            logging);
+    }
+
     private static void EnqueueLoginOk(StubHttpMessageHandler handler, string token = "jwt-token") =>
         handler.EnqueueJson(HttpStatusCode.OK, new { token, expires = "2030-01-01T00:00:00Z" });
 
@@ -47,6 +73,7 @@ public class AuthSessionServiceTests
     /// ProblemDetails-Body (<c>application/problem+json</c>) — das
     /// UnauthorizedResult des Action-Filters am gated Login-Endpunkt.
     /// </summary>
+    /// <param name="handler">Der Stub-HTTP-Handler für Server-Antworten.</param>
     private static void EnqueueGateProbeRejected(StubHttpMessageHandler handler) =>
         handler.Enqueue(new HttpResponseMessage(HttpStatusCode.Unauthorized)
         {
@@ -263,6 +290,70 @@ public class AuthSessionServiceTests
         Assert.Equal(AuthAttemptStatus.Failed, attempt.Status);
     }
 
+    /// <summary>Prüft LoginAsync: das Anmeldeergebnis landet als Information im Protokoll — ohne Zugangsdaten, Token oder Benutzername.</summary>
+    [Fact]
+    public async Task LoginAsync_WritesEntries_WithoutCredentials()
+    {
+        var handler = new StubHttpMessageHandler();
+        var logging = new RecordingLoggerProvider();
+        var service = CreateService(handler, logging, out _);
+        EnqueueLoginOk(handler, "jwt-geheim-token");
+
+        var attempt = await service.LoginAsync(Server, "geheimuser", "supers3cret");
+
+        Assert.Equal(AuthAttemptStatus.Succeeded, attempt.Status);
+        Assert.Contains(logging.Entries, e =>
+            e.Level == LogLevel.Information
+            && e.Category.Contains(nameof(AuthSessionService), StringComparison.Ordinal));
+        Assert.DoesNotContain(logging.Entries, e =>
+            e.Message.Contains("supers3cret", StringComparison.Ordinal)
+            || e.Message.Contains("jwt-geheim-token", StringComparison.Ordinal)
+            || e.Message.Contains("geheimuser", StringComparison.Ordinal));
+    }
+
+    /// <summary>Prüft CreateClient: bei gesetzter LoggerFactory schreibt der API-Client seine Wiederholungs-Warnungen in die Aufzeichnung.</summary>
+    [Fact]
+    public async Task CreateClient_WiresApiClientLogger()
+    {
+        var handler = new StubHttpMessageHandler();
+        var logging = new RecordingLoggerProvider();
+        var service = CreateService(handler, logging, out _);
+        EnqueueLoginOk(handler);
+        await service.LoginAsync(Server, "martin", "pw");
+
+        // Ein Transportfehler löst die Wiederholungsstrategie des
+        // API-Clients aus — der verdrahtete Logger schreibt die Warnung.
+        handler.EnqueueException(new HttpRequestException("ausgefallen"));
+        handler.EnqueueJson(HttpStatusCode.OK, Array.Empty<object>());
+
+        await service.Client!.GetSourcesAsync();
+
+        Assert.Contains(logging.Entries, e =>
+            e.Level == LogLevel.Warning
+            && e.Category.Contains(nameof(VideoPlayerApiClient), StringComparison.Ordinal));
+    }
+
+    /// <summary>Prüft LogoutAsync: die Abmeldung landet als Information im Protokoll — ohne Zugangsdaten oder Token-Werte.</summary>
+    [Fact]
+    public async Task LogoutAsync_WritesEntry()
+    {
+        var handler = new StubHttpMessageHandler();
+        var logging = new RecordingLoggerProvider();
+        var service = CreateService(handler, logging, out var secrets);
+        await secrets.SetCredentialsAsync("martin", "pw-geheim");
+        EnqueueLoginOk(handler, "jwt-geheim");
+        await service.TryStoredLoginAsync(Server);
+
+        await service.LogoutAsync();
+
+        Assert.Contains(logging.Entries, e =>
+            e.Level == LogLevel.Information
+            && e.Category.Contains(nameof(AuthSessionService), StringComparison.Ordinal));
+        Assert.DoesNotContain(logging.Entries, e =>
+            e.Message.Contains("pw-geheim", StringComparison.Ordinal)
+            || e.Message.Contains("jwt-geheim", StringComparison.Ordinal));
+    }
+
     /// <summary>Prüft LogoutAsync: gibt den Client frei und entfernt Zugangsdaten und Token.</summary>
     [Fact]
     public async Task LogoutAsync_ClearsClientAndSecrets()
@@ -418,6 +509,8 @@ public class AuthSessionServiceTests
     /// Test-Vorrichtung: hinterlegt ein Geräte-Token für den Testserver und
     /// aktiviert ihn als aktuellen Server-Kontext.
     /// </summary>
+    /// <param name="deviceTokens">Der Geräte-Token-Dienst.</param>
+    /// <param name="secrets">Der Ablage-Dienst für das Geräte-Token.</param>
     private static async Task PairDeviceAsync(DeviceTokenService deviceTokens, AppSecretsService secrets)
     {
         await secrets.SetDeviceTokenAsync(Server.ToString(), "dev-token");

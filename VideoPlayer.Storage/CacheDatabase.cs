@@ -1,3 +1,5 @@
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using SQLite;
 using VideoPlayer.Storage.Entities;
 
@@ -12,13 +14,16 @@ namespace VideoPlayer.Storage;
 public sealed class CacheDatabase
 {
     private readonly string databasePath;
+    private readonly ILogger<CacheDatabase> logger;
     private Lazy<SQLiteAsyncConnection> connection;
 
     /// <summary>Erstellt die Datenbank; die Verbindung wird erst bei Bedarf geöffnet.</summary>
     /// <param name="layout">Ablagelayout mit dem Datenbankpfad.</param>
-    public CacheDatabase(AppStorageLayout layout)
+    /// <param name="logger">Optionaler Logger für das Programmprotokoll.</param>
+    public CacheDatabase(AppStorageLayout layout, ILogger<CacheDatabase>? logger = null)
     {
         ArgumentNullException.ThrowIfNull(layout);
+        this.logger = logger ?? NullLogger<CacheDatabase>.Instance;
         databasePath = layout.CacheDatabasePath;
         connection = CreateConnection(databasePath);
     }
@@ -66,8 +71,9 @@ public sealed class CacheDatabase
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine(
-                $"[CacheDatabase] Initialisierung fehlgeschlagen — Datei wird neu angelegt: {ex.Message}");
+            logger.LogWarning(
+                ex,
+                "Initialisierung der Cache-Datenbank fehlgeschlagen — Datei wird neu angelegt.");
         }
 
         // Die Lazy-Verbindung cached ihre Ausnahme — für den Neuversuch

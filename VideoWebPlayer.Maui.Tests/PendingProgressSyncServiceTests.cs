@@ -1,4 +1,6 @@
+using Microsoft.Extensions.Logging;
 using VideoPlayer.Storage;
+using VideoWebPlayer.Maui.Tests.Stubs;
 
 namespace VideoWebPlayer.Maui.Tests;
 
@@ -102,6 +104,41 @@ public class PendingProgressSyncServiceTests : IDisposable
         // Gleiche Id unter anderem Typ bleibt unberührt.
         await queue.EnqueueAsync("movie", 2, TimeSpan.FromMinutes(4), TimeSpan.FromMinutes(90));
         Assert.Equal(2, await queue.CountAsync());
+    }
+
+    /// <summary>
+    /// Prüft die Protokolleinträge: nur der Zustandswechsel (erste
+    /// Einreihung eines Mediums) schreibt einen Eintrag — Ersetzen im
+    /// Fortschrittstakt und das Entfernen pro Medium bleiben still.
+    /// </summary>
+    [Fact]
+    public async Task Enqueue_Remove_LoggedAggregated()
+    {
+        var logging = new RecordingLoggerProvider();
+        var db = new BackupDatabase(layout);
+        await db.InitializeAsync();
+        var queue = new PendingProgressSyncService(db, logging.CreateLogger<PendingProgressSyncService>());
+
+        await queue.EnqueueAsync("movie", 42, TimeSpan.FromMinutes(1), TimeSpan.FromMinutes(90));
+        Assert.Contains(logging.Entries, e =>
+            e.Level == LogLevel.Information
+            && e.Category.Contains(nameof(PendingProgressSyncService), StringComparison.Ordinal)
+            && e.Message.Contains("eingereiht", StringComparison.Ordinal));
+
+        // Erneutes Einreihen desselben Mediums (Fortschrittstakt)
+        // erzeugt keinen weiteren Eintrag.
+        await queue.EnqueueAsync("movie", 42, TimeSpan.FromMinutes(2), TimeSpan.FromMinutes(90));
+        Assert.Single(logging.Entries, e =>
+            e.Level == LogLevel.Information
+            && e.Category.Contains(nameof(PendingProgressSyncService), StringComparison.Ordinal)
+            && e.Message.Contains("eingereiht", StringComparison.Ordinal));
+
+        // Entfernen pro Medium bleibt still — die Gesamtzahl trägt der
+        // Flush-Lauf des Aufrufers (ServerSyncService).
+        await queue.RemoveForMediaAsync("movie", 42);
+        Assert.DoesNotContain(logging.Entries, e =>
+            e.Category.Contains(nameof(PendingProgressSyncService), StringComparison.Ordinal)
+            && e.Message.Contains("entfernt", StringComparison.Ordinal));
     }
 
     /// <summary>Prüft Pending: übersteht ein erneutes Öffnen der Datenbank.</summary>

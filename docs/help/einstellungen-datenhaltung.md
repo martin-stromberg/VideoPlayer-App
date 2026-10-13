@@ -47,6 +47,25 @@ sofort übernommen und bleiben nach dem Neustart der App erhalten.
   Ausschalten wird eine Marker-Zeile ins Protokoll geschrieben. Ab
   1 MiB wird die Datei nach `videoplayer.previous.log` rotiert; beide
   Dateien werden beim Versand angehängt.
+- Bei eingeschalteter Protokollierung enthält die Datei sparsame
+  Ablauf-Einträge, anhand derer sich der Weg der App nachvollziehen
+  lässt: App-Start, Serverprüfung und Quellenwechsel, An- und Abmeldung
+  (nur das Ergebnis), Sitzungsablauf, Verbindungsauf- und -abbau der
+  Echtzeit-Ereignisse, Auflösung der Wiedergabequelle (Medientyp und
+  Quellart, z. B. Server-Stream oder lokale Datei), Wiedergabe-Start,
+  -Ende und -Fehlschlag, Bild-im-Bild-Umschaltungen, das Ergebnis der
+  Synchronisation mit Zählern, Download-Aufträge und deren Verlauf,
+  den automatischen Download-Lauf sowie Wechsel zwischen Online- und
+  Offline-Betrieb. Überholbare Störungen (z. B. ein fehlgeschlagener
+  Einzelabruf) erscheinen als Warnung, Fehlschläge als Fehlereintrag.
+- Das Protokoll bleibt bewusst knapp: der laufende Fortschrittstakt
+  der Wiedergabe, einzelne Listeneinträge und Bildabrufe erzeugen
+  keine Einträge — sonst würde die Datei unnütz zulaufen. Es enthält
+  keine Geheimnisse: Zugangsdaten, Benutzernamen und Anmelde-Tokens
+  werden grundsätzlich nicht protokolliert; taucht ein Token-Wert
+  doch einmal in einer technischen Fehlermeldung auf, wird er vor
+  dem Schreiben maskiert. Die Datei kann daher bedenkenlos an den
+  Support weitergegeben werden.
 - **Protokoll senden** — nur sichtbar, solange die Protokollierung aktiv
   ist: öffnet einen E-Mail-Entwurf an `mstromberg84+heimkino@gmail.com`
   mit dem Protokoll als Anhang. Kann kein Mailentwurf geöffnet werden
@@ -114,3 +133,40 @@ beeinflussen sich nicht gegenseitig.
 - MVU-Strecke: Start → `InitializeStorageEffect` + `LoadSettingsEffect` →
   `SettingsLoadedMessage`; Änderung auf der Seite →
   `SaveSettingsRequestedMessage` → `PersistSettingsEffect`.
+
+## Technischer Aufbau des Protokolls
+
+- **Senke:** `AppLogService` (schaltbarer Datei-Speicher,
+  `SetEnabled` aus dem Einstellungs-Fluss; Marker beim Ein-/Ausschalten,
+  Rotation ab `MaxLogFileBytes` = 1 MiB auf
+  `videoplayer.previous.log`, `GetAttachmentPaths` für den Versand).
+  `FileLogger`/`FileLoggerProvider` bilden die `ILogger`-Brücke
+  (Mindestlevel `Information`); `MauiProgram` registriert den Provider
+  als `ILoggerProvider`-Singleton, `FileLogger.IsEnabled` filtert bei
+  deaktiviertem Protokoll früh — die Aufrufe bleiben kostenneutral.
+- **Schreiber:** Alle App-Dienste erhalten injizierte `ILogger<T>`
+  (plattformneutrale Dienste optional mit `NullLogger`-Fallback,
+  ausschließlich DI-erzeugte MAUI-Klassen als Pflichtparameter;
+  `AuthSessionService` nimmt eine `ILoggerFactory`, um neben dem
+  eigenen Logger auch `VideoPlayerApiClientOptions.Logger` des
+  API-Clients und den intern erzeugten `DeviceTokenService` zu
+  versorgen). `ShowDetailsCache` als statische Hilfsklasse erhält den
+  Logger als Methodenparameter der Aufrufer. Frühere
+  `Debug.WriteLine`-Diagnosen sind vollständig ersetzt
+  (Ausnahmen: Altbestand `VideoWebPlayer.Maui`, Discovery in
+  `VideoPlayer.ApiClient`); der Contract-Test
+  `NoDebugWriteLine_RemainsInAppSources` pinnt den Restbestand.
+- **Breadcrumb-Prinzip:** Genau ein Eintrag je Ereignis an genau einer
+  Schicht — Dienste protokollieren ihr Ergebnis, der
+  `ShellAppEffectHandler` nur noch Fehlerpfade und Handler-eigene
+  Ergebnisse (Ablage-Initialisierung, Wiedergabe-Start). Rauschfeste
+  Pfade laufen auf `Debug` (unterhalb der `Information`-Schwelle):
+  Teil-Synchronisationen nach Hub-Ereignissen, Hub-Ereignis-Eingänge,
+  Download-Hinweise ohne Zustandswechsel.
+- **Geheimnis-Schutz:** `AppLogService.MaskAccessToken` ersetzt den
+  Wert jeder `access_token`-Query in Meldung und Exception-Text am
+  Sinkenpunkt; `PlayerPage` bereinigt plattformgenerierte Meldungen
+  vorab mit derselben Funktion. Protokolliert werden Medientyp/-Id,
+  `PlaybackSourceKind`, Status und Zähler — niemals
+  `PlaybackSource.Location`, `AuthAttempt.Username`, Passwörter oder
+  Tokens.

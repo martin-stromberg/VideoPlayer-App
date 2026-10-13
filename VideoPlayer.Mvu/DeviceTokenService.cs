@@ -1,6 +1,7 @@
-using System.Diagnostics;
 using System.Net;
 using System.Text;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using VideoPlayer.ApiClient;
 using VideoPlayer.Storage;
 
@@ -19,6 +20,7 @@ public sealed class DeviceTokenService
 
     private readonly AppSecretsService secrets;
     private readonly Func<Uri, HttpClient> httpClientFactory;
+    private readonly ILogger<DeviceTokenService> logger;
 
     // Serialisiert die Provider-Mutationen: Prüfung + Aktivierung des
     // Pairing-Ergebnisses (SetPairedTokenIfCurrentAsync) darf sich nicht
@@ -28,8 +30,9 @@ public sealed class DeviceTokenService
 
     /// <summary>Erstellt den Dienst mit einem Standard-<see cref="HttpClient"/> für Gate-Probes.</summary>
     /// <param name="secrets">Sichere Ablage der Geräte-Tokens.</param>
-    public DeviceTokenService(AppSecretsService secrets)
-        : this(secrets, null)
+    /// <param name="logger">Optionaler Logger für das Programmprotokoll.</param>
+    public DeviceTokenService(AppSecretsService secrets, ILogger<DeviceTokenService>? logger = null)
+        : this(secrets, null, logger)
     {
     }
 
@@ -39,10 +42,15 @@ public sealed class DeviceTokenService
     /// Fabrik für den HTTP-Client der Gate-Probe (injizierbar für Tests);
     /// <c>null</c> = Standard-Client mit 10-s-Timeout.
     /// </param>
-    public DeviceTokenService(AppSecretsService secrets, Func<Uri, HttpClient>? httpClientFactory)
+    /// <param name="logger">Optionaler Logger für das Programmprotokoll.</param>
+    public DeviceTokenService(
+        AppSecretsService secrets,
+        Func<Uri, HttpClient>? httpClientFactory,
+        ILogger<DeviceTokenService>? logger = null)
     {
         this.secrets = secrets ?? throw new ArgumentNullException(nameof(secrets));
         this.httpClientFactory = httpClientFactory ?? CreateHttpClient;
+        this.logger = logger ?? NullLogger<DeviceTokenService>.Instance;
     }
 
     /// <summary>Die Serveradresse, deren Geräte-Token der Provider aktuell bedient.</summary>
@@ -73,7 +81,7 @@ public sealed class DeviceTokenService
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"[DeviceTokenService] Geräte-Token konnte nicht geladen werden: {ex.Message}");
+                logger.LogWarning(ex, "Geräte-Token konnte nicht geladen werden.");
             }
         }
 
@@ -157,10 +165,11 @@ public sealed class DeviceTokenService
             try
             {
                 await secrets.ClearDeviceTokenAsync(current);
+                logger.LogInformation("Geräte-Token für {ServerAddress} verworfen.", current);
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"[DeviceTokenService] Geräte-Token konnte nicht verworfen werden: {ex.Message}");
+                logger.LogWarning(ex, "Geräte-Token konnte nicht verworfen werden.");
             }
         }
     }
@@ -205,10 +214,11 @@ public sealed class DeviceTokenService
         try
         {
             await secrets.ClearDeviceTokenAsync(discarded);
+            logger.LogInformation("Geräte-Token für {ServerAddress} verworfen.", discarded);
         }
         catch (Exception ex)
         {
-            Debug.WriteLine($"[DeviceTokenService] Geräte-Token konnte nicht verworfen werden: {ex.Message}");
+            logger.LogWarning(ex, "Geräte-Token konnte nicht verworfen werden.");
         }
 
         return true;
@@ -261,7 +271,7 @@ public sealed class DeviceTokenService
         }
         catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or InvalidOperationException or UriFormatException)
         {
-            Debug.WriteLine($"[DeviceTokenService] Gate-Probe fehlgeschlagen: {ex.Message}");
+            logger.LogWarning(ex, "Gate-Probe fehlgeschlagen.");
             return false;
         }
     }
@@ -269,13 +279,15 @@ public sealed class DeviceTokenService
     /// <summary>Löst <see cref="DeviceTokenRejected"/> aus.</summary>
     public void NotifyRejected()
     {
+        logger.LogWarning("Geräte-Token vom Server abgelehnt (Gate-Ablehnung).");
+
         try
         {
             DeviceTokenRejected?.Invoke(this, EventArgs.Empty);
         }
         catch (Exception ex)
         {
-            Debug.WriteLine($"[DeviceTokenService] DeviceTokenRejected-Handler fehlgeschlagen: {ex.Message}");
+            logger.LogWarning(ex, "DeviceTokenRejected-Handler fehlgeschlagen.");
         }
     }
 
@@ -303,7 +315,7 @@ public sealed class DeviceTokenService
         {
             // Ein Lesefehler der sicheren Ablage blockiert die Probe
             // nicht — die statische Auflösung greift.
-            Debug.WriteLine($"[DeviceTokenService] Geräte-Token der Probe-Adresse nicht lesbar: {ex.Message}");
+            logger.LogWarning(ex, "Geräte-Token der Probe-Adresse nicht lesbar.");
         }
 
         return ClientGate.ResolveStatic();

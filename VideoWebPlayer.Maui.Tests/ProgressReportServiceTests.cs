@@ -1,6 +1,7 @@
 #pragma warning disable xUnit1051 // Kurzlebige Unit-Tests: TestContext-CancellationToken nicht erforderlich
 using System.Net;
 using System.Text.Json;
+using Microsoft.Extensions.Logging;
 using VideoPlayer.Mvu;
 using VideoPlayer.Storage;
 using VideoWebPlayer.Maui.Tests.Stubs;
@@ -18,6 +19,7 @@ public class ProgressReportServiceTests : IDisposable
     private static readonly Uri Server = new("http://testserver/videoplayer/");
 
     private readonly string root;
+    private readonly AppStorageLayout layout;
     private readonly PendingProgressSyncService queue;
     private readonly FakeNetworkMonitor monitor = new();
     private readonly StubHttpMessageHandler handler = new();
@@ -27,7 +29,7 @@ public class ProgressReportServiceTests : IDisposable
     public ProgressReportServiceTests()
     {
         root = Path.Combine(Path.GetTempPath(), "videoplayer-report-tests", Guid.NewGuid().ToString("N"));
-        var layout = new AppStorageLayout(
+        layout = new AppStorageLayout(
             backupRoot: Path.Combine(root, "backup"),
             noBackupRoot: Path.Combine(root, "nobackup"),
             cacheRoot: Path.Combine(root, "cache"),
@@ -147,6 +149,87 @@ public class ProgressReportServiceTests : IDisposable
         await service.ReportProgressAsync("movie", 42, TimeSpan.FromMinutes(12), TimeSpan.FromMinutes(90));
 
         Assert.Equal(0, await queue.CountAsync());
+    }
+
+    /// <summary>
+    /// Prüft ReportProgress: das Einreihen protokolliert die
+    /// Warteschlange beim Zustandswechsel (nicht der Dienst pro Takt);
+    /// Fehler-Warnungen erscheinen einmal je Medium und Outcome.
+    /// </summary>
+    [Fact]
+    public async Task ReportProgressAsync_QueueAndDiscard_Logged()
+    {
+        var logging = new RecordingLoggerProvider();
+        var loggedDb = new BackupDatabase(layout);
+        await loggedDb.InitializeAsync();
+        var loggedQueue = new PendingProgressSyncService(
+            loggedDb, logging.CreateLogger<PendingProgressSyncService>());
+        var service = new ProgressReportService(
+            authSession, loggedQueue, monitor, logging.CreateLogger<ProgressReportService>());
+
+        // Ohne Client wird eingereiht → Information nur auf der
+        // Warteschlangen-Schicht, kein Doppeleintrag des Dienstes.
+        await service.ReportProgressAsync("movie", 42, TimeSpan.FromMinutes(1), TimeSpan.FromMinutes(90));
+        Assert.Contains(logging.Entries, e =>
+            e.Level == LogLevel.Information
+            && e.Category.Contains(nameof(PendingProgressSyncService), StringComparison.Ordinal)
+            && e.Message.Contains("eingereiht", StringComparison.Ordinal));
+        Assert.DoesNotContain(logging.Entries, e =>
+            e.Category.Contains(nameof(ProgressReportService), StringComparison.Ordinal)
+            && e.Message.Contains("eingereiht", StringComparison.Ordinal));
+
+        // Erneutes Einreihen desselben Mediums im Fortschrittstakt
+        // bleibt auf beiden Schichten still.
+        await service.ReportProgressAsync("movie", 42, TimeSpan.FromMinutes(2), TimeSpan.FromMinutes(90));
+        Assert.Single(logging.Entries, e =>
+            e.Level == LogLevel.Information
+            && e.Category.Contains(nameof(PendingProgressSyncService), StringComparison.Ordinal)
+            && e.Message.Contains("eingereiht", StringComparison.Ordinal));
+
+        // Permanenter Clientfehler (4xx ohne 401/408/429) → verworfen
+        // → Warning, einmal je Medium (Zustandswechsel, kein Takt).
+        await LoginAsync();
+        handler.Enqueue(HttpStatusCode.NotFound);
+        await service.ReportProgressAsync("movie", 43, TimeSpan.FromMinutes(1), TimeSpan.FromMinutes(90));
+        handler.Enqueue(HttpStatusCode.NotFound);
+        await service.ReportProgressAsync("movie", 43, TimeSpan.FromMinutes(2), TimeSpan.FromMinutes(90));
+        Assert.Single(logging.Entries, e =>
+            e.Level == LogLevel.Warning
+            && e.Category.Contains(nameof(ProgressReportService), StringComparison.Ordinal)
+            && e.Message.Contains("verworfen", StringComparison.Ordinal));
+    }
+
+    /// <summary>
+    /// Prüft ReportProgress: ein persistenter Schreibfehler der
+    /// Warteschlange (z. B. SQLite) wird je Medium einmal als Warnung
+    /// protokolliert — nicht pro Fortschrittstakt, und er entkommt
+    /// nicht als Ausnahme (der nächste Takt versucht erneut).
+    /// </summary>
+    [Fact]
+    public async Task ReportProgress_EnqueueFailure_LogsWarningOncePerMedia()
+    {
+        var logging = new RecordingLoggerProvider();
+        // Die Datenbank bleibt bewusst uninitialisiert — die fehlende
+        // Tabelle pending_progress lässt jedes Einreihen scheitern.
+        var brokenLayout = new AppStorageLayout(
+            backupRoot: Path.Combine(root, "broken-backup"),
+            noBackupRoot: Path.Combine(root, "broken-nobackup"),
+            cacheRoot: Path.Combine(root, "broken-cache"),
+            profile: AppProfile.Create(null));
+        brokenLayout.EnsureDirectoriesExist();
+        var brokenQueue = new PendingProgressSyncService(new BackupDatabase(brokenLayout));
+        var service = new ProgressReportService(
+            authSession, brokenQueue, monitor, logging.CreateLogger<ProgressReportService>());
+
+        // Zwei Fortschrittstakte desselben Mediums — der zweite erzeugt
+        // keinen weiteren Eintrag (Zustandswechsel statt Takt).
+        await service.ReportProgressAsync("movie", 42, TimeSpan.FromMinutes(1), TimeSpan.FromMinutes(90));
+        await service.ReportProgressAsync("movie", 42, TimeSpan.FromMinutes(2), TimeSpan.FromMinutes(90));
+
+        Assert.Single(logging.Entries, e =>
+            e.Level == LogLevel.Warning
+            && e.Category.Contains(nameof(ProgressReportService), StringComparison.Ordinal)
+            && e.Message.Contains("movie/42", StringComparison.Ordinal));
     }
 
     private sealed class FakeNetworkMonitor : INetworkStatusMonitor

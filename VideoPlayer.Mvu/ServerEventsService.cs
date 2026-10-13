@@ -1,3 +1,6 @@
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
+
 namespace VideoPlayer.Mvu;
 
 /// <summary>
@@ -16,6 +19,7 @@ public sealed class ServerEventsService : IAsyncDisposable
     private readonly AuthSessionService authSession;
     private readonly Func<IServerEventsConnection> connectionFactory;
     private readonly SemaphoreSlim gate = new(1, 1);
+    private readonly ILogger<ServerEventsService> logger;
 
     private IServerEventsConnection? connection;
     private string? connectedServerAddress;
@@ -23,12 +27,15 @@ public sealed class ServerEventsService : IAsyncDisposable
     /// <summary>Erstellt den Dienst.</summary>
     /// <param name="authSession">Sitzungsdienst mit dem angemeldeten API-Client (Token-Quelle).</param>
     /// <param name="connectionFactory">Fabrik für die eigentliche Verbindungs-Implementierung (SignalR am App-Rand).</param>
+    /// <param name="logger">Optionaler Logger für das Programmprotokoll.</param>
     public ServerEventsService(
         AuthSessionService authSession,
-        Func<IServerEventsConnection> connectionFactory)
+        Func<IServerEventsConnection> connectionFactory,
+        ILogger<ServerEventsService>? logger = null)
     {
         this.authSession = authSession ?? throw new ArgumentNullException(nameof(authSession));
         this.connectionFactory = connectionFactory ?? throw new ArgumentNullException(nameof(connectionFactory));
+        this.logger = logger ?? NullLogger<ServerEventsService>.Instance;
     }
 
     /// <summary>Die Ereignisverbindung ist aktuell aufgebaut.</summary>
@@ -87,6 +94,9 @@ public sealed class ServerEventsService : IAsyncDisposable
 
             connection = next;
             connectedServerAddress = normalized;
+            logger.LogInformation(
+                "Ereignisverbindung zu {HubAddress} aufgebaut.",
+                new Uri(serverAddress, HubPath).GetLeftPart(UriPartial.Path));
         }
         finally
         {
@@ -102,6 +112,7 @@ public sealed class ServerEventsService : IAsyncDisposable
         try
         {
             await DisconnectCoreAsync();
+            logger.LogInformation("Ereignisverbindung getrennt.");
         }
         finally
         {
@@ -138,7 +149,7 @@ public sealed class ServerEventsService : IAsyncDisposable
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"[ServerEventsService] Trennen fehlgeschlagen: {ex.Message}");
+            logger.LogWarning(ex, "Trennen der Ereignisverbindung fehlgeschlagen.");
         }
 
         await current.DisposeAsync();
@@ -154,7 +165,7 @@ public sealed class ServerEventsService : IAsyncDisposable
         RaiseEventReceived(new ServerEventReceivedEventArgs(ServerEventKind.NewVideosScanned, e.SourceId, e.Count));
 
     private void OnStatusChanged(object? sender, string message) =>
-        System.Diagnostics.Debug.WriteLine($"[ServerEventsService] StatusChanged: {message}");
+        logger.LogInformation("Status der Ereignisverbindung: {StatusMessage}", message);
 
     private void OnClosed(object? sender, EventArgs e)
     {
@@ -173,17 +184,19 @@ public sealed class ServerEventsService : IAsyncDisposable
         connectedServerAddress = null;
         _ = DisposeClosedAsync(closed);
 
+        logger.LogInformation("Ereignisverbindung geschlossen.");
+
         try
         {
             ConnectionClosed?.Invoke(this, EventArgs.Empty);
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"[ServerEventsService] ConnectionClosed-Handler fehlgeschlagen: {ex.Message}");
+            logger.LogWarning(ex, "ConnectionClosed-Handler fehlgeschlagen.");
         }
     }
 
-    private static async Task DisposeClosedAsync(IServerEventsConnection closed)
+    private async Task DisposeClosedAsync(IServerEventsConnection closed)
     {
         try
         {
@@ -191,7 +204,7 @@ public sealed class ServerEventsService : IAsyncDisposable
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"[ServerEventsService] Dispose der getrennten Verbindung fehlgeschlagen: {ex.Message}");
+            logger.LogWarning(ex, "Dispose der getrennten Verbindung fehlgeschlagen.");
         }
     }
 
@@ -203,7 +216,7 @@ public sealed class ServerEventsService : IAsyncDisposable
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"[ServerEventsService] EventReceived-Handler fehlgeschlagen: {ex.Message}");
+            logger.LogWarning(ex, "EventReceived-Handler fehlgeschlagen.");
         }
     }
 }

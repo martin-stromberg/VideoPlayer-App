@@ -1,4 +1,6 @@
 using System.Net;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using VideoPlayer.ApiClient;
 using VideoPlayer.ApiClient.Models;
 using VideoPlayer.Storage;
@@ -25,12 +27,17 @@ public sealed class MediaDetailsService
     private readonly AuthSessionService authSession;
     private readonly CacheDatabase cache;
     private readonly Func<string, bool> fileExists;
+    private readonly ILogger<MediaDetailsService> logger;
 
     /// <summary>Erstellt den Dienst.</summary>
     /// <param name="authSession">Sitzungsdienst mit dem angemeldeten API-Client.</param>
     /// <param name="cache">Cache-Ablage (Download-Manifest, Serienstruktur, Favoriten-Kopie).</param>
-    public MediaDetailsService(AuthSessionService authSession, CacheDatabase cache)
-        : this(authSession, cache, null)
+    /// <param name="logger">Optionaler Logger für das Programmprotokoll.</param>
+    public MediaDetailsService(
+        AuthSessionService authSession,
+        CacheDatabase cache,
+        ILogger<MediaDetailsService>? logger = null)
+        : this(authSession, cache, null, logger)
     {
     }
 
@@ -38,11 +45,17 @@ public sealed class MediaDetailsService
     /// <param name="authSession">Sitzungsdienst mit dem angemeldeten API-Client.</param>
     /// <param name="cache">Cache-Ablage (Download-Manifest, Serienstruktur, Favoriten-Kopie).</param>
     /// <param name="fileExists">Dateiprüfung; <c>null</c> = <see cref="File.Exists(string?)"/>.</param>
-    internal MediaDetailsService(AuthSessionService authSession, CacheDatabase cache, Func<string, bool>? fileExists)
+    /// <param name="logger">Optionaler Logger für das Programmprotokoll.</param>
+    internal MediaDetailsService(
+        AuthSessionService authSession,
+        CacheDatabase cache,
+        Func<string, bool>? fileExists,
+        ILogger<MediaDetailsService>? logger = null)
     {
         this.authSession = authSession ?? throw new ArgumentNullException(nameof(authSession));
         this.cache = cache ?? throw new ArgumentNullException(nameof(cache));
         this.fileExists = fileExists ?? File.Exists;
+        this.logger = logger ?? NullLogger<MediaDetailsService>.Instance;
     }
 
     /// <summary>
@@ -144,7 +157,7 @@ public sealed class MediaDetailsService
                 {
                     var resolvedShowId = showId is > 0 ? showId : entry?.ShowId;
                     var show = resolvedShowId is > 0
-                        ? await ShowDetailsCache.ReadAsync(cache, resolvedShowId.Value, cancellationToken)
+                        ? await ShowDetailsCache.ReadAsync(cache, resolvedShowId.Value, logger, cancellationToken)
                         : null;
                     if (show is not null)
                     {
@@ -173,7 +186,7 @@ public sealed class MediaDetailsService
 
             case "tvshow":
                 {
-                    var show = await ShowDetailsCache.ReadAsync(cache, mediaId, cancellationToken)
+                    var show = await ShowDetailsCache.ReadAsync(cache, mediaId, logger, cancellationToken)
                         ?? throw new InvalidOperationException("Für diese Serie liegen keine Offline-Daten vor.");
                     return MapOfflineShow(
                         show, "tvshow", mediaId,
@@ -186,7 +199,7 @@ public sealed class MediaDetailsService
                     var resolvedShowId = showId is > 0
                         ? showId.Value
                         : throw new InvalidOperationException("Für diese Staffel ist keine Serie hinterlegt.");
-                    var show = await ShowDetailsCache.ReadAsync(cache, resolvedShowId, cancellationToken)
+                    var show = await ShowDetailsCache.ReadAsync(cache, resolvedShowId, logger, cancellationToken)
                         ?? throw new InvalidOperationException("Für diese Staffel liegen keine Offline-Daten vor.");
                     return MapOfflineShow(
                         show, "tvshowseason", mediaId,
@@ -284,7 +297,7 @@ public sealed class MediaDetailsService
                 catch (Exception ex) when (ex is ApiException or HttpRequestException or TaskCanceledException)
                 {
                     // Serie nicht ladbar → Basisdetails der Episode zeigen.
-                    System.Diagnostics.Debug.WriteLine($"[MediaDetailsService] Serie {embeddedShowId} nicht ladbar: {ex.Message}");
+                    logger.LogWarning(ex, "Serie {ShowId} nicht ladbar.", embeddedShowId);
                 }
             }
         }
@@ -328,7 +341,7 @@ public sealed class MediaDetailsService
     private async Task<TvShow> FetchShowAsync(VideoPlayerApiClient client, long showId, CancellationToken cancellationToken)
     {
         var show = await client.GetTvShowAsync(showId, cancellationToken);
-        await ShowDetailsCache.WriteAsync(cache, show, cancellationToken);
+        await ShowDetailsCache.WriteAsync(cache, show, logger, cancellationToken);
         return show;
     }
 
@@ -345,7 +358,7 @@ public sealed class MediaDetailsService
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"[MediaDetailsService] Manifest nicht lesbar: {ex.Message}");
+            logger.LogWarning(ex, "Download-Manifest nicht lesbar.");
             return [];
         }
     }
@@ -370,7 +383,7 @@ public sealed class MediaDetailsService
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"[MediaDetailsService] Favoriten-Kopie nicht lesbar: {ex.Message}");
+            logger.LogWarning(ex, "Favoriten-Kopie nicht lesbar.");
             return false;
         }
     }
@@ -407,7 +420,7 @@ public sealed class MediaDetailsService
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"[MediaDetailsService] Titelsuche fehlgeschlagen: {ex.Message}");
+            logger.LogWarning(ex, "Titelsuche fehlgeschlagen.");
         }
 
         return null;

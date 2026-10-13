@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging;
 using VideoPlayer.Mvu;
 
 namespace VideoPlayer.Maui
@@ -11,16 +12,19 @@ namespace VideoPlayer.Maui
     {
         private readonly MvuHost mvuHost;
         private readonly IServiceProvider services;
+        private readonly ILogger<App> logger;
         private bool startupDispatched;
 
         /// <summary>Initialisiert eine neue Instanz der <see cref="App"/>-Klasse.</summary>
         /// <param name="mvuHost">MVU-Host für den Dispatch der Start-Nachricht.</param>
         /// <param name="services">Dienstanbieter zum Auflösen der Ladeanzeige.</param>
-        public App(MvuHost mvuHost, IServiceProvider services)
+        /// <param name="logger">Logger für das Programmprotokoll.</param>
+        public App(MvuHost mvuHost, IServiceProvider services, ILogger<App> logger)
         {
             InitializeComponent();
             this.mvuHost = mvuHost;
             this.services = services;
+            this.logger = logger;
 
             // Die App ist dunkel-only wie die Webanwendung: alle Farben
             // kommen aus den Vp*-Design-Tokens, ein System-Light-Theme darf
@@ -60,11 +64,12 @@ namespace VideoPlayer.Maui
         {
             try
             {
+                logger.LogInformation("App-Start: Start-Workflow ausgelöst.");
                 await mvuHost.DispatchAsync(new StartupRequestedMessage());
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"[App] Startup-Dispatch fehlgeschlagen: {ex.Message}");
+                logger.LogError(ex, "Startup-Dispatch fehlgeschlagen.");
             }
         }
     }

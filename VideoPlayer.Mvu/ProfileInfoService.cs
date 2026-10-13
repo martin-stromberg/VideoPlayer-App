@@ -1,5 +1,7 @@
 using System.Text;
 using System.Text.Json;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using VideoPlayer.Storage;
 
 namespace VideoPlayer.Mvu;
@@ -16,14 +18,20 @@ public sealed class ProfileInfoService
 {
     private readonly AppSecretsService secrets;
     private readonly AppProfile profile;
+    private readonly ILogger<ProfileInfoService> logger;
 
     /// <summary>Erstellt den Dienst.</summary>
     /// <param name="secrets">Ablage der Zugangsdaten und Anmelde-Token.</param>
     /// <param name="profile">Aktives lokales Profil.</param>
-    public ProfileInfoService(AppSecretsService secrets, AppProfile profile)
+    /// <param name="logger">Optionaler Logger für das Programmprotokoll.</param>
+    public ProfileInfoService(
+        AppSecretsService secrets,
+        AppProfile profile,
+        ILogger<ProfileInfoService>? logger = null)
     {
         this.secrets = secrets ?? throw new ArgumentNullException(nameof(secrets));
         this.profile = profile ?? throw new ArgumentNullException(nameof(profile));
+        this.logger = logger ?? NullLogger<ProfileInfoService>.Instance;
     }
 
     /// <summary>
@@ -40,7 +48,7 @@ public sealed class ProfileInfoService
         var token = await secrets.GetAuthTokenAsync();
         cancellationToken.ThrowIfCancellationRequested();
 
-        var (username, email) = ReadTokenClaims(token);
+        var (username, email) = ReadTokenClaims(token, logger);
         return new ProfileInfo(
             username ?? storedUsername,
             email ?? storedUsername,
@@ -56,10 +64,11 @@ public sealed class ProfileInfoService
     /// rein informativ, eine Signaturprüfung ist nicht erforderlich.
     /// </summary>
     /// <param name="token">Das gespeicherte Anmelde-Token; <c>null</c>/leer = keine Claims.</param>
+    /// <param name="logger">Optionaler Logger für das Programmprotokoll (Lesefehler).</param>
     /// <returns>Die gelesenen Claims als Tupel (Benutzername, E-Mail); beide Elemente <c>null</c>, wenn nicht lesbar.</returns>
-    internal static (string?, string?) ReadTokenClaims(string? token)
+    internal static (string?, string?) ReadTokenClaims(string? token, ILogger? logger = null)
     {
-        using var document = ReadPayload(token);
+        using var document = ReadPayload(token, logger);
         if (document is null)
         {
             return (null, null);
@@ -87,10 +96,11 @@ public sealed class ProfileInfoService
     /// Lesung steuert nur die Sichtbarkeit des Öffentlich-Schalters.
     /// </summary>
     /// <param name="token">Das gespeicherte Anmelde-Token; <c>null</c>/leer = kein Claim.</param>
+    /// <param name="logger">Optionaler Logger für das Programmprotokoll (Lesefehler).</param>
     /// <returns><c>true</c>, wenn der Claim den Administrator-Status meldet.</returns>
-    internal static bool ReadIsAdminClaim(string? token)
+    internal static bool ReadIsAdminClaim(string? token, ILogger? logger = null)
     {
-        using var document = ReadPayload(token);
+        using var document = ReadPayload(token, logger);
         if (document is null)
         {
             return false;
@@ -107,8 +117,9 @@ public sealed class ProfileInfoService
     /// ist rein informativ, eine Signaturprüfung ist nicht erforderlich.
     /// </summary>
     /// <param name="token">Das zu dekodierende Token; <c>null</c>/leer = keine Payload.</param>
+    /// <param name="logger">Optionaler Logger für das Programmprotokoll (Lesefehler).</param>
     /// <returns>Das Payload-Dokument bzw. <c>null</c>, wenn nicht lesbar.</returns>
-    private static JsonDocument? ReadPayload(string? token)
+    private static JsonDocument? ReadPayload(string? token, ILogger? logger = null)
     {
         if (string.IsNullOrWhiteSpace(token))
         {
@@ -135,7 +146,7 @@ public sealed class ProfileInfoService
         }
         catch (Exception ex) when (ex is FormatException or JsonException or ArgumentException or InvalidOperationException)
         {
-            System.Diagnostics.Debug.WriteLine($"[ProfileInfoService] Token-Claims nicht lesbar: {ex.Message}");
+            logger?.LogWarning(ex, "Token-Claims nicht lesbar.");
             return null;
         }
     }

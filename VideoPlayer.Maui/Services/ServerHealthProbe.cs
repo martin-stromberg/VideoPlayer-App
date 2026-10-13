@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging;
 using VideoPlayer.ApiClient;
 using VideoPlayer.Storage;
 
@@ -17,14 +18,24 @@ public sealed class ServerHealthProbe : IServerHealthProbe
 
     private readonly IServerAddressProvider addressProvider;
     private readonly AppSecretsService secrets;
+    private readonly ILogger<ServerHealthProbe> logger;
+    private readonly ILogger apiClientLogger;
 
     /// <summary>Initialisiert eine neue Instanz der <see cref="ServerHealthProbe"/>-Klasse.</summary>
     /// <param name="addressProvider">Liefert die aufgelöste Server-Basisadresse für die parameterlose Prüfung.</param>
     /// <param name="secrets">Sichere Ablage der Geräte-Tokens je Serveradresse.</param>
-    public ServerHealthProbe(IServerAddressProvider addressProvider, AppSecretsService secrets)
+    /// <param name="logger">Logger für das Programmprotokoll.</param>
+    /// <param name="loggerFactory">Logger-Fabrik für den pro Prüfung erzeugten API-Client (Wiederholungs-/401-Warnungen).</param>
+    public ServerHealthProbe(
+        IServerAddressProvider addressProvider,
+        AppSecretsService secrets,
+        ILogger<ServerHealthProbe> logger,
+        ILoggerFactory loggerFactory)
     {
         this.addressProvider = addressProvider;
         this.secrets = secrets;
+        this.logger = logger;
+        apiClientLogger = loggerFactory.CreateLogger<VideoPlayerApiClient>();
     }
 
     /// <inheritdoc/>
@@ -55,12 +66,17 @@ public sealed class ServerHealthProbe : IServerHealthProbe
             };
             var client = new VideoPlayerApiClient(
                 httpClient,
-                new VideoPlayerApiClientOptions { ApiKey = apiKey });
-            return await client.CheckHealthAsync(cancellationToken);
+                new VideoPlayerApiClientOptions { ApiKey = apiKey, Logger = apiClientLogger });
+            var result = await client.CheckHealthAsync(cancellationToken);
+            logger.LogInformation(
+                "Serverprüfung {ServerHost}: {Status}.",
+                baseAddress.Host,
+                result);
+            return result;
         }
         catch (Exception ex) when (ex is InvalidOperationException or UriFormatException or HttpRequestException)
         {
-            System.Diagnostics.Debug.WriteLine($"[ServerHealthProbe] Erreichbarkeitsprüfung fehlgeschlagen: {ex.Message}");
+            logger.LogWarning(ex, "Erreichbarkeitsprüfung für {ServerHost} fehlgeschlagen.", baseAddress.Host);
             return HealthCheckResult.Unreachable;
         }
     }
@@ -85,7 +101,7 @@ public sealed class ServerHealthProbe : IServerHealthProbe
         {
             // Ein Lesefehler der sicheren Ablage blockiert die Prüfung
             // nicht — die statische Auflösung greift.
-            System.Diagnostics.Debug.WriteLine($"[ServerHealthProbe] Geräte-Token des Kandidaten nicht lesbar: {ex.Message}");
+            logger.LogWarning(ex, "Geräte-Token des Kandidaten nicht lesbar.");
         }
 
         return ClientGate.ResolveStatic();

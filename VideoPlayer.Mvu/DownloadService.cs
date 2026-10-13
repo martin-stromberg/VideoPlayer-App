@@ -1,5 +1,7 @@
 using System.Collections.Concurrent;
 using System.Net.Http.Headers;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using VideoPlayer.Storage;
 using VideoPlayer.Storage.Entities;
 
@@ -111,6 +113,7 @@ public sealed class DownloadService
     private readonly Func<HttpClient> httpClientFactory;
     private readonly Func<string, bool> fileExists;
     private readonly long? quotaBytesOverride;
+    private readonly ILogger<DownloadService> logger;
 
     private readonly SemaphoreSlim manifestGate = new(1, 1);
     private readonly SemaphoreSlim pumpGate = new(1, 1);
@@ -123,13 +126,15 @@ public sealed class DownloadService
     /// <param name="cache">Cache-Ablage mit dem Download-Manifest.</param>
     /// <param name="layout">Ablagelayout mit dem Video-Verzeichnis.</param>
     /// <param name="networkMonitor">Netzwerkstatus-Erkennung (WLAN-Bedingung).</param>
+    /// <param name="logger">Optionaler Logger für das Programmprotokoll.</param>
     public DownloadService(
         AuthSessionService authSession,
         AppSecretsService secrets,
         CacheDatabase cache,
         AppStorageLayout layout,
-        INetworkStatusMonitor networkMonitor)
-        : this(authSession, secrets, cache, layout, networkMonitor, null, null, null)
+        INetworkStatusMonitor networkMonitor,
+        ILogger<DownloadService>? logger = null)
+        : this(authSession, secrets, cache, layout, networkMonitor, null, null, null, logger)
     {
     }
 
@@ -142,6 +147,7 @@ public sealed class DownloadService
     /// <param name="httpClientFactory">Fabrik für den Download-<see cref="HttpClient"/>; <c>null</c> = produktive Erzeugung ohne Timeout.</param>
     /// <param name="fileExists">Existenzprüfung für lokale Dateien; <c>null</c> = <see cref="File.Exists(string?)"/>.</param>
     /// <param name="quotaBytesOverride">Ersetzt das GB-Kontingent der Einstellungen (für Tests); <c>null</c> = <c>DownloadQuotaGb</c>.</param>
+    /// <param name="logger">Optionaler Logger für das Programmprotokoll.</param>
     internal DownloadService(
         AuthSessionService authSession,
         AppSecretsService secrets,
@@ -150,7 +156,8 @@ public sealed class DownloadService
         INetworkStatusMonitor networkMonitor,
         Func<HttpClient>? httpClientFactory,
         Func<string, bool>? fileExists,
-        long? quotaBytesOverride)
+        long? quotaBytesOverride,
+        ILogger<DownloadService>? logger = null)
     {
         this.authSession = authSession ?? throw new ArgumentNullException(nameof(authSession));
         this.secrets = secrets ?? throw new ArgumentNullException(nameof(secrets));
@@ -160,6 +167,7 @@ public sealed class DownloadService
         this.httpClientFactory = httpClientFactory ?? CreateHttpClient;
         this.fileExists = fileExists ?? File.Exists;
         this.quotaBytesOverride = quotaBytesOverride;
+        this.logger = logger ?? NullLogger<DownloadService>.Instance;
     }
 
     /// <summary>Wird ausgelöst, wenn ein Download-Eintrag geändert wurde (Zustand oder Fortschritt).</summary>
@@ -200,7 +208,7 @@ public sealed class DownloadService
         {
             // Nicht lesbares Verzeichnis → konservativ 0 (die Engine
             // prüft ohnehin beim Schreiben erneut).
-            System.Diagnostics.Debug.WriteLine($"[DownloadService] Speicherbelegung nicht lesbar: {ex.Message}");
+            logger.LogWarning(ex, "Speicherbelegung nicht lesbar.");
             return 0;
         }
     }
@@ -233,14 +241,56 @@ public sealed class DownloadService
     {
         ArgumentNullException.ThrowIfNull(settings);
         var type = MediaTypeNames.Normalize(mediaType);
+
+        DownloadEnqueueResult Logged(DownloadEnqueueResult enqueueResult)
+        {
+            // Fehler-Notices (ungültiges Medium, Kontingent erschöpft)
+            // sind überholbare Einzelfehler → Warning; nur die
+            // tatsächliche Einplanung ist ein Verlaufsereignis
+            // (Information). Dedup-Hinweise ohne Zustandsänderung
+            // (AlreadyRunning/AlreadyQueued/AlreadyPresent) bleiben
+            // Debug — Auto-Download-Läufe prüfen pro Kandidat und
+            // würden sonst pro Eintrag der Liste einen Eintrag ohne
+            // Vorgang erzeugen.
+            if (enqueueResult.IsError)
+            {
+                logger.LogWarning(
+                    "Download-Auftrag {MediaType}/{MediaId} ({Title}): {Notice}",
+                    type,
+                    mediaId,
+                    title,
+                    enqueueResult.Notice);
+            }
+            else if (enqueueResult.Notice == NoticeEnqueued)
+            {
+                logger.LogInformation(
+                    "Download-Auftrag {MediaType}/{MediaId} ({Title}): {Notice}",
+                    type,
+                    mediaId,
+                    title,
+                    enqueueResult.Notice);
+            }
+            else
+            {
+                logger.LogDebug(
+                    "Download-Auftrag {MediaType}/{MediaId} ({Title}): {Notice}",
+                    type,
+                    mediaId,
+                    title,
+                    enqueueResult.Notice);
+            }
+
+            return enqueueResult;
+        }
+
         if (mediaId <= 0 || type is not ("movie" or "tvshowepisode"))
         {
-            return new DownloadEnqueueResult
+            return Logged(new DownloadEnqueueResult
             {
                 Item = null,
                 Notice = NoticeInvalidMedia,
                 IsError = true
-            };
+            });
         }
 
         DownloadManifestEntry entry;
@@ -253,15 +303,15 @@ public sealed class DownloadService
                 var state = DownloadStateNames.FromPersisted(existing.State);
                 if (state == DownloadState.Downloading && runningTransfers.ContainsKey(Key(type, mediaId)))
                 {
-                    return new DownloadEnqueueResult { Item = ToItem(existing), Notice = NoticeAlreadyRunning };
+                    return Logged(new DownloadEnqueueResult { Item = ToItem(existing), Notice = NoticeAlreadyRunning });
                 }
                 if (state == DownloadState.Queued)
                 {
-                    return new DownloadEnqueueResult { Item = ToItem(existing), Notice = NoticeAlreadyQueued };
+                    return Logged(new DownloadEnqueueResult { Item = ToItem(existing), Notice = NoticeAlreadyQueued });
                 }
                 if (state == DownloadState.Completed && fileExists(existing.FilePath))
                 {
-                    return new DownloadEnqueueResult { Item = ToItem(existing), Notice = NoticeAlreadyPresent };
+                    return Logged(new DownloadEnqueueResult { Item = ToItem(existing), Notice = NoticeAlreadyPresent });
                 }
 
                 // Fehlgeschlagen/abgebrochen/verwaist (completed ohne Datei,
@@ -305,6 +355,10 @@ public sealed class DownloadService
         // Auftrag sofort als fehlgeschlagen geführt statt zu warten.
         if (GetUsedBytes() >= QuotaBytesFor(settings))
         {
+            // Der Zustandswechsel-Eintrag von SetStateAsync (Failed mit
+            // quota_exceeded) trägt das Ereignis bereits als Warnung —
+            // kein zweiter Warn-Eintrag mit dem Hinweistext für
+            // denselben Vorgang.
             await SetStateAsync(entry, DownloadState.Failed, ErrorQuotaExceeded);
             return new DownloadEnqueueResult
             {
@@ -316,7 +370,7 @@ public sealed class DownloadService
 
         RaiseItemChanged(ToItem(entry));
         PumpQueue(settings);
-        return new DownloadEnqueueResult { Item = ToItem(entry), Notice = NoticeEnqueued };
+        return Logged(new DownloadEnqueueResult { Item = ToItem(entry), Notice = NoticeEnqueued });
     }
 
     /// <summary>
@@ -375,7 +429,8 @@ public sealed class DownloadService
         var type = MediaTypeNames.Normalize(mediaType);
         if (runningTransfers.TryGetValue(Key(type, mediaId), out var cts))
         {
-            // Der Transfer meldet den Abbruch selbst als „cancelled".
+            // Der Transfer meldet den Abbruch selbst als „cancelled"
+            // (SetStateAsync-Eintrag) — kein zusätzlicher Zwischeneintrag.
             cts.Cancel();
             return;
         }
@@ -423,6 +478,11 @@ public sealed class DownloadService
         }
 
         RaiseItemRemoved(type, mediaId);
+        logger.LogInformation(
+            "Download {MediaType}/{MediaId} ({Title}) entfernt.",
+            type,
+            mediaId,
+            entry.Title);
         return true;
     }
 
@@ -477,7 +537,7 @@ public sealed class DownloadService
         }
         catch (Exception ex) when (ex is SQLite.SQLiteException or InvalidOperationException)
         {
-            System.Diagnostics.Debug.WriteLine($"[DownloadService] Manifest nicht lesbar: {ex.Message}");
+            logger.LogWarning(ex, "Download-Manifest nicht lesbar.");
             return;
         }
 
@@ -500,6 +560,11 @@ public sealed class DownloadService
 
                 RaiseItemChanged(ToItem(entry));
             }
+        }
+
+        if (toRequeue.Count > 0)
+        {
+            logger.LogInformation("{RequeuedCount} unterbrochene Downloads wieder eingeplant.", toRequeue.Count);
         }
 
         PumpQueue(settings);
@@ -687,11 +752,11 @@ public sealed class DownloadService
             TryDeleteFile(entry.FilePath);
             await SetStateIfPresentAsync(entry, DownloadState.Cancelled, null);
         }
-        catch (OperationCanceledException)
+        catch (OperationCanceledException ex)
         {
             // Zeitüberschreitung/abgebrochene Übertragung ohne Benutzerabbruch.
             TryDeleteFile(entry.FilePath);
-            await SetStateIfPresentAsync(entry, DownloadState.Failed, ErrorNetwork);
+            await SetStateIfPresentAsync(entry, DownloadState.Failed, ErrorNetwork, ex);
         }
         catch (HttpRequestException ex)
         {
@@ -699,19 +764,17 @@ public sealed class DownloadService
             var code = ex.StatusCode is { } statusCode
                 ? $"{ErrorHttpPrefix}{(int)statusCode}"
                 : ErrorNetwork;
-            await SetStateIfPresentAsync(entry, DownloadState.Failed, code);
+            await SetStateIfPresentAsync(entry, DownloadState.Failed, code, ex);
         }
         catch (IOException ex)
         {
             TryDeleteFile(entry.FilePath);
-            System.Diagnostics.Debug.WriteLine($"[DownloadService] Dateioperation fehlgeschlagen: {ex.Message}");
-            await SetStateIfPresentAsync(entry, DownloadState.Failed, ErrorIo);
+            await SetStateIfPresentAsync(entry, DownloadState.Failed, ErrorIo, ex);
         }
         catch (Exception ex)
         {
             TryDeleteFile(entry.FilePath);
-            System.Diagnostics.Debug.WriteLine($"[DownloadService] Transfer fehlgeschlagen: {ex.Message}");
-            await SetStateIfPresentAsync(entry, DownloadState.Failed, ErrorNetwork);
+            await SetStateIfPresentAsync(entry, DownloadState.Failed, ErrorNetwork, ex);
         }
         finally
         {
@@ -747,7 +810,7 @@ public sealed class DownloadService
         RaiseItemChanged(ToItem(entry));
     }
 
-    private async Task SetStateAsync(DownloadManifestEntry entry, DownloadState state, string? error)
+    private async Task SetStateAsync(DownloadManifestEntry entry, DownloadState state, string? error, Exception? exception = null)
     {
         entry.State = DownloadStateNames.ToPersisted(state);
         entry.Error = error;
@@ -762,6 +825,27 @@ public sealed class DownloadService
             manifestGate.Release();
         }
 
+        if (state == DownloadState.Failed)
+        {
+            logger.LogWarning(
+                exception,
+                "Download {VideoType}/{VideoId} ({Title}): {State} ({Error}).",
+                entry.VideoType,
+                entry.VideoId,
+                entry.Title,
+                state,
+                error);
+        }
+        else
+        {
+            logger.LogInformation(
+                "Download {VideoType}/{VideoId} ({Title}): {State}.",
+                entry.VideoType,
+                entry.VideoId,
+                entry.Title,
+                state);
+        }
+
         RaiseItemChanged(ToItem(entry));
     }
 
@@ -773,15 +857,16 @@ public sealed class DownloadService
     /// <param name="entry">Der zuletzt bekannte Manifest-Eintrag.</param>
     /// <param name="state">Der zu setzende Zustand.</param>
     /// <param name="error">Der Fehlercode; <c>null</c> = kein Fehler.</param>
+    /// <param name="exception">Die auslösende Ausnahme; wird im Fehlerfall mitprotokolliert.</param>
     /// <returns>Eine abgeschlossene Aufgabe nach dem Schreiben.</returns>
-    private async Task SetStateIfPresentAsync(DownloadManifestEntry entry, DownloadState state, string? error)
+    private async Task SetStateIfPresentAsync(DownloadManifestEntry entry, DownloadState state, string? error, Exception? exception = null)
     {
         if (await FindEntryAsync(entry.VideoType, entry.VideoId) is null)
         {
             return;
         }
 
-        await SetStateAsync(entry, state, error);
+        await SetStateAsync(entry, state, error, exception);
     }
 
     private async Task<DownloadManifestEntry?> FindEntryAsync(string type, long mediaId)
@@ -833,7 +918,7 @@ public sealed class DownloadService
         {
             // Reste werden bei der nächsten Quota-Berechnung mitgezählt —
             // kein kritischer Fehler.
-            System.Diagnostics.Debug.WriteLine($"[DownloadService] Datei löschen fehlgeschlagen: {ex.Message}");
+            logger.LogWarning(ex, "Datei löschen fehlgeschlagen.");
         }
     }
 
@@ -863,7 +948,7 @@ public sealed class DownloadService
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"[DownloadService] ItemChanged-Handler fehlgeschlagen: {ex.Message}");
+            logger.LogWarning(ex, "ItemChanged-Handler fehlgeschlagen.");
         }
     }
 
@@ -875,7 +960,7 @@ public sealed class DownloadService
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"[DownloadService] ItemRemoved-Handler fehlgeschlagen: {ex.Message}");
+            logger.LogWarning(ex, "ItemRemoved-Handler fehlgeschlagen.");
         }
     }
 

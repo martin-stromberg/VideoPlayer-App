@@ -1,3 +1,5 @@
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using VideoPlayer.Storage;
 
 namespace VideoPlayer.Mvu;
@@ -18,14 +20,20 @@ public sealed class UpcomingEpisodesService
 {
     private readonly AuthSessionService authSession;
     private readonly CacheDatabase cache;
+    private readonly ILogger<UpcomingEpisodesService> logger;
 
     /// <summary>Erstellt den Dienst.</summary>
     /// <param name="authSession">Sitzungsdienst mit dem angemeldeten API-Client.</param>
     /// <param name="cache">Cache-Ablage (gecachte Serienstruktur).</param>
-    public UpcomingEpisodesService(AuthSessionService authSession, CacheDatabase cache)
+    /// <param name="logger">Optionaler Logger für das Programmprotokoll.</param>
+    public UpcomingEpisodesService(
+        AuthSessionService authSession,
+        CacheDatabase cache,
+        ILogger<UpcomingEpisodesService>? logger = null)
     {
         this.authSession = authSession ?? throw new ArgumentNullException(nameof(authSession));
         this.cache = cache ?? throw new ArgumentNullException(nameof(cache));
+        this.logger = logger ?? NullLogger<UpcomingEpisodesService>.Instance;
     }
 
     /// <summary>
@@ -66,7 +74,7 @@ public sealed class UpcomingEpisodesService
             try
             {
                 var show = await client.GetTvShowAsync(showId, cancellationToken);
-                await ShowDetailsCache.WriteAsync(cache, show, cancellationToken);
+                await ShowDetailsCache.WriteAsync(cache, show, logger, cancellationToken);
                 return show.Seasons
                     .OrderBy(s => s.Number)
                     .SelectMany(s => s.Episodes.OrderBy(e => e.Number))
@@ -77,11 +85,11 @@ public sealed class UpcomingEpisodesService
             {
                 // Online-Ladung fehlgeschlagen → auf die gecachte
                 // Serienstruktur zurückfallen (Offline-/Fehler-Fallback).
-                System.Diagnostics.Debug.WriteLine($"[UpcomingEpisodesService] Serie {showId} nicht ladbar: {ex.Message}");
+                logger.LogWarning(ex, "Serie {ShowId} nicht ladbar.", showId);
             }
         }
 
-        var cached = await ShowDetailsCache.ReadAsync(cache, showId, cancellationToken);
+        var cached = await ShowDetailsCache.ReadAsync(cache, showId, logger, cancellationToken);
         return cached is null
             ? []
             : ShowDetailsCache.OrderedEpisodes(cached)
