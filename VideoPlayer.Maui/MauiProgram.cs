@@ -70,6 +70,14 @@ namespace VideoPlayer.Maui
             // Ablage-Layouts): der Startzustand wird synchron aus der
             // persistenten Einstellung gelesen; Laufzeit-Umschaltungen
             // laufen über ShellAppEffectHandler → AppLogService.SetEnabled.
+            //
+            // AddLogging() aktiviert die Logging-Pipeline explizit:
+            // MauiAppBuilder registriert ohne jede builder.Logging-
+            // Konfiguration eine NullLoggerFactory, die DI-registrierte
+            // ILoggerProvider ignoriert — im Debug übernimmt das
+            // AddDebug() weiter unten, im Release würde ohne diese
+            // Zeile jeder ILogger<T>-Aufruf ins Leere laufen.
+            builder.Services.AddLogging();
             builder.Services.AddSingleton(sp =>
                 new AppLogService(
                     sp.GetRequiredService<AppStorageLayout>(),

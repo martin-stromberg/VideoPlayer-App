@@ -142,7 +142,12 @@ beeinflussen sich nicht gegenseitig.
   `videoplayer.previous.log`, `GetAttachmentPaths` für den Versand).
   `FileLogger`/`FileLoggerProvider` bilden die `ILogger`-Brücke
   (Mindestlevel `Information`); `MauiProgram` registriert den Provider
-  als `ILoggerProvider`-Singleton, `FileLogger.IsEnabled` filtert bei
+  als `ILoggerProvider`-Singleton und aktiviert die Logging-Pipeline
+  explizit über `builder.Services.AddLogging()` — ohne die Aktivierung
+  liefert der `MauiAppBuilder` eine `NullLoggerFactory`, die
+  DI-registrierte Provider ignoriert (im Debug übernimmt das
+  `AddDebug()`, im Release würde die Brücke sonst ins Leere laufen).
+  `FileLogger.IsEnabled` filtert bei
   deaktiviertem Protokoll früh — die Aufrufe bleiben kostenneutral.
 - **Schreiber:** Alle App-Dienste erhalten injizierte `ILogger<T>`
   (plattformneutrale Dienste optional mit `NullLogger`-Fallback,
