@@ -1,5 +1,12 @@
 # Änderungsprotokoll
 
+## 2026-10-13 — Sucheingabe im Quellen-Browsing übersteht Modell-Aktualisierungen (Issue #49, Schritt 2)
+
+- **Unbestätigte Sucheingabe bleibt erhalten:** `SourceOverviewPage.UpdateUi` schrieb bei jedem `ModelChanged`-Tick den abgeschickten `SourceBrowserState.SearchText` in das `MediaSearchBar` und zerstörte damit jede unbestätigte Eingabe — die Suche war praktisch nicht auslösbar. Die Spiegelung schreibt jetzt nur noch, wenn sich der abgeschickte Modell-Suchtext geändert hat (seitenlokaler Merker `mirroredSearchText`): unbestätigte Eingaben überstehen Sync-/Fortschritts-/Netzwerk-Ticks, der abgeschickte Filter bleibt nach dem Submit und bei Rückkehr auf die Seite sichtbar, und Quellen-Wechsel oder Zustands-Resets leeren das Feld weiterhin. Kein Live-Suchen — `TextChanged` bleibt unverdrahtet.
+- **DevApi-Erweiterung:** `DevApiModelSnapshot.SourceBrowserSearchText` macht den aktiven Suchfilter für UI-Tests ablesbar; `MediaSearchBar` erhielt eine `AutomationId` und `UiDriver` eine `PressEnter`-Hilfe für die Return-Submit-Geste.
+- **Tests:** Neue Contract-Pins `SourceOverviewSearchContractTests` (Spiegel-Guard, AutomationId, Submit-Dispatch) und drei E2E-Szenarien `SourceSearchTests` (Eingabe übersteht Genre-Ticks ohne `search`-Request, Return lädt gefiltert ab Seite 0, abgeschickter Text sichtbar nach Detail-Rückkehr). Gesamt: 1320 Unit-/Contract-Tests grün, 61 E2E-Tests (davon 1 fachfremder Flake in `ServerSetupTests`, im Wiederholungslauf grün).
+- **Doku:** `docs/help/quellen-browsing-details.md` (Textsuche-Abschnitt), `README.md`, `docs/RELEASE_NOTES.md`.
+
 ## 2026-10-13 — Genre-Filter im Quellen-Browsing: Sichtbarkeitsregel für leere Server-Genrelisten (Issue #49, Schritt 1)
 
 - **Diagnose des fehlenden Genre-Filters:** Die horizontale Genre-Leiste (`GenresCollection` der `SourceOverviewPage`) und der komplette Ladepfad (`LoadSourceGenresEffect` → `ShellAppEffectHandler.LoadSourceGenresAsync` → `SourceBrowserService.LoadGenresAsync` → `GET api/SourceGenres/{id}` → `SourceGenresLoadedMessage` → `UpdateSourceGenresLoaded`) waren im Auslieferungsstand vollständig vorhanden — die Leiste fehlte nicht baulich, sondern zeigte funktionslos nur den synthetischen „Alle"-Eintrag, weil der Genre-Abruf für die betroffene Quelle keine Einträge lieferte (leere Serverantwort bzw. stiller Ladefehler-Fallback auf `[Alle]`). Eine etwaige serverseitige Ursache (Endpunkt liefert für die Quelle eine leere Genre-Liste) ist dokumentiert — Server und API-Verträge bleiben unverändert.

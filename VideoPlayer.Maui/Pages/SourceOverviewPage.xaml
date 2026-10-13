@@ -15,6 +15,7 @@
              Return/Suchen-Taste -->
         <Border Grid.Row="0" Style="{StaticResource InputFrame}">
             <SearchBar x:Name="MediaSearchBar"
+                       AutomationId="MediaSearchBar"
                        Placeholder="Suchen"
                        SearchButtonPressed="OnSearchButtonPressed" />
         </Border>

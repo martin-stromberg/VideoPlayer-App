@@ -51,7 +51,14 @@ Navigationsstack geschoben):
   Ladefehler-Fallback auf „Alle"); serverseitige Ursachen bleiben
   unverändert dokumentiert.
 - **Textsuche:** das Suchfeld filtert serverseitig über den
-  `search`-Parameter; Abschicken erfolgt über die Suchen-Taste.
+  `search`-Parameter; Abschicken erfolgt über die Suchen-/Return-Taste
+  und lädt die Trefferliste ab der ersten Seite neu. Eine getippte,
+  noch nicht abgeschickte Eingabe bleibt über beliebige
+  Modell-Aktualisierungen hinweg erhalten (Synchronisation,
+  Fortschritt, Netzwerkereignisse, Ladezustände) — die Seite spiegelt
+  den Modell-Suchtext nur noch ins Feld, wenn sich der abgeschickte
+  Wert tatsächlich geändert hat (Abschicken, Quellen-Wechsel,
+  Zustands-Reset). Es gibt bewusst kein Live-Suchen pro Tastenschlag.
 - **Medien-Raster:** dreispaltige Poster-Karten mit Titel; fehlt ein
   Poster, bleibt der Titel lesbar.
 - **Seitenweises Nachladen:** beim Erreichen des Listenendes wird die
@@ -59,7 +66,9 @@ Navigationsstack geschoben):
   angehängt; scheitert das Nachladen, bietet die Fußzeile „Erneut
   versuchen" — die geladenen Einträge bleiben stehen.
 - **Rückkehr** aus einer Detailseite stellt Genre-Filter, Suchtext und
-  Listenstand wieder her — kein erneutes Laden.
+  Listenstand wieder her — kein erneutes Laden; der zuletzt
+  abgeschickte Suchtext steht als erkennbarer aktiver Filter weiterhin
+  im Suchfeld.
 
 ## Medien-Detailseiten
 

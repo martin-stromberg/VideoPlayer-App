@@ -119,6 +119,7 @@ public class DevApiModelSnapshotTests
             {
                 SourceId = 5,
                 SelectedGenreId = 4,
+                SearchText = "Matrix",
                 Genres =
                 [
                     new SourceGenreItem { Id = 0, Name = "Alle" },
@@ -137,6 +138,7 @@ public class DevApiModelSnapshotTests
         Assert.Equal(new[] { "Alle", "Komödie" }, snapshot.SourceBrowserGenreNames);
         Assert.Equal(4, snapshot.SourceBrowserSelectedGenreId);
         Assert.True(snapshot.SourceBrowserShowGenreFilter);
+        Assert.Equal("Matrix", snapshot.SourceBrowserSearchText);
         Assert.Equal(new[] { "Eintrag A" }, snapshot.SourceBrowserItemTitles);
     }
 
