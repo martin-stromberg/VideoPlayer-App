@@ -11,11 +11,11 @@ Issue: #49
 | [x] | – | Einstiegspunkt ermitteln (Neuprojekt, keine Artefakte vorhanden) | – |
 | [x] | 3 | Anforderung aufbereiten (Unteragent) | `requirement.md` |
 | [x] | 4 | Bestandsaufnahme (Unteragent) | `inventory.md`, `inventory/` |
-| [ ] | 5 | Grobe Projektplanung (Unteragent) | `project-plan.md` |
-| [ ] | – | Offene Punkte prüfen/klären | `project-plan.md` (aktualisiert) |
-| [ ] | – | Planprüfung (Unteragent) | `project-plan-check.md` |
-| [ ] | – | Planungscommit | – |
-| [ ] | – | Entwicklungsschritte-Tracking anlegen | `steps.md`, `status.html` |
+| [x] | 5 | Grobe Projektplanung (Unteragent) | `project-plan.md` |
+| [x] | – | Offene Punkte prüfen/klären | `project-plan.md` (aktualisiert) |
+| [x] | – | Planprüfung (Unteragent) | `project-plan-check.md` |
+| [x] | – | Planungscommit | – |
+| [x] | – | Entwicklungsschritte-Tracking anlegen | `steps.md`, `status.html` |
 | [ ] | 6 | Entwicklungsschleife (je Schritt: Branch, Lifecycle, Abnahme, Merge) | `acceptance-schritt-{n}.md` |
 | [ ] | 7 | Aufräumen (Projektverzeichnis entfernen) | – |
 | [ ] | – | Abschlusscommit + PR gegen staging | – |
