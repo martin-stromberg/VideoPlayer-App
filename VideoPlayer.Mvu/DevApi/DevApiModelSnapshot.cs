@@ -218,6 +218,24 @@ public sealed record DevApiModelSnapshot
     /// <summary>Anzeigetitel der Episoden der gewählten Staffel (leer ohne Serien-Details).</summary>
     public IReadOnlyList<string> MediaDetailsSeasonEpisodeTitles { get; init; } = [];
 
+    /// <summary>Id der im Quellen-Browser geöffneten Quelle (0 = kein Browser aktiv).</summary>
+    public long SourceBrowserSourceId { get; init; }
+
+    /// <summary>Anzeigenamen der Genre-Leiste des Quellen-Browsers in Anzeigereihenfolge (inkl. „Alle"-Eintrag).</summary>
+    public IReadOnlyList<string> SourceBrowserGenreNames { get; init; } = [];
+
+    /// <summary>Aktuell gewählter Genre-Filter des Quellen-Browsers (0 = „Alle").</summary>
+    public long SourceBrowserSelectedGenreId { get; init; }
+
+    /// <summary>Die Genre-Leiste des Quellen-Browsers ist sichtbar (reale Server-Genres vorhanden).</summary>
+    public bool SourceBrowserShowGenreFilter { get; init; }
+
+    /// <summary>Zuletzt abgeschickter Suchtext des Quellen-Browsers (aktiver Filter; leer = keine Suche).</summary>
+    public string SourceBrowserSearchText { get; init; } = string.Empty;
+
+    /// <summary>Anzeigetitel der geladenen Einträge des Quellen-Browsers (Anzeigereihenfolge).</summary>
+    public IReadOnlyList<string> SourceBrowserItemTitles { get; init; } = [];
+
     /// <summary>Erzeugt den Snapshot aus dem aktuellen Modell.</summary>
     /// <param name="model">Das unveränderliche App-Modell.</param>
     /// <returns>Der serialisierbare Auszug.</returns>
@@ -320,7 +338,13 @@ public sealed record DevApiModelSnapshot
                 .Select(s => s.Name).ToList() ?? [],
             MediaDetailsSelectedSeasonNumber = model.MediaDetails.Details?.SelectedSeason?.Number ?? 0,
             MediaDetailsSeasonEpisodeTitles = model.MediaDetails.Details?.SelectedSeasonEpisodes
-                .Select(e => e.DisplayTitle).ToList() ?? []
+                .Select(e => e.DisplayTitle).ToList() ?? [],
+            SourceBrowserSourceId = model.SourceBrowser.SourceId,
+            SourceBrowserGenreNames = model.SourceBrowser.Genres.Select(g => g.Name).ToList(),
+            SourceBrowserSelectedGenreId = model.SourceBrowser.SelectedGenreId,
+            SourceBrowserShowGenreFilter = model.SourceBrowser.ShowGenreFilter,
+            SourceBrowserSearchText = model.SourceBrowser.SearchText,
+            SourceBrowserItemTitles = model.SourceBrowser.Items.Select(i => i.Title).ToList()
         };
     }
 }

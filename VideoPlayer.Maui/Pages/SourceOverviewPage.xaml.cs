@@ -1,3 +1,4 @@
+using System.Collections.ObjectModel;
 using VideoPlayer.Mvu;
 
 namespace VideoPlayer.Maui.Pages;
@@ -14,9 +15,17 @@ namespace VideoPlayer.Maui.Pages;
 public partial class SourceOverviewPage : ContentPage
 {
     private readonly MvuHost mvuHost;
+    // Stabile ItemsSource: SourceItemListSync gleicht sie granular mit
+    // der Modell-Liste ab — ein Referenzwechsel pro Folgeseite würde
+    // die Scrollposition auf den Listenanfang zurücksetzen.
+    private readonly ObservableCollection<SourceMediaItem> browserItems = [];
     private long sourceId;
     private string? sourceName;
     private bool subscribed;
+    // Der zuletzt aus dem Modell ins Suchfeld gespiegelte abgeschickte
+    // Suchtext — Ausgangspunkt „noch nie gespiegelt", damit ein
+    // vorhandener Filter beim ersten UpdateUi angezeigt wird.
+    private string? mirroredSearchText;
 
     /// <summary>Initialisiert eine neue Instanz der <see cref="SourceOverviewPage"/>-Klasse.</summary>
     /// <param name="mvuHost">MVU-Host; dient als <see cref="BindableObject.BindingContext"/> und Dispatch-Ziel der Browser-Nachrichten.</param>
@@ -25,6 +34,7 @@ public partial class SourceOverviewPage : ContentPage
         InitializeComponent();
         this.mvuHost = mvuHost;
         BindingContext = mvuHost;
+        ItemsCollection.ItemsSource = browserItems;
         UpdateUi(mvuHost.Model);
     }
 
@@ -88,15 +98,22 @@ public partial class SourceOverviewPage : ContentPage
     private void UpdateUi(AppModel model)
     {
         var browser = model.SourceBrowser;
+        // Granularer Abgleich: eine angehängte Folgeseite erzeugt nur
+        // Add-Ereignisse am Ende — die CollectionView behält ihre
+        // Scrollposition (kein Neuaufbau durch ItemsSource-Wechsel).
+        SourceItemListSync.Sync(browserItems, browser.Items);
         ErrorPanel.IsVisible = browser.HasError && browser.Items.Count == 0;
         ErrorLabel.Text = browser.Error;
         FooterErrorPanel.IsVisible = browser.HasError && browser.Items.Count > 0;
         EmptyLabel.IsVisible = browser.ShowEmpty;
         ItemsCollection.IsVisible = !browser.ShowEmpty;
-        // Suchtext des Browser-Zustands bei Rückkehr in das Feld
-        // zurückspiegeln (Filter bleibt sichtbar aktiv).
-        if (!string.Equals(MediaSearchBar.Text, browser.SearchText, StringComparison.Ordinal))
+        // Den abgeschickten Modell-Suchtext nur bei einer Änderung ins
+        // Feld spiegeln (Abschicken, Quellen-Wechsel, Zustands-Reset):
+        // eine unbestätigte Eingabe darf beliebige Modell-Ticks
+        // überstehen; der aktive Filter bleibt bei Rückkehr sichtbar.
+        if (!string.Equals(mirroredSearchText, browser.SearchText, StringComparison.Ordinal))
         {
+            mirroredSearchText = browser.SearchText;
             MediaSearchBar.Text = browser.SearchText;
         }
     }

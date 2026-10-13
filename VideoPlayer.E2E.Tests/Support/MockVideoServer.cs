@@ -264,6 +264,38 @@ public sealed class MockVideoServer : IDisposable
     /// <summary>Id des Playlist-Eintrags des Weiterschauen-Bezugs; <c>null</c> = kein Bezug.</summary>
     public long? ContinueWatchingPlaylistEntryId { get; set; }
 
+    /// <summary>
+    /// Opt-in Quellen-Browsing: die freigegebenen Quellen des
+    /// <c>GET /api/Sources</c>-Endpunkts — belegt statt der
+    /// Standard-Leerliste; jede Quelle erzeugt einen eigenen
+    /// Menüeintrag in der App (<c>sourceoverview</c>-Route).
+    /// </summary>
+    public List<MockSource> Sources { get; } = [];
+
+    /// <summary>
+    /// Opt-in Genre-Listen je Quelle (<c>GET api/SourceGenres/{id}</c>,
+    /// Schlüssel = Quellen-Id); nicht konfigurierte Quellen liefern
+    /// eine leere Genre-Liste (befundetes Serververhalten „keine
+    /// Genres für die Quelle").
+    /// </summary>
+    public Dictionary<long, List<MockSourceGenre>> SourceGenres { get; } = [];
+
+    /// <summary>
+    /// Opt-in Einträge des Quellen-Browsing
+    /// (<c>GET api/items?mediaSourceId=…</c>): gefiltert nach
+    /// Quellen-Id, <c>genreId</c> (<see cref="MockSourceItem.GenreIds"/>)
+    /// und <c>search</c> (Titel-Teilstring), paginiert über
+    /// <c>page</c>/<c>size</c>.
+    /// </summary>
+    public List<MockSourceItem> SourceItems { get; } = [];
+
+    /// <summary>
+    /// Rohe Request-Pfade inklusive Query der Quellen-Eintragsaufrufe
+    /// (<c>GET api/items?mediaSourceId=…</c>) in Reihenfolge — Nachweis
+    /// der gesendeten <c>genreId</c>/<c>search</c>-Parameter (Diagnose).
+    /// </summary>
+    public List<string> SourceItemRequests { get; } = [];
+
     /// <summary>Alle empfangenen Anfragepfade in Reihenfolge (Diagnose: Detail- vs. Wiedergabeaufrufe).</summary>
     public List<string> RequestedPaths { get; } = [];
 
@@ -555,6 +587,40 @@ public sealed class MockVideoServer : IDisposable
                 GenreOptions.Select(g => new { id = g.Id, name = g.Name })));
         }
 
+        // Opt-in Quellen-Browsing: Genres einer Quelle — nicht
+        // konfigurierte Quellen liefern eine leere Genre-Liste.
+        if (method == "GET" && path.StartsWith("/api/SourceGenres/", StringComparison.OrdinalIgnoreCase))
+        {
+            if (!IsGateValid(request))
+            {
+                return GateRejected();
+            }
+
+            if (!IsBearerValid(request))
+            {
+                return (401, "text/plain", Encoding.UTF8.GetBytes("unauthorized"));
+            }
+
+            return HandleSourceGenres(path);
+        }
+
+        // Opt-in Quellen-Browsing: paginierte Eintragsliste einer Quelle.
+        if (method == "GET" && path.Equals("/api/items", StringComparison.OrdinalIgnoreCase)
+            && !string.IsNullOrWhiteSpace(QueryValue(request.Path, "mediaSourceId")))
+        {
+            if (!IsGateValid(request))
+            {
+                return GateRejected();
+            }
+
+            if (!IsBearerValid(request))
+            {
+                return (401, "text/plain", Encoding.UTF8.GetBytes("unauthorized"));
+            }
+
+            return HandleSourceItems(request.Path);
+        }
+
         // Opt-in Playlistfluss: eigene + öffentliche Playlists, Detail,
         // Einträge (unpaginiert/paginiert), Cover, Wiedergabe-Endpunkte
         // sowie die Verwaltungs-Endpunkte (Anlage/Bearbeitung/Löschung,
@@ -615,6 +681,12 @@ public sealed class MockVideoServer : IDisposable
     /// <returns>Der überschreibende Antwortkörper bzw. <c>null</c> ohne Überschreibung.</returns>
     private byte[]? ListOverride(string path)
     {
+        if (path.Equals("/api/Sources", StringComparison.OrdinalIgnoreCase)
+            && Sources.Count > 0)
+        {
+            return JsonBody(Sources.Select(s => new { id = s.Id, name = s.Name }));
+        }
+
         if (path.Equals("/api/items/recent", StringComparison.OrdinalIgnoreCase)
             && PlaybackMovieId is not null)
         {
@@ -1563,6 +1635,68 @@ public sealed class MockVideoServer : IDisposable
             && e.MediaType.Equals(serverMediaType, StringComparison.OrdinalIgnoreCase));
 
     /// <summary>
+    /// <c>GET api/SourceGenres/{id}</c>: liefert die per
+    /// <see cref="SourceGenres"/> konfigurierte Genre-Liste der Quelle —
+    /// nicht konfigurierte Quellen antworten mit einer leeren Liste
+    /// (Nachbild des befundenen Serververhaltens „keine Genres").
+    /// </summary>
+    /// <param name="path">Der angefragte Request-Pfad (ohne Query).</param>
+    /// <returns>Die Mock-Antwort des Genre-Endpunkts.</returns>
+    private MockResponse HandleSourceGenres(string path)
+    {
+        var rest = path["/api/SourceGenres/".Length..];
+        if (!long.TryParse(rest, out var sourceId) || sourceId <= 0)
+        {
+            return (404, "application/json", JsonBody(new { error = "not found" }));
+        }
+
+        var source = Sources.FirstOrDefault(s => s.Id == sourceId);
+        SourceGenres.TryGetValue(sourceId, out var genres);
+        return (200, "application/json", JsonBody(new
+        {
+            sourceId,
+            sourceName = source?.Name ?? string.Empty,
+            genres = (genres ?? []).Select(g => new { id = g.Id, name = g.Name }).ToArray()
+        }));
+    }
+
+    /// <summary>
+    /// <c>GET api/items?mediaSourceId=…&amp;page=…&amp;size=…[&amp;search=…][&amp;genreId=…]</c>:
+    /// paginierte Eintragsliste der Quelle aus <see cref="SourceItems"/> —
+    /// <c>genreId</c> filtert über <see cref="MockSourceItem.GenreIds"/>,
+    /// <c>search</c> über den Titel (OrdinalIgnoreCase-Teilstring). Jeder
+    /// Aufruf wird mit rohem Pfad (inkl. Query) in
+    /// <see cref="SourceItemRequests"/> protokolliert.
+    /// </summary>
+    /// <param name="rawPath">Der angefragte Request-Pfad inklusive Query.</param>
+    /// <returns>Die Mock-Antwort der Eintragsliste.</returns>
+    private MockResponse HandleSourceItems(string rawPath)
+    {
+        lock (SourceItemRequests)
+        {
+            SourceItemRequests.Add(rawPath);
+        }
+
+        var mediaSourceId = long.TryParse(QueryValue(rawPath, "mediaSourceId"), out var msId) ? msId : 0L;
+        var page = int.TryParse(QueryValue(rawPath, "page"), out var p) ? p : 0;
+        var size = int.TryParse(QueryValue(rawPath, "size"), out var s) && s > 0 ? s : 20;
+        var genreId = long.TryParse(QueryValue(rawPath, "genreId"), out var g) ? g : 0L;
+        var search = QueryValue(rawPath, "search");
+
+        var items = SourceItems
+            .Where(i => i.MediaSourceId == mediaSourceId)
+            .Where(i => genreId <= 0 || i.GenreIds.Contains(genreId))
+            .Where(i => string.IsNullOrWhiteSpace(search)
+                || i.Title.Contains(search, StringComparison.OrdinalIgnoreCase))
+            .Skip(page * size)
+            .Take(size);
+
+        return (200, "application/json", JsonBody(items
+            .Select(i => new { id = i.Id, type = i.Type, title = i.Title })
+            .ToArray()));
+    }
+
+    /// <summary>
     /// <c>GET api/items/tvshow/{id}</c>: liefert die Opt-in-Serie mit
     /// einer Staffel, die Ausgangs-Episode (<see cref="PlaybackEpisodeId"/>)
     /// und die Folge-Episode (<see cref="PlaybackNextEpisodeId"/>)
@@ -2317,4 +2451,46 @@ public sealed class MockShowEpisode
 
     /// <summary>Anzeigetitel der Episode.</summary>
     public string Title { get; set; } = string.Empty;
+}
+
+/// <summary>Opt-in-Quelle des Mock-Servers (<c>GET /api/Sources</c>, <see cref="MockVideoServer.Sources"/>).</summary>
+public sealed class MockSource
+{
+    /// <summary>Id der Quelle.</summary>
+    public long Id { get; set; }
+
+    /// <summary>Anzeigename der Quelle (Menüeintrag, Seitentitel).</summary>
+    public string Name { get; set; } = string.Empty;
+}
+
+/// <summary>Genre-Eintrag einer Quelle (<c>GET api/SourceGenres/{id}</c>, <see cref="MockVideoServer.SourceGenres"/>).</summary>
+public sealed class MockSourceGenre
+{
+    /// <summary>Id des Genres.</summary>
+    public long Id { get; set; }
+
+    /// <summary>Anzeigename des Genres.</summary>
+    public string Name { get; set; } = string.Empty;
+}
+
+/// <summary>
+/// Opt-in-Eintrag des Quellen-Browsing (<see cref="MockVideoServer.SourceItems"/>,
+/// <c>GET api/items?mediaSourceId=…</c>).
+/// </summary>
+public sealed class MockSourceItem
+{
+    /// <summary>Id des Eintrags.</summary>
+    public long Id { get; set; }
+
+    /// <summary>Anzeigetitel des Eintrags.</summary>
+    public string Title { get; set; } = string.Empty;
+
+    /// <summary>Medientyp der Summary (Server-Konvention, z. B. <c>Movie</c>, <c>TvShow</c>).</summary>
+    public string Type { get; set; } = "Movie";
+
+    /// <summary>Id der Quelle, der der Eintrag gehört (<c>mediaSourceId</c>-Filter).</summary>
+    public long MediaSourceId { get; set; }
+
+    /// <summary>Genre-Ids des Eintrags — Grundlage des <c>genreId</c>-Filters.</summary>
+    public List<long> GenreIds { get; } = [];
 }

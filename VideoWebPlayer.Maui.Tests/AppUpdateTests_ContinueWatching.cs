@@ -3,12 +3,16 @@ using VideoPlayer.Mvu;
 namespace VideoWebPlayer.Maui.Tests;
 
 /// <summary>
-/// MVU-Übergänge der Weiterschauen-Auswahl (Issue #43, Schritt 1):
-/// abspielbare Einträge (<c>movie</c>/<c>episode</c>) starten direkt die
-/// Wiedergabe über den gemeinsamen Startpfad — ohne Detailseite —,
-/// Episoden mit Serienkontext lösen die Folge-Episoden-Nachladung aus,
-/// alle übrigen Einträge und Guards behalten den Detail-Fallback bzw.
-/// die Unverändertheit. Zusätzlich die Übernahme der nachgeladenen
+/// MVU-Übergänge der Weiterschauen-Auswahl (Issue #49, Schritt 4):
+/// abspielbare Einträge (<c>movie</c>/<c>episode</c>) öffnen die
+/// Titel-Detailansicht und starten darüber die Wiedergabe über den
+/// gemeinsamen Startpfad — die Detail-Navigation liegt in der
+/// Effektliste vor der Player-Navigation, sodass „Player schließen"
+/// zur Detailansicht zurückkehrt. Episoden mit Serienkontext lösen
+/// weiterhin die Folge-Episoden-Nachladung aus; offline behalten
+/// Episoden ohne Serien-Kennung die bisherige Direktwiedergabe. Alle
+/// übrigen Einträge und Guards behalten den Detail-Fallback bzw. die
+/// Unverändertheit. Zusätzlich die Übernahme der nachgeladenen
 /// Fortsetzungsliste (<see cref="UpcomingEpisodesLoadedMessage"/>).
 /// </summary>
 public class AppUpdateTests_ContinueWatching
@@ -19,25 +23,36 @@ public class AppUpdateTests_ContinueWatching
         IsStartupRunning = false
     };
 
+    private static AppModel Offline() => new()
+    {
+        ConnectionState = ConnectionState.Offline,
+        IsStartupRunning = false,
+        HasOfflineData = true
+    };
+
     private static HomeMediaItem Item(
         string mediaType,
         long id,
         string title = "Titel",
         long? showId = null,
+        long? seasonId = null,
+        long? episodeId = null,
         bool isPlaceholder = false) => new()
         {
             Id = id,
             MediaType = mediaType,
             Title = title,
             ShowId = showId,
+            SeasonId = seasonId,
+            EpisodeId = episodeId,
             IsPlaceholder = isPlaceholder
         };
 
-    // --- Direkter Wiedergabestart ---
+    // --- Detailansicht mit Wiedergabe ---
 
-    /// <summary>Prüft den Film-Direktstart: Player-State + Navigation + Quellauflösung ohne Detail-Navigation.</summary>
+    /// <summary>Prüft den Film-Start: Detailseite unter der Wiedergabe — Effekt-Reihenfolge Details → Player → Quellauflösung.</summary>
     [Fact]
-    public void ContinueWatchingItemSelected_Movie_StartsPlayback()
+    public void ContinueWatchingItemSelected_Movie_OpensDetailsAndStartsPlayback()
     {
         var transition = AppUpdate.Update(
             Connected(),
@@ -50,21 +65,25 @@ public class AppUpdateTests_ContinueWatching
         Assert.True(player.IsResolving);
         Assert.True(player.Attempted);
 
-        Assert.IsType<NavigateToPlayerEffect>(transition.Effects[0]);
-        var resolve = Assert.IsType<ResolvePlaybackSourceEffect>(transition.Effects[1]);
+        var details = Assert.IsType<NavigateToMediaDetailsEffect>(transition.Effects[0]);
+        Assert.Equal("movie", details.MediaType);
+        Assert.Equal(42, details.MediaId);
+        Assert.Equal("Matrix", details.Title);
+        Assert.IsType<NavigateToPlayerEffect>(transition.Effects[1]);
+        var resolve = Assert.IsType<ResolvePlaybackSourceEffect>(transition.Effects[2]);
         Assert.Equal("movie", resolve.MediaType);
         Assert.Equal(42, resolve.MediaId);
-        Assert.DoesNotContain(transition.Effects, e => e is NavigateToMediaDetailsEffect);
-        Assert.DoesNotContain(transition.Effects, e => e is LoadUpcomingEpisodesEffect);
+        Assert.Equal(3, transition.Effects.Count);
     }
 
-    /// <summary>Prüft den Episoden-Direktstart: Wiedergabe-Übergang plus Serienkontext-Ladeeffekt mit den Kontext-Ids.</summary>
+    /// <summary>Prüft den Episoden-Start: Detailseite mit Serienkontext-Hints unter der Wiedergabe plus Folge-Episoden-Nachladung.</summary>
     [Fact]
-    public void ContinueWatchingItemSelected_Episode_StartsPlaybackWithShowLoad()
+    public void ContinueWatchingItemSelected_Episode_OpensDetailsAndStartsPlaybackWithShowLoad()
     {
         var transition = AppUpdate.Update(
             Connected(),
-            new ContinueWatchingItemSelectedMessage(Item("episode", 31, "Pilot", showId: 11)));
+            new ContinueWatchingItemSelectedMessage(
+                Item("episode", 31, "Pilot", showId: 11, seasonId: 7, episodeId: 31)));
 
         var player = transition.Model.Player;
         Assert.Equal("tvshowepisode", player.MediaType);
@@ -73,32 +92,41 @@ public class AppUpdateTests_ContinueWatching
         Assert.True(player.IsResolving);
         Assert.True(player.Attempted);
 
-        Assert.IsType<NavigateToPlayerEffect>(transition.Effects[0]);
-        var resolve = Assert.IsType<ResolvePlaybackSourceEffect>(transition.Effects[1]);
+        var details = Assert.IsType<NavigateToMediaDetailsEffect>(transition.Effects[0]);
+        Assert.Equal("episode", details.MediaType);
+        Assert.Equal(31, details.MediaId);
+        Assert.Equal(11, details.ShowId);
+        Assert.Equal(7, details.SeasonId);
+        Assert.Equal(31, details.EpisodeId);
+        Assert.IsType<NavigateToPlayerEffect>(transition.Effects[1]);
+        var resolve = Assert.IsType<ResolvePlaybackSourceEffect>(transition.Effects[2]);
         Assert.Equal("tvshowepisode", resolve.MediaType);
         Assert.Equal(31, resolve.MediaId);
-        var load = Assert.IsType<LoadUpcomingEpisodesEffect>(transition.Effects[2]);
+        var load = Assert.IsType<LoadUpcomingEpisodesEffect>(transition.Effects[3]);
         Assert.Equal(31, load.MediaId);
         Assert.Equal(11, load.ShowId);
-        Assert.DoesNotContain(transition.Effects, e => e is NavigateToMediaDetailsEffect);
+        Assert.Equal(4, transition.Effects.Count);
     }
 
-    /// <summary>Prüft die CLR-Typvariante: ein <c>tvshowepisode</c>-Eintrag (Offline-Liste) startet ebenfalls direkt mit Ladeeffekt.</summary>
+    /// <summary>Prüft die CLR-Typvariante: ein <c>tvshowepisode</c>-Eintrag (Offline-Liste) öffnet ebenfalls die Detailseite mit Ladeeffekt.</summary>
     [Fact]
-    public void ContinueWatchingItemSelected_ClrEpisodeType_StartsPlaybackWithShowLoad()
+    public void ContinueWatchingItemSelected_ClrEpisodeType_OpensDetailsAndStartsPlaybackWithShowLoad()
     {
         var transition = AppUpdate.Update(
             Connected(),
             new ContinueWatchingItemSelectedMessage(Item("tvshowepisode", 31, "Pilot", showId: 11)));
 
         Assert.Equal("tvshowepisode", transition.Model.Player.MediaType);
-        var load = Assert.IsType<LoadUpcomingEpisodesEffect>(transition.Effects[2]);
+        Assert.IsType<NavigateToMediaDetailsEffect>(transition.Effects[0]);
+        Assert.IsType<NavigateToPlayerEffect>(transition.Effects[1]);
+        Assert.IsType<ResolvePlaybackSourceEffect>(transition.Effects[2]);
+        var load = Assert.IsType<LoadUpcomingEpisodesEffect>(transition.Effects[3]);
         Assert.Equal(11, load.ShowId);
     }
 
-    /// <summary>Prüft den Episoden-Direktstart ohne Serienkontext-Hint: Wiedergabe ja, aber kein Serien-Ladeeffekt.</summary>
+    /// <summary>Prüft den Episoden-Start ohne Serienkontext-Hint: online löst die Detailseite die Serie selbst auf — Detailseite und Wiedergabe, aber kein Serien-Ladeeffekt.</summary>
     [Fact]
-    public void ContinueWatchingItemSelected_EpisodeWithoutShowId_NoShowLoad()
+    public void ContinueWatchingItemSelected_EpisodeWithoutShowId_OpensDetailsAndStartsPlayback()
     {
         var transition = AppUpdate.Update(
             Connected(),
@@ -106,8 +134,59 @@ public class AppUpdateTests_ContinueWatching
 
         Assert.True(transition.Model.Player.IsActive);
         Assert.Equal(31, transition.Model.Player.MediaId);
+        Assert.IsType<NavigateToMediaDetailsEffect>(transition.Effects[0]);
+        Assert.IsType<NavigateToPlayerEffect>(transition.Effects[1]);
+        Assert.IsType<ResolvePlaybackSourceEffect>(transition.Effects[2]);
         Assert.DoesNotContain(transition.Effects, e => e is LoadUpcomingEpisodesEffect);
+    }
+
+    // --- Offline-Fallunterscheidung ---
+
+    /// <summary>Prüft den Offline-Film: der Manifesteintrag ist sein eigener Kontext — Detailseite und Wiedergabe.</summary>
+    [Fact]
+    public void ContinueWatchingItemSelected_OfflineMovie_OpensDetailsAndStartsPlayback()
+    {
+        var transition = AppUpdate.Update(
+            Offline(),
+            new ContinueWatchingItemSelectedMessage(Item("movie", 42, "Matrix")));
+
+        Assert.True(transition.Model.Player.IsActive);
+        Assert.IsType<NavigateToMediaDetailsEffect>(transition.Effects[0]);
+        Assert.IsType<NavigateToPlayerEffect>(transition.Effects[1]);
+        Assert.IsType<ResolvePlaybackSourceEffect>(transition.Effects[2]);
+    }
+
+    /// <summary>Prüft die Offline-Episode mit Serien-Kennung: der Offline-Snapshot kann den Serienkontext aufbauen — Detailseite, Wiedergabe und Folge-Episoden-Nachladung.</summary>
+    [Fact]
+    public void ContinueWatchingItemSelected_OfflineEpisodeWithShowId_OpensDetailsAndStartsPlayback()
+    {
+        var transition = AppUpdate.Update(
+            Offline(),
+            new ContinueWatchingItemSelectedMessage(Item("tvshowepisode", 31, "Pilot", showId: 11, episodeId: 31)));
+
+        var details = Assert.IsType<NavigateToMediaDetailsEffect>(transition.Effects[0]);
+        Assert.Equal(11, details.ShowId);
+        Assert.IsType<NavigateToPlayerEffect>(transition.Effects[1]);
+        Assert.IsType<ResolvePlaybackSourceEffect>(transition.Effects[2]);
+        var load = Assert.IsType<LoadUpcomingEpisodesEffect>(transition.Effects[3]);
+        Assert.Equal(11, load.ShowId);
+    }
+
+    /// <summary>Prüft die Offline-Episode ohne Serien-Kennung: ohne nutzbaren Kontext bleibt die bisherige Direktwiedergabe — keine Detail-Navigation.</summary>
+    [Fact]
+    public void ContinueWatchingItemSelected_OfflineEpisodeWithoutShowId_StartsPlaybackWithoutDetails()
+    {
+        var transition = AppUpdate.Update(
+            Offline(),
+            new ContinueWatchingItemSelectedMessage(Item("tvshowepisode", 31, "Pilot")));
+
+        Assert.True(transition.Model.Player.IsActive);
+        Assert.Equal(31, transition.Model.Player.MediaId);
+        Assert.IsType<NavigateToPlayerEffect>(transition.Effects[0]);
+        Assert.IsType<ResolvePlaybackSourceEffect>(transition.Effects[1]);
+        Assert.Equal(2, transition.Effects.Count);
         Assert.DoesNotContain(transition.Effects, e => e is NavigateToMediaDetailsEffect);
+        Assert.DoesNotContain(transition.Effects, e => e is LoadUpcomingEpisodesEffect);
     }
 
     // --- Detail-Fallback nicht abspielbarer Typen ---

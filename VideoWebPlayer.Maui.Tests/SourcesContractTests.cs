@@ -133,7 +133,7 @@ public class SourcesContractTests
         Assert.Contains("PosterImageService", shell, StringComparison.Ordinal);
     }
 
-    /// <summary>Prüft SourceOverviewPage: hat Genre-Bar, Suche und ein inkrementelles Raster.</summary>
+    /// <summary>Prüft SourceOverviewPage: hat Genre-Bar, Suche und ein inkrementelles Raster mit stabiler ItemsSource.</summary>
     [Fact]
     public void SourceOverviewPage_HasGenreBar_Search_AndIncrementalGrid()
     {
@@ -141,10 +141,20 @@ public class SourcesContractTests
 
         Assert.Contains("{Binding Model.SourceBrowser.Genres}", xaml, StringComparison.Ordinal);
         Assert.Contains("SearchBar", xaml, StringComparison.Ordinal);
-        Assert.Contains("{Binding Model.SourceBrowser.Items}", xaml, StringComparison.Ordinal);
         // Seitenweises Nachladen am Listenende.
         Assert.Contains("RemainingItemsThresholdReached", xaml, StringComparison.Ordinal);
         Assert.Contains("CachedPosterImage", xaml, StringComparison.Ordinal);
+        // Kein Binding auf die Modell-Liste: ein ItemsSource-
+        // Referenzwechsel pro Folgeseite würde die Scrollposition
+        // auf den Listenanfang zurücksetzen (Issue #49, Schritt 3).
+        Assert.DoesNotContain("{Binding Model.SourceBrowser.Items}", xaml, StringComparison.Ordinal);
+
+        // Die ItemsSource ist die stabile seiten-eigene Liste, die
+        // SourceItemListSync granular mit der Modell-Liste abgleicht
+        // (angehängte Folgeseiten erzeugen nur Add-Ereignisse).
+        var code = Read("VideoPlayer.Maui", "Pages", "SourceOverviewPage.xaml.cs");
+        Assert.Contains("ItemsCollection.ItemsSource", code, StringComparison.Ordinal);
+        Assert.Contains("SourceItemListSync.Sync", code, StringComparison.Ordinal);
     }
 
     /// <summary>Prüft SourceOverviewPage: dispatcht Browsernachrichten.</summary>

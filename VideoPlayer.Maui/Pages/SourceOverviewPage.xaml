@@ -15,15 +15,20 @@
              Return/Suchen-Taste -->
         <Border Grid.Row="0" Style="{StaticResource InputFrame}">
             <SearchBar x:Name="MediaSearchBar"
+                       AutomationId="MediaSearchBar"
                        Placeholder="Suchen"
                        SearchButtonPressed="OnSearchButtonPressed" />
         </Border>
 
         <!-- Genre-Leiste: horizontal, „Alle" als erster Eintrag —
-             Auswahl als getönte Pill statt Vollfläche. -->
+             Auswahl als getönte Pill statt Vollfläche. Nur sichtbar,
+             wenn die Quelle reale Genres liefert (ShowGenreFilter) —
+             eine „Alle"-nur-Zeile wäre funktionslos. -->
         <CollectionView x:Name="GenresCollection"
+                        AutomationId="GenresCollection"
                         Grid.Row="1"
                         ItemsSource="{Binding Model.SourceBrowser.Genres}"
+                        IsVisible="{Binding Model.SourceBrowser.ShowGenreFilter}"
                         SelectionMode="Single"
                         SelectionChanged="OnGenreSelected">
             <CollectionView.ItemsLayout>
@@ -83,10 +88,14 @@
                IsVisible="False" />
 
         <!-- Medien-Raster mit seitenweisem Nachladen: Posterkarten mit
-             Rundung und Schatten, Titel darunter. -->
+             Rundung und Schatten, Titel darunter. Die ItemsSource kommt
+             aus dem Code-Behind (stabile Liste, die SourceItemListSync
+             granular abgleicht) — ein Binding auf
+             Model.SourceBrowser.Items würde bei jeder Folgeseite die
+             Referenz tauschen und die Ansicht an den Anfang setzen. -->
         <CollectionView x:Name="ItemsCollection"
+                        AutomationId="ItemsCollection"
                         Grid.Row="4"
-                        ItemsSource="{Binding Model.SourceBrowser.Items}"
                         SelectionMode="Single"
                         SelectionChanged="OnMediaItemSelected"
                         RemainingItemsThreshold="6"

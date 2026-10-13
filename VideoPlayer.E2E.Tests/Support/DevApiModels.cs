@@ -217,6 +217,24 @@ public sealed class DevApiModel
 
     /// <summary>Anzeigetitel der Episoden der gewählten Staffel.</summary>
     [JsonPropertyName("mediaDetailsSeasonEpisodeTitles")] public List<string>? MediaDetailsSeasonEpisodeTitles { get; set; }
+
+    /// <summary>Id der im Quellen-Browser geöffneten Quelle (0 = kein Browser aktiv).</summary>
+    [JsonPropertyName("sourceBrowserSourceId")] public long SourceBrowserSourceId { get; set; }
+
+    /// <summary>Anzeigenamen der Genre-Leiste des Quellen-Browsers (inkl. „Alle"-Eintrag).</summary>
+    [JsonPropertyName("sourceBrowserGenreNames")] public List<string>? SourceBrowserGenreNames { get; set; }
+
+    /// <summary>Aktuell gewählter Genre-Filter des Quellen-Browsers (0 = „Alle").</summary>
+    [JsonPropertyName("sourceBrowserSelectedGenreId")] public long SourceBrowserSelectedGenreId { get; set; }
+
+    /// <summary>Die Genre-Leiste des Quellen-Browsers ist sichtbar.</summary>
+    [JsonPropertyName("sourceBrowserShowGenreFilter")] public bool SourceBrowserShowGenreFilter { get; set; }
+
+    /// <summary>Zuletzt abgeschickter Suchtext des Quellen-Browsers (aktiver Filter).</summary>
+    [JsonPropertyName("sourceBrowserSearchText")] public string? SourceBrowserSearchText { get; set; }
+
+    /// <summary>Anzeigetitel der geladenen Einträge des Quellen-Browsers.</summary>
+    [JsonPropertyName("sourceBrowserItemTitles")] public List<string>? SourceBrowserItemTitles { get; set; }
 }
 
 /// <summary>DTO einer Genre-Option des Playlist-Genre-Editors im Modell-Snapshot.</summary>

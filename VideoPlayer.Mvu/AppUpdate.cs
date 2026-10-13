@@ -74,6 +74,19 @@ public static class AppUpdate
     /// <summary>Fehlertext der Wiedergabeseite bei nicht verfügbarer/abspielbarer Quelle.</summary>
     public const string PlaybackUnavailableError = "Das Video kann nicht abgespielt werden.";
 
+    /// <summary>
+    /// Toleranzfenster der Ende-Plausibilitätsprüfung in Sekunden: ein
+    /// <c>MediaEnded</c>-Ereignis gilt nur als tatsächliches Wiedergabeende,
+    /// wenn die Restlaufzeit (Dauer − Position) innerhalb dieses Fensters
+    /// liegt. Der feste Wert orientiert sich am Standard des Angesehen-
+    /// Endfensters (<see cref="AppSettings.WatchedEndWindowSeconds"/>,
+    /// 300 s) — innerhalb dieses Fensters markiert der Fortschrittstakt
+    /// das Medium ohnehin als angesehen bzw. greift die Auto-Fortsetzung
+    /// bereits, sodass ein Ende-Ereignis dort zum Normalablauf konsistent
+    /// ist. Die Schwelle ist bewusst eine Konstante, keine Einstellung.
+    /// </summary>
+    private const int PlaybackEndedToleranceSeconds = 300;
+
     /// <summary>Fehlertext des Protokollversands, wenn noch keine Protokolldatei vorhanden ist.</summary>
     public const string LogProtocolEmptyError = "Es ist noch kein Protokoll vorhanden.";
 
@@ -1345,15 +1358,19 @@ public static class AppUpdate
 
     /// <summary>
     /// Auswahl eines Weiterschauen-Eintrags: abspielbare Medientypen
-    /// (<c>movie</c>/<c>tvshowepisode</c>) starten direkt die Wiedergabe
-    /// über den gemeinsamen Startpfad — ohne Detailansicht; bei einer
-    /// Episode mit bekanntem Serienkontext wird die Fortsetzungsliste
-    /// zusätzlich per Datenabruf nachgeladen. Alle übrigen Einträge
-    /// öffnen weiterhin die Detailseite.
+    /// (<c>movie</c>/<c>tvshowepisode</c>) öffnen die Titel-Detailansicht
+    /// und starten darüber die Wiedergabe — „Player schließen" kehrt zur
+    /// Detailseite zurück statt zur Startliste (Parität zur
+    /// Serveranwendung); bei einer Episode mit bekanntem Serienkontext
+    /// wird die Fortsetzungsliste zusätzlich per Datenabruf nachgeladen.
+    /// Ausnahme Offline: eine Episode ohne Serien-Kennung kann die
+    /// Detailansicht nicht im Serienkontext aufbauen und behält die
+    /// bisherige Direktwiedergabe. Alle übrigen Einträge öffnen weiterhin
+    /// die Detailseite.
     /// </summary>
     /// <param name="model">Aktuelles App-Model.</param>
     /// <param name="message">Die Auswahl-Nachricht.</param>
-    /// <returns>Übergang zum Wiedergabestart bzw. zur Detailseite.</returns>
+    /// <returns>Übergang zu Detailseite und Wiedergabestart bzw. nur zur Detailseite.</returns>
     private static AppTransition UpdateContinueWatchingItemSelected(AppModel model, ContinueWatchingItemSelectedMessage message)
     {
         var item = message.Item;
@@ -1387,17 +1404,30 @@ public static class AppUpdate
         }
 
         var transition = StartPlayback(model, mediaType, item.Id, item.Title);
-        if (mediaType == "tvshowepisode" && item.ShowId is > 0)
+        var effects = new List<AppEffect>();
+        if (!model.IsOffline || mediaType != "tvshowepisode" || item.ShowId is > 0)
         {
-            // Der Serienkontext für die Folgevideo-Funktion fehlt ohne
-            // Detailseite — er wird unabhängig per Datenabruf geladen.
-            return transition with
-            {
-                Effects = [.. transition.Effects, new LoadUpcomingEpisodesEffect(item.Id, item.ShowId.Value)]
-            };
+            // Detailansicht unter die Wiedergabe legen — Effekte laufen
+            // sequenziell, die Detailseite wird daher vor dem Player auf
+            // den Stack geschoben. Offline nur mit nutzbarem Kontext:
+            // eine Episode ohne Serien-Kennung kann die Offline-
+            // Detailansicht nicht aufbauen und behält die Direktwiedergabe
+            // (Filme sind über den Manifesteintrag selbst ihr Kontext).
+            effects.Add(new NavigateToMediaDetailsEffect(
+                item.MediaType, item.Id, item.Title,
+                item.ShowId, item.SeasonId, item.EpisodeId));
         }
 
-        return transition;
+        effects.AddRange(transition.Effects);
+        if (mediaType == "tvshowepisode" && item.ShowId is > 0)
+        {
+            // Der Serienkontext für die Folgevideo-Funktion liegt zum
+            // Startzeitpunkt noch nicht im Model — er wird unabhängig per
+            // Datenabruf geladen.
+            effects.Add(new LoadUpcomingEpisodesEffect(item.Id, item.ShowId.Value));
+        }
+
+        return transition with { Effects = effects };
     }
 
     /// <summary>
@@ -3842,17 +3872,37 @@ public static class AppUpdate
             effects);
     }
 
+    /// <summary>
+    /// Ende-Ereignis der Wiedergabeseite: wird nur als tatsächliches
+    /// Wiedergabeende gewertet, wenn die gemeldete Position innerhalb von
+    /// <see cref="PlaybackEndedToleranceSeconds"/> vor bzw. an der
+    /// Gesamtdauer liegt (<see cref="IsPlaybackEndPlausible"/>). Verfrühte
+    /// oder verspätete Ereignisse (Stream-Abbruch, Format-/Positionswechsel,
+    /// nachgezogenes <c>MediaEnded</c> eines bereits gewechselten Mediums)
+    /// werden verworfen — sie lösen weder die „angesehen"-Markierung und
+    /// die End-Fortschrittsmeldung noch die Auto-Fortsetzung aus. Beim
+    /// plausiblen Ende läuft der Abschluss unverändert: „angesehen"
+    /// markieren, Endposition melden, optional den Download der gesehenen
+    /// Episode entfernen und bei aktiviertem Schalter fortsetzen — im
+    /// Playlist-Kontext über die serverseitige Playlist-Reihenfolge
+    /// (<see cref="AdvancePlaylistEntry"/>), sonst über die Serien-
+    /// Fortsetzungsliste (<see cref="AdvanceToNextEpisode"/>).
+    /// </summary>
+    /// <param name="model">Aktuelles App-Model.</param>
+    /// <returns>Übergang mit dem Abschluss-Zustand bzw. unverändertem Modell bei unplausiblen Ereignissen.</returns>
     private static AppTransition UpdatePlaybackEnded(AppModel model)
     {
         var player = model.Player;
-        if (!player.IsActive)
+        if (!player.IsActive || !IsPlaybackEndPlausible(player))
         {
             return AppTransition.Unchanged(model);
         }
 
         // Abschluss: als „angesehen" markieren und die Endposition melden
-        // (Position = Dauer — das Medium wurde vollständig gespielt).
-        var finalPosition = player.Duration > TimeSpan.Zero ? player.Duration : player.Position;
+        // (Position = Dauer — das Medium wurde vollständig gespielt; die
+        // Plausibilitätsprüfung hat eine positive Dauer bereits sicher-
+        // gestellt).
+        var finalPosition = player.Duration;
         var updated = player with
         {
             IsPlaying = false,
@@ -3903,6 +3953,25 @@ public static class AppUpdate
         return new AppTransition(
             MarkEpisodeWatchedInDetails(model, updated) with { Player = updated },
             effects);
+    }
+
+    /// <summary>
+    /// Plausibilitätsprüfung des Ende-Ereignisses gegen den gemeldeten
+    /// Wiedergabestand: plausibel ist das Ende nur bei bekannter
+    /// Gesamtdauer und einer Restlaufzeit innerhalb von
+    /// <see cref="PlaybackEndedToleranceSeconds"/> (Position nahe/an/über
+    /// dem Ende). Eine unbekannte Dauer (<c>&lt;= 0</c>) macht das
+    /// Ereignis unplausibel — ohne Referenz kann nicht zwischen
+    /// tatsächlichem Ende und verfrühtem Feuern unterschieden werden.
+    /// </summary>
+    /// <param name="player">Aktueller Player-Zustand (letzter gemeldeter Takt).</param>
+    /// <returns><see langword="true"/>, wenn das Ende-Ereignis dem Wiedergabestand entspricht.</returns>
+    private static bool IsPlaybackEndPlausible(PlayerState player)
+    {
+        return player.Duration > TimeSpan.Zero
+            && player.Position >= TimeSpan.Zero
+            && player.Duration - player.Position
+                <= TimeSpan.FromSeconds(PlaybackEndedToleranceSeconds);
     }
 
     /// <summary>

@@ -38,16 +38,49 @@ Navigationsstack geschoben):
   (kein Filter); das gewählte Genre ist hervorgehoben. Ein Wechsel
   lädt die Liste ab der ersten Seite neu (`genreId`-Parameter von
   `api/items`).
+- **Sichtbarkeit der Genre-Leiste:** Die Leiste erscheint nur, wenn
+  der Server für die Quelle tatsächlich Genres liefert
+  (`api/SourceGenres/{id}`). Liefert der Endpunkt eine leere Liste —
+  oder schlägt der Abruf fehl — bleibt die Leiste ausgeblendet, statt
+  eine funktionslose Zeile mit nur „Alle" zu zeigen
+  (`SourceBrowserState.ShowGenreFilter`: mindestens ein Genre mit
+  `Id > 0` erforderlich). Diagnosebefund des betreffenden Schritts:
+  Leiste und Ladepfad waren im Auslieferungsstand vollständig
+  vorhanden — die fehlende Anzeige entstand, weil der Genre-Abruf
+  für die Quelle keine Einträge lieferte (leere Serverantwort bzw.
+  Ladefehler-Fallback auf „Alle"); serverseitige Ursachen bleiben
+  unverändert dokumentiert.
 - **Textsuche:** das Suchfeld filtert serverseitig über den
-  `search`-Parameter; Abschicken erfolgt über die Suchen-Taste.
+  `search`-Parameter; Abschicken erfolgt über die Suchen-/Return-Taste
+  und lädt die Trefferliste ab der ersten Seite neu. Eine getippte,
+  noch nicht abgeschickte Eingabe bleibt über beliebige
+  Modell-Aktualisierungen hinweg erhalten (Synchronisation,
+  Fortschritt, Netzwerkereignisse, Ladezustände) — die Seite spiegelt
+  den Modell-Suchtext nur noch ins Feld, wenn sich der abgeschickte
+  Wert tatsächlich geändert hat (Abschicken, Quellen-Wechsel,
+  Zustands-Reset). Es gibt bewusst kein Live-Suchen pro Tastenschlag.
 - **Medien-Raster:** dreispaltige Poster-Karten mit Titel; fehlt ein
   Poster, bleibt der Titel lesbar.
 - **Seitenweises Nachladen:** beim Erreichen des Listenendes wird die
   nächste Seite (`size` = 20, Wert des Altbestands) automatisch
   angehängt; scheitert das Nachladen, bietet die Fußzeile „Erneut
   versuchen" — die geladenen Einträge bleiben stehen.
+- **Scrollposition beim Nachladen:** die Trefferliste bleibt beim
+  Anhängen einer Folgeseite an der bisherigen Position — die neuen
+  Einträge erscheinen am Ende, ohne dass die Ansicht an den Anfang
+  springt. Die Seite bindet dazu eine stabile eigene Eintragsliste,
+  die `SourceItemListSync` granular mit der unveränderlichen
+  Modell-Liste abgleicht (gemeinsames Präfix per `Id`, Anhänge erzeugen
+  nur `Add`-Ereignisse) — ein `ItemsSource`-Referenzwechsel pro
+  Folgeseite, der den Ansichts-Reset verursachte, entfällt. Erstladen,
+  Genre-Wechsel und neue Suche ersetzen die Liste dagegen bewusst
+  komplett und zeigen sie wieder von Anfang an; das gilt für die
+  ungefilterte Liste wie für Such- und Genre-Treffer (gleicher
+  Anzeige- und Nachladepfad).
 - **Rückkehr** aus einer Detailseite stellt Genre-Filter, Suchtext und
-  Listenstand wieder her — kein erneutes Laden.
+  Listenstand wieder her — kein erneutes Laden; der zuletzt
+  abgeschickte Suchtext steht als erkennbarer aktiver Filter weiterhin
+  im Suchfeld.
 
 ## Medien-Detailseiten
 

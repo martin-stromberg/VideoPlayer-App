@@ -1,6 +1,7 @@
 using FlaUI.Core.AutomationElements;
 using FlaUI.Core.Conditions;
 using FlaUI.Core.Definitions;
+using FlaUI.Core.Patterns;
 using FlaUI.UIA3;
 
 namespace VideoPlayer.E2E.Tests.Support;
@@ -422,6 +423,21 @@ public sealed class UiDriver : IDisposable
         FlaUI.Core.Input.Keyboard.Release(FlaUI.Core.WindowsAPI.VirtualKeyShort.ALT);
     }
 
+    /// <summary>
+    /// Fokussiert ein Element per AutomationId und sendet die Return-Taste
+    /// — die Submit-Geste eines Suchfelds (<c>SearchButtonPressed</c>).
+    /// </summary>
+    /// <param name="automationId">AutomationId des Eingabefelds.</param>
+    /// <param name="timeout">Maximale Wartezeit (Standard 15 s).</param>
+    public void PressEnter(string automationId, TimeSpan? timeout = null)
+    {
+        var element = FindByAutomationId(automationId, timeout);
+        element.Focus();
+        Thread.Sleep(150);
+        FlaUI.Core.Input.Keyboard.Press(FlaUI.Core.WindowsAPI.VirtualKeyShort.RETURN);
+        FlaUI.Core.Input.Keyboard.Release(FlaUI.Core.WindowsAPI.VirtualKeyShort.RETURN);
+    }
+
     /// <summary>Sucht ein Element per Anzeigename (einmalig, ohne Retry).</summary>
     /// <param name="name">Der gesuchte Name.</param>
     /// <returns>Das Element oder <c>null</c>.</returns>
@@ -472,6 +488,94 @@ public sealed class UiDriver : IDisposable
 
             Thread.Sleep(200);
         }
+    }
+
+    /// <summary>
+    /// Scrollt den Container mit der angegebenen AutomationId ans
+    /// vertikale Ende — löst bei Listen mit
+    /// <c>RemainingItemsThreshold</c> das Nachladen wie ein Nutzer aus.
+    /// Bevorzugt das UIA-<c>ScrollPattern</c> des (verschachtelten)
+    /// ScrollViewers; ohne Scroll-Provider fällt es auf Mausrad-Scrolls
+    /// über dem Elementmittelpunkt zurück.
+    /// </summary>
+    /// <param name="automationId">AutomationId des Containers.</param>
+    /// <param name="timeout">Maximale Wartezeit auf das Element (Standard 15 s).</param>
+    public void ScrollToEnd(string automationId, TimeSpan? timeout = null)
+    {
+        var element = FindByAutomationId(automationId, timeout);
+        var scroll = FindScrollPattern(element);
+        if (scroll is not null && scroll.VerticallyScrollable.ValueOrDefault)
+        {
+            var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(30);
+            var previous = -1.0;
+            var stalled = 0;
+            while (DateTime.UtcNow < deadline && stalled < 3)
+            {
+                scroll.Scroll(ScrollAmount.NoAmount, ScrollAmount.LargeIncrement);
+                Thread.Sleep(400);
+                var percent = scroll.VerticalScrollPercent.ValueOrDefault;
+                if (percent >= 99)
+                {
+                    return;
+                }
+
+                stalled = Math.Abs(percent - previous) < 0.01 ? stalled + 1 : 0;
+                previous = percent;
+            }
+
+            return;
+        }
+
+        // Fallback: echte Mausrad-Scrolls am Elementmittelpunkt
+        // (gleiche Ereigniskette wie das Scrollen per Rad/Touchpad).
+        var bounds = element.BoundingRectangle;
+        FlaUI.Core.Input.Mouse.MoveTo(
+            bounds.X + bounds.Width / 2, bounds.Y + bounds.Height / 2);
+        for (var i = 0; i < 40; i++)
+        {
+            FlaUI.Core.Input.Mouse.Scroll(-3);
+            Thread.Sleep(120);
+        }
+    }
+
+    /// <summary>
+    /// Liest die vertikale Scrollposition (Prozent) des Containers mit
+    /// der angegebenen AutomationId — Nachweis, dass eine Liste ihre
+    /// Position nach einem Update behält statt an den Anfang zu springen.
+    /// </summary>
+    /// <param name="automationId">AutomationId des Containers.</param>
+    /// <returns>Der vertikale Scroll-Prozentsatz oder <c>double.NaN</c>, wenn kein Scroll-Provider existiert.</returns>
+    public double GetVerticalScrollPercent(string automationId)
+    {
+        var element = FindByAutomationId(automationId);
+        var scroll = FindScrollPattern(element);
+        if (scroll is null || scroll.VerticallyScrollable.ValueOrDefault is not true)
+        {
+            return double.NaN;
+        }
+
+        return scroll.VerticalScrollPercent.ValueOrDefault;
+    }
+
+    /// <summary>Sucht das erste Element mit UIA-ScrollPattern im Teilbaum (inklusive des Elements selbst).</summary>
+    /// <param name="element">Wurzelelement der Suche.</param>
+    /// <returns>Das ScrollPattern oder <c>null</c>.</returns>
+    private static IScrollPattern? FindScrollPattern(AutomationElement element)
+    {
+        if (element.Patterns.Scroll.IsSupported)
+        {
+            return element.Patterns.Scroll.Pattern;
+        }
+
+        foreach (var descendant in element.FindAllDescendants())
+        {
+            if (descendant.Patterns.Scroll.IsSupported)
+            {
+                return descendant.Patterns.Scroll.Pattern;
+            }
+        }
+
+        return null;
     }
 
     /// <summary>
