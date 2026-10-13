@@ -1345,15 +1345,19 @@ public static class AppUpdate
 
     /// <summary>
     /// Auswahl eines Weiterschauen-Eintrags: abspielbare Medientypen
-    /// (<c>movie</c>/<c>tvshowepisode</c>) starten direkt die Wiedergabe
-    /// über den gemeinsamen Startpfad — ohne Detailansicht; bei einer
-    /// Episode mit bekanntem Serienkontext wird die Fortsetzungsliste
-    /// zusätzlich per Datenabruf nachgeladen. Alle übrigen Einträge
-    /// öffnen weiterhin die Detailseite.
+    /// (<c>movie</c>/<c>tvshowepisode</c>) öffnen die Titel-Detailansicht
+    /// und starten darüber die Wiedergabe — „Player schließen" kehrt zur
+    /// Detailseite zurück statt zur Startliste (Parität zur
+    /// Serveranwendung); bei einer Episode mit bekanntem Serienkontext
+    /// wird die Fortsetzungsliste zusätzlich per Datenabruf nachgeladen.
+    /// Ausnahme Offline: eine Episode ohne Serien-Kennung kann die
+    /// Detailansicht nicht im Serienkontext aufbauen und behält die
+    /// bisherige Direktwiedergabe. Alle übrigen Einträge öffnen weiterhin
+    /// die Detailseite.
     /// </summary>
     /// <param name="model">Aktuelles App-Model.</param>
     /// <param name="message">Die Auswahl-Nachricht.</param>
-    /// <returns>Übergang zum Wiedergabestart bzw. zur Detailseite.</returns>
+    /// <returns>Übergang zu Detailseite und Wiedergabestart bzw. nur zur Detailseite.</returns>
     private static AppTransition UpdateContinueWatchingItemSelected(AppModel model, ContinueWatchingItemSelectedMessage message)
     {
         var item = message.Item;
@@ -1387,17 +1391,30 @@ public static class AppUpdate
         }
 
         var transition = StartPlayback(model, mediaType, item.Id, item.Title);
-        if (mediaType == "tvshowepisode" && item.ShowId is > 0)
+        var effects = new List<AppEffect>();
+        if (!model.IsOffline || mediaType != "tvshowepisode" || item.ShowId is > 0)
         {
-            // Der Serienkontext für die Folgevideo-Funktion fehlt ohne
-            // Detailseite — er wird unabhängig per Datenabruf geladen.
-            return transition with
-            {
-                Effects = [.. transition.Effects, new LoadUpcomingEpisodesEffect(item.Id, item.ShowId.Value)]
-            };
+            // Detailansicht unter die Wiedergabe legen — Effekte laufen
+            // sequenziell, die Detailseite wird daher vor dem Player auf
+            // den Stack geschoben. Offline nur mit nutzbarem Kontext:
+            // eine Episode ohne Serien-Kennung kann die Offline-
+            // Detailansicht nicht aufbauen und behält die Direktwiedergabe
+            // (Filme sind über den Manifesteintrag selbst ihr Kontext).
+            effects.Add(new NavigateToMediaDetailsEffect(
+                item.MediaType, item.Id, item.Title,
+                item.ShowId, item.SeasonId, item.EpisodeId));
         }
 
-        return transition;
+        effects.AddRange(transition.Effects);
+        if (mediaType == "tvshowepisode" && item.ShowId is > 0)
+        {
+            // Der Serienkontext für die Folgevideo-Funktion liegt zum
+            // Startzeitpunkt noch nicht im Model — er wird unabhängig per
+            // Datenabruf geladen.
+            effects.Add(new LoadUpcomingEpisodesEffect(item.Id, item.ShowId.Value));
+        }
+
+        return transition with { Effects = effects };
     }
 
     /// <summary>
