@@ -1,5 +1,10 @@
 # Änderungsprotokoll
 
+## 2026-10-13 — Protokollierung schreibt in der installierten App wieder Ablauf-Einträge
+
+- **Logging-Pipeline im Release aktiviert:** Die installierte App schrieb nur die Marker-Zeilen ins `videoplayer.log` — alle `ILogger<T>`-Ablauf-Einträge liefen ins Leere, weil der `MauiAppBuilder` ohne `builder.Logging`-Konfiguration eine `NullLoggerFactory` bereitstellt, die DI-registrierte `ILoggerProvider` ignoriert; `builder.Logging.AddDebug()` hatte diese Aktivierung bisher nur im Debug übernommen. `MauiProgram.CreateMauiApp()` ruft jetzt explizit `builder.Services.AddLogging()` auf — die echte `LoggerFactory` nimmt den `FileLoggerProvider` auch im Release auf, und die Aktionen des Anwenders erscheinen wie vorgesehen als sparsame Breadcrumbs im Protokoll.
+- **Tests:** Neuer Contract-Pin `MauiProgram_ActivatesLoggingPipeline` (`LogProtocolContractTests`) sichert die Aktivierungszeile; Gesamtlauf 1312 Unit-/Contract-Tests und 56 E2E-Tests (davon 1 bereits bestehender, fachfremder Playlist-Navigations-Fehlschlag).
+
 ## 2026-10-12 — Programmprotokoll mit diagnostisch verwertbarem Inhalt
 
 - **Ablauf-Einträge statt nur Marker-Zeile:** Der Schalter „Protokollierung" (`AppSettings.LoggingEnabled`) schrieb bisher nur die Ein-/Ausschalt-Marker in `videoplayer.log` — jetzt fließen sparsame, fachliche Breadcrumbs in die Datei: App-Start und Ablage-Initialisierung, Serverprüfung und Quellenwechsel, An-/Abmeldung und stille Neuanmeldung (Status, nie Zugangsdaten), Sitzungsablauf, Auf-/Abbau und Verlust der Ereignisverbindung, Auflösung der Wiedergabequelle (Medientyp/-Id, Quellart, Fortsetzungsposition), Wiedergabe-Start/-Ende/-Fehlschlag inkl. Anzeigetitel, PiP-/Mini-Player-Umschaltung, Synchronisations-Ergebnis mit `SyncResult`-Zählern, Fortschritts-Einreihen/-Verwerfen/-Nachsenden, Download-Aufträge und -Zustandswechsel, Auto-Download-Läufe, Geräte-Token-Verwerfen/-Ablehnung sowie Online-/Offline-Wechsel inkl. WLAN-Kontext.

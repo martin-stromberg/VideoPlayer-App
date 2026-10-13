@@ -79,6 +79,22 @@ public class LogProtocolContractTests
         Assert.Contains("new FileLoggerProvider(sp.GetRequiredService<AppLogService>())", source, StringComparison.Ordinal);
     }
 
+    /// <summary>
+    /// Die Logging-Pipeline wird explizit aktiviert: ohne
+    /// <c>builder.Logging</c>-Konfiguration liefert der
+    /// <c>MauiAppBuilder</c> eine <c>NullLoggerFactory</c>, die
+    /// DI-registrierte <c>ILoggerProvider</c> ignoriert — im Debug
+    /// übernimmt die Aktivierung <c>AddDebug()</c>, im Release muss
+    /// <c>AddLogging()</c> die echte <c>LoggerFactory</c> sichern.
+    /// </summary>
+    [Fact]
+    public void MauiProgram_ActivatesLoggingPipeline()
+    {
+        var source = ReadFile("VideoPlayer.Maui", "MauiProgram.cs");
+
+        Assert.Contains("builder.Services.AddLogging()", source, StringComparison.Ordinal);
+    }
+
     /// <summary>Der Developer-API-Snapshot führt die Protokoll-Felder für die E2E-Beobachtbarkeit.</summary>
     [Fact]
     public void DevApiSnapshot_ExposesLoggingFields()
