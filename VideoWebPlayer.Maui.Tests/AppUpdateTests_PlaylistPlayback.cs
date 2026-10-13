@@ -270,10 +270,13 @@ public class AppUpdateTests_PlaylistPlayback
 
         Assert.Equal(30, next.Player.MediaId);
         Assert.False(next.Player.IsPlaylistPlayback);
-        Assert.Equal(3, effects.Count);
-        Assert.IsType<NavigateToPlayerEffect>(effects[0]);
-        Assert.IsType<ResolvePlaybackSourceEffect>(effects[1]);
-        var upcoming = Assert.IsType<LoadUpcomingEpisodesEffect>(effects[2]);
+        // Detailansicht unter der Wiedergabe, dann Quellauflösung und
+        // Serienkontext-Nachladung (Issue #49, Schritt 4).
+        Assert.Equal(4, effects.Count);
+        Assert.IsType<NavigateToMediaDetailsEffect>(effects[0]);
+        Assert.IsType<NavigateToPlayerEffect>(effects[1]);
+        Assert.IsType<ResolvePlaybackSourceEffect>(effects[2]);
+        var upcoming = Assert.IsType<LoadUpcomingEpisodesEffect>(effects[3]);
         Assert.Equal(12, upcoming.ShowId);
     }
 
@@ -296,7 +299,10 @@ public class AppUpdateTests_PlaylistPlayback
         var (_, effects) = AppUpdate.Update(
             model, new ContinueWatchingItemSelectedMessage(item));
 
-        Assert.IsType<LoadUpcomingEpisodesEffect>(effects[2]);
+        // Detail-Navigation + Wiedergabe + Serienkontext-Nachladung
+        // (Issue #49, Schritt 4) — der Ladeeffekt bleibt der letzte.
+        Assert.IsType<NavigateToMediaDetailsEffect>(effects[0]);
+        Assert.IsType<LoadUpcomingEpisodesEffect>(effects[3]);
     }
 
     // --- Manuelle Navigation ---

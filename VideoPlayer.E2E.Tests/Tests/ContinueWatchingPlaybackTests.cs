@@ -3,15 +3,16 @@ using VideoPlayer.E2E.Tests.Support;
 namespace VideoPlayer.E2E.Tests.Tests;
 
 /// <summary>
-/// E2E-Szenarien der direkten Wiedergabe aus der Weiterschauen-Liste
-/// (Issue #43, Schritt 1): Ein Tap auf einen abspielbaren
-/// Weiterschauen-Eintrag (<c>movie</c>/<c>episode</c>) startet die
-/// Wiedergabe direkt an der Fortsetzungsposition — ohne Detailseite —,
-/// das Folgevideo bleibt über den unabhängig aufgelösten Serienkontext
-/// erhalten, und nicht abspielbare Einträge (<c>show</c>) öffnen
-/// weiterhin die Detailansicht. Der Auswahl-Pfad nutzt <c>/invoke</c>
-/// mit <c>itemIndex</c> auf dem BindableLayout-Karussell (dieselbe
-/// Ereigniskette wie Fingertipp).
+/// E2E-Szenarien der Weiterschauen-Navigation (Issue #49, Schritt 4):
+/// Ein Tap auf einen abspielbaren Weiterschauen-Eintrag
+/// (<c>movie</c>/<c>episode</c>) öffnet die Titel-Detailansicht und
+/// startet darüber die Wiedergabe an der Fortsetzungsposition —
+/// „Player schließen" kehrt zur Detailansicht zurück statt zur
+/// Startliste. Das Folgevideo bleibt über den nachgeladenen
+/// Serienkontext erhalten, und nicht abspielbare Einträge
+/// (<c>show</c>) öffnen weiterhin nur die Detailansicht. Der
+/// Auswahl-Pfad nutzt <c>/invoke</c> mit <c>itemIndex</c> auf dem
+/// BindableLayout-Karussell (dieselbe Ereigniskette wie Fingertipp).
 /// </summary>
 public sealed class ContinueWatchingPlaybackTests : E2ETestBase
 {
@@ -34,12 +35,13 @@ public sealed class ContinueWatchingPlaybackTests : E2ETestBase
 
     /// <summary>
     /// Pflichtszenario (AK 1 + 2): Ein Tap auf den
-    /// Weiterschauen-Filmeintrag startet die Wiedergabe direkt ab der
-    /// Fortsetzungsposition — die Detailseite wird nicht aufgerufen
-    /// (kein Movie-Detail-Request, nur der Stream).
+    /// Weiterschauen-Filmeintrag öffnet die Titel-Detailansicht und
+    /// startet darüber die Wiedergabe ab der Fortsetzungsposition —
+    /// „Player schließen" kehrt zur geöffneten Detailansicht zurück
+    /// statt zur Startliste.
     /// </summary>
     [Fact]
-    public async Task TapContinueWatchingMovie_StartsPlaybackAtResume_WithoutDetails()
+    public async Task TapContinueWatchingMovie_OpensDetailsAndStartsPlaybackAtResume()
     {
         Assert.True(File.Exists(TestVideo), $"Testvideo fehlt im Output-Verzeichnis: {TestVideo}");
         using var server = new MockVideoServer("AAAAAA", "e2e-device-cw", "e2e@example.test", "e2e-pass")
@@ -59,28 +61,39 @@ public sealed class ContinueWatchingPlaybackTests : E2ETestBase
             m => m.PlayerIsActive && m.PlayerIsPlaying
                 && m.PlayerPositionSeconds >= 12,
             TimeSpan.FromSeconds(60),
-            "Direktwiedergabe ab der Fortsetzungsposition", Ct);
+            "Wiedergabe über der Detailansicht ab der Fortsetzungsposition", Ct);
 
         Assert.False(app.Process.HasExited, "Die App wurde beim Wiedergabestart beendet.");
         Assert.Null(model.PlayerError);
         Assert.Equal(MovieId, model.PlayerMediaId);
-        // Nachweis „keine Detailseite": der Stream wurde abgerufen,
-        // der Movie-Detail-Endpunkt nicht.
+        // Die Wiedergabe läuft und die Detailansicht wurde darunter
+        // geöffnet (Movie-Detail-Request).
         Assert.True(server.WasPathRequested("/api/items/movie/8001/stream"),
             "Der Wiedergabe-Stream wurde nicht angefordert.");
-        Assert.False(server.WasPathRequested("/api/items/movie/8001"),
-            "Die Detailseite wurde im Hintergrund geladen (Movie-Detail-Request).");
+        Assert.True(server.WasPathRequested("/api/items/movie/8001"),
+            "Die Titel-Detailansicht wurde nicht geladen (Movie-Detail-Request fehlt).");
+
+        // „Player schließen" kehrt zur Detailansicht zurück — die
+        // Kopf-Sektion der MediaDetailsPage wird sichtbar, während ein
+        // Rücksprung zur Startliste wieder deren Karussells zeigen würde.
+        app.Ui.GoBack();
+        await app.DevApi.WaitForModelAsync(
+            m => !m.PlayerIsActive,
+            TimeSpan.FromSeconds(30),
+            "Player geschlossen", Ct);
+        var header = app.Ui.FindByAutomationId("HeaderSection", TimeSpan.FromSeconds(30));
+        Assert.NotNull(header);
     }
 
     /// <summary>
     /// Pflichtszenario (AK 5): Ein Tap auf den
-    /// Weiterschauen-Episodeneintrag startet die Wiedergabe direkt; der
-    /// Serienkontext wird per <c>api/items/tvshow/{id}</c> ohne
-    /// Detailseite geladen (Folge-Episoden im Modell) und die
-    /// Auto-Fortsetzung wechselt zur Folge-Episode.
+    /// Weiterschauen-Episodeneintrag öffnet die Titel-Detailansicht im
+    /// Serienkontext und startet darüber die Wiedergabe; die
+    /// Fortsetzungsliste wird weiterhin nachgeladen (Folge-Episoden im
+    /// Modell) und die Auto-Fortsetzung wechselt zur Folge-Episode.
     /// </summary>
     [Fact]
-    public async Task TapContinueWatchingEpisode_StartsPlaybackAndAdvancesToNextEpisode()
+    public async Task TapContinueWatchingEpisode_OpensDetailsAndStartsPlaybackAndAdvancesToNextEpisode()
     {
         Assert.True(File.Exists(TestVideo), $"Testvideo fehlt im Output-Verzeichnis: {TestVideo}");
         using var server = new MockVideoServer("AAAAAA", "e2e-device-cw-ep", "e2e@example.test", "e2e-pass")
@@ -100,11 +113,11 @@ public sealed class ContinueWatchingPlaybackTests : E2ETestBase
         var index = await ContinueWatchingIndexAsync(app, EpisodeTitle);
         await app.DevApi.InvokeAsync("ContinueWatchingCarousel", index, Ct);
 
-        // Direktstart der Episode — ohne Episoden-Detailaufruf.
+        // Wiedergabe der Episode über der geöffneten Detailansicht.
         var model = await app.DevApi.WaitForModelAsync(
             m => m.PlayerIsActive && m.PlayerMediaId == EpisodeId,
             TimeSpan.FromSeconds(60),
-            "Direktwiedergabe der Weiterschauen-Episode", Ct);
+            "Wiedergabe der Weiterschauen-Episode über der Detailansicht", Ct);
         Assert.False(app.Process.HasExited, "Die App wurde beim Wiedergabestart beendet.");
 
         // Folgevideo-Funktion: das kurze Testvideo liegt im
@@ -118,19 +131,27 @@ public sealed class ContinueWatchingPlaybackTests : E2ETestBase
         Assert.Equal(NextEpisodeId, model.PlayerMediaId);
         Assert.Null(model.PlayerError);
 
-        // Nachweis „keine Detailseite" + „Serienkontext unabhängig":
-        // beide Episoden-Streams liefen, der Serienkontext kam per
-        // tvshow-Abruf — die Episoden-Detail-Endpunkte nie.
+        // Nachweis „Detailansicht geöffnet" + „Serienkontext vorhanden":
+        // beide Episoden-Streams liefen, und die Serie wurde per
+        // tvshow-Abruf geladen (Detailseite im Serienkontext und/oder
+        // Fortsetzungs-Nachladung — beide nutzen denselben Endpunkt).
         Assert.True(server.WasPathRequested("/api/items/tvshowepisode/8201/stream"),
             "Der Stream der Ausgangs-Episode wurde nicht angefordert.");
         Assert.True(server.WasPathRequested("/api/items/tvshowepisode/8202/stream"),
             "Der Stream der Folge-Episode wurde nicht angefordert.");
         Assert.True(server.WasPathRequested("/api/items/tvshow/8101"),
             "Der Serienkontext wurde nicht per tvshow-Abruf geladen.");
-        Assert.False(server.WasPathRequested("/api/items/tvshowepisode/8201"),
-            "Die Episoden-Detailseite wurde im Hintergrund geladen.");
-        Assert.False(server.WasPathRequested("/api/items/tvshowepisode/8202"),
-            "Die Detailseite der Folge-Episode wurde im Hintergrund geladen.");
+
+        // „Player schließen" kehrt zur Detailansicht der Episode im
+        // Serienkontext zurück (Staffel-Episodenliste im Modell).
+        app.Ui.GoBack();
+        await app.DevApi.WaitForModelAsync(
+            m => !m.PlayerIsActive
+                && m.MediaDetailsSeasonEpisodeTitles is { Count: > 0 },
+            TimeSpan.FromSeconds(30),
+            "Player geschlossen — Detailansicht im Serienkontext", Ct);
+        var header = app.Ui.FindByAutomationId("HeaderSection", TimeSpan.FromSeconds(30));
+        Assert.NotNull(header);
     }
 
     /// <summary>

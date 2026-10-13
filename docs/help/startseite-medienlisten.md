@@ -87,33 +87,46 @@ Neustart ohne Serveranfrage verfügbar und belastet keine Backups.
 Das Control `CachedPosterImage` bindet die Bild-Id und weist
 nachgereichte Ergebnisse nur zu, wenn die Id noch stimmt.
 
-## Auswahl: Direkte Wiedergabe aus der Weiterschauen-Liste
+## Auswahl: Detailansicht mit Wiedergabe aus der Weiterschauen-Liste
 
 Das Antippen einer Karte führt je nach Liste unterschiedlich weit:
 
 - **„Weiterschauen":** Abspielbare Einträge (Filme und Episoden)
-  starten **direkt die Wiedergabe** an der gespeicherten
-  Fortsetzungsposition — ohne Umweg über die Detailseite
-  (`ContinueWatchingItemSelectedMessage` → gemeinsamer Wiedergabe-Start
-  mit „Abspielen" auf der Detailseite). Einträge, die nicht direkt
-  abspielbar sind (Serie, Staffel, Kollektion), öffnen wie bisher die
-  Detailansicht.
+  öffnen die **Titel-Detailansicht und starten darüber die
+  Wiedergabe** an der gespeicherten Fortsetzungsposition — Parität
+  zur Serveranwendung
+  (`ContinueWatchingItemSelectedMessage` → `NavigateToMediaDetailsEffect`
+  vor dem gemeinsamen Wiedergabe-Start). Das Schließen des Players
+  kehrt damit zur geöffneten Detailansicht zurück statt zur
+  Startliste — Titelinformationen bleiben ohne Umweg über die
+  Quellenansicht einsehbar. Einträge, die nicht direkt abspielbar
+  sind (Serie, Staffel, Kollektion), öffnen wie bisher nur die
+  Detailansicht; Einträge mit Playlist-Bezug starten weiterhin direkt
+  im Playlist-Kontext.
 - **„Favoriten" und „Neu im Programm":** Ein Antippen öffnet
   weiterhin ausschließlich die Detailseite
   (`MediaItemSelectedMessage` → `NavigateToMediaDetailsEffect` per
   Shell-Route `mediadetails?mediaType=…&id=…&title=…`).
 
-Die Fortsetzungsposition kommt beim Direktstart über denselben
-Auflösungspfad wie beim Wiedergabestart von der Detailseite — der
-Eintrag muss dafür keine weiteren Angaben mitbringen.
+Die Fortsetzungsposition kommt über denselben Auflösungspfad wie
+beim Wiedergabestart von der Detailseite — der Eintrag muss dafür
+keine weiteren Angaben mitbringen.
+
+**Offline-Sonderfall:** Im Offline-Modus gilt dieselbe
+Detailansicht-mit-Wiedergabe für Filme und für Episoden mit
+Serien-Kennung — die Offline-Detailansicht baut daraus den
+Serienkontext aus der gecachten Serienstruktur auf. Eine Episode
+ohne Serien-Kennung besitzt keinen nutzbaren Detail-Kontext und
+behält die direkte Wiedergabe ohne Detailansicht; nicht auswählbare
+Platzhalter fehlender Episoden bleiben ohne Aktion.
 
 ## Kontextmenü der Weiterschauen-Liste
 
 Ein **2-Sekunden-Long-Press** auf einen Eintrag der
 Weiterschauen-Liste öffnet ein Kontextmenü mit den Aktionen
 **„Ausblenden"** und **„Überspringen"** sowie **„Abbrechen"** — analog
-zur Serveranwendung. Der kurze Tap bleibt davon unberührt und startet
-weiterhin die direkte Wiedergabe bzw. die Detailansicht.
+zur Serveranwendung. Der kurze Tap bleibt davon unberührt und öffnet
+weiterhin die Detailansicht mit Wiedergabe bzw. nur die Detailansicht.
 
 - **„Ausblenden"** ruft den Server-Endpunkt
   `api/continue-watching/hide` auf, **„Überspringen"**
@@ -131,11 +144,11 @@ weiterhin die direkte Wiedergabe bzw. die Detailansicht.
   bieten kein Menü.
 
 Damit das **Folgevideo** (Auto-Fortsetzung bzw. Fehler-Rückfall auf
-die nächste Episode) auch beim Direktstart einer Episode funktioniert,
-lädt die App den Serienkontext unabhängig von der Detailseite: online
-über `api/items/tvshow/{showId}` (die Serien-Id steckt als
-Kontext-Hinweis im Weiterschauen-Eintrag), offline aus der gecachten
-Serienstruktur (`ShowDetailsCache`). Die Folge-Episoden werden dem
+die nächste Episode) auch beim Start aus der Weiterschauen-Liste
+funktioniert, lädt die App den Serienkontext unabhängig vom
+Detail-Ladevorgang nach: online über `api/items/tvshow/{showId}` (die
+Serien-Id steckt als Kontext-Hinweis im Weiterschauen-Eintrag),
+offline aus der gecachten Serienstruktur (`ShowDetailsCache`). Die Folge-Episoden werden dem
 Player nachträglich zugeordnet, solange derselbe Titel läuft — ein
 Ladefehlschlag entfällt die Fortsetzungsfunktion still, die Wiedergabe
 bleibt davon unberührt.

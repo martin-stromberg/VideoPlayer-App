@@ -37,6 +37,12 @@ Wiederanmelde-/Offline-Zustand.
   gecachter Serienstruktur: geladene Episoden bleiben abspielbar,
   fehlende erscheinen abgedunkelt mit „Nicht heruntergeladen" und
   ohne Abspiel-/Download-Schalter.
+- **Weiterschauen-Auswahl offline:** Ein Tipp auf einen Eintrag mit
+  nutzbarer Kennung (Film mit Manifesteintrag, Episode mit
+  Serien-Kennung) öffnet wie online die Detailansicht und startet
+  darüber die Wiedergabe; eine Episode ohne Serien-Kennung startet
+  weiterhin direkt, und Platzhalter fehlender Episoden bleiben ohne
+  Aktion.
 - Serverseitige Aktionen (Favorit umschalten, Download starten) sind
   im Offline-Snapshot ausgeblendet; die Quellen-Einträge des Menüs
   werden offline entfernt — ohne Verbindung steht keine Quellenliste
