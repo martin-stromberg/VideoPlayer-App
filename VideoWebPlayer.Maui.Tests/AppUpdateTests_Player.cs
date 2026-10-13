@@ -526,14 +526,14 @@ public class AppUpdateTests_Player
     {
         var model = WithPlayer(PlayingState(mediaId: 32)
             with
-            {
-                // Zustand direkt nach dem Wechsel: Quellenauflösung der
-                // Folge-Episode läuft, Position/Dauer noch unbekannt.
-                Position = TimeSpan.Zero,
-                Duration = TimeSpan.Zero,
-                IsResolving = true,
-                UpcomingEpisodes = [new PlayerEpisodeRef { MediaId = 33, Title = "Folge 3" }]
-            });
+        {
+            // Zustand direkt nach dem Wechsel: Quellenauflösung der
+            // Folge-Episode läuft, Position/Dauer noch unbekannt.
+            Position = TimeSpan.Zero,
+            Duration = TimeSpan.Zero,
+            IsResolving = true,
+            UpcomingEpisodes = [new PlayerEpisodeRef { MediaId = 33, Title = "Folge 3" }]
+        });
 
         var transition = AppUpdate.Update(model, new PlaybackEndedMessage());
 
@@ -649,7 +649,8 @@ public class AppUpdateTests_Player
         var model = WithDetails(ShowDetails()) with
         {
             Player = PlayingState(position: TimeSpan.FromMinutes(45))
-                with { MediaType = "movie", MediaId = 42 }
+                with
+            { MediaType = "movie", MediaId = 42 }
         };
 
         var transition = AppUpdate.Update(model, new PlaybackEndedMessage());
