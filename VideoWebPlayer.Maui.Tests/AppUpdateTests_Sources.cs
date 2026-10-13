@@ -358,6 +358,52 @@ public class AppUpdateTests_Sources
         Assert.Same(model, transition.Model);
     }
 
+    /// <summary>Prüft SourceGenresLoaded: bei nur „Alle"-Liste → bleibt die Genre-Leiste ausgeblendet.</summary>
+    [Fact]
+    public void SourceGenresLoaded_OnlyAllEntry_HidesGenreFilter()
+    {
+        // Leere Server-Genreliste (bzw. Ladefehler-Fallback): der
+        // Ladepfad liefert nur den „Alle"-Eintrag — die Leiste darf
+        // nicht als funktionslose Ein-Eintrag-Zeile erscheinen
+        // (Schritt-1-Projektklärung).
+        var model = Connected() with
+        {
+            SourceBrowser = new SourceBrowserState { SourceId = 5 }
+        };
+
+        var transition = AppUpdate.Update(
+            model,
+            new SourceGenresLoadedMessage(5, [new SourceGenreItem { Id = 0, Name = "Alle", IsSelected = true }]));
+
+        var browser = transition.Model.SourceBrowser;
+        Assert.Single(browser.Genres);
+        Assert.False(browser.ShowGenreFilter);
+    }
+
+    /// <summary>Prüft SourceGenresLoaded: bei Server-Genres → wird die Genre-Leiste sichtbar.</summary>
+    [Fact]
+    public void SourceGenresLoaded_ServerGenres_ShowsGenreFilter()
+    {
+        var model = Connected() with
+        {
+            SourceBrowser = new SourceBrowserState { SourceId = 5 }
+        };
+
+        var transition = AppUpdate.Update(
+            model,
+            new SourceGenresLoadedMessage(5,
+            [
+                new SourceGenreItem { Id = 0, Name = "Alle" },
+                new SourceGenreItem { Id = 4, Name = "Komödie" },
+                new SourceGenreItem { Id = 8, Name = "Drama" }
+            ]));
+
+        var browser = transition.Model.SourceBrowser;
+        Assert.Equal(3, browser.Genres.Count);
+        Assert.True(browser.ShowGenreFilter);
+        Assert.True(browser.Genres.Single(g => g.Id == 0).IsSelected);
+    }
+
     // --- Filter / Suche ---
 
     /// <summary>Prüft GenreSelected: bei <c>ReloadsFromFirstPage</c> → lädt mit Genrefilter neu.</summary>
