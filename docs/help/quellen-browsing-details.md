@@ -65,6 +65,18 @@ Navigationsstack geschoben):
   nächste Seite (`size` = 20, Wert des Altbestands) automatisch
   angehängt; scheitert das Nachladen, bietet die Fußzeile „Erneut
   versuchen" — die geladenen Einträge bleiben stehen.
+- **Scrollposition beim Nachladen:** die Trefferliste bleibt beim
+  Anhängen einer Folgeseite an der bisherigen Position — die neuen
+  Einträge erscheinen am Ende, ohne dass die Ansicht an den Anfang
+  springt. Die Seite bindet dazu eine stabile eigene Eintragsliste,
+  die `SourceItemListSync` granular mit der unveränderlichen
+  Modell-Liste abgleicht (gemeinsames Präfix per `Id`, Anhänge erzeugen
+  nur `Add`-Ereignisse) — ein `ItemsSource`-Referenzwechsel pro
+  Folgeseite, der den Ansichts-Reset verursachte, entfällt. Erstladen,
+  Genre-Wechsel und neue Suche ersetzen die Liste dagegen bewusst
+  komplett und zeigen sie wieder von Anfang an; das gilt für die
+  ungefilterte Liste wie für Such- und Genre-Treffer (gleicher
+  Anzeige- und Nachladepfad).
 - **Rückkehr** aus einer Detailseite stellt Genre-Filter, Suchtext und
   Listenstand wieder her — kein erneutes Laden; der zuletzt
   abgeschickte Suchtext steht als erkennbarer aktiver Filter weiterhin
