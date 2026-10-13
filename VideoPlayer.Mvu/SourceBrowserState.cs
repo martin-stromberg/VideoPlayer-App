@@ -58,6 +58,18 @@ public sealed record SourceBrowserState
     /// <summary>Das Raster enthält Einträge.</summary>
     public bool HasItems => Items.Count > 0;
 
+    /// <summary>
+    /// Die Genre-Leiste wird angezeigt — die Quelle lieferte mindestens
+    /// ein reales Genre (<see cref="SourceGenreItem.Id"/> &gt; 0) neben dem
+    /// synthetischen „Alle"-Eintrag. Enthält <see cref="Genres"/> nur
+    /// „Alle" (leere Serverliste oder Ladefehler-Fallback), bleibt die
+    /// Leiste ausgeblendet statt eine funktionslose Zeile zu zeigen.
+    /// „Alle" ist stets der einzige synthetische Eintrag und steht an
+    /// Index 0 — mehr als ein Eintrag bedeutet daher: mindestens ein
+    /// reales Server-Genre.
+    /// </summary>
+    public bool ShowGenreFilter => Genres.Count > 1;
+
     /// <summary>Der letzte Ladeversuch ist fehlgeschlagen.</summary>
     public bool HasError => Error is not null;
 

@@ -109,6 +109,37 @@ public class DevApiModelSnapshotTests
         Assert.Equal(2, snapshot.PlayerUpcomingEpisodeCount);
     }
 
+    /// <summary>Der Snapshot mappt den Zustand des Quellen-Browsers (Genre-Leiste, Auswahl, Einträge).</summary>
+    [Fact]
+    public void DevApiModelSnapshot_MapsSourceBrowser()
+    {
+        var model = new AppModel
+        {
+            SourceBrowser = new SourceBrowserState
+            {
+                SourceId = 5,
+                SelectedGenreId = 4,
+                Genres =
+                [
+                    new SourceGenreItem { Id = 0, Name = "Alle" },
+                    new SourceGenreItem { Id = 4, Name = "Komödie", IsSelected = true }
+                ],
+                Items =
+                [
+                    new SourceMediaItem { Id = 1, Title = "Eintrag A", MediaType = "moviecollection" }
+                ]
+            }
+        };
+
+        var snapshot = DevApiModelSnapshot.FromModel(model);
+
+        Assert.Equal(5, snapshot.SourceBrowserSourceId);
+        Assert.Equal(new[] { "Alle", "Komödie" }, snapshot.SourceBrowserGenreNames);
+        Assert.Equal(4, snapshot.SourceBrowserSelectedGenreId);
+        Assert.True(snapshot.SourceBrowserShowGenreFilter);
+        Assert.Equal(new[] { "Eintrag A" }, snapshot.SourceBrowserItemTitles);
+    }
+
     /// <summary>Die JSON-Serialisierung nutzt camelCase-Feldnamen.</summary>
     [Fact]
     public void Snapshot_SerializesCamelCase()

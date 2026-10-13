@@ -38,6 +38,18 @@ Navigationsstack geschoben):
   (kein Filter); das gewählte Genre ist hervorgehoben. Ein Wechsel
   lädt die Liste ab der ersten Seite neu (`genreId`-Parameter von
   `api/items`).
+- **Sichtbarkeit der Genre-Leiste:** Die Leiste erscheint nur, wenn
+  der Server für die Quelle tatsächlich Genres liefert
+  (`api/SourceGenres/{id}`). Liefert der Endpunkt eine leere Liste —
+  oder schlägt der Abruf fehl — bleibt die Leiste ausgeblendet, statt
+  eine funktionslose Zeile mit nur „Alle" zu zeigen
+  (`SourceBrowserState.ShowGenreFilter`: mindestens ein Genre mit
+  `Id > 0` erforderlich). Diagnosebefund des betreffenden Schritts:
+  Leiste und Ladepfad waren im Auslieferungsstand vollständig
+  vorhanden — die fehlende Anzeige entstand, weil der Genre-Abruf
+  für die Quelle keine Einträge lieferte (leere Serverantwort bzw.
+  Ladefehler-Fallback auf „Alle"); serverseitige Ursachen bleiben
+  unverändert dokumentiert.
 - **Textsuche:** das Suchfeld filtert serverseitig über den
   `search`-Parameter; Abschicken erfolgt über die Suchen-Taste.
 - **Medien-Raster:** dreispaltige Poster-Karten mit Titel; fehlt ein

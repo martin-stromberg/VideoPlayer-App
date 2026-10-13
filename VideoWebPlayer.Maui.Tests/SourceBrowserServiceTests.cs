@@ -96,6 +96,30 @@ public class SourceBrowserServiceTests
         Assert.EndsWith("/api/SourceGenres/1", Assert.Single(handler.Requests).PathAndQuery);
     }
 
+    /// <summary>Prüft LoadGenres: bei leerer Serverliste → liefert nur den „Alle"-Eintrag.</summary>
+    [Fact]
+    public async Task LoadGenres_EmptyServerList_ReturnsOnlyAllEntry()
+    {
+        // Serverseitig leere Genre-Liste (Diagnosebefund der Anforderung):
+        // der Dienst liefert ausschließlich den „Alle"-Eintrag — die
+        // Sichtbarkeitsregel (SourceBrowserState.ShowGenreFilter) blendet
+        // die Leiste in diesem Fall aus.
+        await LoginAsync();
+        handler.EnqueueJson(HttpStatusCode.OK, new SourceGenres
+        {
+            SourceId = 1,
+            SourceName = "Serien",
+            Genres = []
+        });
+
+        var genres = await CreateService().LoadGenresAsync(1);
+
+        var all = Assert.Single(genres);
+        Assert.Equal(0, all.Id);
+        Assert.Equal("Alle", all.Name);
+        Assert.True(all.IsSelected);
+    }
+
     /// <summary>Prüft LoadItems: bei erster Seite → fordert die Query an und bildet die Summaries ab.</summary>
     [Fact]
     public async Task LoadItems_FirstPage_MapsSummaries_AndRequestsQuery()

@@ -20,10 +20,14 @@
         </Border>
 
         <!-- Genre-Leiste: horizontal, „Alle" als erster Eintrag —
-             Auswahl als getönte Pill statt Vollfläche. -->
+             Auswahl als getönte Pill statt Vollfläche. Nur sichtbar,
+             wenn die Quelle reale Genres liefert (ShowGenreFilter) —
+             eine „Alle"-nur-Zeile wäre funktionslos. -->
         <CollectionView x:Name="GenresCollection"
+                        AutomationId="GenresCollection"
                         Grid.Row="1"
                         ItemsSource="{Binding Model.SourceBrowser.Genres}"
+                        IsVisible="{Binding Model.SourceBrowser.ShowGenreFilter}"
                         SelectionMode="Single"
                         SelectionChanged="OnGenreSelected">
             <CollectionView.ItemsLayout>
@@ -85,6 +89,7 @@
         <!-- Medien-Raster mit seitenweisem Nachladen: Posterkarten mit
              Rundung und Schatten, Titel darunter. -->
         <CollectionView x:Name="ItemsCollection"
+                        AutomationId="ItemsCollection"
                         Grid.Row="4"
                         ItemsSource="{Binding Model.SourceBrowser.Items}"
                         SelectionMode="Single"
