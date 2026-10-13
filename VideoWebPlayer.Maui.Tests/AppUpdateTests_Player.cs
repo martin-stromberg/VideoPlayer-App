@@ -447,6 +447,102 @@ public class AppUpdateTests_Player
         Assert.DoesNotContain(transition.Effects, e => e is ResolvePlaybackSourceEffect);
     }
 
+    // --- Ende-Plausibilitätsprüfung (Issue 49, Schritt 5) ---
+
+    /// <summary>Prüft PlaybackEnded: ein Ereignis mitten in der Wiedergabe wird als verfrüht verworfen.</summary>
+    [Fact]
+    public void PlaybackEnded_MidPlayback_IsIgnored()
+    {
+        var duration = TimeSpan.FromMinutes(45);
+        var model = WithPlayer(PlayingState(
+            duration: duration,
+            position: TimeSpan.FromMinutes(10),
+            upcoming: [new PlayerEpisodeRef { MediaId = 32, Title = "Folge 2" }]));
+
+        var transition = AppUpdate.Update(model, new PlaybackEndedMessage());
+
+        // Weder „angesehen"/Abschlussmeldung noch Auto-Fortsetzung —
+        // der Player-Zustand bleibt unverändert laufend.
+        Assert.Same(model, transition.Model);
+        Assert.Empty(transition.Effects);
+        Assert.False(transition.Model.Player.IsWatched);
+        Assert.True(transition.Model.Player.IsPlaying);
+    }
+
+    /// <summary>Prüft PlaybackEnded: bei unbekannter Gesamtdauer wird das Ereignis nicht als Ende gewertet.</summary>
+    [Fact]
+    public void PlaybackEnded_UnknownDuration_IsIgnored()
+    {
+        var model = WithPlayer(PlayingState(
+            duration: TimeSpan.Zero,
+            position: TimeSpan.FromMinutes(10),
+            upcoming: [new PlayerEpisodeRef { MediaId = 32, Title = "Folge 2" }]));
+
+        var transition = AppUpdate.Update(model, new PlaybackEndedMessage());
+
+        Assert.Same(model, transition.Model);
+        Assert.Empty(transition.Effects);
+        Assert.Equal(31, transition.Model.Player.MediaId);
+    }
+
+    /// <summary>Prüft PlaybackEnded: ein Ereignis am inneren Rand des Toleranzfensters (300 s) gilt als Ende.</summary>
+    [Fact]
+    public void PlaybackEnded_WithinTolerance_Completes()
+    {
+        var duration = TimeSpan.FromMinutes(45);
+        var model = WithPlayer(PlayingState(
+            duration: duration,
+            position: duration - TimeSpan.FromSeconds(300)));
+
+        var transition = AppUpdate.Update(model, new PlaybackEndedMessage());
+
+        Assert.True(transition.Model.Player.IsWatched);
+        Assert.Single(transition.Effects, e => e is ReportPlaybackProgressEffect);
+    }
+
+    /// <summary>Prüft PlaybackEnded: eine Sekunde außerhalb des Toleranzfensters (301 s) wird verworfen.</summary>
+    [Fact]
+    public void PlaybackEnded_JustOutsideTolerance_IsIgnored()
+    {
+        var duration = TimeSpan.FromMinutes(45);
+        var model = WithPlayer(PlayingState(
+            duration: duration,
+            position: duration - TimeSpan.FromSeconds(301)));
+
+        var transition = AppUpdate.Update(model, new PlaybackEndedMessage());
+
+        Assert.Same(model, transition.Model);
+        Assert.Empty(transition.Effects);
+    }
+
+    /// <summary>
+    /// Prüft PlaybackEnded: ein nachgezogenes Ende-Ereignis des
+    /// Vorgängermediums trifft den bereits gewechselten Folge-Zustand
+    /// (Position/Dauer zurückgesetzt) und darf die neue Episode nicht
+    /// als gesehen markieren oder weiter vorlaufen.
+    /// </summary>
+    [Fact]
+    public void PlaybackEnded_AfterAdvance_IgnoresStaleEvent()
+    {
+        var model = WithPlayer(PlayingState(mediaId: 32)
+            with
+            {
+                // Zustand direkt nach dem Wechsel: Quellenauflösung der
+                // Folge-Episode läuft, Position/Dauer noch unbekannt.
+                Position = TimeSpan.Zero,
+                Duration = TimeSpan.Zero,
+                IsResolving = true,
+                UpcomingEpisodes = [new PlayerEpisodeRef { MediaId = 33, Title = "Folge 3" }]
+            });
+
+        var transition = AppUpdate.Update(model, new PlaybackEndedMessage());
+
+        Assert.Same(model, transition.Model);
+        Assert.Empty(transition.Effects);
+        Assert.False(transition.Model.Player.IsWatched);
+        Assert.Equal(32, transition.Model.Player.MediaId);
+    }
+
     // --- Angesehen-Markierung in den geladenen Details (Schritt 7) ---
 
     /// <summary>Prüft PlaybackEnded: die gesehene Episode wird in den geladenen Details markiert.</summary>
@@ -552,7 +648,8 @@ public class AppUpdateTests_Player
     {
         var model = WithDetails(ShowDetails()) with
         {
-            Player = PlayingState() with { MediaType = "movie", MediaId = 42 }
+            Player = PlayingState(position: TimeSpan.FromMinutes(45))
+                with { MediaType = "movie", MediaId = 42 }
         };
 
         var transition = AppUpdate.Update(model, new PlaybackEndedMessage());
@@ -569,7 +666,7 @@ public class AppUpdateTests_Player
         var details = ShowDetails();
         var model = WithDetails(details) with
         {
-            Player = PlayingState(mediaId: 99)
+            Player = PlayingState(mediaId: 99, position: TimeSpan.FromMinutes(45))
         };
 
         var transition = AppUpdate.Update(model, new PlaybackEndedMessage());
