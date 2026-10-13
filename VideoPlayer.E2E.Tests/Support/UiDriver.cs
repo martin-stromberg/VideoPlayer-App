@@ -422,6 +422,21 @@ public sealed class UiDriver : IDisposable
         FlaUI.Core.Input.Keyboard.Release(FlaUI.Core.WindowsAPI.VirtualKeyShort.ALT);
     }
 
+    /// <summary>
+    /// Fokussiert ein Element per AutomationId und sendet die Return-Taste
+    /// — die Submit-Geste eines Suchfelds (<c>SearchButtonPressed</c>).
+    /// </summary>
+    /// <param name="automationId">AutomationId des Eingabefelds.</param>
+    /// <param name="timeout">Maximale Wartezeit (Standard 15 s).</param>
+    public void PressEnter(string automationId, TimeSpan? timeout = null)
+    {
+        var element = FindByAutomationId(automationId, timeout);
+        element.Focus();
+        Thread.Sleep(150);
+        FlaUI.Core.Input.Keyboard.Press(FlaUI.Core.WindowsAPI.VirtualKeyShort.RETURN);
+        FlaUI.Core.Input.Keyboard.Release(FlaUI.Core.WindowsAPI.VirtualKeyShort.RETURN);
+    }
+
     /// <summary>Sucht ein Element per Anzeigename (einmalig, ohne Retry).</summary>
     /// <param name="name">Der gesuchte Name.</param>
     /// <returns>Das Element oder <c>null</c>.</returns>

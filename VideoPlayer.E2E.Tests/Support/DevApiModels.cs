@@ -230,6 +230,9 @@ public sealed class DevApiModel
     /// <summary>Die Genre-Leiste des Quellen-Browsers ist sichtbar.</summary>
     [JsonPropertyName("sourceBrowserShowGenreFilter")] public bool SourceBrowserShowGenreFilter { get; set; }
 
+    /// <summary>Zuletzt abgeschickter Suchtext des Quellen-Browsers (aktiver Filter).</summary>
+    [JsonPropertyName("sourceBrowserSearchText")] public string? SourceBrowserSearchText { get; set; }
+
     /// <summary>Anzeigetitel der geladenen Einträge des Quellen-Browsers.</summary>
     [JsonPropertyName("sourceBrowserItemTitles")] public List<string>? SourceBrowserItemTitles { get; set; }
 }

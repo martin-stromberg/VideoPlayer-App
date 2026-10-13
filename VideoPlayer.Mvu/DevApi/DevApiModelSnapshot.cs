@@ -230,6 +230,9 @@ public sealed record DevApiModelSnapshot
     /// <summary>Die Genre-Leiste des Quellen-Browsers ist sichtbar (reale Server-Genres vorhanden).</summary>
     public bool SourceBrowserShowGenreFilter { get; init; }
 
+    /// <summary>Zuletzt abgeschickter Suchtext des Quellen-Browsers (aktiver Filter; leer = keine Suche).</summary>
+    public string SourceBrowserSearchText { get; init; } = string.Empty;
+
     /// <summary>Anzeigetitel der geladenen Einträge des Quellen-Browsers (Anzeigereihenfolge).</summary>
     public IReadOnlyList<string> SourceBrowserItemTitles { get; init; } = [];
 
@@ -340,6 +343,7 @@ public sealed record DevApiModelSnapshot
             SourceBrowserGenreNames = model.SourceBrowser.Genres.Select(g => g.Name).ToList(),
             SourceBrowserSelectedGenreId = model.SourceBrowser.SelectedGenreId,
             SourceBrowserShowGenreFilter = model.SourceBrowser.ShowGenreFilter,
+            SourceBrowserSearchText = model.SourceBrowser.SearchText,
             SourceBrowserItemTitles = model.SourceBrowser.Items.Select(i => i.Title).ToList()
         };
     }
