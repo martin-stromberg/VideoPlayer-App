@@ -16,6 +16,6 @@ Issue: #49
 | [x] | – | Planprüfung (Unteragent) | `project-plan-check.md` |
 | [x] | – | Planungscommit | – |
 | [x] | – | Entwicklungsschritte-Tracking anlegen | `steps.md`, `status.html` |
-| [ ] | 6 | Entwicklungsschleife (je Schritt: Branch, Lifecycle, Abnahme, Merge) | `acceptance-schritt-{n}.md` |
-| [ ] | 7 | Aufräumen (Projektverzeichnis entfernen) | – |
-| [ ] | – | Abschlusscommit + PR gegen staging | – |
+| [x] | 6 | Entwicklungsschleife (je Schritt: Branch, Lifecycle, Abnahme, Merge) | `acceptance-schritt-{n}.md` |
+| [x] | 7 | Aufräumen (Projektverzeichnis entfernen) | – |
+| [x] | – | Abschlusscommit + PR gegen staging | – |
