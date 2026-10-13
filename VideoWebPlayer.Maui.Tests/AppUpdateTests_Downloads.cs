@@ -484,7 +484,10 @@ public class AppUpdateTests_Downloads
                 MediaType = "tvshowepisode",
                 MediaId = 33,
                 Attempted = true,
-                Duration = TimeSpan.FromMinutes(40)
+                Duration = TimeSpan.FromMinutes(40),
+                // Position am Medienende — das Ende-Ereignis gilt nur
+                // innerhalb des Toleranzfensters als Wiedergabeende.
+                Position = TimeSpan.FromMinutes(40)
             }
         };
         var transition = AppUpdate.Update(model, new PlaybackEndedMessage());

@@ -499,6 +499,35 @@ public class AppUpdateTests_PlaylistPlayback
         Assert.False(next.Player.IsResolving);
     }
 
+    /// <summary>
+    /// Prüft PlaybackEnded: ein verfrühtes Ende-Ereignis mitten in der
+    /// Wiedergabe wird auch im Playlist-Kontext verworfen — kein
+    /// serverseitiger Vorlauf, keine „angesehen"-Markierung.
+    /// </summary>
+    [Fact]
+    public void PlaybackEnded_InPlaylist_MidPlayback_IsIgnored()
+    {
+        var playing = PlayingInPlaylist();
+        var model = playing with
+        {
+            // Langes Medium, Position weit vor dem Ende — das Ereignis
+            // liegt außerhalb des Toleranzfensters und muss verworfen
+            // werden (die Fixture-Dauer von 100 s liegt selbst komplett
+            // im Fenster).
+            Player = playing.Player with
+            {
+                Duration = TimeSpan.FromMinutes(45),
+                Position = TimeSpan.FromMinutes(10)
+            }
+        };
+
+        var (next, effects) = AppUpdate.Update(model, new PlaybackEndedMessage());
+
+        Assert.Same(model, next);
+        Assert.Empty(effects);
+        Assert.False(next.Player.IsWatched);
+    }
+
     /// <summary>Prüft PlaybackProgress: am Titelende schaltet der Server zum Folgeeintrag weiter.</summary>
     [Fact]
     public void PlaybackProgress_NearEnd_InPlaylist_AdvancesPlaylist()
@@ -589,6 +618,10 @@ public class AppUpdateTests_PlaylistPlayback
                 MediaId = 31,
                 Title = "Folge 1",
                 IsPlaying = true,
+                // Position am Medienende — das Ende-Ereignis gilt nur
+                // innerhalb des Toleranzfensters als Wiedergabeende.
+                Duration = TimeSpan.FromMinutes(45),
+                Position = TimeSpan.FromMinutes(45),
                 UpcomingEpisodes = [new PlayerEpisodeRef { MediaId = 32, Title = "Folge 2" }]
             }
         };

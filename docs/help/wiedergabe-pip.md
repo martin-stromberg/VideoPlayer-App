@@ -124,6 +124,31 @@ die Fortsetzung den Folge-Eintrag über den serverseitigen
 Serienreihenfolge); meldet der Server keinen Folgeeintrag, endet die
 Wiedergabe.
 
+## Wiedergabeende
+
+Erreicht die Wiedergabe das Ende des Mediums, wird der Titel als
+„angesehen" markiert, die Endposition abschließend an den Server
+gemeldet und — bei aktivierter Auto-Fortsetzung — der Folgetitel
+gestartet. Das Ende-Ereignis des Players wird dabei gegen den
+gemeldeten Wiedergabestand plausibilisiert: nur wenn die Position
+innerhalb eines festen Toleranzfensters (300 Sekunden, Orientierung
+am „Als angesehen"-Endfenster) vor bzw. an der Gesamtdauer liegt,
+gilt das Ereignis als tatsächliches Ende. Ein verfrüht feuerndes
+Ereignis — etwa bei einem Stream-Abbruch, einem Formatwechsel oder
+einem Positionswechsel mitten in der Wiedergabe — sowie ein
+nachgezogenes Ereignis eines bereits gewechselten Mediums werden
+verworfen und lösen weder die Markierung noch die Fortschritts-
+meldung oder die Fortsetzung aus. Ist die Gesamtdauer unbekannt,
+wird das Ereignis ebenfalls nicht als Ende gewertet. Die Prüfung
+gilt einheitlich für die Serien-/Einzelwiedergabe und die
+Playlist-Wiedergabe.
+
+Technischer Hintergrund: die Auswertung liegt in
+`AppUpdate.UpdatePlaybackEnded` (`IsPlaybackEndPlausible` prüft
+`PlayerState.Duration`/`Position` gegen die Konstante
+`PlaybackEndedToleranceSeconds`); `PlayerPage.OnMediaEnded` bleibt
+reiner Event-Übersetzer.
+
 ## Playlist-Navigation
 
 Bei Playlist-Wiedergabe zeigt der Player die Schaltflächen **„Zurück"**
