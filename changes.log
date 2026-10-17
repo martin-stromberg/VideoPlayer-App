@@ -1,5 +1,11 @@
 # Änderungsprotokoll
 
+## 2026-10-17 — Build-Fehler net10.0-maccatalyst: IosBackgroundDownloadBackend nicht verfügbar (Issue #61)
+
+- **Ursache:** `MauiProgram.cs` registrierte `IosBackgroundDownloadBackend` unter `#if IOS || MACCATALYST`; die Klasse liegt jedoch unter `Platforms/iOS/` und wird nur für `net10.0-ios` kompiliert — der MacCatalyst-Build brach mit 4× `CS0234`.
+- **Fix:** DI-Registrierung und der Compiler-Guard der Backend-Datei auf `#if IOS` reduziert. MacCatalyst registriert damit — wie Windows/Android — kein `IDownloadBackend` und fällt im `DownloadService` auf den prozessinternen `HttpDownloadBackend` zurück; die systemseitige Hintergrund-Session bleibt dokumentiert iOS-exklusiv.
+- **Verifikation:** `dotnet build VideoPlayer.Maui -f net10.0-maccatalyst -c Debug` lokal erfolgreich (0 Fehler); Contract-Tests `IosBackgroundDownloadBackend_Wired` und `DownloadService_UsesBackend_AndCompletesExternal` grün.
+
 ## 2026-10-17 — Fortschrittsmeldung trägt den Playlist-Bezug (Issue #59)
 
 - **Playlist-Kontext im Fortschrittsreport:** `POST api/continue-watching/progress` meldete aus der Playlist-Wiedergabe heraus nur Medium und Position ohne Playlist-Bezug — der Server legte neben dem playlist-gebundenen Weiterschauen-Eintrag einen zweiten, kontextlosen Eintrag an. `PlaybackProgressReport` (`VideoPlayer.ApiClient`) trägt jetzt `PlaylistId` (`long?`), durchgereicht über `ReportPlaybackProgressEffect` → `ShellAppEffectHandler` → `ProgressReportService` → `VideoPlayerApiClient.ReportPlaybackProgressAsync` an allen drei Meldepfaden (5-s-Takt `UpdatePlaybackProgress`, Wiedergabeende `UpdatePlaybackEnded`, Player-Schluss `UpdatePlayerClosed`). Die Befüllung kommt aus der neuen abgeleiteten Eigenschaft `PlayerState.ProgressReportPlaylistId` (`IsPlaylistPlayback ? PlaylistId : null`) — kontextlose Wiedergabe sendet `null` wie bisher. Der Server schreibt damit den playlist-gebundenen Weiterschauen-Eintrag fort statt ein Duplikat anzulegen.
