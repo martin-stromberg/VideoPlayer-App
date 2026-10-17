@@ -116,6 +116,7 @@ public sealed class DownloadService
     private readonly Func<HttpClient> httpClientFactory;
     private readonly Func<string, bool> fileExists;
     private readonly long? quotaBytesOverride;
+    private readonly IDownloadBackend? backend;
     private readonly ILogger<DownloadService> logger;
 
     private readonly SemaphoreSlim manifestGate = new(1, 1);
@@ -130,14 +131,16 @@ public sealed class DownloadService
     /// <param name="layout">Ablagelayout mit dem Video-Verzeichnis.</param>
     /// <param name="networkMonitor">Netzwerkstatus-Erkennung (WLAN-Bedingung).</param>
     /// <param name="logger">Optionaler Logger für das Programmprotokoll.</param>
+    /// <param name="backend">Plattform-Transfer-Backend (iOS: Hintergrund-Session); <c>null</c> = prozessinterner HTTP-Stream.</param>
     public DownloadService(
         AuthSessionService authSession,
         AppSecretsService secrets,
         CacheDatabase cache,
         AppStorageLayout layout,
         INetworkStatusMonitor networkMonitor,
-        ILogger<DownloadService>? logger = null)
-        : this(authSession, secrets, cache, layout, networkMonitor, null, null, null, logger)
+        ILogger<DownloadService>? logger = null,
+        IDownloadBackend? backend = null)
+        : this(authSession, secrets, cache, layout, networkMonitor, null, null, null, logger, backend)
     {
     }
 
@@ -151,6 +154,7 @@ public sealed class DownloadService
     /// <param name="fileExists">Existenzprüfung für lokale Dateien; <c>null</c> = <see cref="File.Exists(string?)"/>.</param>
     /// <param name="quotaBytesOverride">Ersetzt das GB-Kontingent der Einstellungen (für Tests); <c>null</c> = <c>DownloadQuotaGb</c>.</param>
     /// <param name="logger">Optionaler Logger für das Programmprotokoll.</param>
+    /// <param name="backend">Plattform-Transfer-Backend (iOS: Hintergrund-Session); <c>null</c> = prozessinterner HTTP-Stream.</param>
     internal DownloadService(
         AuthSessionService authSession,
         AppSecretsService secrets,
@@ -160,7 +164,8 @@ public sealed class DownloadService
         Func<HttpClient>? httpClientFactory,
         Func<string, bool>? fileExists,
         long? quotaBytesOverride,
-        ILogger<DownloadService>? logger = null)
+        ILogger<DownloadService>? logger = null,
+        IDownloadBackend? backend = null)
     {
         this.authSession = authSession ?? throw new ArgumentNullException(nameof(authSession));
         this.secrets = secrets ?? throw new ArgumentNullException(nameof(secrets));
@@ -171,6 +176,9 @@ public sealed class DownloadService
         this.fileExists = fileExists ?? File.Exists;
         this.quotaBytesOverride = quotaBytesOverride;
         this.logger = logger ?? NullLogger<DownloadService>.Instance;
+        // Backend delegiert den Transfer (iOS: systemseitige Hintergrund-
+        // Session). Ohne Angabe bleibt der prozessinterne HTTP-Stream.
+        this.backend = backend;
     }
 
     /// <summary>Wird ausgelöst, wenn ein Download-Eintrag geändert wurde (Zustand oder Fortschritt).</summary>
@@ -574,6 +582,54 @@ public sealed class DownloadService
     }
 
     /// <summary>
+    /// Meldet den Abschluss eines systemseitig geführten Transfers (iOS-
+    /// Hintergrund-Session), für den kein aktiver <c>TransferAsync</c>-Aufruf
+    /// mehr existiert — z. B. nach App-Neustart durch das System.
+    /// <paramref name="mediaKey"/> ist der Dateiname ohne Endung
+    /// (<c>{typ}_{mediaId}</c>); <paramref name="tempPath"/> die vom System
+    /// gelieferte fertige Datei, <paramref name="errorCode"/> der Fehlercode
+    /// oder <c>null</c>.
+    /// </summary>
+    /// <param name="mediaKey">Der Medien-Key aus dem Dateinamen-Muster.</param>
+    /// <param name="errorCode">Fehlercode des Transfers; <c>null</c> = Erfolg.</param>
+    /// <param name="tempPath">Pfad der fertig geladenen Temp-Datei; <c>null</c> bei Fehler.</param>
+    /// <param name="cancellationToken">Bricht die Manifest-Operation ab.</param>
+    /// <returns>Eine abgeschlossene Aufgabe nach der Korrektur.</returns>
+    public async Task CompleteExternalTransferAsync(
+        string mediaKey, string? errorCode, string? tempPath, CancellationToken cancellationToken = default)
+    {
+        var parts = mediaKey.Split('|')[0].Split('_');
+        if (parts.Length != 2 || !long.TryParse(parts[1], out var mediaId))
+        {
+            return;
+        }
+
+        var entry = await FindEntryAsync(parts[0], mediaId);
+        if (entry is null || DownloadStateNames.FromPersisted(entry.State) != DownloadState.Downloading)
+        {
+            return;
+        }
+
+        if (errorCode is null && tempPath is not null)
+        {
+            try
+            {
+                File.Copy(tempPath, entry.FilePath, overwrite: true);
+                entry.SizeBytes = new FileInfo(entry.FilePath).Length;
+                await SetStateAsync(entry, DownloadState.Completed, null);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                await SetStateAsync(entry, DownloadState.Failed, ErrorIo, ex);
+            }
+        }
+        else
+        {
+            await SetStateAsync(entry, DownloadState.Failed, errorCode ?? ErrorNetwork);
+        }
+    }
+
+    /// <summary>
     /// Entfernt alle Downloads vollständig: bricht alle laufenden Transfers ab,
     /// löscht alle bekannten Dateien und leert das Manifest. Danach ist die
     /// Warteschlange leer — `PumpQueue` startet nichts Neues.
@@ -891,23 +947,7 @@ public sealed class DownloadService
                 return;
             }
 
-            using var http = httpClientFactory();
-            using var request = new HttpRequestMessage(HttpMethod.Get, url.Value.Url);
-            if (url.Value.Token is not null)
-            {
-                request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", url.Value.Token);
-            }
-
-            using var response = await http.SendAsync(
-                request, HttpCompletionOption.ResponseHeadersRead, cts.Token);
-            if (!response.IsSuccessStatusCode)
-            {
-                await SetStateIfPresentAsync(
-                    entry, DownloadState.Failed, $"{ErrorHttpPrefix}{(int)response.StatusCode}");
-                return;
-            }
-
-            entry.TotalBytes = response.Content.Headers.ContentLength ?? 0;
+            entry.TotalBytes = 0;
             entry.DownloadedBytes = 0;
             await manifestGate.WaitAsync(cts.Token);
             try
@@ -921,61 +961,70 @@ public sealed class DownloadService
             RaiseItemChanged(ToItem(entry));
 
             Directory.CreateDirectory(layout.VideosDirectory);
-            var input = await response.Content.ReadAsStreamAsync(cts.Token);
             var quotaExceeded = false;
-            await using (input.ConfigureAwait(false))
+            var scannedUsed = usedAtStart;
+            var downloadedAtScan = 0L;
+            var progressTicks = 0;
+            var progress = new Progress<(long Downloaded, long Total)>(p =>
             {
-                var output = new FileStream(
-                    entry.FilePath, FileMode.Create, FileAccess.Write, FileShare.None,
-                    CopyBufferSize, useAsync: true);
-                await using (output.ConfigureAwait(false))
+                entry.DownloadedBytes = p.Downloaded;
+                if (p.Total > 0)
                 {
-                    var buffer = new byte[CopyBufferSize];
-                    long downloaded = 0;
-                    // Zuletzt gemessene Gesamtbelegung samt eigenem Stand:
-                    // parallel laufende Transfers schreiben ebenfalls ins
-                    // Verzeichnis — die periodische Neumessung hält das
-                    // Kontingent auch über Transfer-Grenzen hinweg ein.
-                    var scannedUsed = usedAtStart;
-                    var downloadedAtScan = 0L;
-                    var chunksSinceScan = 0;
-                    int read;
-                    while ((read = await input.ReadAsync(buffer.AsMemory(0, buffer.Length), cts.Token)) > 0)
-                    {
-                        if (++chunksSinceScan >= QuotaScanIntervalChunks)
-                        {
-                            scannedUsed = GetUsedBytes();
-                            downloadedAtScan = downloaded;
-                            chunksSinceScan = 0;
-                        }
-
-                        // Laufende Quota-Prüfung: der Transfer wird
-                        // verworfen, bevor das Kontingent überschritten
-                        // wird (wichtig bei parallelen Downloads). Das
-                        // Löschen der Teildatei erfolgt erst nach dem
-                        // Schließen des Ausgabestroms (offenes Handle).
-                        if (scannedUsed + (downloaded - downloadedAtScan) + read > quotaBytes)
-                        {
-                            quotaExceeded = true;
-                            break;
-                        }
-
-                        await output.WriteAsync(buffer.AsMemory(0, read), cts.Token);
-                        downloaded += read;
-                        entry.DownloadedBytes = downloaded;
-                        await ReportProgressThrottledAsync(key, entry);
-                    }
-
-                    entry.DownloadedBytes = downloaded;
-                    entry.SizeBytes = downloaded;
+                    entry.TotalBytes = p.Total;
                 }
+
+                // Laufende Quota-Prüfung: periodische Neumessung hält das
+                // Kontingent auch über Transfer-Grenzen hinweg ein
+                // (parallele Transfers schreiben in dasselbe Verzeichnis).
+                if (++progressTicks >= QuotaScanIntervalChunks)
+                {
+                    scannedUsed = GetUsedBytes();
+                    downloadedAtScan = p.Downloaded;
+                    progressTicks = 0;
+                }
+
+                if (scannedUsed + (p.Downloaded - downloadedAtScan) > quotaBytes)
+                {
+                    quotaExceeded = true;
+                    cts.Cancel();
+                    return;
+                }
+
+                _ = ReportProgressThrottledAsync(key, entry);
+            });
+
+            var activeBackend = backend ?? new HttpDownloadBackend(httpClientFactory);
+            DownloadBackendResult result;
+            try
+            {
+                result = await activeBackend.TransferAsync(
+                    url.Value.Url, url.Value.Token, entry.FilePath,
+                    settings.WifiOnlyDownloads, progress, cts.Token);
+            }
+            catch (OperationCanceledException) when (quotaExceeded)
+            {
+                result = new DownloadBackendResult(0, 0, ErrorQuotaExceeded);
             }
 
-            if (quotaExceeded)
+            if (quotaExceeded || result.ErrorCode == ErrorQuotaExceeded)
             {
                 TryDeleteFile(entry.FilePath);
                 await SetStateIfPresentAsync(entry, DownloadState.Failed, ErrorQuotaExceeded);
                 return;
+            }
+
+            if (result.ErrorCode is not null)
+            {
+                TryDeleteFile(entry.FilePath);
+                await SetStateIfPresentAsync(entry, DownloadState.Failed, result.ErrorCode);
+                return;
+            }
+
+            entry.DownloadedBytes = result.BytesWritten;
+            entry.SizeBytes = result.BytesWritten;
+            if (result.TotalBytes > 0)
+            {
+                entry.TotalBytes = result.TotalBytes;
             }
 
             await SetStateIfPresentAsync(entry, DownloadState.Completed, null);

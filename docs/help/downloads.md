@@ -114,6 +114,17 @@ Ist die Einstellung aktiv, wird der fertige Download einer Episode
 entfernt, sobald sie als „angesehen" gilt (Endfenster-Schwelle oder
 Wiedergabe-Ende). Laufende oder wartende Downloads bleiben unberührt.
 
+## Hintergrund-Downloads unter iOS
+
+Auf iOS läuft die Dateiübertragung in einer systemseitigen
+Hintergrund-Session: Downloads werden fortgesetzt, wenn die App in den
+Hintergrund wechselt oder suspendiert wird. Schließt das System einen
+Download, während die App beendet war, wird das Ergebnis beim nächsten
+Start ins Download-Manifest übernommen (Eintrag „Fertig" bzw.
+„Fehlgeschlagen"). Auf anderen Plattformen bleibt der prozessinterne
+Transfer aktiv; unterbrochene Downloads werden dort bei der nächsten
+Verbindung fortgesetzt (Neustart ab Position 0).
+
 ## Abgleich des Ablageorts
 
 Beim App-Start und beim Öffnen der Downloads-Seite gleicht die App den

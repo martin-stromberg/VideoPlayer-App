@@ -217,4 +217,30 @@ public class DownloadsContractTests
         Assert.Contains("nicht zugeordnet", state.OrphanedText, StringComparison.Ordinal);
         Assert.Contains("2,0 GB", state.OrphanedText, StringComparison.Ordinal);
     }
+
+    /// <summary>Prüft iOS-Backend: Hintergrund-URL-Session und App-Delegate-Verdrahtung vorhanden.</summary>
+    [Fact]
+    public void IosBackgroundDownloadBackend_Wired()
+    {
+        var backend = Read("VideoPlayer.Maui", "Platforms", "iOS", "IosBackgroundDownloadBackend.cs");
+        var appDelegate = Read("VideoPlayer.Maui", "Platforms", "iOS", "AppDelegate.cs");
+        var maui = Read("VideoPlayer.Maui", "MauiProgram.cs");
+
+        Assert.Contains("CreateBackgroundSessionConfiguration", backend, StringComparison.Ordinal);
+        Assert.Contains("AllowsCellularAccess", backend, StringComparison.Ordinal);
+        Assert.Contains("CompletionSink", backend, StringComparison.Ordinal);
+        Assert.Contains("handleEventsForBackgroundURLSession", appDelegate, StringComparison.Ordinal);
+        Assert.Contains("IosBackgroundDownloadBackend", maui, StringComparison.Ordinal);
+        Assert.Contains("IDownloadBackend", maui, StringComparison.Ordinal);
+    }
+
+    /// <summary>Prüft DownloadService: Backend-Abstraktion und externe Transfer-Vervollständigung.</summary>
+    [Fact]
+    public void DownloadService_UsesBackend_AndCompletesExternal()
+    {
+        var code = Read("VideoPlayer.Mvu", "DownloadService.cs");
+
+        Assert.Contains("IDownloadBackend", code, StringComparison.Ordinal);
+        Assert.Contains("CompleteExternalTransferAsync", code, StringComparison.Ordinal);
+    }
 }
