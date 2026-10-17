@@ -166,16 +166,18 @@ detailseiten-unabhängige Serienkontext.
 
 Der automatische Download-Vorlauf folgt bei playlist-gebundenen
 Weiterschauen-Einträgen der **Playlist-Reihenfolge**: statt der
-nächsten Serien-Episoden reiht er die nächsten ladbaren und
-zugänglichen Einträge der Playlist (`api/playlists/{id}/entries/paged`,
-Server-Reihenfolge ab dem aktuellen Eintrag) ein — bis zur Anzahl
-„Vorzuladende Episoden". Playlist-gebundene Filme laden sich selbst
-plus die folgenden Playlist-Einträge. Der Bezug landet als
+Serienreihenfolge reiht er den aktuellen Eintrag und die folgenden
+ladbaren und zugänglichen Einträge der Playlist
+(`api/playlists/{id}/entries/paged`, Server-Reihenfolge ab
+einschließlich des aktuellen Eintrags) ein — insgesamt bis zur Anzahl
+„Anzahl vorzuladender Episoden". Playlist-gebundene Filme laden sich
+selbst plus die folgenden Playlist-Einträge — der Film zählt dabei ins
+Budget. Der Bezug landet als
 `PlaylistId`/`PlaylistEntryId`/`PlaylistSortOrder` im Download-Manifest
 (`download_manifest`, Spalten werden in Bestandsinstallationen
 nachgezogen). Bei verwaistem Eintragsbezug oder nicht erreichbarer
-Playlist gilt der Serien-Pfad; Einträge ohne Playlist-Bezug bleiben
-unverändert. Details siehe `downloads.md`.
+Playlist gilt der Serien-Pfad; Einträge ohne Playlist-Bezug folgen dem
+Serien-Pfad. Details siehe `downloads.md`.
 
 ## MVU-Anbindung
 

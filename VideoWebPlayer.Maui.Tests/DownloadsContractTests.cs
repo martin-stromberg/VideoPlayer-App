@@ -1,3 +1,4 @@
+using System.Globalization;
 using VideoPlayer.Mvu;
 using VideoWebPlayer.Maui.Tests.Stubs;
 
@@ -211,11 +212,23 @@ public class DownloadsContractTests
     [Fact]
     public void DownloadsPageState_OrphanedText_WhenSet_NamesBytes()
     {
-        var state = new DownloadsPageState { OrphanedBytes = 2_147_483_648L };
+        // Die Größenformatierung folgt der UI-Kultur; die App-Texte sind deutsch,
+        // daher wird die Erwartung unter fester deutscher Kultur geprüft.
+        var previousCulture = CultureInfo.CurrentCulture;
+        try
+        {
+            CultureInfo.CurrentCulture = CultureInfo.GetCultureInfo("de-DE");
 
-        Assert.NotNull(state.OrphanedText);
-        Assert.Contains("nicht zugeordnet", state.OrphanedText, StringComparison.Ordinal);
-        Assert.Contains("2,0 GB", state.OrphanedText, StringComparison.Ordinal);
+            var state = new DownloadsPageState { OrphanedBytes = 2_147_483_648L };
+
+            Assert.NotNull(state.OrphanedText);
+            Assert.Contains("nicht zugeordnet", state.OrphanedText, StringComparison.Ordinal);
+            Assert.Contains("2,0 GB", state.OrphanedText, StringComparison.Ordinal);
+        }
+        finally
+        {
+            CultureInfo.CurrentCulture = previousCulture;
+        }
     }
 
     /// <summary>Prüft iOS-Backend: Hintergrund-URL-Session und App-Delegate-Verdrahtung vorhanden.</summary>
