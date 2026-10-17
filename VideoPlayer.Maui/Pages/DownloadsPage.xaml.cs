@@ -77,6 +77,8 @@ public partial class DownloadsPage : ContentPage
         DownloadListSync.Sync(downloadItems, model.Downloads.Items);
         OfflineBanner.IsVisible = model.IsOffline;
         QuotaLabel.Text = model.Downloads.QuotaText;
+        OrphanedLabel.Text = model.Downloads.OrphanedText;
+        OrphanedLabel.IsVisible = model.Downloads.OrphanedText is not null;
         ErrorPanel.IsVisible = model.Downloads.HasError && !model.Downloads.IsLoading;
         ErrorLabel.Text = model.Downloads.Error;
         EmptyLabel.IsVisible = model.Downloads.ShowEmpty;

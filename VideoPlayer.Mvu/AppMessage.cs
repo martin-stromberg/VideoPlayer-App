@@ -1044,12 +1044,14 @@ public sealed record DownloadsPageOpenedMessage : AppMessage;
 /// <param name="UsedBytes">Durch Download-Dateien belegter Speicher.</param>
 /// <param name="QuotaGb">Konfiguriertes Speicherplatzkontingent in Gigabyte.</param>
 /// <param name="Error">Fehlertext bei Fehlschlag; <c>null</c> bei Erfolg.</param>
+/// <param name="OrphanedBytes">Bytes erkannter Restdaten ohne Manifest-Eintrag (Abgleich beim Laden).</param>
 /// <returns>Nachricht mit dem Ladeergebnis der Download-Liste.</returns>
 public sealed record DownloadsLoadedMessage(
     IReadOnlyList<DownloadListItem> Items,
     long UsedBytes,
     int QuotaGb,
-    string? Error) : AppMessage;
+    string? Error,
+    long OrphanedBytes = 0) : AppMessage;
 
 /// <summary>
 /// Der Anwender fordert den Download eines Mediums an („Herunterladen"

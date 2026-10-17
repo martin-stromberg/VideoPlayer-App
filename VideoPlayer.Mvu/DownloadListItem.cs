@@ -85,6 +85,7 @@ public sealed record DownloadListItem
             DownloadService.ErrorNoConnection => "Keine Serververbindung.",
             DownloadService.ErrorNetwork => "Der Download wurde unterbrochen (Netzwerkfehler).",
             DownloadService.ErrorIo => "Die Videodatei konnte nicht gespeichert werden.",
+            DownloadService.ErrorMissingFile => "Die Datei ist nicht mehr vorhanden — der Download kann erneut eingeplant werden.",
             var code when code is not null && code.StartsWith(DownloadService.ErrorHttpPrefix, StringComparison.Ordinal) =>
                 "Der Server hat den Download abgelehnt.",
             _ => "Der Download ist fehlgeschlagen."

@@ -16,6 +16,13 @@
                Grid.Row="0"
                Style="{StaticResource Caption}" />
 
+        <!-- Erkannte Restdaten ohne Manifest-Eintrag (nur sichtbar,
+             wenn vorhanden) — sie zählen in der Belegung mit. -->
+        <Label x:Name="OrphanedLabel"
+               Grid.Row="0"
+               Style="{StaticResource Caption}"
+               IsVisible="False" />
+
         <!-- Hinweis im Offline-Zustand: die Liste liegt lokal vor;
              wartende Downloads starten mit der Verbindung. -->
         <Border x:Name="OfflineBanner"

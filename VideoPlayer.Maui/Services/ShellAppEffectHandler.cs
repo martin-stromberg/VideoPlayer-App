@@ -1459,9 +1459,14 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
     {
         IReadOnlyList<DownloadListItem> items = [];
         long usedBytes = 0;
+        long orphanedBytes = 0;
         string? error = null;
         try
         {
+            // Abgleich Ablageort ↔ Manifest: überholte Teildateien werden
+            // entfernt, Restdaten ohne Manifest-Bezug werden erkannt und
+            // in der Belegungsanzeige ausgewiesen.
+            orphanedBytes = (await downloads.ReconcileAsync()).OrphanedBytes;
             items = await downloads.LoadItemsAsync();
             usedBytes = downloads.GetUsedBytes();
         }
@@ -1471,7 +1476,7 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
             error = "Die Downloads konnten nicht geladen werden.";
         }
 
-        await DispatchMessageAsync(new DownloadsLoadedMessage(items, usedBytes, settings.DownloadQuotaGb, error));
+        await DispatchMessageAsync(new DownloadsLoadedMessage(items, usedBytes, settings.DownloadQuotaGb, error, orphanedBytes));
     }
 
     private async Task EnqueueDownloadAsync(EnqueueDownloadEffect enqueue, CancellationToken cancellationToken)
@@ -1553,6 +1558,11 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
     {
         try
         {
+            // Abgleich Ablageort ↔ Manifest vor der Wiederaufnahme:
+            // überholte Teildateien werden entfernt, Restdaten ohne
+            // Manifest-Bezug und korrigierte Einträge werden gezählt —
+            // ein Fehler des Abgleichs unterbricht die Wiederaufnahme nicht.
+            await downloads.ReconcileAsync(cancellationToken);
             await downloads.ResumeInterruptedAsync(settings, cancellationToken);
             // Der Wiederaufnahme-Eintrag mit der Anzahl obliegt
             // DownloadService (eine Schicht pro Ereignis) — hier nur

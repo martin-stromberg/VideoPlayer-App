@@ -77,6 +77,9 @@ public sealed class DownloadService
     /// <summary>Fehlercode-Präfix: HTTP-Fehlerstatus des Servers (<c>http_&lt;code&gt;</c>).</summary>
     public const string ErrorHttpPrefix = "http_";
 
+    /// <summary>Fehlercode: als abgeschlossen geführter Download ohne lokale Datei (durch Abgleich erkannt).</summary>
+    public const string ErrorMissingFile = "missing_file";
+
     /// <summary>Hinweis: der Download ist bereits abgeschlossen vorhanden.</summary>
     public const string NoticeAlreadyPresent = "Der Download ist bereits vorhanden.";
 
@@ -568,6 +571,134 @@ public sealed class DownloadService
         }
 
         PumpQueue(settings);
+    }
+
+    /// <summary>
+    /// Gleicht den Video-Ablageort mit dem Download-Manifest ab:
+    /// überholte Teildateien (Reste abgebrochener, fehlgeschlagener oder
+    /// verwaist laufender Aufträge) werden entfernt; Dateien ohne
+    /// Manifest-Eintrag werden als Restdaten erkannt und gezählt, aber
+    /// nicht entfernt (Bereinigung ist eine Anwenderentscheidung); als
+    /// „fertig" geführte Einträge ohne Datei werden als fehlgeschlagen
+    /// (<see cref="ErrorMissingFile"/>) korrigiert und sind damit erneut
+    /// einplanbar. Dateien von Einträgen im Zustand
+    /// <see cref="DownloadState.Completed"/> und von gerade laufenden
+    /// Transfers werden nie angefasst.
+    /// </summary>
+    /// <param name="cancellationToken">Bricht die Manifest-Operationen ab.</param>
+    /// <returns>Das Abgleichsergebnis mit den erkannten und entfernten Datenmengen.</returns>
+    public async Task<DownloadReconcileResult> ReconcileAsync(CancellationToken cancellationToken = default)
+    {
+        var removedPartialBytes = 0L;
+        var removedPartialCount = 0;
+        var orphanedBytes = 0L;
+        var orphanedFileCount = 0;
+        var correctedCompleted = 0;
+
+        List<DownloadManifestEntry> entries;
+        try
+        {
+            entries = await cache.Connection.Table<DownloadManifestEntry>().ToListAsync();
+        }
+        catch (Exception ex) when (ex is SQLite.SQLiteException or InvalidOperationException)
+        {
+            logger.LogWarning(ex, "Download-Manifest nicht lesbar — Abgleich übersprungen.");
+            return new DownloadReconcileResult();
+        }
+
+        var manifestPaths = new HashSet<string>(
+            entries.Select(e => e.FilePath).Where(p => !string.IsNullOrWhiteSpace(p)),
+            StringComparer.OrdinalIgnoreCase);
+
+        string[] files;
+        try
+        {
+            files = Directory.Exists(layout.VideosDirectory)
+                ? Directory.GetFiles(layout.VideosDirectory)
+                : [];
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            logger.LogWarning(ex, "Video-Verzeichnis nicht lesbar — Abgleich übersprungen.");
+            return new DownloadReconcileResult();
+        }
+
+        var entryByPath = entries
+            .Where(e => !string.IsNullOrWhiteSpace(e.FilePath))
+            .GroupBy(e => e.FilePath, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(g => g.Key, g => g.First(), StringComparer.OrdinalIgnoreCase);
+
+        foreach (var path in files)
+        {
+            long size;
+            try
+            {
+                // Kann zwischen Enumeration und Zugriff verschwinden
+                // (paralleler Transfer/Benutzer) — dann nichts zu zählen.
+                size = new FileInfo(path).Length;
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                continue;
+            }
+
+            if (!manifestPaths.Contains(path))
+            {
+                // Kein Manifest-Bezug → verwaiste Restdaten: erfassen,
+                // aber nicht entfernen (Anwender entscheidet).
+                orphanedFileCount++;
+                orphanedBytes += size;
+                continue;
+            }
+
+            var entry = entryByPath[path];
+            var state = DownloadStateNames.FromPersisted(entry.State);
+            var isRunning = state == DownloadState.Downloading
+                && runningTransfers.ContainsKey(Key(entry.VideoType, entry.VideoId));
+
+            // Überholte Teildatei: Eintrag wartet, ist fehlgeschlagen/
+            // abgebrochen oder „läuft" ohne tatsächlichen Transfer — die
+            // Datei ist ein Rest (verwaltete Fehlerpfade löschen sie
+            // bereits; Rückstände entstehen durch Prozessabbruch).
+            if (state != DownloadState.Completed && !isRunning)
+            {
+                removedPartialCount++;
+                removedPartialBytes += size;
+                TryDeleteFile(path);
+            }
+        }
+
+        foreach (var entry in entries)
+        {
+            if (DownloadStateNames.FromPersisted(entry.State) == DownloadState.Completed
+                && !fileExists(entry.FilePath))
+            {
+                await SetStateAsync(entry, DownloadState.Failed, ErrorMissingFile);
+                correctedCompleted++;
+            }
+        }
+
+        if (removedPartialCount > 0 || orphanedFileCount > 0 || correctedCompleted > 0)
+        {
+            logger.LogInformation(
+                "Download-Abgleich: {RemovedCount} überholte Teildateien entfernt ({RemovedBytes} Bytes), "
+                + "{OrphanedCount} Restdateien ohne Manifest-Eintrag erkannt ({OrphanedBytes} Bytes), "
+                + "{CorrectedCount} fertige Einträge ohne Datei korrigiert.",
+                removedPartialCount,
+                removedPartialBytes,
+                orphanedFileCount,
+                orphanedBytes,
+                correctedCompleted);
+        }
+
+        return new DownloadReconcileResult
+        {
+            RemovedPartialBytes = removedPartialBytes,
+            RemovedPartialCount = removedPartialCount,
+            OrphanedBytes = orphanedBytes,
+            OrphanedFileCount = orphanedFileCount,
+            CorrectedCompletedCount = correctedCompleted
+        };
     }
 
     private async Task PumpQueueAsync(AppSettings settings)

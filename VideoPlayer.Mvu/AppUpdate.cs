@@ -4116,6 +4116,7 @@ public static class AppUpdate
                     Items = message.Items,
                     UsedBytes = message.UsedBytes,
                     QuotaGb = message.QuotaGb,
+                    OrphanedBytes = message.OrphanedBytes,
                     Error = message.Error
                 }
             },
