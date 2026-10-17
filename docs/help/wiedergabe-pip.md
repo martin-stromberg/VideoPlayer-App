@@ -100,10 +100,20 @@ Die Quellauflösung (`PlaybackSourceService`) wählt automatisch:
   Server gemeldet, solange die Wiedergabe läuft; unveränderte
   Positionen (Pause) werden nicht erneut gesendet. Beim Ende und beim
   Verlassen der Seite wird der Stand abschließend gemeldet.
+- **Playlist-Bezug:** läuft die Wiedergabe im Playlist-Kontext, trägt
+  jede Fortschrittsmeldung — Takt, Ende und Schluss — die `PlaylistId`
+  des aktiven Kontexts mit (`PlayerState.ProgressReportPlaylistId`,
+  `IsPlaylistPlayback ? PlaylistId : null`). Der Server schreibt damit
+  den playlist-gebundenen Weiterschauen-Eintrag fort, statt daneben
+  einen zweiten, kontextlosen Eintrag anzulegen; kontextlose
+  Wiedergabe meldet `null` und verhält sich wie bisher.
 - **Offline:** nicht zustellbare Meldungen landen verlustfrei in der
   persistenten Warteschlange `pending_progress` und werden bei der
   nächsten Online-Rückkehr automatisch nachgesendet — sie überstehen
-  App-Neustarts und Backup-Wiederherstellungen.
+  App-Neustarts und Backup-Wiederherstellungen. Der Playlist-Bezug
+  wird dabei in der Warteschlange mitgespeichert (Spalte `PlaylistId`)
+  und beim Nachsenden wieder übergeben, sodass auch nachträglich
+  zugestellte Meldungen den playlist-gebundenen Eintrag erreichen.
 - **„Angesehen":** erreicht die Position das Ende abzüglich des
   eingestellten Zeitfensters („Als angesehen"-Einstellung), wird das
   Medium als angesehen markiert — die Anzeige erscheint dezent im

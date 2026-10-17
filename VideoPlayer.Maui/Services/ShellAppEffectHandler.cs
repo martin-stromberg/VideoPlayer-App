@@ -489,7 +489,8 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
             await services.GetRequiredService<ProgressReportService>()
                 .ReportProgressAsync(
                     report.MediaType, (int)report.MediaId,
-                    report.Position, report.Duration, cancellationToken);
+                    report.Position, report.Duration, report.PlaylistId,
+                    cancellationToken);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {

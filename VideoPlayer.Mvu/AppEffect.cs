@@ -647,12 +647,14 @@ public sealed record LoadUpcomingEpisodesEffect(
 /// <param name="MediaId">Id des Mediums.</param>
 /// <param name="Position">Zu meldende Wiedergabeposition.</param>
 /// <param name="Duration">Gesamtdauer des Mediums.</param>
+/// <param name="PlaylistId">Id der Playlist des Wiedergabekontexts; <c>null</c> bei kontextloser Wiedergabe.</param>
 /// <returns>Effekt-Datensatz für die Fortschrittsmeldung.</returns>
 public sealed record ReportPlaybackProgressEffect(
     string MediaType,
     long MediaId,
     TimeSpan Position,
-    TimeSpan Duration) : AppEffect;
+    TimeSpan Duration,
+    long? PlaylistId) : AppEffect;
 
 /// <summary>
 /// Picture-in-Picture-/Mini-Player-Modus umschalten (Ergebnis:

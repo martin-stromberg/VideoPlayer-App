@@ -162,6 +162,17 @@ Serienreihenfolge des Mediums. Ist das Medium inzwischen nicht mehr
 Teil der Playlist (`playlistEntryId` fehlt), gilt wie bisher der
 detailseiten-unabhängige Serienkontext.
 
+Der Bezug wirkt auch in der Gegenrichtung: Fortschrittsmeldungen aus
+einer laufenden Playlist-Wiedergabe tragen die `PlaylistId` des
+aktiven Kontexts mit (`POST api/continue-watching/progress`, alle
+Meldepfade — Takt, Ende und Player-Schluss). Der Server schreibt
+damit den playlist-gebundenen Weiterschauen-Eintrag fort, statt
+daneben einen zweiten, kontextlosen Eintrag für dasselbe Medium
+anzulegen. Auch offline eingereihte Meldungen behalten den Bezug —
+die Fortschritts-Warteschlange `pending_progress` speichert die
+`PlaylistId` mit und übergibt sie beim Nachsenden. Meldungen ohne
+Playlist-Kontext bleiben unverändert kontextlos.
+
 ## Downloads mit Playlist-Bezug (Schritt 7)
 
 Der automatische Download-Vorlauf folgt bei playlist-gebundenen

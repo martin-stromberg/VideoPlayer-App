@@ -189,6 +189,24 @@ public class ServerSyncServiceTests : IDisposable
             && e.Message.Contains("nachgesendet", StringComparison.Ordinal));
     }
 
+    /// <summary>Prüft FlushPendingProgress: der gespeicherte Playlist-Bezug wird beim Nachsenden mitgegeben.</summary>
+    [Fact]
+    public async Task FlushPendingProgress_SendsStoredPlaylistId()
+    {
+        await LoginAsync();
+        await queue.EnqueueAsync("movie", 42, TimeSpan.FromMinutes(12), TimeSpan.FromMinutes(90), playlistId: 7);
+        handler.Enqueue(HttpStatusCode.OK);
+
+        var sent = await CreateService().FlushPendingProgressAsync();
+
+        Assert.Equal(1, sent);
+        var request = Assert.Single(handler.Requests, r =>
+            r.PathAndQuery.EndsWith("/api/continue-watching/progress"));
+        using var body = JsonDocument.Parse(request.Body!);
+        Assert.Equal(7, body.RootElement.GetProperty("PlaylistId").GetInt64());
+        Assert.Equal(0, await queue.CountAsync());
+    }
+
     /// <summary>Prüft SynchronizeAsync: ohne Client → ist ein No-Op.</summary>
     [Fact]
     public async Task SynchronizeAsync_WithoutClient_IsNoOp()

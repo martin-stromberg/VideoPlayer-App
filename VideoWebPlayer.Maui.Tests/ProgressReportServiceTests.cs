@@ -88,6 +88,41 @@ public class ProgressReportServiceTests : IDisposable
         Assert.Equal(0, await queue.CountAsync());
     }
 
+    /// <summary>Prüft ReportProgress: der Playlist-Kontext geht im Direktversand in den Request-Body.</summary>
+    [Fact]
+    public async Task ReportProgress_Online_SendsPlaylistId()
+    {
+        await LoginAsync();
+        handler.Enqueue(HttpStatusCode.OK);
+        var service = CreateService();
+
+        await service.ReportProgressAsync(
+            "movie", 42, TimeSpan.FromMinutes(12), TimeSpan.FromMinutes(90), playlistId: 7);
+
+        var request = Assert.Single(handler.Requests, r =>
+            r.PathAndQuery.EndsWith("/api/continue-watching/progress"));
+        using var body = JsonDocument.Parse(request.Body!);
+        Assert.Equal(7, body.RootElement.GetProperty("PlaylistId").GetInt64());
+        Assert.Equal(0, await queue.CountAsync());
+    }
+
+    /// <summary>Prüft ReportProgress: beim Einreihen wird der Playlist-Kontext persistent gespeichert.</summary>
+    [Fact]
+    public async Task ReportProgress_Offline_EnqueuesPlaylistId()
+    {
+        await LoginAsync();
+        monitor.IsOnline = false;
+        var service = CreateService();
+
+        await service.ReportProgressAsync(
+            "movie", 42, TimeSpan.FromMinutes(12), TimeSpan.FromMinutes(90), playlistId: 7);
+
+        var entry = Assert.Single(await queue.GetPendingAsync());
+        Assert.Equal(7, entry.PlaylistId);
+        Assert.DoesNotContain(handler.Requests, r =>
+            r.PathAndQuery.EndsWith("/api/continue-watching/progress"));
+    }
+
     /// <summary>Prüft ReportProgress: bei Offline → reiht ohne Request ein.</summary>
     [Fact]
     public async Task ReportProgress_Offline_EnqueuesWithoutRequest()

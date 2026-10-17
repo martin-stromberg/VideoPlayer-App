@@ -66,4 +66,12 @@ public class PlaybackProgressReport
 
     /// <summary>Gesamtdauer des Mediums in Sekunden.</summary>
     public long DurationSeconds { get; set; }
+
+    /// <summary>
+    /// ID der Playlist des Wiedergabekontexts; <c>null</c> bei
+    /// kontextloser Wiedergabe. Der Server schreibt damit den
+    /// playlist-gebundenen Weiterschauen-Eintrag fort statt einen
+    /// zweiten, kontextlosen Eintrag anzulegen.
+    /// </summary>
+    public long? PlaylistId { get; set; }
 }

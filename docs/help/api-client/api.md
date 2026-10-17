@@ -82,9 +82,9 @@ Der Server kann `429 Too Many Requests` liefern; der Client wiederholt dann wie 
 
 **Rückgabe:** `IReadOnlyList<ContinueWatchingEntry>`.
 
-### `ReportPlaybackProgressAsync(mediaType, mediaId, positionSeconds, durationSeconds)` / `POST api/continue-watching/progress`
+### `ReportPlaybackProgressAsync(mediaType, mediaId, positionSeconds, durationSeconds, playlistId = null)` / `POST api/continue-watching/progress`
 
-**Beschreibung:** Meldet den Wiedergabefortschritt (Body: `PlaybackProgressReport`).
+**Beschreibung:** Meldet den Wiedergabefortschritt (Body: `PlaybackProgressReport`). `playlistId` trägt den Playlist-Wiedergabekontext (`long?`, `null` bei kontextloser Wiedergabe) — der Server schreibt damit den playlist-gebundenen Weiterschauen-Eintrag fort.
 
 ### `HideContinueWatchingEntryAsync(mediaType, mediaId)` / `POST api/continue-watching/hide` · `SkipContinueWatchingEntryAsync(mediaType, mediaId)` / `POST api/continue-watching/skip`
 

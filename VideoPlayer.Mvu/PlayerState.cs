@@ -105,6 +105,14 @@ public sealed record PlayerState
             ? $"„{PlaylistName}“ · Eintrag {PlaylistPosition}/{PlaylistTotalCount}"
             : $"„{PlaylistName}“";
 
+    /// <summary>
+    /// In der Fortschrittsmeldung zu übermittelnder Playlist-Bezug:
+    /// <see cref="PlaylistId"/> bei gültiger Playlist-Wiedergabe, sonst
+    /// <c>null</c> (kontextlose Wiedergabe — der Server legt den
+    /// Weiterschauen-Eintrag dann ohne Playlist-Bezug an).
+    /// </summary>
+    public long? ProgressReportPlaylistId => IsPlaylistPlayback ? PlaylistId : null;
+
     /// <summary>Fehlertext der letzten Quell-/Wiedergabe-Störung; <c>null</c> = kein Fehler.</summary>
     public string? Error { get; init; }
 
