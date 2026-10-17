@@ -36,7 +36,7 @@ public sealed class IosBackgroundDownloadBackend : NSObject, IDownloadBackend, I
         public long DownloadedBytes { get; set; }
     }
 
-    private readonly ConcurrentDictionary<nint, PendingTransfer> pending = new();
+    private readonly ConcurrentDictionary<nuint, PendingTransfer> pending = new();
     private readonly ConcurrentDictionary<int, Action> systemCompletionHandlers = new();
     private NSUrlSession? session;
 
