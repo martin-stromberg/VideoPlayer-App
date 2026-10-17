@@ -1,0 +1,161 @@
+using System.Collections.ObjectModel;
+using VideoPlayer.Mvu;
+
+namespace VideoPlayer.Maui.Pages;
+
+/// <summary>
+/// Browsing-Seite einer Quelle (Shell-Route „sourceoverview?id=…&amp;name=…"):
+/// Genre-Leiste mit „Alle"-Eintrag, Suchfeld, Medien-Raster mit
+/// seitenweisem Nachladen — wie in der alten App (SourceOverviewPage).
+/// Benutzeraktionen laufen über den MVU-Kreislauf; der Seiten-Status
+/// steht in <see cref="AppModel.SourceBrowser"/>.
+/// </summary>
+[QueryProperty(nameof(SourceId), "id")]
+[QueryProperty(nameof(SourceName), "name")]
+public partial class SourceOverviewPage : ContentPage
+{
+    private readonly MvuHost mvuHost;
+    // Stabile ItemsSource: SourceItemListSync gleicht sie granular mit
+    // der Modell-Liste ab — ein Referenzwechsel pro Folgeseite würde
+    // die Scrollposition auf den Listenanfang zurücksetzen.
+    private readonly ObservableCollection<SourceMediaItem> browserItems = [];
+    private long sourceId;
+    private string? sourceName;
+    private bool subscribed;
+    // Der zuletzt aus dem Modell ins Suchfeld gespiegelte abgeschickte
+    // Suchtext — Ausgangspunkt „noch nie gespiegelt", damit ein
+    // vorhandener Filter beim ersten UpdateUi angezeigt wird.
+    private string? mirroredSearchText;
+
+    /// <summary>Initialisiert eine neue Instanz der <see cref="SourceOverviewPage"/>-Klasse.</summary>
+    /// <param name="mvuHost">MVU-Host; dient als <see cref="BindableObject.BindingContext"/> und Dispatch-Ziel der Browser-Nachrichten.</param>
+    public SourceOverviewPage(MvuHost mvuHost)
+    {
+        InitializeComponent();
+        this.mvuHost = mvuHost;
+        BindingContext = mvuHost;
+        ItemsCollection.ItemsSource = browserItems;
+        UpdateUi(mvuHost.Model);
+    }
+
+    /// <summary>Quellen-Id aus dem Navigationspfad.</summary>
+    public string SourceId
+    {
+        set => sourceId = long.TryParse(Uri.UnescapeDataString(value ?? string.Empty), out var id) ? id : 0;
+    }
+
+    /// <summary>Quellenname aus dem Navigationspfad (Seitentitel).</summary>
+    public string SourceName
+    {
+        set
+        {
+            sourceName = Uri.UnescapeDataString(value ?? string.Empty);
+            Title = string.IsNullOrWhiteSpace(sourceName) ? "Quelle" : sourceName;
+        }
+    }
+
+    /// <inheritdoc/>
+    protected override void OnAppearing()
+    {
+        base.OnAppearing();
+        // Das ModelChanged-Abo gilt nur, solange die Seite sichtbar ist
+        // (Muster: SettingsPage) — verlassene Instanzen dürfen nicht
+        // weiter am MvuHost hängen.
+        subscribed = true;
+        mvuHost.ModelChanged -= OnModelChanged;
+        mvuHost.ModelChanged += OnModelChanged;
+        UpdateUi(mvuHost.Model);
+        // Beim ersten Öffnen (oder erneutem Aufruf einer anderen Quelle)
+        // werden Genres + erste Seite geladen; im Offlinebetrieb ist die
+        // Seite über die Quellenliste gar nicht erreichbar — ein
+        // verwaister Zustand wird vom Update auf Initial zurückgesetzt.
+        if (mvuHost.Model.SourceBrowser.SourceId != sourceId || !mvuHost.Model.SourceBrowser.Attempted)
+        {
+            _ = mvuHost.DispatchAsync(new SourceBrowserOpenedMessage(sourceId, sourceName ?? string.Empty));
+        }
+    }
+
+    /// <inheritdoc/>
+    protected override void OnDisappearing()
+    {
+        subscribed = false;
+        mvuHost.ModelChanged -= OnModelChanged;
+        base.OnDisappearing();
+    }
+
+    private void OnModelChanged(object? sender, EventArgs e)
+    {
+        var model = mvuHost.Model;
+        MainThread.BeginInvokeOnMainThread(() =>
+        {
+            if (subscribed)
+            {
+                UpdateUi(model);
+            }
+        });
+    }
+
+    private void UpdateUi(AppModel model)
+    {
+        var browser = model.SourceBrowser;
+        // Granularer Abgleich: eine angehängte Folgeseite erzeugt nur
+        // Add-Ereignisse am Ende — die CollectionView behält ihre
+        // Scrollposition (kein Neuaufbau durch ItemsSource-Wechsel).
+        SourceItemListSync.Sync(browserItems, browser.Items);
+        ErrorPanel.IsVisible = browser.HasError && browser.Items.Count == 0;
+        ErrorLabel.Text = browser.Error;
+        FooterErrorPanel.IsVisible = browser.HasError && browser.Items.Count > 0;
+        EmptyLabel.IsVisible = browser.ShowEmpty;
+        ItemsCollection.IsVisible = !browser.ShowEmpty;
+        // Den abgeschickten Modell-Suchtext nur bei einer Änderung ins
+        // Feld spiegeln (Abschicken, Quellen-Wechsel, Zustands-Reset):
+        // eine unbestätigte Eingabe darf beliebige Modell-Ticks
+        // überstehen; der aktive Filter bleibt bei Rückkehr sichtbar.
+        if (!string.Equals(mirroredSearchText, browser.SearchText, StringComparison.Ordinal))
+        {
+            mirroredSearchText = browser.SearchText;
+            MediaSearchBar.Text = browser.SearchText;
+        }
+    }
+
+    private void OnGenreSelected(object? sender, SelectionChangedEventArgs e)
+    {
+        if (e.CurrentSelection.FirstOrDefault() is SourceGenreItem genre)
+        {
+            _ = mvuHost.DispatchAsync(new SourceGenreSelectedMessage(genre.Id));
+        }
+
+        if (sender is CollectionView collectionView)
+        {
+            collectionView.SelectedItem = null;
+        }
+    }
+
+    private void OnSearchButtonPressed(object? sender, EventArgs e)
+    {
+        _ = mvuHost.DispatchAsync(new SourceSearchSubmittedMessage(MediaSearchBar.Text));
+    }
+
+    private void OnMediaItemSelected(object? sender, SelectionChangedEventArgs e)
+    {
+        if (e.CurrentSelection.FirstOrDefault() is SourceMediaItem item)
+        {
+            _ = mvuHost.DispatchAsync(new SourceMediaItemSelectedMessage(item));
+        }
+
+        if (sender is CollectionView collectionView)
+        {
+            collectionView.SelectedItem = null;
+        }
+    }
+
+    private void OnRemainingItemsThresholdReached(object? sender, EventArgs e)
+    {
+        _ = mvuHost.DispatchAsync(new SourceItemsNextPageRequestedMessage());
+    }
+
+    private void OnRetryClicked(object? sender, EventArgs e)
+    {
+        _ = mvuHost.DispatchAsync(new SourceItemsRetryRequestedMessage());
+    }
+}

@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="VideoPlayer.Maui.Pages.LoadingPage"
+             Title="VideoPlayer">
+
+    <VerticalStackLayout Padding="24" Spacing="14" HorizontalOptions="Center" VerticalOptions="Center">
+        <Label Text="VIDEOPLAYER"
+               Style="{StaticResource Kicker}"
+               HorizontalTextAlignment="Center" />
+        <ActivityIndicator IsRunning="True" WidthRequest="48" HeightRequest="48" />
+        <Label Text="VideoPlayer wird geladen" FontFamily="InterSemiBold" FontSize="16" HorizontalTextAlignment="Center" />
+        <Label Text="{Binding Model.StartupStatusText}" Style="{StaticResource Caption}" FontSize="13" HorizontalTextAlignment="Center" />
+    </VerticalStackLayout>
+
+</ContentPage>

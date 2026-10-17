@@ -3,52 +3,76 @@ using Microsoft.Maui.Layouts;
 
 namespace VideoWebPlayer.Maui.Components;
 
+/// <summary>
+/// Layout-Rahmen ("Chrome") für Seiten: stellt Header mit Titel und Aktionsbereich,
+/// einen Inhaltsbereich (Body) sowie einen Footer bereit – jeweils mit Hintergrundgrafiken.
+/// </summary>
 public class PageChrome : ContentView
 {
     private readonly ContentView _headerActionsHost;
     private readonly ContentView _bodyHost;
     private readonly ContentView _footerHost;
 
+    /// <value>Bindable Property für <see cref="HeaderTitle"/> — Titel im Header-Bereich.</value>
     public static readonly BindableProperty HeaderTitleProperty =
         BindableProperty.Create(nameof(HeaderTitle), typeof(string), typeof(PageChrome), string.Empty,
             propertyChanged: (b, _, n) => ((PageChrome)b).OnHeaderTitleChanged((string?)n));
 
+    /// <value>Bindable Property für <see cref="HeaderActions"/> — Aktions-Elemente im Header.</value>
     public static readonly BindableProperty HeaderActionsProperty =
         BindableProperty.Create(nameof(HeaderActions), typeof(View), typeof(PageChrome), default(View),
             propertyChanged: (b, _, n) => ((PageChrome)b).OnHeaderActionsChanged((View?)n));
 
+    /// <value>Bindable Property für <see cref="Body"/> — der eigentliche Seiteninhalt.</value>
     public static readonly BindableProperty BodyProperty =
         BindableProperty.Create(nameof(Body), typeof(View), typeof(PageChrome), default(View),
             propertyChanged: (b, _, n) => ((PageChrome)b).OnBodyChanged((View?)n));
 
+    /// <value>Bindable Property für <see cref="Footer"/> — Inhalt des Footer-Bereichs.</value>
     public static readonly BindableProperty FooterProperty =
         BindableProperty.Create(nameof(Footer), typeof(View), typeof(PageChrome), default(View),
             propertyChanged: (b, _, n) => ((PageChrome)b).OnFooterChanged((View?)n));
 
+    /// <summary>
+    /// Titel, der im Header-Bereich angezeigt wird.
+    /// </summary>
     public string HeaderTitle
     {
         get => (string)GetValue(HeaderTitleProperty);
         set => SetValue(HeaderTitleProperty, value);
     }
 
+    /// <summary>
+    /// View mit Aktions-Elementen (z. B. Buttons), die rechts im Header angezeigt wird.
+    /// </summary>
     public View? HeaderActions
     {
         get => (View?)GetValue(HeaderActionsProperty);
         set => SetValue(HeaderActionsProperty, value);
     }
 
+    /// <summary>
+    /// Der eigentliche Seiteninhalt im mittleren Bereich.
+    /// </summary>
     public View? Body
     {
         get => (View?)GetValue(BodyProperty);
         set => SetValue(BodyProperty, value);
     }
 
+    /// <summary>
+    /// View, die im Footer-Bereich am unteren Rand angezeigt wird.
+    /// </summary>
     public View? Footer
     {
         get => (View?)GetValue(FooterProperty);
         set => SetValue(FooterProperty, value);
     }
 
+    /// <summary>
+    /// Erstellt eine neue Instanz des <see cref="PageChrome"/> und baut das
+    /// Layout-Grid mit Header-, Content- und Footer-Hintergründen auf.
+    /// </summary>
     public PageChrome()
     {
         _headerActionsHost = new ContentView

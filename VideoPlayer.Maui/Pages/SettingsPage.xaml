@@ -1,0 +1,206 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="VideoPlayer.Maui.Pages.SettingsPage"
+             Title="Einstellungen">
+
+    <ScrollView>
+        <VerticalStackLayout Padding="24" Spacing="18">
+
+            <Label Text="Einstellungen" Style="{StaticResource PageTitle}" />
+
+            <Label x:Name="InvalidInputLabel"
+                   AutomationId="InvalidInputLabel"
+                   Text="Bitte eine gültige Zahl eingeben."
+                   Style="{StaticResource ErrorText}"
+                   IsVisible="False" />
+
+            <!-- Darstellung -->
+            <VerticalStackLayout Spacing="8">
+                <Label Text="Darstellung" Style="{StaticResource Kicker}" />
+                <Border Style="{StaticResource Card}">
+                    <Grid ColumnDefinitions="*,Auto">
+                        <Label Text="Kopfbereich anzeigen"
+                               VerticalOptions="Center" />
+                        <Switch x:Name="HomeHeroSwitch"
+                                AutomationId="HomeHeroSwitch"
+                                Grid.Column="1"
+                                VerticalOptions="Center" />
+                    </Grid>
+                </Border>
+            </VerticalStackLayout>
+
+            <!-- Downloads -->
+            <VerticalStackLayout Spacing="8">
+                <Label Text="Downloads" Style="{StaticResource Kicker}" />
+                <Border Style="{StaticResource Card}">
+                    <VerticalStackLayout Spacing="14">
+                        <Grid ColumnDefinitions="*,Auto">
+                            <Label Text="Automatische Downloads"
+                                   VerticalOptions="Center" />
+                            <Switch x:Name="AutoDownloadSwitch"
+                                    AutomationId="AutoDownloadSwitch"
+                                    Grid.Column="1"
+                                    VerticalOptions="Center" />
+                        </Grid>
+
+                        <BoxView HeightRequest="1"
+                                 Color="{StaticResource VpBorder}" />
+
+                        <VerticalStackLayout Spacing="8">
+                            <Label Text="Anzahl vorzuladender Episoden"
+                                   Style="{StaticResource Caption}"
+                                   FontSize="13" />
+                            <Border Style="{StaticResource InputFrame}">
+                                <Entry x:Name="PreloadEpisodeCountEntry"
+                                       AutomationId="PreloadEpisodeCountEntry"
+                                       Keyboard="Numeric"
+                                       Placeholder="1 – 10" />
+                            </Border>
+                        </VerticalStackLayout>
+
+                        <BoxView HeightRequest="1"
+                                 Color="{StaticResource VpBorder}" />
+
+                        <Grid ColumnDefinitions="*,Auto">
+                            <Label Text="Downloads nur im WLAN"
+                                   VerticalOptions="Center" />
+                            <Switch x:Name="WifiOnlySwitch"
+                                    AutomationId="WifiOnlySwitch"
+                                    Grid.Column="1"
+                                    VerticalOptions="Center" />
+                        </Grid>
+
+                        <BoxView HeightRequest="1"
+                                 Color="{StaticResource VpBorder}" />
+
+                        <VerticalStackLayout Spacing="8">
+                            <Label Text="Speicherplatzkontingent für Downloads (GB)"
+                                   Style="{StaticResource Caption}"
+                                   FontSize="13" />
+                            <Border Style="{StaticResource InputFrame}">
+                                <Entry x:Name="DownloadQuotaGbEntry"
+                                       AutomationId="DownloadQuotaGbEntry"
+                                       Keyboard="Numeric"
+                                       Placeholder="Standard: 5" />
+                            </Border>
+                        </VerticalStackLayout>
+
+                        <BoxView HeightRequest="1"
+                                 Color="{StaticResource VpBorder}" />
+
+                        <Grid ColumnDefinitions="*,Auto">
+                            <Label Text="Gesehene Episoden automatisch löschen"
+                                   VerticalOptions="Center" />
+                            <Switch x:Name="AutoDeleteWatchedSwitch"
+                                    AutomationId="AutoDeleteWatchedSwitch"
+                                    Grid.Column="1"
+                                    VerticalOptions="Center" />
+                        </Grid>
+                    </VerticalStackLayout>
+                </Border>
+            </VerticalStackLayout>
+
+            <!-- Wiedergabe -->
+            <VerticalStackLayout Spacing="8">
+                <Label Text="Wiedergabe" Style="{StaticResource Kicker}" />
+                <Border Style="{StaticResource Card}">
+                    <VerticalStackLayout Spacing="14">
+                        <Grid ColumnDefinitions="*,Auto">
+                            <Label Text="Auto-Fortsetzung"
+                                   VerticalOptions="Center" />
+                            <Switch x:Name="AutoResumeSwitch"
+                                    AutomationId="AutoResumeSwitch"
+                                    Grid.Column="1"
+                                    VerticalOptions="Center" />
+                        </Grid>
+
+                        <BoxView HeightRequest="1"
+                                 Color="{StaticResource VpBorder}" />
+
+                        <VerticalStackLayout Spacing="8">
+                            <Label Text="Zeitfenster Auto-Fortsetzung (Sekunden Restlaufzeit)"
+                                   Style="{StaticResource Caption}"
+                                   FontSize="13" />
+                            <Border Style="{StaticResource InputFrame}">
+                                <Entry x:Name="AutoResumeRemainingEntry"
+                                       AutomationId="AutoResumeRemainingEntry"
+                                       Keyboard="Numeric"
+                                       Placeholder="30 – 3600" />
+                            </Border>
+                        </VerticalStackLayout>
+
+                        <BoxView HeightRequest="1"
+                                 Color="{StaticResource VpBorder}" />
+
+                        <VerticalStackLayout Spacing="8">
+                            <Label Text="Als angesehen ab … Sekunden vor Ende"
+                                   Style="{StaticResource Caption}"
+                                   FontSize="13" />
+                            <Border Style="{StaticResource InputFrame}">
+                                <Entry x:Name="WatchedEndWindowEntry"
+                                       AutomationId="WatchedEndWindowEntry"
+                                       Keyboard="Numeric"
+                                       Placeholder="30 – 3600" />
+                            </Border>
+                        </VerticalStackLayout>
+                    </VerticalStackLayout>
+                </Border>
+            </VerticalStackLayout>
+
+            <!-- Protokoll -->
+            <VerticalStackLayout Spacing="8">
+                <Label Text="Protokoll" Style="{StaticResource Kicker}" />
+                <Border Style="{StaticResource Card}">
+                    <VerticalStackLayout Spacing="14">
+                        <Grid ColumnDefinitions="*,Auto">
+                            <Label Text="Protokollierung"
+                                   VerticalOptions="Center" />
+                            <Switch x:Name="LoggingSwitch"
+                                    AutomationId="LoggingSwitch"
+                                    Grid.Column="1"
+                                    VerticalOptions="Center" />
+                        </Grid>
+
+                        <VerticalStackLayout x:Name="SendLogSection"
+                                             IsVisible="False"
+                                             Spacing="8">
+                            <BoxView HeightRequest="1"
+                                     Color="{StaticResource VpBorder}" />
+
+                            <Button x:Name="SendLogButton"
+                                    AutomationId="SendLogButton"
+                                    Text="Protokoll senden"
+                                    Style="{StaticResource SecondaryButton}"
+                                    Clicked="OnSendLogClicked" />
+
+                            <Label x:Name="SendLogErrorLabel"
+                                   AutomationId="SendLogErrorLabel"
+                                   Style="{StaticResource ErrorText}"
+                                   IsVisible="False" />
+                        </VerticalStackLayout>
+                    </VerticalStackLayout>
+                </Border>
+            </VerticalStackLayout>
+
+            <!-- Server -->
+            <VerticalStackLayout Spacing="8">
+                <Label Text="Server" Style="{StaticResource Kicker}" />
+                <Border Style="{StaticResource Card}">
+                    <Grid ColumnDefinitions="*,Auto">
+                        <Label Text="Verbindung und Serverauswahl verwalten"
+                               VerticalOptions="Center" />
+                        <Button x:Name="ServerSwitchButton"
+                                AutomationId="ServerSwitchButton"
+                                Grid.Column="1"
+                                Text="Server wechseln"
+                                Style="{StaticResource SecondaryButton}"
+                                Clicked="OnServerSwitchClicked" />
+                    </Grid>
+                </Border>
+            </VerticalStackLayout>
+
+        </VerticalStackLayout>
+    </ScrollView>
+
+</ContentPage>

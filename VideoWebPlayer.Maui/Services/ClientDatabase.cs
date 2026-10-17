@@ -10,6 +10,11 @@ namespace VideoWebPlayer.Maui.Services;
 public class ClientDatabase
 {
     private static ClientDatabase? _instance;
+
+    /// <summary>
+    /// Ruft die gemeinsame Singleton-Instanz der Datenbank ab.
+    /// </summary>
+    /// <value>Die Singleton-Instanz der <see cref="ClientDatabase"/>.</value>
     public static ClientDatabase Instance => _instance ??= new ClientDatabase();
 
     internal SQLiteAsyncConnection Database { get; }

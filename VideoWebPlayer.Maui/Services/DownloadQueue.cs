@@ -3,6 +3,10 @@ using VideoWebPlayer.Maui.Models;
 
 namespace VideoWebPlayer.Maui.Services;
 
+/// <summary>
+/// In-Memory-Warteschlange für Video-Downloads.
+/// Verarbeitet Downloads nacheinander im Hintergrund und meldet Fortschritt und Abschluss über Events.
+/// </summary>
 public class DownloadQueue
 {
     private static DownloadQueue? _instance;
@@ -13,9 +17,20 @@ public class DownloadQueue
     private readonly CancellationTokenSource _cancellationTokenSource = new();
     private bool _isProcessing = false;
 
+    /// <summary>
+    /// Ruft die gemeinsame Singleton-Instanz der Download-Warteschlange ab.
+    /// </summary>
+    /// <value>Die Singleton-Instanz der <see cref="DownloadQueue"/>.</value>
     public static DownloadQueue Instance => _instance ??= new DownloadQueue();
 
+    /// <summary>
+    /// Wird ausgelöst, wenn sich der Fortschritt eines Downloads ändert.
+    /// </summary>
     public event EventHandler<DownloadProgressEventArgs>? DownloadProgress;
+
+    /// <summary>
+    /// Wird ausgelöst, wenn ein Download abgeschlossen ist (erfolgreich oder mit Fehler).
+    /// </summary>
     public event EventHandler<DownloadCompletedEventArgs>? DownloadCompleted;
 
     private DownloadQueue()
@@ -24,6 +39,10 @@ public class DownloadQueue
         _ = Task.Run(() => ProcessQueueAsync(_cancellationTokenSource.Token));
     }
 
+    /// <summary>
+    /// Fügt eine Download-Aufgabe zur Warteschlange hinzu, sofern sie nicht bereits enthalten ist.
+    /// </summary>
+    /// <param name="task">Die einzureihende Download-Aufgabe.</param>
     public void EnqueueDownload(DownloadTask task)
     {
         var key = $"{task.VideoType}_{task.VideoId}";
@@ -43,6 +62,12 @@ public class DownloadQueue
         System.Diagnostics.Debug.WriteLine($"Download queued: {task.Title} (Queue size: {_queue.Count})");
     }
 
+    /// <summary>
+    /// Prüft, ob für das angegebene Video bereits ein Download in der Warteschlange ist.
+    /// </summary>
+    /// <param name="videoId">Die ID des Videos.</param>
+    /// <param name="videoType">Der Typ des Videos (Movie oder Episode).</param>
+    /// <returns><c>true</c>, wenn das Video in der Warteschlange ist; sonst <c>false</c>.</returns>
     public bool IsInQueue(long videoId, string videoType)
     {
         var key = $"{videoType}_{videoId}";
@@ -176,45 +201,176 @@ public class DownloadQueue
     }
 }
 
+/// <summary>
+/// Beschreibt eine einzelne Download-Aufgabe in der <see cref="DownloadQueue"/>.
+/// </summary>
 public class DownloadTask
 {
+    /// <summary>
+    /// Ruft die ID des Videos ab oder legt sie fest.
+    /// </summary>
+    /// <value>Die ID des Videos.</value>
     public long VideoId { get; set; }
+
+    /// <summary>
+    /// Ruft den Typ des Videos ab oder legt ihn fest.
+    /// </summary>
+    /// <value>Der Video-Typ (Movie oder Episode).</value>
     public string VideoType { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Ruft den Titel des Videos ab oder legt ihn fest.
+    /// </summary>
+    /// <value>Der Anzeigetitel des Videos.</value>
     public string Title { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Ruft die Stream-URL ab, von der heruntergeladen wird, oder legt sie fest.
+    /// </summary>
+    /// <value>Die URL des Video-Streams.</value>
     public string StreamUrl { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Ruft den lokalen Zielpfad der Download-Datei ab oder legt ihn fest.
+    /// </summary>
+    /// <value>Der lokale Dateipfad für den Download.</value>
     public string LocalFilePath { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Ruft die Aufbewahrungsart des Downloads ab oder legt sie fest.
+    /// </summary>
+    /// <value>Die <see cref="DownloadRetentionType"/>-Aufbewahrungsart.</value>
     public DownloadRetentionType RetentionType { get; set; }
+
+    /// <summary>
+    /// Ruft den Zeitpunkt ab, an dem der Download abläuft, oder legt ihn fest.
+    /// </summary>
+    /// <value>Das Ablaufdatum des Downloads.</value>
     public DateTime ExpiresAt { get; set; }
 
     // Video-Metadaten
+
+    /// <summary>
+    /// Ruft die Handlungsbeschreibung des Videos ab oder legt sie fest.
+    /// </summary>
+    /// <value>Die Beschreibung des Inhalts oder <c>null</c>.</value>
     public string? Plot { get; set; }
+
+    /// <summary>
+    /// Ruft die Genrenamen des Videos ab oder legt sie fest.
+    /// </summary>
+    /// <value>Kommaseparierte Genrenamen oder <c>null</c>.</value>
     public string? GenreNames { get; set; }
+
+    /// <summary>
+    /// Ruft das Erscheinungsjahr des Videos ab oder legt es fest.
+    /// </summary>
+    /// <value>Das Erscheinungsjahr oder <c>null</c>.</value>
     public string? ReleaseYear { get; set; }
 
     // Episode-Informationen
+
+    /// <summary>
+    /// Ruft die Episodennummer ab oder legt sie fest (nur bei Serienepisoden).
+    /// </summary>
+    /// <value>Die Episodennummer oder <c>null</c>.</value>
     public int? EpisodeNumber { get; set; }
+
+    /// <summary>
+    /// Ruft die Staffelnummer ab oder legt sie fest (nur bei Serienepisoden).
+    /// </summary>
+    /// <value>Die Staffelnummer oder <c>null</c>.</value>
     public int? SeasonNumber { get; set; }
+
+    /// <summary>
+    /// Ruft den Namen der Serie ab oder legt ihn fest (nur bei Serienepisoden).
+    /// </summary>
+    /// <value>Der Serienname oder <c>null</c>.</value>
     public string? TVShowName { get; set; }
 
     // Bild-URLs (Server)
+
+    /// <summary>
+    /// Ruft die Server-URL des Poster-Bildes ab oder legt sie fest.
+    /// </summary>
+    /// <value>Die URL des Posters oder <c>null</c>.</value>
     public string? PosterImageUrl { get; set; }
+
+    /// <summary>
+    /// Ruft die Server-URL des Banner-Bildes ab oder legt sie fest.
+    /// </summary>
+    /// <value>Die URL des Banners oder <c>null</c>.</value>
     public string? BannerImageUrl { get; set; }
 }
 
+/// <summary>
+/// Event-Argumente für den Fortschritt eines Downloads.
+/// </summary>
 public class DownloadProgressEventArgs : EventArgs
 {
+    /// <summary>
+    /// Ruft die ID des Videos ab oder legt sie fest.
+    /// </summary>
+    /// <value>Die ID des Videos.</value>
     public long VideoId { get; set; }
+
+    /// <summary>
+    /// Ruft den Typ des Videos ab oder legt ihn fest.
+    /// </summary>
+    /// <value>Der Video-Typ (Movie oder Episode).</value>
     public string VideoType { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Ruft den Download-Fortschritt in Prozent ab oder legt ihn fest.
+    /// </summary>
+    /// <value>Der Fortschritt in Prozent (0–100).</value>
     public double ProgressPercent { get; set; }
+
+    /// <summary>
+    /// Ruft die Anzahl bereits heruntergeladener Bytes ab oder legt sie fest.
+    /// </summary>
+    /// <value>Die heruntergeladene Datenmenge in Bytes.</value>
     public long DownloadedBytes { get; set; }
+
+    /// <summary>
+    /// Ruft die Gesamtgröße des Downloads in Bytes ab oder legt sie fest.
+    /// </summary>
+    /// <value>Die Gesamtgröße in Bytes.</value>
     public long TotalBytes { get; set; }
 }
 
+/// <summary>
+/// Event-Argumente für den Abschluss eines Downloads.
+/// </summary>
 public class DownloadCompletedEventArgs : EventArgs
 {
+    /// <summary>
+    /// Ruft die ID des Videos ab oder legt sie fest.
+    /// </summary>
+    /// <value>Die ID des Videos.</value>
     public long VideoId { get; set; }
+
+    /// <summary>
+    /// Ruft den Typ des Videos ab oder legt ihn fest.
+    /// </summary>
+    /// <value>Der Video-Typ (Movie oder Episode).</value>
     public string VideoType { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Ruft den lokalen Pfad der heruntergeladenen Datei ab oder legt ihn fest.
+    /// </summary>
+    /// <value>Der lokale Dateipfad des Downloads.</value>
     public string LocalFilePath { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Ruft ab, ob der Download erfolgreich war, oder legt dies fest.
+    /// </summary>
+    /// <value><c>true</c> bei erfolgreichem Download; sonst <c>false</c>.</value>
     public bool Success { get; set; }
+
+    /// <summary>
+    /// Ruft die Fehlermeldung bei einem fehlgeschlagenen Download ab oder legt sie fest.
+    /// </summary>
+    /// <value>Die Fehlermeldung oder <c>null</c>, wenn der Download erfolgreich war.</value>
     public string? ErrorMessage { get; set; }
 }

@@ -3,39 +3,58 @@ using VideoWebPlayer.Client.Models;
 
 namespace VideoWebPlayer.Maui.Services;
 
+/// <summary>
+/// Dienst zur Verwaltung der Benutzeranmeldung und der gespeicherten Zugangsdaten.
+/// </summary>
 public class AuthService : IAuthService
 {
     private readonly ISettingsService _settings;
 
+    /// <summary>
+    /// Initialisiert eine neue Instanz der <see cref="AuthService"/>-Klasse mit dem Standard-Einstellungsdienst.
+    /// </summary>
     public AuthService() : this(new SettingsService())
     {
     }
 
+    /// <summary>
+    /// Initialisiert eine neue Instanz der <see cref="AuthService"/>-Klasse.
+    /// </summary>
+    /// <param name="settings">Der zu verwendende Einstellungsdienst.</param>
     public AuthService(ISettingsService settings)
     {
         _settings = settings;
     }
 
+    /// <inheritdoc/>
     public bool HasCredentials()
     {
         return _settings.HasCredentials();
     }
 
+    /// <inheritdoc/>
     public (string username, string password) GetCredentials()
     {
         return (_settings.GetUsername(), _settings.GetPassword());
     }
 
+    /// <summary>
+    /// Speichert die Zugangsdaten des Benutzers.
+    /// </summary>
+    /// <param name="username">Der Benutzername.</param>
+    /// <param name="password">Das Passwort.</param>
     public void SaveCredentials(string username, string password)
     {
         _settings.SetCredentials(username, password);
     }
 
+    /// <inheritdoc/>
     public void ClearCredentials()
     {
         _settings.ClearCredentials();
     }
 
+    /// <inheritdoc/>
     public async Task<(bool success, string? errorMessage)> LoginAsync(string username, string password, CancellationToken cancellationToken = default)
     {
         var serverAddress = _settings.ServerAddress;

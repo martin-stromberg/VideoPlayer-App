@@ -13,6 +13,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       tag: ${{ steps.get-tag.outputs.tag }}
+      version: ${{ steps.get-tag.outputs.version }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -43,6 +44,7 @@ jobs:
           git fetch --tags
           tag=$(git describe --tags --match 'v*' --abbrev=0)
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "version=${tag#v}" >> "$GITHUB_OUTPUT"
 
   build-windows:
     needs: release
@@ -88,7 +90,11 @@ jobs:
 
   build-ios:
     needs: release
-    runs-on: macos-latest
+    # Das aktuelle MAUI-Workload-Paket Microsoft.iOS.Sdk.net10.0_27.0
+    # verlangt Xcode 27 — macos-latest liefert hoechstens 26.x. Das
+    # xcode-27-Image (Preview) traegt Xcode 27 als Default.
+    # Kann auf macos-latest zurueck, sobald dort Xcode 27 GA ist.
+    runs-on: xcode-27
     steps:
       - name: Checkout release tag
         uses: actions/checkout@v4
@@ -106,8 +112,14 @@ jobs:
       - name: Set application version
         run: pwsh .github/scripts/Set-Version.ps1 -Version '${{ needs.release.outputs.tag }}'
 
+      # EnableCodeSigning=false: der Runner hat keine Zertifikate im
+      # Keychain; Simulator-Builds sind ohnehin ad-hoc signiert. Ab
+      # iOS-SDK 27 wird sonst "No valid iOS code signing keys" gemeldet.
       - name: Build iOS
-        run: dotnet build VideoWebPlayer.Maui/VideoWebPlayer.Maui.csproj --configuration Release --framework net10.0-ios --runtime iossimulator-arm64
+        run: dotnet build VideoWebPlayer.Maui/VideoWebPlayer.Maui.csproj --configuration Release --framework net10.0-ios --runtime iossimulator-arm64 -p:EnableCodeSigning=false
+
+      - name: Build iOS (VideoPlayer.Maui)
+        run: dotnet build VideoPlayer.Maui/VideoPlayer.Maui.csproj --configuration Release --framework net10.0-ios --runtime iossimulator-arm64 -p:EnableCodeSigning=false
 
       - name: Upload iOS artifact
         env:
@@ -117,6 +129,53 @@ jobs:
           if [ -n "$app" ]; then
             zip -r "${app}.zip" "$app"
             gh release upload '${{ needs.release.outputs.tag }}' "${app}.zip" --clobber
+          fi
+        shell: bash
+
+  # Signierter Store-Build auf macos-latest (Release-Xcode). Der Job
+  # bleibt deaktiviert, bis die Signatur-Secrets gesetzt sind -
+  # Aktivierung ueber die Repository-Variable IOS_SIGNING_ENABLED=true,
+  # ohne Codeaenderung. Laedt die .ipa nach TestFlight und legt sie
+  # zusaetzlich ans GitHub-Prerelease.
+  package-ios:
+    needs: release
+    if: vars.IOS_SIGNING_ENABLED == 'true'
+    runs-on: macos-latest
+    timeout-minutes: 45
+    steps:
+      # fetch-depth 0 ist Pflicht: die Buildnummer (CFBundleVersion)
+      # ist die Anzahl der Commits (git rev-list --count) - ein
+      # Shallow-Checkout wuerde eine zu kleine, kollidierende Nummer
+      # erzeugen.
+      - name: Checkout release tag
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.release.outputs.tag }}
+          fetch-depth: 0
+
+      - name: Build, sign and upload release candidate (ios)
+        uses: ./.github/actions/package-ios
+        with:
+          release-version: ${{ needs.release.outputs.version }}
+          release-tag: ${{ needs.release.outputs.tag }}
+          codesign-key: ${{ secrets.IOS_CODESIGN_KEY }}
+          provisioning-profile: ${{ secrets.IOS_PROVISIONING_PROFILE }}
+          api-key-id: ${{ secrets.IOS_API_KEY_ID }}
+          api-issuer-id: ${{ secrets.IOS_API_ISSUER_ID }}
+          api-key-p8: ${{ secrets.IOS_API_KEY_P8 }}
+          certificate-p12-base64: ${{ secrets.IOS_CERTIFICATE_P12_BASE64 }}
+          certificate-p12-password: ${{ secrets.IOS_CERTIFICATE_P12_PASSWORD }}
+          provisioning-profile-base64: ${{ secrets.IOS_PROVISIONING_PROFILE_BASE64 }}
+
+      - name: Upload iOS artifact
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release upload '${{ needs.release.outputs.tag }}' release-ios.ipa --clobber
+          # dSYM-Archiv des Builds mit hochladen (wenn von der Action erzeugt),
+          # damit TestFlight-Crash-Reports dieses Builds symbolisierbar sind.
+          if [ -f release-ios-dsym.zip ]; then
+            gh release upload '${{ needs.release.outputs.tag }}' release-ios-dsym.zip --clobber
           fi
         shell: bash
 

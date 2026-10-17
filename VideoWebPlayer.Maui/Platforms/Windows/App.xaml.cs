@@ -6,19 +6,20 @@
 namespace VideoWebPlayer.Maui.WinUI
 {
     /// <summary>
-    /// Provides application-specific behavior to supplement the default Application class.
+    /// Stellt anwendungsspezifisches Verhalten bereit, das die Standard-Application-Klasse ergänzt.
     /// </summary>
     public partial class App : MauiWinUIApplication
     {
         /// <summary>
-        /// Initializes the singleton application object.  This is the first line of authored code
-        /// executed, and as such is the logical equivalent of main() or WinMain().
+        /// Initialisiert das Singleton-Anwendungsobjekt. Dies ist die erste Zeile des eigenen Codes,
+        /// der ausgeführt wird, und damit das logische Äquivalent zu main() bzw. WinMain().
         /// </summary>
         public App()
         {
             this.InitializeComponent();
         }
 
+        /// <inheritdoc/>
         protected override MauiApp CreateMauiApp() => MauiProgram.CreateMauiApp();
     }
 

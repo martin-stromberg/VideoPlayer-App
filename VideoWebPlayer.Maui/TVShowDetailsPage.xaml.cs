@@ -4,12 +4,22 @@ using VideoWebPlayer.Maui.Models;
 
 namespace VideoWebPlayer.Maui;
 
+/// <summary>
+/// Detailseite einer TV-Serie: zeigt Staffeln und Episoden an und ermöglicht
+/// Favoriten-Markierung sowie Download/Entfernen von Episoden.
+/// </summary>
 public partial class TVShowDetailsPage : ContentPage
 {
     private readonly TVShowDetailsViewModel _viewModel;
     private readonly long? _initialSeasonId;
     private readonly long? _initialEpisodeId;
 
+    /// <summary>
+    /// Erstellt eine neue Instanz der <see cref="TVShowDetailsPage"/>.
+    /// </summary>
+    /// <param name="tvShowId">ID der anzuzeigenden Serie auf dem Server.</param>
+    /// <param name="seasonId">Optionale Staffel-ID, die initial vorausgewählt werden soll.</param>
+    /// <param name="episodeId">Optionale Episoden-ID, die initial vorausgewählt werden soll.</param>
     public TVShowDetailsPage(long tvShowId, long? seasonId = null, long? episodeId = null)
     {
         InitializeComponent();
@@ -23,6 +33,7 @@ public partial class TVShowDetailsPage : ContentPage
         DownloadQueue.Instance.DownloadCompleted += OnDownloadCompleted;
     }
 
+    /// <inheritdoc/>
     protected override async void OnAppearing()
     {
         base.OnAppearing();
@@ -37,6 +48,7 @@ public partial class TVShowDetailsPage : ContentPage
         }
     }
 
+    /// <inheritdoc/>
     protected override void OnDisappearing()
     {
         base.OnDisappearing();

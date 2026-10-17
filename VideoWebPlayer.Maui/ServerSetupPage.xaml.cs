@@ -3,12 +3,20 @@ using VideoWebPlayer.Maui.Services;
 
 namespace VideoWebPlayer.Maui;
 
+/// <summary>
+/// Seite zum Einrichten der Serveradresse – mit manueller Eingabe sowie
+/// automatischer Server-Suche im Netzwerk (mDNS/UDP).
+/// </summary>
 public partial class ServerSetupPage : ContentPage
 {
     private readonly ISettingsService _settings;
     private readonly Entry _serverEntry;
     private readonly Label _statusLabel;
 
+    /// <summary>
+    /// Erstellt eine neue Instanz der <see cref="ServerSetupPage"/> und baut die UI auf.
+    /// </summary>
+    /// <param name="settings">Der Einstellungsdienst; bei <c>null</c> wird ein Standard-<see cref="Services.SettingsService"/> verwendet.</param>
     public ServerSetupPage(ISettingsService? settings)
     {
         _settings = settings ?? new Services.SettingsService();

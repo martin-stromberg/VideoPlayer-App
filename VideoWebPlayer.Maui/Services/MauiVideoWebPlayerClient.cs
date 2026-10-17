@@ -13,6 +13,13 @@ public class MauiVideoWebPlayerClient : VideoWebPlayerClient
     private readonly IAuthService _authService;
     private readonly ISettingsService _settings;
 
+    /// <summary>
+    /// Initialisiert eine neue Instanz der <see cref="MauiVideoWebPlayerClient"/>-Klasse.
+    /// </summary>
+    /// <param name="httpClient">Der zu verwendende <see cref="HttpClient"/>.</param>
+    /// <param name="settings">Der Einstellungsdienst für Serveradresse und Token.</param>
+    /// <param name="logger">Der Logger für diesen Client.</param>
+    /// <param name="authService">Der Authentifizierungsdienst für die stille Wiederanmeldung.</param>
     public MauiVideoWebPlayerClient(HttpClient httpClient, ISettingsService settings, ILogger<MauiVideoWebPlayerClient> logger, IAuthService authService)
         : base(httpClient, logger)
     {
@@ -24,6 +31,7 @@ public class MauiVideoWebPlayerClient : VideoWebPlayerClient
         LoadAuthTokenFromSettings();
     }
 
+    /// <inheritdoc/>
     protected override async Task<bool> HandleUnauthorized()
     {
         var handled = await base.HandleUnauthorized();
@@ -85,6 +93,7 @@ public class MauiVideoWebPlayerClient : VideoWebPlayerClient
     /// <summary>
     /// Überschreibt SetAuthorizationToken, um den Token auch in Preferences zu speichern.
     /// </summary>
+    /// <param name="token">Das zu setzende Autorisierungstoken.</param>
     public override void SetAuthorizationToken(AuthorizationToken token)
     {
         base.SetAuthorizationToken(token);

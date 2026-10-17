@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <WarningsAsErrors>CS1591</WarningsAsErrors>
+    <PackageLicenseFile>LICENSE</PackageLicenseFile>
+    <Copyright>Copyright (c) Martin Stromberg</Copyright>
+    <Authors>Martin Stromberg</Authors>
+    <VideoPlayerApiToken Condition="'$(VideoPlayerApiToken)' == ''">&lt;MAUI_CLIENT_API_TOKEN&gt;</VideoPlayerApiToken>
+  </PropertyGroup>
+  <ItemGroup>
+    <AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute">
+      <_Parameter1>VideoPlayer.ApiClient.ApiToken</_Parameter1>
+      <_Parameter2>$(VideoPlayerApiToken)</_Parameter2>
+    </AssemblyAttribute>
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="VideoWebPlayer.Maui.Tests" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.10" />
+    <PackageReference Include="Zeroconf" Version="3.7.16" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="../LICENSE" Pack="true" PackagePath="\" />
+  </ItemGroup>
+</Project>

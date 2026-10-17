@@ -4,11 +4,19 @@ using VideoWebPlayer.Maui.Services;
 
 namespace VideoWebPlayer.Maui;
 
+/// <summary>
+/// Login-Seite zur Eingabe von Benutzername und Passwort für die Server-Anmeldung.
+/// </summary>
 public partial class LoginPage : ContentPage
 {
     private readonly IAuthService _auth;
     private readonly ISettingsService _settings;
 
+    /// <summary>
+    /// Erstellt eine neue Instanz der <see cref="LoginPage"/>.
+    /// </summary>
+    /// <param name="auth">Der Authentifizierungsdienst; bei <c>null</c> wird ein Standard-<see cref="Services.AuthService"/> verwendet.</param>
+    /// <param name="settings">Der Einstellungsdienst; bei <c>null</c> wird er aus dem ServiceProvider geholt.</param>
     public LoginPage(IAuthService? auth, ISettingsService? settings = null)
     {
         InitializeComponent();

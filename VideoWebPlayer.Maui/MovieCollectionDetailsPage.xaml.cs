@@ -4,10 +4,18 @@ using VideoWebPlayer.Maui.Models;
 
 namespace VideoWebPlayer.Maui;
 
+/// <summary>
+/// Detailseite einer Film-Sammlung (Collection): zeigt die enthaltenen Filme an
+/// und ermöglicht Favoriten-Markierung sowie Downloads.
+/// </summary>
 public partial class MovieCollectionDetailsPage : ContentPage
 {
     private readonly MovieCollectionDetailsViewModel _viewModel;
 
+    /// <summary>
+    /// Erstellt eine neue Instanz der <see cref="MovieCollectionDetailsPage"/>.
+    /// </summary>
+    /// <param name="collectionId">ID der anzuzeigenden Film-Sammlung auf dem Server.</param>
     public MovieCollectionDetailsPage(long collectionId)
     {
         InitializeComponent();
@@ -18,6 +26,7 @@ public partial class MovieCollectionDetailsPage : ContentPage
         DownloadQueue.Instance.DownloadCompleted += OnDownloadCompleted;
     }
 
+    /// <inheritdoc/>
     protected override async void OnAppearing()
     {
         base.OnAppearing();
@@ -32,6 +41,7 @@ public partial class MovieCollectionDetailsPage : ContentPage
         }
     }
 
+    /// <inheritdoc/>
     protected override void OnDisappearing()
     {
         base.OnDisappearing();

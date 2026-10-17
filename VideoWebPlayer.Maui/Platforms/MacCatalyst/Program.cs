@@ -3,6 +3,9 @@ using UIKit;
 
 namespace VideoWebPlayer.Maui
 {
+    /// <summary>
+    /// Einstiegspunkt-Klasse der MacCatalyst-App.
+    /// </summary>
     public class Program
     {
         // This is the main entry point of the application.

@@ -2,6 +2,10 @@ using VideoWebPlayer.Maui.ViewModels;
 
 namespace VideoWebPlayer.Maui;
 
+/// <summary>
+/// Übersichtsseite einer Medien-Quelle: zeigt die Inhalte als scrollbares Raster
+/// mit Lazy-Loading und passt die Spaltenanzahl an die Fensterbreite an.
+/// </summary>
 public partial class SourceOverviewPage : ContentPage
 {
     private readonly SourceOverviewViewModel _viewModel;
@@ -9,6 +13,11 @@ public partial class SourceOverviewPage : ContentPage
     private int _currentSpan = 4;
     private bool _isLoadingInProgress = false;
 
+    /// <summary>
+    /// Erstellt eine neue Instanz der <see cref="SourceOverviewPage"/>.
+    /// </summary>
+    /// <param name="sourceId">ID der anzuzeigenden Quelle auf dem Server.</param>
+    /// <param name="sourceName">Anzeigename der Quelle.</param>
     public SourceOverviewPage(long sourceId, string sourceName)
     {
         InitializeComponent();
@@ -16,6 +25,7 @@ public partial class SourceOverviewPage : ContentPage
         BindingContext = _viewModel;
     }
 
+    /// <inheritdoc/>
     protected override async void OnAppearing()
     {
         base.OnAppearing();
@@ -32,6 +42,7 @@ public partial class SourceOverviewPage : ContentPage
         }
     }
 
+    /// <inheritdoc/>
     protected override void OnSizeAllocated(double width, double height)
     {
         base.OnSizeAllocated(width, height);

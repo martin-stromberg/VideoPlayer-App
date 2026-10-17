@@ -1,0 +1,45 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <!-- Zielplattformen einzeln abschaltbar (Reporter-Muster wie in
+         VideoPlayer.Maui): die CI-Store-Builds setzen
+         IncludeAndroidTarget/IncludeMacCatalystTarget auf false. -->
+    <IncludeIosTarget Condition="'$(IncludeIosTarget)' == ''">true</IncludeIosTarget>
+    <IncludeAndroidTarget Condition="'$(IncludeAndroidTarget)' == ''">true</IncludeAndroidTarget>
+    <IncludeMacCatalystTarget Condition="'$(IncludeMacCatalystTarget)' == ''">true</IncludeMacCatalystTarget>
+    <TargetFrameworks />
+    <TargetFrameworks Condition="'$(IncludeAndroidTarget)' == 'true'">$(TargetFrameworks);net10.0-android</TargetFrameworks>
+    <TargetFrameworks Condition="!$([MSBuild]::IsOSPlatform('linux')) and '$(IncludeIosTarget)' == 'true'">$(TargetFrameworks);net10.0-ios</TargetFrameworks>
+    <TargetFrameworks Condition="!$([MSBuild]::IsOSPlatform('linux')) and '$(IncludeMacCatalystTarget)' == 'true'">$(TargetFrameworks);net10.0-maccatalyst</TargetFrameworks>
+    <TargetFrameworks Condition="$([MSBuild]::IsOSPlatform('windows'))">$(TargetFrameworks);net10.0-windows10.0.19041.0</TargetFrameworks>
+    <UseMaui>true</UseMaui>
+    <!-- Die Bibliothek enthaelt keinerlei MAUI-Ressourcen (XAML, Bilder,
+         Fonts) — ohne diesen Schalter wuerde sie die MAUI-Default-
+         Ressourcen erneut in die referenzierende App einbinden und
+         dort PRI175/PRI277 (doppelte Resources.xbf) ausloesen. -->
+    <EnableDefaultMauiItems>false</EnableDefaultMauiItems>
+    <!-- Wie in VideoPlayer.Maui.csproj: expliziter Pin, sonst loest das
+         Projekt die implizite Workload-Version auf und die App-PRI-
+         Generierung sieht zwei MAUI-Versionen (PRI175/PRI277). -->
+    <MauiPackageVersion>10.0.90</MauiPackageVersion>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <WarningsAsErrors>CS1591</WarningsAsErrors>
+    <PackageId>msTools.DeveloperApi.Maui</PackageId>
+    <Description>MAUI-Handler der lokalen Developer-API fuer Debug-/E2E-Automatisierung (Elementbaum, Invoke, Texteingabe).</Description>
+    <SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'ios'">15.0</SupportedOSPlatformVersion>
+    <SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'maccatalyst'">15.0</SupportedOSPlatformVersion>
+    <SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">21.0</SupportedOSPlatformVersion>
+    <SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">10.0.17763.0</SupportedOSPlatformVersion>
+    <TargetPlatformMinVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">10.0.17763.0</TargetPlatformMinVersion>
+    <PackageLicenseFile>LICENSE</PackageLicenseFile>
+    <Copyright>Copyright (c) Martin Stromberg</Copyright>
+    <Authors>Martin Stromberg</Authors>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Maui.Controls" Version="$(MauiPackageVersion)" />
+    <PackageReference Include="Microsoft.Maui.Essentials" Version="$(MauiPackageVersion)" />
+    <ProjectReference Include="..\msTools.DeveloperApi\msTools.DeveloperApi.csproj" />
+    <None Include="../LICENSE" Pack="true" PackagePath="\" />
+  </ItemGroup>
+</Project>

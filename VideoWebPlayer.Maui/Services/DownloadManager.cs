@@ -17,12 +17,17 @@ public class DownloadManager
     private SemaphoreSlim _dbLock => ClientDatabase.Instance.Lock;
     private IPublishNotificationEvent? _eventPublisher;
 
+    /// <summary>
+    /// Ruft die gemeinsame Singleton-Instanz des Download-Managers ab.
+    /// </summary>
+    /// <value>Die Singleton-Instanz des <see cref="DownloadManager"/>.</value>
     public static DownloadManager Instance => _instance ??= new DownloadManager();
 
     /// <summary>
-    /// Sets the event publisher for download events.
-    /// Should be called during app initialization.
+    /// Setzt den Event-Publisher für Download-Ereignisse.
+    /// Sollte während der App-Initialisierung aufgerufen werden.
     /// </summary>
+    /// <param name="eventPublisher">Der Publisher für Benachrichtigungs-Ereignisse.</param>
     public void SetEventPublisher(IPublishNotificationEvent eventPublisher)
     {
         _eventPublisher = eventPublisher;
@@ -99,6 +104,14 @@ public class DownloadManager
         }
     }
 
+    /// <summary>
+    /// Erstellt eine Video-Anfrage und startet im Hintergrund die Ermittlung der Videoquelle
+    /// (lokale Datei oder Stream-URL inklusive Fortsetzungsposition).
+    /// </summary>
+    /// <param name="videoId">Die ID des Videos.</param>
+    /// <param name="videoType">Der Typ des Videos (Movie oder Episode).</param>
+    /// <param name="title">Der Titel des Videos.</param>
+    /// <returns>Die erstellte <see cref="VideoRequest"/>; die Quelle wird asynchron nachgeladen.</returns>
     public async Task<VideoRequest> RequestVideoAsync(long videoId, string videoType, string title)
     {
         var request = new VideoRequest
@@ -245,6 +258,12 @@ public class DownloadManager
         return streamUrl;
     }
 
+    /// <summary>
+    /// Sucht einen vorhandenen Download-Eintrag in der Datenbank.
+    /// </summary>
+    /// <param name="videoId">Die ID des Videos.</param>
+    /// <param name="videoType">Der Typ des Videos (Movie oder Episode).</param>
+    /// <returns>Den gefundenen <see cref="DownloadedVideo"/>-Eintrag oder <c>null</c>.</returns>
     public async Task<DownloadedVideo?> GetDownloadAsync(long videoId, string videoType)
     {
         videoType = NormalizeVideoType(videoType);
@@ -266,6 +285,10 @@ public class DownloadManager
         }
     }
 
+    /// <summary>
+    /// Ruft alle abgeschlossenen Downloads aus der Datenbank ab, absteigend nach Download-Datum sortiert.
+    /// </summary>
+    /// <returns>Liste aller abgeschlossenen <see cref="DownloadedVideo"/>-Einträge.</returns>
     public async Task<List<DownloadedVideo>> GetAllDownloadsAsync()
     {
         await _dbLock.WaitAsync();
@@ -282,6 +305,13 @@ public class DownloadManager
         }
     }
 
+    /// <summary>
+    /// Stellt einen Download für die angefragte Video-Quelle in die Warteschlange,
+    /// sofern er nicht bereits vorhanden oder eingereiht ist.
+    /// </summary>
+    /// <param name="request">Die Video-Anfrage mit ID, Typ und Titel.</param>
+    /// <param name="retentionType">Die Aufbewahrungsart, die das Ablaufdatum bestimmt.</param>
+    /// <returns>Ein Task, der das Einreihen abschließt.</returns>
     public async Task QueueDownloadAsync(VideoRequest request, DownloadRetentionType retentionType)
     {
         request.VideoType = NormalizeVideoType(request.VideoType);
@@ -479,6 +509,13 @@ public class DownloadManager
         public string? BannerImageUrl { get; set; }
     }
 
+    /// <summary>
+    /// Speichert einen abgeschlossenen Download inklusive Metadaten und lokal geladenen Bildern
+    /// in der Datenbank und löst das entsprechende Ereignis aus.
+    /// </summary>
+    /// <param name="task">Die abgeschlossene Download-Aufgabe.</param>
+    /// <param name="fileSizeBytes">Die Größe der heruntergeladenen Datei in Bytes.</param>
+    /// <returns>Ein Task, der das Speichern abschließt.</returns>
     public async Task SaveCompletedDownloadAsync(DownloadTask task, long fileSizeBytes)
     {
         await _dbLock.WaitAsync();
@@ -578,6 +615,15 @@ public class DownloadManager
         return App.ServiceProvider?.GetService<ISettingsService>() ?? new SettingsService();
     }
 
+    /// <summary>
+    /// Aktualisiert die Wiedergabeposition eines Downloads lokal in der Datenbank
+    /// und meldet sie zusätzlich an den Server (nicht blockierend bei Fehlern).
+    /// </summary>
+    /// <param name="videoId">Die ID des Videos.</param>
+    /// <param name="videoType">Der Typ des Videos (Movie oder Episode).</param>
+    /// <param name="positionSeconds">Die aktuelle Wiedergabeposition in Sekunden.</param>
+    /// <param name="durationSeconds">Die Gesamtdauer des Videos in Sekunden.</param>
+    /// <returns>Ein Task, der die Aktualisierung abschließt.</returns>
     public async Task UpdatePlaybackPositionAsync(long videoId, string videoType, double positionSeconds, double durationSeconds)
     {
         System.Diagnostics.Debug.WriteLine($"[DownloadManager] UpdatePlaybackPositionAsync called: {videoType} {videoId} - {positionSeconds}s / {durationSeconds}s");
@@ -633,6 +679,12 @@ public class DownloadManager
         }
     }
 
+    /// <summary>
+    /// Ruft die lokal gespeicherte Wiedergabeposition eines Downloads ab.
+    /// </summary>
+    /// <param name="videoId">Die ID des Videos.</param>
+    /// <param name="videoType">Der Typ des Videos (Movie oder Episode).</param>
+    /// <returns>Die gespeicherte Position in Sekunden oder <c>null</c>, wenn kein Download vorhanden ist.</returns>
     public async Task<double?> GetPlaybackPositionAsync(long videoId, string videoType)
     {
         var download = await GetDownloadAsync(videoId, videoType);
@@ -711,6 +763,10 @@ public class DownloadManager
         }
     }
 
+    /// <summary>
+    /// Entfernt alle abgelaufenen Downloads aus der Datenbank und löscht die zugehörigen Dateien.
+    /// </summary>
+    /// <returns>Ein Task, der den Aufräumvorgang abschließt.</returns>
     public async Task CleanupExpiredDownloadsAsync()
     {
         await _dbLock.WaitAsync();

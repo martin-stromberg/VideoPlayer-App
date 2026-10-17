@@ -3,15 +3,39 @@ using Microsoft.Maui.ApplicationModel;
 
 namespace VideoWebPlayer.Maui
 {
+    /// <summary>
+    /// Hauptanwendungsklasse der MAUI-App. Kümmert sich um die nachträgliche
+    /// Initialisierung der Dienste (Downloads, SignalR) sowie um Offline-Fallbacks.
+    /// </summary>
     public partial class App : Application
     {
+        /// <summary>
+        /// Der ServiceProvider der laufenden Anwendung; wird von <see cref="MauiProgram.CreateMauiApp"/> gesetzt.
+        /// </summary>
         public static IServiceProvider? ServiceProvider { get; set; }
         private bool _startupInitialized;
         private bool _onlineInitialized;
 
+        /// <summary>
+        /// Zeigt einen Alert-Dialog sicher auf dem Main-Thread an (ohne Accept-Button).
+        /// Schlägt die Anzeige fehl (z. B. fehlendes XamlRoot), wird nichts geworfen.
+        /// </summary>
+        /// <param name="title">Titel des Dialogs.</param>
+        /// <param name="message">Anzuzeigende Nachricht.</param>
+        /// <param name="cancel">Beschriftung des Abbrechen-Buttons.</param>
+        /// <returns>Ein Task, der abgeschlossen wird, sobald der Dialog geschlossen oder übersprungen wurde.</returns>
         public static Task SafeDisplayAlertAsync(string title, string message, string cancel)
             => SafeDisplayAlertAsync(title, message, accept: null, cancel, defaultAcceptResult: true);
 
+        /// <summary>
+        /// Zeigt einen Alert-Dialog mit Accept- und Cancel-Button sicher auf dem Main-Thread an.
+        /// Schlägt die Anzeige fehl, wird <c>false</c> zurückgegeben statt eine Exception zu werfen.
+        /// </summary>
+        /// <param name="title">Titel des Dialogs.</param>
+        /// <param name="message">Anzuzeigende Nachricht.</param>
+        /// <param name="accept">Beschriftung des Accept-Buttons.</param>
+        /// <param name="cancel">Beschriftung des Abbrechen-Buttons.</param>
+        /// <returns><c>true</c>, wenn der Benutzer den Accept-Button gewählt hat, sonst <c>false</c>.</returns>
         public static Task<bool> SafeDisplayAlertAsync(string title, string message, string accept, string cancel)
             => SafeDisplayAlertAsync(title, message, accept, cancel, defaultAcceptResult: false);
 
@@ -60,6 +84,10 @@ namespace VideoWebPlayer.Maui
             }
         }
 
+        /// <summary>
+        /// Erstellt eine neue Instanz der <see cref="App"/> und plant die Initialisierung,
+        /// sobald der <see cref="ServiceProvider"/> verfügbar ist.
+        /// </summary>
         public App()
         {
             InitializeComponent();
@@ -86,6 +114,7 @@ namespace VideoWebPlayer.Maui
             });
         }
 
+        /// <inheritdoc/>
         protected override Window CreateWindow(IActivationState? activationState)
         {
             // Use AppShell as the root when available so the Shell flyout is shown on mobile.
@@ -110,6 +139,12 @@ namespace VideoWebPlayer.Maui
             return window;
         }
 
+        /// <summary>
+        /// Führt die Initialisierung aus, sobald die Dienste verfügbar sind
+        /// (wird genau einmal pro App-Instanz ausgeführt). Konfiguriert u. a. den
+        /// DownloadManager mit dem Event-Publisher.
+        /// </summary>
+        /// <param name="services">Der ServiceProvider der Anwendung.</param>
         public void InitializeAfterServices(IServiceProvider services)
         {
             // Ensure this only runs once per app instance.
@@ -126,6 +161,12 @@ namespace VideoWebPlayer.Maui
             }
         }
 
+        /// <summary>
+        /// Wird nach Abschluss des Startup-Workflows (Server-Setup, Verbindung, Login)
+        /// bzw. nach einer Token-Erneuerung aufgerufen und startet die Online-Dienste
+        /// (Watchlist-Download-Koordinator, SignalR).
+        /// </summary>
+        /// <param name="services">Der ServiceProvider der Anwendung.</param>
         public void InitializeAfterStartupWorkflowOnline(IServiceProvider services)
         {
             // This can be triggered after the startup workflow (server setup + connect + login)

@@ -1,0 +1,364 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:controls="clr-namespace:VideoPlayer.Maui.Controls"
+             xmlns:mvu="clr-namespace:VideoPlayer.Mvu;assembly=VideoPlayer.Mvu"
+             x:Class="VideoPlayer.Maui.Pages.MediaDetailsPage"
+             Title="Details"
+             x:DataType="mvu:MvuHost">
+
+    <Grid RowDefinitions="Auto,Auto,*"
+          RowSpacing="10">
+
+        <ActivityIndicator x:Name="LoadingIndicator"
+                           Grid.Row="0"
+                           Margin="16,0"
+                           IsRunning="{Binding Model.MediaDetails.IsLoading}"
+                           IsVisible="{Binding Model.MediaDetails.IsLoading}"
+                           Color="{StaticResource VpPrimary}" />
+
+        <VerticalStackLayout x:Name="ErrorPanel"
+                             Grid.Row="1"
+                             Margin="16,0"
+                             Spacing="8"
+                             IsVisible="False">
+            <Label x:Name="ErrorLabel" Style="{StaticResource ErrorText}" />
+        </VerticalStackLayout>
+
+        <!-- Detail-Ansicht (Layout je nach Medientyp über IsVisible) -->
+        <ScrollView x:Name="DetailsScroll"
+                    Grid.Row="2"
+                    IsVisible="False">
+            <VerticalStackLayout Spacing="14">
+
+                <!-- Kopfbereich (Web-Vorbild .tvshow-header): vollbreites
+                     Hintergrundbild (Episoden-Still bzw. Banner/Fanart/
+                     Poster über api/pictures) unter geschichteten
+                     Dunkelgradienten; unten links Titel, Metazeile und
+                     Handlung, oben rechts der Favoriten-Schalter, unten
+                     rechts die Aktionen. Die Höhe folgt der Seitenbreite
+                     (Code-Behind: clamp-Äquivalent zu
+                     clamp(360px, 52vw, 620px)). -->
+                <Grid x:Name="HeaderSection"
+                      AutomationId="HeaderSection"
+                      HeightRequest="420"
+                      BackgroundColor="{StaticResource VpSurfaceLow}">
+
+                    <!-- Bildebene: cover-Anzeige; ohne geladenes Bild
+                         bleibt die Ebene leer und die Gradienten liegen
+                         über der Flächenfarbe (Web-Fallback). -->
+                    <Image x:Name="HeaderImage"
+                           AutomationId="HeaderImage"
+                           Aspect="AspectFill"
+                           HorizontalOptions="Fill"
+                           VerticalOptions="Fill" />
+
+                    <!-- Seitlicher Dunkelgradient (Web: 90deg,
+                         rgba(19,19,19,.98 → .76 → .18)). -->
+                    <Border AutomationId="HeaderSideGradient">
+                        <Border.Background>
+                            <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
+                                <GradientStop Color="{StaticResource VpHeroSideStrong}" Offset="0.0" />
+                                <GradientStop Color="{StaticResource VpHeroSideMid}" Offset="0.45" />
+                                <GradientStop Color="{StaticResource VpHeroSideSoft}" Offset="1.0" />
+                            </LinearGradientBrush>
+                        </Border.Background>
+                    </Border>
+
+                    <!-- Bottom-Fade in den Seitenhintergrund (Web: 0deg
+                         zu vp-bg). -->
+                    <Border AutomationId="HeaderBottomFade">
+                        <Border.Background>
+                            <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                                <GradientStop Color="{StaticResource VpHeroFadeClear}" Offset="0.0" />
+                                <GradientStop Color="{StaticResource VpBg}" Offset="1.0" />
+                            </LinearGradientBrush>
+                        </Border.Background>
+                    </Border>
+
+                    <!-- Trennlinie am unteren Rand (Web: border-bottom
+                         vp-border). -->
+                    <BoxView Color="{StaticResource VpBorder}"
+                             HeightRequest="1"
+                             VerticalOptions="End" />
+
+                    <!-- Favoriten-Schalter oben rechts (Web .favorite-btn). -->
+                    <Button x:Name="FavoriteButton"
+                            Text="☆"
+                            Style="{StaticResource IconButton}"
+                            FontSize="20"
+                            WidthRequest="44"
+                            HeightRequest="44"
+                            HorizontalOptions="End"
+                            VerticalOptions="Start"
+                            Margin="0,16,20,0"
+                            Clicked="OnFavoriteClicked" />
+
+                    <!-- Aktions-Schalter unten rechts (Web .play-button). -->
+                    <HorizontalStackLayout HorizontalOptions="End"
+                                           VerticalOptions="End"
+                                           Margin="0,0,24,20"
+                                           Spacing="10">
+                        <Button x:Name="DownloadButton"
+                                Text="&#xe2c4;"
+                                Style="{StaticResource IconButton}"
+                                FontFamily="MaterialIcons"
+                                FontSize="18"
+                                WidthRequest="44"
+                                HeightRequest="44"
+                                IsVisible="False"
+                                Clicked="OnDownloadClicked" />
+                        <Button x:Name="AddToPlaylistButton"
+                                AutomationId="AddToPlaylistButton"
+                                Text="Zu Playlist"
+                                FontSize="14"
+                                HeightRequest="44"
+                                IsVisible="False"
+                                Clicked="OnAddToPlaylistClicked" />
+                        <Button x:Name="PlayButton"
+                                AutomationId="PlayButton"
+                                Text="Abspielen"
+                                FontSize="14"
+                                HeightRequest="44"
+                                IsVisible="False"
+                                Clicked="OnPlayClicked" />
+                    </HorizontalStackLayout>
+
+                    <!-- Inhalt: Titel, Metazeile, Handlung. -->
+                    <VerticalStackLayout VerticalOptions="End"
+                                         Padding="24,0,140,28"
+                                         Spacing="8"
+                                         MaximumWidthRequest="820">
+                        <Label x:Name="TitleLabel"
+                               FontSize="30"
+                               FontAttributes="Bold"
+                               TextColor="{StaticResource VpText}" />
+                        <Label x:Name="MetaLabel"
+                               FontSize="13"
+                               FontFamily="InterSemiBold"
+                               TextColor="{StaticResource VpPrimarySoft}" />
+                        <Label x:Name="PlotLabel"
+                               FontSize="14"
+                               TextColor="{StaticResource VpTextSoft}"
+                               MaxLines="4"
+                               LineBreakMode="TailTruncation" />
+                    </VerticalStackLayout>
+                </Grid>
+
+                <!-- Inhalte unterhalb des Headers mit Seitenrand. -->
+                <VerticalStackLayout Padding="24,0,24,8" Spacing="14">
+
+                    <!-- Hinweis der letzten Download-Anforderung
+                         (eingeplant/bereits vorhanden/Fehler). -->
+                    <Label x:Name="DownloadNoticeLabel"
+                           FontSize="12"
+                           IsVisible="False" />
+
+                    <!-- Hinweis der Playlist-Hinzufügung (Erfolg/Fehler). -->
+                    <Label x:Name="AddToPlaylistNoticeLabel"
+                           AutomationId="AddToPlaylistNoticeLabel"
+                           FontSize="12"
+                           IsVisible="False" />
+
+                    <!-- Serienansicht: Staffel-Picker + Episodenliste -->
+                    <VerticalStackLayout x:Name="SeasonSection"
+                                         Spacing="10"
+                                         IsVisible="False">
+                        <Border Style="{StaticResource InputFrame}">
+                            <Picker x:Name="SeasonPicker"
+                                    AutomationId="SeasonPicker"
+                                    Title="Staffel"
+                                    ItemDisplayBinding="{Binding Name}"
+                                    SelectedIndexChanged="OnSeasonSelected" />
+                        </Border>
+                        <!-- Episodenliste als BindableLayout statt
+                             CollectionView: eine virtualisierte Liste im
+                             ScrollView wird unter iOS mit Höhe 0 gemessen
+                             (Muster: MediaCarousel). -->
+                        <VerticalStackLayout x:Name="EpisodesList"
+                                             AutomationId="EpisodesList">
+                            <BindableLayout.ItemTemplate>
+                                <DataTemplate x:DataType="mvu:EpisodeItem">
+                                    <Border Style="{StaticResource Card}"
+                                            Padding="12"
+                                            Margin="0,0,0,10">
+                                        <Border.GestureRecognizers>
+                                            <!-- Antippen der Karte öffnet
+                                                 die Episoden-Detailseite
+                                                 (Muster: MediaCarousel). -->
+                                            <TapGestureRecognizer Tapped="OnEpisodeTapped" />
+                                        </Border.GestureRecognizers>
+                                        <Border.Triggers>
+                                            <!-- Platzhalter fehlender Offline-Episoden:
+                                                 abgedunkelt, ohne Aktions-Schalter. -->
+                                            <DataTrigger TargetType="Border"
+                                                         Binding="{Binding IsPlaceholder}"
+                                                         Value="True">
+                                                <Setter Property="Opacity" Value="0.55" />
+                                            </DataTrigger>
+                                        </Border.Triggers>
+                                        <Grid ColumnDefinitions="128,*,Auto,Auto"
+                                              ColumnSpacing="14">
+                                            <Border Grid.Column="0"
+                                                    Padding="0"
+                                                    StrokeThickness="0"
+                                                    WidthRequest="128"
+                                                    HeightRequest="72"
+                                                    BackgroundColor="{StaticResource VpSurfaceLow}"
+                                                    StrokeShape="RoundRectangle 8">
+                                                <Grid>
+                                                    <controls:CachedPosterImage PictureId="{Binding PosterPictureId}"
+                                                                                Aspect="AspectFill" />
+                                                    <!-- Angesehen-Badge (Web:
+                                                         WatchedIndicator mit
+                                                         watched-indicator-episode
+                                                         und -image-left) —
+                                                         rundes dunkles Badge mit
+                                                         Auge in Primärfarbe, oben
+                                                         links über dem Poster,
+                                                         nur bei gesetztem
+                                                         Gesehen-Zeitpunkt. -->
+                                                    <Border AutomationId="WatchedIndicator"
+                                                            IsVisible="{Binding IsWatched}"
+                                                            WidthRequest="26"
+                                                            HeightRequest="26"
+                                                            Margin="6,6,0,0"
+                                                            HorizontalOptions="Start"
+                                                            VerticalOptions="Start"
+                                                            InputTransparent="True"
+                                                            ToolTipProperties.Text="Gesehen"
+                                                            Stroke="{StaticResource VpBadgeBorder}"
+                                                            StrokeThickness="1"
+                                                            BackgroundColor="{StaticResource VpBadgeBg}"
+                                                            Padding="4">
+                                                        <Border.StrokeShape>
+                                                            <RoundRectangle CornerRadius="999" />
+                                                        </Border.StrokeShape>
+                                                        <!-- Auge des Web-SVG
+                                                             (viewBox 24×24):
+                                                             Kontur-Pfad, Pupille
+                                                             und Glanzpunkt. -->
+                                                        <Grid WidthRequest="18"
+                                                              HeightRequest="18">
+                                                            <Path Data="M2 12C4 7 8 4 12 4C16 4 20 7 22 12C20 17 16 20 12 20C8 20 4 17 2 12Z"
+                                                                  Stroke="{StaticResource VpPrimarySoft}"
+                                                                  StrokeThickness="1.6"
+                                                                  Fill="Transparent"
+                                                                  Aspect="Uniform" />
+                                                            <Ellipse WidthRequest="5"
+                                                                     HeightRequest="5"
+                                                                     Fill="{StaticResource VpPrimarySoft}" />
+                                                            <Ellipse WidthRequest="1.5"
+                                                                     HeightRequest="1.5"
+                                                                     Fill="{StaticResource VpText}"
+                                                                     Opacity="0.9"
+                                                                     TranslationX="1"
+                                                                     TranslationY="-0.8" />
+                                                        </Grid>
+                                                    </Border>
+                                                </Grid>
+                                            </Border>
+                                            <VerticalStackLayout Grid.Column="1"
+                                                                 Spacing="4"
+                                                                 VerticalOptions="Center">
+                                                <Label Text="{Binding DisplayTitle}"
+                                                       FontSize="14"
+                                                       FontFamily="InterSemiBold"
+                                                       TextColor="{StaticResource VpText}" />
+                                                <Label Text="{Binding Plot}"
+                                                       Style="{StaticResource Caption}"
+                                                       MaxLines="2"
+                                                       LineBreakMode="TailTruncation" />
+                                                <!-- Platzhalter-Hinweis (nur im
+                                                     Offline-Snapshot sichtbar). -->
+                                                <Label Text="Nicht heruntergeladen"
+                                                       FontSize="11"
+                                                       TextColor="{StaticResource VpTextMuted}"
+                                                       IsVisible="{Binding ShowUnavailable}" />
+                                            </VerticalStackLayout>
+                                            <Button Grid.Column="2"
+                                                    Text="&#xe2c4;"
+                                                    Style="{StaticResource IconButton}"
+                                                    FontFamily="MaterialIcons"
+                                                    FontSize="18"
+                                                    WidthRequest="44"
+                                                    HeightRequest="44"
+                                                    VerticalOptions="Center"
+                                                    Clicked="OnEpisodeDownloadClicked">
+                                                <Button.Triggers>
+                                                    <DataTrigger TargetType="Button"
+                                                                 Binding="{Binding IsPlaceholder}"
+                                                                 Value="True">
+                                                        <Setter Property="IsVisible" Value="False" />
+                                                    </DataTrigger>
+                                                </Button.Triggers>
+                                            </Button>
+                                            <Button Grid.Column="3"
+                                                    Text="&#xe037;"
+                                                    Style="{StaticResource IconButton}"
+                                                    FontFamily="MaterialIcons"
+                                                    FontSize="18"
+                                                    WidthRequest="44"
+                                                    HeightRequest="44"
+                                                    VerticalOptions="Center"
+                                                    Clicked="OnEpisodePlayClicked">
+                                                <Button.Triggers>
+                                                    <DataTrigger TargetType="Button"
+                                                                 Binding="{Binding IsPlaceholder}"
+                                                                 Value="True">
+                                                        <Setter Property="IsVisible" Value="False" />
+                                                    </DataTrigger>
+                                                </Button.Triggers>
+                                            </Button>
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </BindableLayout.ItemTemplate>
+                        </VerticalStackLayout>
+                    </VerticalStackLayout>
+
+                    <!-- Sammelansicht: enthaltene Filme -->
+                    <VerticalStackLayout x:Name="CollectionSection"
+                                         Spacing="10"
+                                         IsVisible="False">
+                        <Label Text="Enthaltene Filme"
+                               Style="{StaticResource SectionTitle}" />
+                        <CollectionView x:Name="CollectionCollection"
+                                        SelectionMode="Single"
+                                        SelectionChanged="OnCollectionMovieSelected">
+                            <CollectionView.ItemsLayout>
+                                <GridItemsLayout Orientation="Vertical" Span="3" VerticalItemSpacing="14" HorizontalItemSpacing="14" />
+                            </CollectionView.ItemsLayout>
+                            <CollectionView.ItemTemplate>
+                                <DataTemplate x:DataType="mvu:CollectionMovieItem">
+                                    <VerticalStackLayout Spacing="7">
+                                        <Border Padding="0"
+                                                Stroke="{StaticResource VpBorder}"
+                                                StrokeThickness="1"
+                                                HeightRequest="200"
+                                                BackgroundColor="{StaticResource VpSurface}"
+                                                StrokeShape="RoundRectangle 12">
+                                            <Border.Shadow>
+                                                <Shadow Brush="{StaticResource VpShadowBrush}" Offset="0,4" Radius="10" Opacity="0.3" />
+                                            </Border.Shadow>
+                                            <controls:CachedPosterImage PictureId="{Binding PosterPictureId}"
+                                                                        Aspect="AspectFill" />
+                                        </Border>
+                                        <Label Text="{Binding Title}"
+                                               FontSize="13"
+                                               FontFamily="InterMedium"
+                                               TextColor="{StaticResource VpText}"
+                                               LineBreakMode="TailTruncation"
+                                               MaxLines="2" />
+                                    </VerticalStackLayout>
+                                </DataTemplate>
+                            </CollectionView.ItemTemplate>
+                        </CollectionView>
+                    </VerticalStackLayout>
+
+                </VerticalStackLayout>
+            </VerticalStackLayout>
+        </ScrollView>
+    </Grid>
+
+</ContentPage>

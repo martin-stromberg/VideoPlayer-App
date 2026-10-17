@@ -4,21 +4,45 @@ using System.Runtime.CompilerServices;
 
 namespace VideoWebPlayer.Maui.ViewModels;
 
+/// <summary>
+/// Typ eines Medien-Karussells; bestimmt, wie z. B. LongPress-Gesten verarbeitet werden.
+/// </summary>
 public enum CarouselKind
 {
+    /// <summary>
+    /// Karussell für die "Weiterschauen"-Liste.
+    /// </summary>
     ContinueWatching,
+    /// <summary>
+    /// Karussell für die Favoriten.
+    /// </summary>
     Favorites,
+    /// <summary>
+    /// Karussell für die zuletzt hinzugefügten Einträge.
+    /// </summary>
     RecentEntries,
+    /// <summary>
+    /// Karussell für die heruntergeladenen Videos.
+    /// </summary>
     Downloads,
+    /// <summary>
+    /// Sonstiges Karussell ohne spezielles Verhalten.
+    /// </summary>
     Other
 }
 
+/// <summary>
+/// ViewModel für ein horizontales Medien-Karussell auf der Startseite.
+/// </summary>
 public class MediaCarouselViewModel : INotifyPropertyChanged
 {
     private string? _title;
     private bool _isLoading;
     private readonly List<MediaItemViewModel> _updatedItems = new();
 
+    /// <summary>
+    /// Der Anzeigetitel des Karussells.
+    /// </summary>
     public string? Title
     {
         get => _title;
@@ -37,6 +61,9 @@ public class MediaCarouselViewModel : INotifyPropertyChanged
     /// </summary>
     public CarouselKind Kind { get; set; } = CarouselKind.Other;
 
+    /// <summary>
+    /// Gibt an, ob die Elemente des Karussells gerade geladen werden.
+    /// </summary>
     public bool IsLoading
     {
         get => _isLoading;
@@ -50,10 +77,19 @@ public class MediaCarouselViewModel : INotifyPropertyChanged
         }
     }
 
+    /// <summary>
+    /// Gibt an, ob das Karussell mindestens ein Element enthält.
+    /// </summary>
     public bool HasItems => Items.Count > 0;
 
+    /// <summary>
+    /// Die im Karussell angezeigten Elemente.
+    /// </summary>
     public ObservableCollection<MediaItemViewModel> Items { get; }
 
+    /// <summary>
+    /// Erstellt eine neue Instanz des <see cref="MediaCarouselViewModel"/>.
+    /// </summary>
     public MediaCarouselViewModel()
     {
         Items = new ObservableCollection<MediaItemViewModel>();
@@ -66,16 +102,28 @@ public class MediaCarouselViewModel : INotifyPropertyChanged
     /// </summary>
     public class MediaItemPressedEventArgs : EventArgs
     {
+        /// <summary>
+        /// Das Element, auf das der LongPress ausgeführt wurde.
+        /// </summary>
         public MediaItemViewModel Item { get; }
+
+        /// <summary>
+        /// Erstellt eine neue Instanz der <see cref="MediaItemPressedEventArgs"/>.
+        /// </summary>
+        /// <param name="item">Das betroffene Medien-Element.</param>
         public MediaItemPressedEventArgs(MediaItemViewModel item) => Item = item;
     }
 
+    /// <summary>
+    /// Wird ausgelöst, wenn ein LongPress auf ein Element des Karussells verarbeitet wurde.
+    /// </summary>
     public event EventHandler<MediaItemPressedEventArgs>? ItemPressed;
 
     /// <summary>
     /// Führt ein LongPress für das übergebene Element aus. Das ViewModel entscheidet,
     /// ob das Event verarbeitet werden soll; falls ja, wird ItemPressed ausgelöst.
     /// </summary>
+    /// <param name="item">Das Medien-Element, auf das der LongPress ausgeführt wurde.</param>
     public void ExecuteLongPress(MediaItemViewModel item)
     {
         if (item == null)
@@ -98,6 +146,8 @@ public class MediaCarouselViewModel : INotifyPropertyChanged
     /// Die Erkennung eines vorhandenen Elements erfolgt primär über EntryId und MediaType, als
     /// Fallback über Title bzw. Referenzvergleich.
     /// </summary>
+    /// <param name="item">Das einzufügende bzw. zu aktualisierende Medien-Element.</param>
+    /// <param name="position">Die gewünschte Einfügeposition; bei <c>null</c> wird Position 0 verwendet.</param>
     public void AddItem(MediaItemViewModel item, int? position = null)
     {
         if (item == null)
@@ -194,8 +244,13 @@ public class MediaCarouselViewModel : INotifyPropertyChanged
         }
     }
 
+    /// <inheritdoc/>
     public event PropertyChangedEventHandler? PropertyChanged;
 
+    /// <summary>
+    /// Löst das <see cref="PropertyChanged"/>-Ereignis aus.
+    /// </summary>
+    /// <param name="propertyName">Der Name der geänderten Eigenschaft (wird automatisch ermittelt).</param>
     protected virtual void OnPropertyChanged([CallerMemberName] string? propertyName = null)
     {
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));

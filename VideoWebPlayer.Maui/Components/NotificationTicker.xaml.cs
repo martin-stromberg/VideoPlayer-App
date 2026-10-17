@@ -6,6 +6,10 @@ using System.Threading;
 
 namespace VideoWebPlayer.Maui.Components;
 
+/// <summary>
+/// Laufband-Komponente (Ticker), die Benachrichtigungen über Downloads,
+/// neue Videos und Statusänderungen als durchlaufende Textmeldungen anzeigt.
+/// </summary>
 public partial class NotificationTicker : ContentView
 {
     private readonly ISubscribeNotificationEvent? _eventSubscriber;
@@ -19,24 +23,36 @@ public partial class NotificationTicker : ContentView
     private int _pendingMessages;
     private int _activeMessages;
 
+    /// <value>Bindable Property für <see cref="Message"/> — die anzuzeigende Benachrichtigungsmeldung.</value>
     public static readonly BindableProperty MessageProperty =
         BindableProperty.Create(nameof(Message), typeof(string), typeof(NotificationTicker), string.Empty);
 
+    /// <value>Bindable Property für <see cref="HasMessage"/> — ob eine Meldung angezeigt wird.</value>
     public static readonly BindableProperty HasMessageProperty =
         BindableProperty.Create(nameof(HasMessage), typeof(bool), typeof(NotificationTicker), false);
 
+    /// <summary>
+    /// Die aktuell anzuzeigende Benachrichtigungsmeldung.
+    /// </summary>
     public string Message
     {
         get => (string)GetValue(MessageProperty);
         set => SetValue(MessageProperty, value);
     }
 
+    /// <summary>
+    /// Gibt an, ob aktuell eine Meldung angezeigt wird bzw. in der Warteschlange ist.
+    /// </summary>
     public bool HasMessage
     {
         get => (bool)GetValue(HasMessageProperty);
         set => SetValue(HasMessageProperty, value);
     }
 
+    /// <summary>
+    /// Erstellt eine neue Instanz des <see cref="NotificationTicker"/> und
+    /// abonniert die relevanten Benachrichtigungs- und Download-Events.
+    /// </summary>
     public NotificationTicker()
     {
         InitializeComponent();
@@ -242,6 +258,7 @@ public partial class NotificationTicker : ContentView
         }
     }
 
+    /// <inheritdoc/>
     protected override void OnSizeAllocated(double width, double height)
     {
         base.OnSizeAllocated(width, height);

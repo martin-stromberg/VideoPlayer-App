@@ -1,7 +1,10 @@
 namespace VideoWebPlayer.Maui.Tests;
 
+/// <summary>Vertragstests für <c>MauiSettings</c> (Quelltext-/Verhaltensvertrag).</summary>
 public class MauiSettingsContractTests
 {
+    /// <summary>Prüft MauiAuthAndProfileConsumers: umgehen den SettingsService nicht.</summary>
+    /// <param name="relativePath">Der relative Pfad.</param>
     [Theory]
     [InlineData("VideoWebPlayer.Maui/Services/AuthService.cs")]
     [InlineData("VideoWebPlayer.Maui/Services/ConnectionService.cs")]
@@ -19,6 +22,7 @@ public class MauiSettingsContractTests
         Assert.DoesNotContain("SecureStorage.Default.SetAsync(", source, StringComparison.Ordinal);
     }
 
+    /// <summary>Prüft SettingsService: speichert sensible Werte im profilbewussten SecureStorage.</summary>
     [Fact]
     public void SettingsService_StoresSensitiveValuesInProfileAwareSecureStorage()
     {

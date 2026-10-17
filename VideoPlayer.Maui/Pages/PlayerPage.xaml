@@ -1,0 +1,145 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:mct="http://schemas.microsoft.com/dotnet/2022/maui/toolkit"
+             xmlns:mvu="clr-namespace:VideoPlayer.Mvu;assembly=VideoPlayer.Mvu"
+             x:Class="VideoPlayer.Maui.Pages.PlayerPage"
+             Title="Wiedergabe"
+             x:DataType="mvu:MvuHost">
+
+    <Grid x:Name="PlayerRoot" BackgroundColor="{StaticResource VpBgDeep}">
+
+        <!-- Videofläche -->
+        <mct:MediaElement x:Name="VideoElement"
+                          ShouldAutoPlay="True"
+                          ShouldShowPlaybackControls="True"
+                          ShouldKeepScreenOn="True"
+                          MediaOpened="OnMediaOpened"
+                          MediaEnded="OnMediaEnded"
+                          MediaFailed="OnMediaFailed"
+                          StateChanged="OnMediaStateChanged" />
+
+        <!-- Lade-/Puffer-Anzeige (Quellauflösung oder Zwischenpufferung) -->
+        <ActivityIndicator x:Name="LoadingIndicator"
+                           IsRunning="{Binding Model.Player.IsResolving}"
+                           IsVisible="{Binding Model.Player.IsResolving}"
+                           Color="{StaticResource VpPrimary}"
+                           HeightRequest="48"
+                           WidthRequest="48" />
+
+        <!-- Kopf-Overlay: Titel und „angesehen"-Hinweis.
+             VerticalOptions="Start" ist Pflicht: Ohne Angabe füllt das Layout
+             (Default Fill) das gesamte Grid und fängt als Hit-Test-Blocker
+             alle Eingaben auf dem MediaElement ab. Das Kopfband selbst ist
+             eingabedurchlässig — InputTransparent steht dafür am
+             Elternlayout, nicht nur am inneren Border: Unter iOS hit-testet
+             ein Layout auch bei eingabedurchlässigem Inhalt in den eigenen
+             Bounds weiter und fing dort die Eingaben der nativen
+             Transportleiste (Vollbild-/PiP-Buttons) ab. Unter iOS
+             verschiebt das Code-Behind das Band zusätzlich per Margin
+             unter die native Top-Leiste, damit Scrim und WatchedBadge
+             die eingeblendeten nativen Buttons auch visuell nicht
+             überdecken (der Margin hier bleibt der Windows-/Standard-
+             pfad). Achtung: Ein interaktives Element darf sich nicht in
+             diesem Band befinden — unter Windows deaktiviert
+             InputTransparent auf dem Elternelement den gesamten
+             Teilbaum, ein InputTransparent="False" am Kind reaktiviert
+             es nicht. -->
+        <VerticalStackLayout x:Name="OverlayChrome"
+                             VerticalOptions="Start"
+                             InputTransparent="True"
+                             Spacing="0">
+            <Border Padding="14"
+                    InputTransparent="True">
+                <!-- Scrim-Verlauf statt Vollfläche: dunkel oben,
+                     auslaufend nach unten. -->
+                <Border.Background>
+                    <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                        <GradientStop Color="{StaticResource VpScrimStart}" Offset="0.0" />
+                        <GradientStop Color="{StaticResource VpScrimEnd}" Offset="1.0" />
+                    </LinearGradientBrush>
+                </Border.Background>
+                <Grid ColumnDefinitions="*,Auto"
+                      ColumnSpacing="8">
+                    <VerticalStackLayout Grid.Column="0"
+                                       Spacing="2">
+                        <Label x:Name="TitleLabel"
+                               FontSize="16"
+                               FontFamily="InterSemiBold"
+                               TextColor="{StaticResource VpText}"
+                               VerticalOptions="Center"
+                               LineBreakMode="TailTruncation" />
+                        <Label x:Name="PlaylistContextLabel"
+                               FontSize="12"
+                               TextColor="{StaticResource VpSecondary}"
+                               VerticalOptions="Center"
+                               LineBreakMode="TailTruncation"
+                               IsVisible="False" />
+                    </VerticalStackLayout>
+                    <Label x:Name="WatchedBadge"
+                           Grid.Column="1"
+                           Text="Angesehen"
+                           FontSize="12"
+                           TextColor="{StaticResource VpSecondary}"
+                           VerticalOptions="Center"
+                           IsVisible="False" />
+                </Grid>
+            </Border>
+        </VerticalStackLayout>
+
+        <!-- Playlist-Navigation (nur bei Playlist-Wiedergabe sichtbar):
+             liegt wie der Mini-Player-Schalter als eigenes Element über
+             dem Video, damit sie nicht vom eingabedurchlässigen Kopfband
+             blockiert wird. Unter iOS versetzt das Code-Behind den
+             Top-Margin unter die native Top-Leiste — relativ zum
+             ebenfalls verschobenen Kopfband bleibt der Abstand gleich. -->
+        <HorizontalStackLayout x:Name="PlaylistNavigationBar"
+                               Spacing="10"
+                               Margin="0,64,16,0"
+                               HorizontalOptions="End"
+                               VerticalOptions="Start"
+                               IsVisible="False">
+            <Button x:Name="PreviousButton"
+                    AutomationId="PlayerPreviousButton"
+                    Text="Zurück"
+                    Style="{StaticResource SecondaryButton}"
+                    FontSize="12"
+                    HeightRequest="38"
+                    Clicked="OnPreviousClicked" />
+            <Button x:Name="NextButton"
+                    AutomationId="PlayerNextButton"
+                    Text="Weiter"
+                    Style="{StaticResource SecondaryButton}"
+                    FontSize="12"
+                    HeightRequest="38"
+                    Clicked="OnNextClicked" />
+        </HorizontalStackLayout>
+
+        <!-- Mini-Player-Schalter liegt als eigenes Element über dem Kopfband,
+             damit er nicht vom eingabedurchlässigen Border mit blockiert wird. -->
+        <Button x:Name="PipButton"
+                Text="Mini-Player"
+                Style="{StaticResource SecondaryButton}"
+                FontSize="12"
+                HeightRequest="38"
+                Margin="0,18,16,0"
+                HorizontalOptions="End"
+                VerticalOptions="Start"
+                IsVisible="False"
+                Clicked="OnPipClicked" />
+
+        <!-- Fehlerhinweis (Quelle nicht verfügbar / Wiedergabefehler) -->
+        <Border x:Name="ErrorPanel"
+                VerticalOptions="End"
+                Margin="16"
+                Padding="14,10"
+                StrokeShape="RoundRectangle 12"
+                BackgroundColor="{StaticResource VpOverlay}"
+                IsVisible="False">
+            <Label x:Name="ErrorLabel"
+                   Style="{StaticResource ErrorText}" />
+        </Border>
+
+    </Grid>
+
+</ContentPage>
