@@ -260,6 +260,22 @@ public class AppUpdateTests_Player
         Assert.Equal(duration, report.Duration);
     }
 
+    /// <summary>Prüft PlaybackProgress: kontextlose Wiedergabe meldet PlaylistId = null (Issue 59).</summary>
+    [Fact]
+    public void PlaybackProgress_WithoutPlaylist_ReportsNullPlaylistId()
+    {
+        var model = WithPlayer(PlayingState());
+
+        var transition = AppUpdate.Update(
+            model,
+            new PlaybackProgressMessage(
+                TimeSpan.FromMinutes(5), TimeSpan.FromMinutes(45), true, false));
+
+        var report = Assert.IsType<ReportPlaybackProgressEffect>(
+            Assert.Single(transition.Effects, e => e is ReportPlaybackProgressEffect));
+        Assert.Null(report.PlaylistId);
+    }
+
     /// <summary>Prüft PlaybackProgress: unveränderte Position → keine erneute Meldung.</summary>
     [Fact]
     public void PlaybackProgress_UnchangedPosition_NoReport()

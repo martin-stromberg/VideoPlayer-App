@@ -3814,7 +3814,8 @@ public static class AppUpdate
             // Altbestands: Schwellenwert 0,5 s gegen Doppelmeldungen).
             updated = updated with { LastReportedPositionSeconds = message.Position.TotalSeconds };
             effects.Add(new ReportPlaybackProgressEffect(
-                updated.MediaType!, updated.MediaId, message.Position, message.Duration));
+                updated.MediaType!, updated.MediaId, message.Position, message.Duration,
+                updated.ProgressReportPlaylistId));
         }
 
         if (message.Duration > TimeSpan.Zero)
@@ -3917,7 +3918,8 @@ public static class AppUpdate
         var effects = new List<AppEffect>
         {
             new ReportPlaybackProgressEffect(
-                updated.MediaType!, updated.MediaId, finalPosition, updated.Duration)
+                updated.MediaType!, updated.MediaId, finalPosition, updated.Duration,
+                updated.ProgressReportPlaylistId)
         };
 
         // Optionales Aufräumen: einen abgeschlossenen Download der
@@ -4080,7 +4082,8 @@ public static class AppUpdate
         if (player.Position > TimeSpan.Zero)
         {
             effects.Add(new ReportPlaybackProgressEffect(
-                player.MediaType!, player.MediaId, player.Position, player.Duration));
+                player.MediaType!, player.MediaId, player.Position, player.Duration,
+                player.ProgressReportPlaylistId));
         }
 
         return new AppTransition(model with { Player = PlayerState.Empty }, effects);

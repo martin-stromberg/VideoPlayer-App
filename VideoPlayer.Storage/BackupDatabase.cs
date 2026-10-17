@@ -43,6 +43,7 @@ public sealed class BackupDatabase
         await Connection.CreateTableAsync<BackupStateEntry>();
         await Connection.CreateTableAsync<PendingProgressSyncEntry>();
         await EnsureColumnAsync("pending_progress", "DurationTicks", "bigint NOT NULL DEFAULT 0");
+        await EnsureColumnAsync("pending_progress", "PlaylistId", "bigint");
     }
 
     /// <summary>

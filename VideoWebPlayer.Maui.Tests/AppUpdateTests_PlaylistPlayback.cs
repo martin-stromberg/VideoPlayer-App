@@ -634,4 +634,63 @@ public class AppUpdateTests_PlaylistPlayback
         Assert.Equal(32, resolve.MediaId);
         Assert.Null(resolve.StartPositionSeconds);
     }
+
+    // --- Playlist-Bezug in der Fortschrittsmeldung (Issue 59) ---
+
+    /// <summary>Prüft PlaybackProgress: der Takt-Effekt trägt die PlaylistId des Wiedergabekontexts.</summary>
+    [Fact]
+    public void PlaybackProgress_InPlaylist_ReportsPlaylistId()
+    {
+        var model = PlayingInPlaylist() with
+        {
+            // Auto-Fortsetzung abgeschaltet — der Meldungseffekt bleibt
+            // der einzige Effekt des Takts.
+            Settings = new AppSettings { AutoResumeEnabled = false }
+        };
+
+        var (_, effects) = AppUpdate.Update(
+            model,
+            new PlaybackProgressMessage(
+                Position: TimeSpan.FromSeconds(50),
+                Duration: TimeSpan.FromSeconds(100),
+                IsPlaying: true,
+                IsBuffering: false));
+
+        var report = Assert.IsType<ReportPlaybackProgressEffect>(Assert.Single(effects));
+        Assert.Equal(7, report.PlaylistId);
+        Assert.Equal(10, report.MediaId);
+    }
+
+    /// <summary>
+    /// Prüft PlaybackEnded: die Abschlussmeldung trägt die PlaylistId des
+    /// endenden Stands — sie läuft dem Advance-Effekt voraus
+    /// (Snapshot-Semantik: die Meldung gilt dem alten Eintrag).
+    /// </summary>
+    [Fact]
+    public void PlaybackEnded_InPlaylist_ReportsPlaylistId()
+    {
+        var model = PlayingInPlaylist();
+
+        var (_, effects) = AppUpdate.Update(model, new PlaybackEndedMessage());
+
+        var report = Assert.IsType<ReportPlaybackProgressEffect>(
+            Assert.Single(effects, e => e is ReportPlaybackProgressEffect));
+        Assert.Equal(7, report.PlaylistId);
+        Assert.Equal(10, report.MediaId);
+        Assert.Contains(effects, e => e is AdvancePlaylistEntryEffect);
+    }
+
+    /// <summary>Prüft PlayerClosed: die Abschlussmeldung beim Schließen trägt die PlaylistId.</summary>
+    [Fact]
+    public void PlayerClosed_InPlaylist_ReportsPlaylistId()
+    {
+        var model = PlayingInPlaylist();
+
+        var (next, effects) = AppUpdate.Update(model, new PlayerClosedMessage());
+
+        var report = Assert.IsType<ReportPlaybackProgressEffect>(
+            Assert.Single(effects, e => e is ReportPlaybackProgressEffect));
+        Assert.Equal(7, report.PlaylistId);
+        Assert.False(next.Player.IsActive);
+    }
 }

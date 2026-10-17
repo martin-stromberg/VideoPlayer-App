@@ -1,6 +1,7 @@
 #pragma warning disable xUnit1026 // Name-Parameter dient der Lesbarkeit der Testfälle
 #pragma warning disable xUnit1051 // Kurzlebige Unit-Tests: TestContext-CancellationToken nicht erforderlich
 using System.Net;
+using System.Text.Json;
 using VideoPlayer.ApiClient;
 using VideoPlayer.ApiClient.Models;
 using VideoWebPlayer.Maui.Tests.Stubs;
@@ -120,6 +121,41 @@ public class VideoPlayerApiClientTests_Endpoints
         Assert.Equal("Neuer Film", movie.Name);
         Assert.True(movie.IsFavorite);
         Assert.Equal("Handlung", movie.Plot);
+    }
+
+    /// <summary>Prüft ReportPlaybackProgressAsync: der Playlist-Kontext landet PascalCase im Request-Body.</summary>
+    [Fact]
+    public async Task ReportPlaybackProgress_SendsPlaylistId()
+    {
+        var handler = new StubHttpMessageHandler();
+        handler.Enqueue(HttpStatusCode.OK, "{}");
+        var client = ApiClientTestFactory.CreateClient(handler);
+
+        await client.ReportPlaybackProgressAsync("movie", 7, 120, 3600, playlistId: 7);
+
+        var request = Assert.Single(handler.Requests);
+        Assert.Equal("/api/continue-watching/progress", request.PathAndQuery);
+        using var body = JsonDocument.Parse(request.Body!);
+        Assert.Equal("movie", body.RootElement.GetProperty("MediaType").GetString());
+        Assert.Equal(7, body.RootElement.GetProperty("PlaylistId").GetInt64());
+    }
+
+    /// <summary>Prüft ReportPlaybackProgressAsync: ohne Playlist-Parameter bleibt der Kontext leer (Rückwärtsverhalten).</summary>
+    [Fact]
+    public async Task ReportPlaybackProgress_WithoutPlaylist_OmitsContext()
+    {
+        var handler = new StubHttpMessageHandler();
+        handler.Enqueue(HttpStatusCode.OK, "{}");
+        var client = ApiClientTestFactory.CreateClient(handler);
+
+        await client.ReportPlaybackProgressAsync("movie", 7, 120, 3600);
+
+        var request = Assert.Single(handler.Requests);
+        using var body = JsonDocument.Parse(request.Body!);
+        Assert.True(
+            !body.RootElement.TryGetProperty("PlaylistId", out var playlist)
+            || playlist.ValueKind == JsonValueKind.Null,
+            "kontextlose Meldung trägt keinen Playlist-Bezug");
     }
 
     /// <summary>Prüft GetContinueWatchingAsync: deserialisiert Einträge.</summary>

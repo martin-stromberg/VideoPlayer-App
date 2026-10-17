@@ -32,4 +32,11 @@ public sealed class PendingProgressSyncEntry
 
     /// <summary>Zeitpunkt der letzten Aktualisierung (UTC).</summary>
     public DateTime UpdatedAtUtc { get; set; }
+
+    /// <summary>
+    /// Playlist-Bezug der wartenden Meldung; <c>NULL</c> bei
+    /// kontextloser Wiedergabe. In bestehenden Datenbanken per
+    /// Migration nachgezogen (<see cref="BackupDatabase.InitializeAsync"/>).
+    /// </summary>
+    public long? PlaylistId { get; set; }
 }

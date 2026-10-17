@@ -120,6 +120,14 @@ public sealed class MockVideoServer : IDisposable
     public List<string> LoginRequestBodies { get; } = [];
 
     /// <summary>
+    /// Alle empfangenen Fortschritts-Bodies
+    /// (<c>POST /api/continue-watching/progress</c>) in Reihenfolge —
+    /// Grundlage des Nachweises, dass die Meldung den Playlist-Bezug
+    /// führt.
+    /// </summary>
+    public List<string> ProgressReportBodies { get; } = [];
+
+    /// <summary>
     /// Opt-in Wiedergabefluss: Id des angebotenen Films; <c>null</c> =
     /// Standard (leere Listen, unbekannte Item-/Stream-Routen liefern
     /// 404). Belegt liefert „Neu im Programm" den Movie-Eintrag
@@ -333,6 +341,42 @@ public sealed class MockVideoServer : IDisposable
         }
     }
 
+    /// <summary>
+    /// Wertet die aufgezeichneten Fortschritts-Bodies aus: die
+    /// <c>playlistId</c> jeder Meldung (case-insensitive Feldnamensuche,
+    /// der Client serialisiert PascalCase) bzw. <c>null</c>, wenn das
+    /// Feld fehlt oder keinen Zahlenwert trägt. Die Auswertung ist
+    /// bewusst ohne Fehlertoleranz: ein Body, der nicht als JSON-Objekt
+    /// lesbar ist, ist ein Protokollverstoß und schlägt als Ausnahme
+    /// (<see cref="JsonException"/>,
+    /// <see cref="InvalidOperationException"/>) durch — er darf nicht
+    /// still als „kein Playlist-Bezug" zählen, sonst bestünde der
+    /// Negativtest falsch-positiv.
+    /// </summary>
+    /// <returns>Die Playlist-Bezüge der eingegangenen Meldungen in Reihenfolge.</returns>
+    public List<long?> GetProgressReportPlaylistIds()
+    {
+        lock (ProgressReportBodies)
+        {
+            return ProgressReportBodies.Select(body =>
+            {
+                using var doc = JsonDocument.Parse(body);
+                foreach (var property in doc.RootElement.EnumerateObject())
+                {
+                    if (string.Equals(property.Name, "playlistId", StringComparison.OrdinalIgnoreCase))
+                    {
+                        return property.Value.ValueKind == JsonValueKind.Number
+                            && property.Value.TryGetInt64(out var value)
+                                ? (long?)value
+                                : null;
+                    }
+                }
+
+                return (long?)null;
+            }).ToList();
+        }
+    }
+
     /// <inheritdoc/>
     public void Dispose()
     {
@@ -457,7 +501,12 @@ public sealed class MockVideoServer : IDisposable
                 return (401, "text/plain", Encoding.UTF8.GetBytes("unauthorized"));
             }
 
-            // Fortschritts-Senke: die Meldung wird angenommen, sonst nichts.
+            // Fortschritts-Senke: die Meldung wird angenommen; der Body
+            // wird für den Nachweis der gemeldeten Felder aufgezeichnet.
+            lock (ProgressReportBodies)
+            {
+                ProgressReportBodies.Add(request.Body);
+            }
             return (204, "text/plain", Array.Empty<byte>());
         }
 

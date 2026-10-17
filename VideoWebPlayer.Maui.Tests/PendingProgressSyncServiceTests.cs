@@ -158,4 +158,78 @@ public class PendingProgressSyncServiceTests : IDisposable
         Assert.Equal(TimeSpan.FromMinutes(12).Ticks, entry.PositionTicks);
         Assert.Equal(TimeSpan.FromMinutes(90).Ticks, entry.DurationTicks);
     }
+
+    /// <summary>Prüft Enqueue: der Playlist-Kontext wird in der neuen Spalte gespeichert (Issue 59).</summary>
+    [Fact]
+    public async Task Enqueue_StoresPlaylistId()
+    {
+        var queue = await CreateInitializedAsync();
+
+        await queue.EnqueueAsync("movie", 42, TimeSpan.FromMinutes(12), TimeSpan.FromMinutes(90), playlistId: 7);
+
+        var entry = Assert.Single(await queue.GetPendingAsync());
+        Assert.Equal(7, entry.PlaylistId);
+    }
+
+    /// <summary>
+    /// Prüft Enqueue: bei einem Kontextwechsel desselben Mediums gewinnt
+    /// der zuletzt eingereihte Stand — die Deduplikation pro Medium
+    /// (<c>VideoType</c>/<c>VideoId</c>) bleibt unverändert.
+    /// </summary>
+    [Fact]
+    public async Task Enqueue_SameMedia_LatestContextWins()
+    {
+        var queue = await CreateInitializedAsync();
+
+        await queue.EnqueueAsync("movie", 42, TimeSpan.FromMinutes(1), TimeSpan.FromMinutes(90), playlistId: 7);
+        await queue.EnqueueAsync("movie", 42, TimeSpan.FromMinutes(2), TimeSpan.FromMinutes(90), playlistId: 9);
+        await queue.EnqueueAsync("movie", 42, TimeSpan.FromMinutes(3), TimeSpan.FromMinutes(90));
+
+        var entry = Assert.Single(await queue.GetPendingAsync());
+        Assert.Equal(TimeSpan.FromMinutes(3).Ticks, entry.PositionTicks);
+        Assert.Null(entry.PlaylistId);
+        Assert.Equal(1, await queue.CountAsync());
+    }
+
+    /// <summary>Prüft Pending: der Playlist-Bezug übersteht ein erneutes Öffnen der Datenbank.</summary>
+    [Fact]
+    public async Task Pending_PlaylistId_SurvivesDatabaseReopen()
+    {
+        var first = await CreateInitializedAsync();
+        await first.EnqueueAsync("movie", 42, TimeSpan.FromMinutes(12), TimeSpan.FromMinutes(90), playlistId: 7);
+        SQLite.SQLiteAsyncConnection.ResetPool();
+
+        var second = await CreateInitializedAsync();
+
+        var entry = Assert.Single(await second.GetPendingAsync());
+        Assert.Equal(7, entry.PlaylistId);
+    }
+
+    /// <summary>
+    /// Prüft die Migration: eine ohne die PlaylistId-Spalte angelegte
+    /// <c>pending_progress</c>-Tabelle (Altbestand) bekommt sie über
+    /// <c>InitializeAsync</c>/<c>EnsureColumnAsync</c> nachgezogen.
+    /// </summary>
+    [Fact]
+    public async Task PendingProgress_PlaylistColumn_MigratedOnExistingDatabase()
+    {
+        // Tabelle im Schema einer Altversion anlegen (ohne PlaylistId) —
+        // die Initialisierung muss die Spalte nachziehen statt zu scheitern.
+        var db = new BackupDatabase(layout);
+        await db.Connection.ExecuteAsync(
+            "CREATE TABLE IF NOT EXISTS pending_progress (" +
+            "Id integer primary key autoincrement, " +
+            "VideoId integer not null, " +
+            "VideoType varchar not null, " +
+            "PositionTicks bigint not null, " +
+            "DurationTicks bigint not null, " +
+            "UpdatedAtUtc datetime not null)");
+        await db.InitializeAsync();
+        var queue = new PendingProgressSyncService(db);
+
+        await queue.EnqueueAsync("movie", 42, TimeSpan.FromMinutes(1), TimeSpan.FromMinutes(90), playlistId: 7);
+
+        var entry = Assert.Single(await queue.GetPendingAsync());
+        Assert.Equal(7, entry.PlaylistId);
+    }
 }
