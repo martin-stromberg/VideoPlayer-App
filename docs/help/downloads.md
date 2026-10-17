@@ -33,9 +33,15 @@ auch offline, weil der Bestand lokal im Download-Manifest liegt.
 - Über der Liste steht die Kontingent-Belegung („x von y GB belegt");
   ein Offline-Banner kündigt an, dass wartende Downloads mit der
   Verbindung fortgesetzt werden.
+- Je Eintrag wird die Dateigröße angezeigt (bei laufenden Downloads
+  „x von y GB").
 - Aktionen je Eintrag: **Abbrechen** (wartend/läuft), **Erneut
   versuchen** (fehlgeschlagen/abgebrochen), **Löschen** (immer —
   entfernt Datei und Eintrag, laufende Transfers werden abgebrochen).
+- **„Alle löschen"** (Kopfbereich, mit Rückfrage) entfernt alle
+  Aufträge, Dateien und Restdaten.
+- **„Speicher bereinigen"** (unter der Belegungszeile, nur bei erkannten
+  Restdaten) entfernt nicht zugeordnete Dateien nach Rückfrage.
 
 ## Parallele Downloads, Abbruch und Wiederaufnahme
 

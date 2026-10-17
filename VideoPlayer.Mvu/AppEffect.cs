@@ -720,6 +720,23 @@ public sealed record CancelDownloadEffect(string MediaType, long MediaId) : AppE
 public sealed record DeleteDownloadEffect(string MediaType, long MediaId) : AppEffect;
 
 /// <summary>
+/// Alle Downloads vollständig entfernen: laufende Transfers abbrechen, alle
+/// Dateien löschen und das Manifest leeren; anschließend wird die Liste neu
+/// geladen (<c>DownloadsLoadedMessage</c>).
+/// </summary>
+/// <param name="Settings">Aktuelle App-Einstellungen (für das Neu-Laden der Liste).</param>
+/// <returns>Effekt-Datensatz für die Gesamtlöschung.</returns>
+public sealed record DeleteAllDownloadsEffect(AppSettings Settings) : AppEffect;
+
+/// <summary>
+/// Erkannte Restdaten ohne Manifest-Eintrag aus dem Video-Ablageort entfernen;
+/// anschließend wird die Liste neu geladen (<c>DownloadsLoadedMessage</c>).
+/// </summary>
+/// <param name="Settings">Aktuelle App-Einstellungen (für das Neu-Laden der Liste).</param>
+/// <returns>Effekt-Datensatz für die Restdaten-Bereinigung.</returns>
+public sealed record PurgeOrphanedDownloadsEffect(AppSettings Settings) : AppEffect;
+
+/// <summary>
 /// Unterbrochene Downloads wiederaufnehmen: wartende und verwaist
 /// laufende Aufträge sowie nicht-Quota-Fehlschläge werden erneut
 /// eingeplant (der Server-Stream unterstützt keine Range-Fortsetzung —

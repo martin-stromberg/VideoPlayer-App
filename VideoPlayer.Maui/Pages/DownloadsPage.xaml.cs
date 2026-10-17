@@ -78,7 +78,10 @@ public partial class DownloadsPage : ContentPage
         OfflineBanner.IsVisible = model.IsOffline;
         QuotaLabel.Text = model.Downloads.QuotaText;
         OrphanedLabel.Text = model.Downloads.OrphanedText;
-        OrphanedLabel.IsVisible = model.Downloads.OrphanedText is not null;
+        var showOrphans = model.Downloads.OrphanedText is not null;
+        OrphanedLabel.IsVisible = showOrphans;
+        PurgeOrphansButton.IsVisible = showOrphans;
+        DeleteAllButton.IsVisible = model.Downloads.HasItems || showOrphans;
         ErrorPanel.IsVisible = model.Downloads.HasError && !model.Downloads.IsLoading;
         ErrorLabel.Text = model.Downloads.Error;
         EmptyLabel.IsVisible = model.Downloads.ShowEmpty;
@@ -111,5 +114,39 @@ public partial class DownloadsPage : ContentPage
     private void OnRetryClicked(object? sender, EventArgs e)
     {
         _ = mvuHost.DispatchAsync(new DownloadsPageOpenedMessage());
+    }
+
+    /// <summary>
+    /// „Alle löschen" mit Rückfrage — Muster: PlaylistDetailsPage.ConfirmDeleteAsync.
+    /// </summary>
+    /// <param name="sender">Der auslösende Schalter.</param>
+    /// <param name="e">Die Ereignisdaten.</param>
+    private async void OnDeleteAllClicked(object? sender, EventArgs e)
+    {
+        var confirmed = await DisplayAlertAsync(
+            "Alle Downloads löschen?",
+            "Alle heruntergeladenen Videos und erkannten Restdaten werden dauerhaft entfernt.",
+            "Löschen",
+            "Abbrechen");
+        if (confirmed)
+        {
+            _ = mvuHost.DispatchAsync(new DownloadsDeleteAllRequestedMessage());
+        }
+    }
+
+    /// <summary>Bereinigung erkannter Restdaten ohne Manifest-Eintrag.</summary>
+    /// <param name="sender">Der auslösende Schalter.</param>
+    /// <param name="e">Die Ereignisdaten.</param>
+    private async void OnPurgeOrphansClicked(object? sender, EventArgs e)
+    {
+        var confirmed = await DisplayAlertAsync(
+            "Speicher bereinigen?",
+            $"Nicht zugeordnete Restdaten ({mvuHost.Model.Downloads.OrphanedText}) werden dauerhaft entfernt.",
+            "Bereinigen",
+            "Abbrechen");
+        if (confirmed)
+        {
+            _ = mvuHost.DispatchAsync(new DownloadsPurgeOrphansRequestedMessage());
+        }
     }
 }
