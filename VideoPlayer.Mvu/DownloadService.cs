@@ -574,6 +574,108 @@ public sealed class DownloadService
     }
 
     /// <summary>
+    /// Entfernt alle Downloads vollständig: bricht alle laufenden Transfers ab,
+    /// löscht alle bekannten Dateien und leert das Manifest. Danach ist die
+    /// Warteschlange leer — `PumpQueue` startet nichts Neues.
+    /// </summary>
+    /// <param name="cancellationToken">Bricht die Manifest-Operationen ab.</param>
+    /// <returns>Die Anzahl entfernter Manifest-Einträge.</returns>
+    public async Task<int> DeleteAllAsync(CancellationToken cancellationToken = default)
+    {
+        foreach (var cts in runningTransfers.Values)
+        {
+            cts.Cancel();
+        }
+
+        List<DownloadManifestEntry> entries;
+        try
+        {
+            entries = await cache.Connection.Table<DownloadManifestEntry>().ToListAsync();
+        }
+        catch (Exception ex) when (ex is SQLite.SQLiteException or InvalidOperationException)
+        {
+            logger.LogWarning(ex, "Download-Manifest nicht lesbar — Gesamtlöschung übersprungen.");
+            return 0;
+        }
+
+        foreach (var entry in entries)
+        {
+            TryDeleteFile(entry.FilePath);
+        }
+
+        await manifestGate.WaitAsync(cancellationToken);
+        try
+        {
+            await cache.Connection.DeleteAllAsync<DownloadManifestEntry>();
+        }
+        finally
+        {
+            manifestGate.Release();
+        }
+
+        foreach (var entry in entries)
+        {
+            RaiseItemRemoved(entry.VideoType, entry.VideoId);
+        }
+
+        logger.LogInformation("{Count} Downloads vollständig entfernt.", entries.Count);
+        return entries.Count;
+    }
+
+    /// <summary>
+    /// Entfernt erkannte Restdaten: Dateien im Video-Ablageort ohne
+    /// Manifest-Eintrag (Dateien verwalteter Downloads bleiben unberührt).
+    /// </summary>
+    /// <param name="cancellationToken">Bricht die Operation ab.</param>
+    /// <returns>Die freigegebenen Bytes.</returns>
+    public async Task<long> PurgeOrphansAsync(CancellationToken cancellationToken = default)
+    {
+        List<DownloadManifestEntry> entries;
+        string[] files;
+        try
+        {
+            entries = await cache.Connection.Table<DownloadManifestEntry>().ToListAsync();
+            files = Directory.Exists(layout.VideosDirectory)
+                ? Directory.GetFiles(layout.VideosDirectory)
+                : [];
+        }
+        catch (Exception ex) when (ex is SQLite.SQLiteException or InvalidOperationException or IOException or UnauthorizedAccessException)
+        {
+            logger.LogWarning(ex, "Bereinigung der Restdaten nicht möglich.");
+            return 0;
+        }
+
+        var manifestPaths = new HashSet<string>(
+            entries.Select(e => e.FilePath).Where(p => !string.IsNullOrWhiteSpace(p)),
+            StringComparer.OrdinalIgnoreCase);
+
+        var freed = 0L;
+        var count = 0;
+        foreach (var path in files)
+        {
+            if (manifestPaths.Contains(path))
+            {
+                continue;
+            }
+
+            try
+            {
+                freed += new FileInfo(path).Length;
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                continue;
+            }
+
+            TryDeleteFile(path);
+            count++;
+        }
+
+        logger.LogInformation("{Count} Restdateien ohne Manifest-Eintrag entfernt ({Bytes} Bytes).", count, freed);
+        return freed;
+    }
+
+    /// <summary>
     /// Gleicht den Video-Ablageort mit dem Download-Manifest ab:
     /// überholte Teildateien (Reste abgebrochener, fehlgeschlagener oder
     /// verwaist laufender Aufträge) werden entfernt; Dateien ohne
@@ -1067,6 +1169,7 @@ public sealed class DownloadService
             State = DownloadStateNames.FromPersisted(entry.State),
             DownloadedBytes = entry.DownloadedBytes,
             TotalBytes = entry.TotalBytes,
+            SizeBytes = entry.SizeBytes,
             Error = string.IsNullOrWhiteSpace(entry.Error) ? null : entry.Error
         };
     }

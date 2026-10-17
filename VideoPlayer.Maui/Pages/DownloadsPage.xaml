@@ -18,10 +18,32 @@
 
         <!-- Erkannte Restdaten ohne Manifest-Eintrag (nur sichtbar,
              wenn vorhanden) — sie zählen in der Belegung mit. -->
-        <Label x:Name="OrphanedLabel"
-               Grid.Row="0"
-               Style="{StaticResource Caption}"
-               IsVisible="False" />
+        <HorizontalStackLayout Grid.Row="0" Spacing="10">
+            <Label x:Name="OrphanedLabel"
+                   Style="{StaticResource Caption}"
+                   VerticalOptions="Center"
+                   IsVisible="False" />
+            <Button x:Name="PurgeOrphansButton"
+                    Text="Speicher bereinigen"
+                    Style="{StaticResource SecondaryButton}"
+                    FontSize="12"
+                    Padding="10,4"
+                    Clicked="OnPurgeOrphansClicked"
+                    IsVisible="False" />
+        </HorizontalStackLayout>
+
+        <!-- Gesamtaktion: alle Downloads löschen (mit Rückfrage) — nur
+             sichtbar, wenn Einträge oder Restdaten vorhanden sind. -->
+        <Button x:Name="DeleteAllButton"
+                Grid.Row="0"
+                HorizontalOptions="End"
+                Text="Alle löschen"
+                Style="{StaticResource GhostButton}"
+                TextColor="{StaticResource VpDanger}"
+                FontSize="12"
+                Padding="10,4"
+                Clicked="OnDeleteAllClicked"
+                IsVisible="False" />
 
         <!-- Hinweis im Offline-Zustand: die Liste liegt lokal vor;
              wartende Downloads starten mit der Verbindung. -->
@@ -100,6 +122,9 @@
                             <HorizontalStackLayout Spacing="10">
                                 <Label Text="{Binding MediaTypeText}"
                                        Style="{StaticResource Caption}" />
+                                <Label Text="{Binding SizeText}"
+                                       Style="{StaticResource Caption}"
+                                       IsVisible="{Binding HasSizeText}" />
                                 <Label Text="{Binding ProgressPercentText}"
                                        Style="{StaticResource Caption}"
                                        IsVisible="{Binding ShowProgress}" />

@@ -268,6 +268,41 @@ public class DownloadServiceReconcileTests : IDisposable
         Assert.Equal(0, result.CorrectedCompletedCount);
     }
 
+    /// <summary>Prüft Gesamtlöschung: alle Dateien und Manifest-Einträge werden entfernt.</summary>
+    [Fact]
+    public async Task DeleteAll_RemovesFilesAndManifest()
+    {
+        var path1 = WriteFile("movie_42.mp4", 100);
+        var path2 = WriteFile("movie_43.mp4", 200);
+        await InsertEntryAsync("completed", path1, 42);
+        await InsertEntryAsync("queued", path2, 43);
+        var service = CreateService();
+
+        var removed = await service.DeleteAllAsync();
+
+        Assert.Equal(2, removed);
+        Assert.False(File.Exists(path1));
+        Assert.False(File.Exists(path2));
+        Assert.Empty(await cache.Connection.Table<DownloadManifestEntry>().ToListAsync());
+    }
+
+    /// <summary>Prüft Restdaten-Bereinigung: nur Dateien ohne Manifest-Bezug werden entfernt.</summary>
+    [Fact]
+    public async Task PurgeOrphans_RemovesOnlyOrphaned()
+    {
+        var managed = WriteFile("movie_42.mp4", 100);
+        var orphan = WriteFile("movie_999.mp4", 700);
+        await InsertEntryAsync("completed", managed, 42);
+        var service = CreateService();
+
+        var freed = await service.PurgeOrphansAsync();
+
+        Assert.Equal(700, freed);
+        Assert.False(File.Exists(orphan));
+        Assert.True(File.Exists(managed));
+        Assert.Equal("completed", (await ReadEntryAsync())!.State);
+    }
+
     private sealed class FakeNetworkMonitor : INetworkStatusMonitor
     {
         public bool IsOnline { get; set; } = true;

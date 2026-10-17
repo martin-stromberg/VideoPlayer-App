@@ -1132,6 +1132,12 @@ public sealed record DownloadRetryRequestedMessage(DownloadListItem Item) : AppM
 /// <returns>Nachricht für die Lösch-Anforderung.</returns>
 public sealed record DownloadDeleteRequestedMessage(DownloadListItem Item) : AppMessage;
 
+/// <summary>Der Anwender fordert das Löschen aller Downloads an (nach Rückfrage im UI).</summary>
+public sealed record DownloadsDeleteAllRequestedMessage : AppMessage;
+
+/// <summary>Der Anwender fordert die Bereinigung erkannter Restdaten ohne Manifest-Eintrag an.</summary>
+public sealed record DownloadsPurgeOrphansRequestedMessage : AppMessage;
+
 /// <summary>
 /// Der Anwender fordert den Protokollversand an („Protokoll senden" auf der
 /// Einstellungsseite) — nur wirksam bei aktivierter Protokollierung.

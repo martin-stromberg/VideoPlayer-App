@@ -29,6 +29,9 @@ public sealed record DownloadListItem
     /// <summary>Erwartete Gesamtgröße in Bytes; 0 = unbekannt.</summary>
     public long TotalBytes { get; init; }
 
+    /// <summary>Größe der fertigen Datei in Bytes (nur abgeschlossene Downloads).</summary>
+    public long SizeBytes { get; init; }
+
     /// <summary>Maschinenlesbarer Fehlercode des letzten Fehlschlags; <c>null</c> = kein Fehler.</summary>
     public string? Error { get; init; }
 
@@ -90,6 +93,30 @@ public sealed record DownloadListItem
                 "Der Server hat den Download abgelehnt.",
             _ => "Der Download ist fehlgeschlagen."
         };
+
+    /// <summary>
+    /// Größenanzeige des Eintrags: bei abgeschlossenen Downloads die Dateigröße,
+    /// bei laufenden „x von y", sonst <c>null</c> (kein Label).
+    /// </summary>
+    public string? SizeText =>
+        State switch
+        {
+            DownloadState.Completed when SizeBytes > 0 => FormatBytes(SizeBytes),
+            DownloadState.Downloading when TotalBytes > 0 =>
+                $"{FormatBytes(DownloadedBytes)} von {FormatBytes(TotalBytes)}",
+            _ => null
+        };
+
+    /// <summary>Eine Größenangabe wird angezeigt.</summary>
+    public bool HasSizeText => SizeText is not null;
+
+    /// <summary>Formatiert Bytes als lesbare Angabe (GB ab 0,1 GB, sonst MB).</summary>
+    /// <param name="bytes">Die Bytezahl.</param>
+    /// <returns>Formatierte Größenangabe.</returns>
+    public static string FormatBytes(long bytes) =>
+        bytes >= 104_857_600L
+            ? $"{bytes / 1_073_741_824d:0.0} GB"
+            : $"{bytes / 1_048_576d:0} MB";
 
     /// <summary>Übersetzte Medientyp-Bezeichnung (Anzeige neben dem Zustand).</summary>
     public string MediaTypeText =>

@@ -100,6 +100,52 @@ public class AppUpdateTests_Downloads
         Assert.NotNull(transition.Model.Downloads.OrphanedText);
     }
 
+    /// <summary>Prüft DeleteAll: mit Einträgen wird der Gesamtlösch-Effekt erzeugt.</summary>
+    [Fact]
+    public void DownloadsDeleteAll_WithItems_EmitsEffect()
+    {
+        var transition = AppUpdate.Update(
+            ConnectedModel() with
+            {
+                Downloads = DownloadsPageState.Initial with { Items = [Item(1)] }
+            },
+            new DownloadsDeleteAllRequestedMessage());
+
+        Assert.IsType<DeleteAllDownloadsEffect>(Assert.Single(transition.Effects));
+    }
+
+    /// <summary>Prüft DeleteAll: ohne Einträge und ohne Restdaten passiert nichts.</summary>
+    [Fact]
+    public void DownloadsDeleteAll_Empty_NoEffect()
+    {
+        var transition = AppUpdate.Update(ConnectedModel(), new DownloadsDeleteAllRequestedMessage());
+
+        Assert.Empty(transition.Effects);
+    }
+
+    /// <summary>Prüft Purge-Request: mit Restdaten wird der Bereinigungs-Effekt erzeugt.</summary>
+    [Fact]
+    public void DownloadsPurgeOrphans_WithOrphans_EmitsEffect()
+    {
+        var transition = AppUpdate.Update(
+            ConnectedModel() with
+            {
+                Downloads = DownloadsPageState.Initial with { OrphanedBytes = 1024 }
+            },
+            new DownloadsPurgeOrphansRequestedMessage());
+
+        Assert.IsType<PurgeOrphanedDownloadsEffect>(Assert.Single(transition.Effects));
+    }
+
+    /// <summary>Prüft Purge-Request: ohne Restdaten passiert nichts.</summary>
+    [Fact]
+    public void DownloadsPurgeOrphans_None_NoEffect()
+    {
+        var transition = AppUpdate.Update(ConnectedModel(), new DownloadsPurgeOrphansRequestedMessage());
+
+        Assert.Empty(transition.Effects);
+    }
+
     /// <summary>Prüft Requested: verbunden → Einreihe-Effekt.</summary>
     [Fact]
     public void DownloadRequested_Connected_EnqueuesDownload()
