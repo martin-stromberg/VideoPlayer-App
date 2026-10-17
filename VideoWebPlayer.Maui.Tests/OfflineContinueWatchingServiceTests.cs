@@ -21,6 +21,7 @@ public class OfflineContinueWatchingServiceTests : IDisposable
     private readonly string root;
     private readonly CacheDatabase cache;
     private readonly BackupDatabase backup;
+    private readonly AppStorageLayout layout;
     private readonly HashSet<string> existingFiles = new(StringComparer.OrdinalIgnoreCase);
     private readonly OfflineContinueWatchingService service;
 
@@ -28,7 +29,7 @@ public class OfflineContinueWatchingServiceTests : IDisposable
     public OfflineContinueWatchingServiceTests()
     {
         root = Path.Combine(Path.GetTempPath(), "videoplayer-offlinecw-tests", Guid.NewGuid().ToString("N"));
-        var layout = new AppStorageLayout(
+        layout = new AppStorageLayout(
             backupRoot: Path.Combine(root, "backup"),
             noBackupRoot: Path.Combine(root, "nobackup"),
             cacheRoot: Path.Combine(root, "cache"),
@@ -39,7 +40,7 @@ public class OfflineContinueWatchingServiceTests : IDisposable
         backup = new BackupDatabase(layout);
         backup.InitializeAsync().Wait();
         service = new OfflineContinueWatchingService(
-            cache, backup, new HomeListService(cache), existingFiles.Contains);
+            cache, backup, new HomeListService(cache), layout, existingFiles.Contains);
     }
 
     /// <inheritdoc/>
@@ -93,8 +94,8 @@ public class OfflineContinueWatchingServiceTests : IDisposable
     [Fact]
     public async Task ContinueWatching_CompletedMovieWithFile_Appears()
     {
-        existingFiles.Add("/downloads/movie-7.mp4");
-        await AddManifestEntryAsync(7, "movie", "completed", "/downloads/movie-7.mp4", title: "Film Sieben");
+        existingFiles.Add(Path.Combine(layout.VideosDirectory, "movie-7.mp4"));
+        await AddManifestEntryAsync(7, "movie", "completed", Path.Combine(layout.VideosDirectory, "movie-7.mp4"), title: "Film Sieben");
 
         var lists = await service.LoadHomeListsAsync();
 
@@ -110,12 +111,12 @@ public class OfflineContinueWatchingServiceTests : IDisposable
     [Fact]
     public async Task ContinueWatching_IncompleteOrMissingFiles_AreFiltered()
     {
-        existingFiles.Add("/downloads/movie-7.mp4");
-        await AddManifestEntryAsync(7, "movie", "completed", "/downloads/movie-7.mp4", title: "Ok");
-        await AddManifestEntryAsync(8, "movie", "downloading", "/downloads/movie-8.mp4", title: "Läuft");
-        await AddManifestEntryAsync(9, "movie", "queued", "/downloads/movie-9.mp4", title: "Wartet");
-        await AddManifestEntryAsync(10, "movie", "failed", "/downloads/movie-10.mp4", title: "Fehler");
-        await AddManifestEntryAsync(11, "movie", "completed", "/downloads/weg.mp4", title: "Datei weg");
+        existingFiles.Add(Path.Combine(layout.VideosDirectory, "movie-7.mp4"));
+        await AddManifestEntryAsync(7, "movie", "completed", Path.Combine(layout.VideosDirectory, "movie-7.mp4"), title: "Ok");
+        await AddManifestEntryAsync(8, "movie", "downloading", Path.Combine(layout.VideosDirectory, "movie-8.mp4"), title: "Läuft");
+        await AddManifestEntryAsync(9, "movie", "queued", Path.Combine(layout.VideosDirectory, "movie-9.mp4"), title: "Wartet");
+        await AddManifestEntryAsync(10, "movie", "failed", Path.Combine(layout.VideosDirectory, "movie-10.mp4"), title: "Fehler");
+        await AddManifestEntryAsync(11, "movie", "completed", Path.Combine(layout.VideosDirectory, "weg.mp4"), title: "Datei weg");
 
         var lists = await service.LoadHomeListsAsync();
 
@@ -127,9 +128,9 @@ public class OfflineContinueWatchingServiceTests : IDisposable
     [Fact]
     public async Task ContinueWatching_EpisodeWithMissingNext_ShowsPlaceholder()
     {
-        existingFiles.Add("/downloads/ep-31.mp4");
+        existingFiles.Add(Path.Combine(layout.VideosDirectory, "ep-31.mp4"));
         await AddManifestEntryAsync(
-            31, "tvshowepisode", "completed", "/downloads/ep-31.mp4",
+            31, "tvshowepisode", "completed", Path.Combine(layout.VideosDirectory, "ep-31.mp4"),
             showId: 11, showTitle: "Serie", seasonNumber: 1, episodeNumber: 1,
             title: "Serie – Pilot");
         await WriteShowAsync(new CachedShowEntry
@@ -171,13 +172,13 @@ public class OfflineContinueWatchingServiceTests : IDisposable
     [Fact]
     public async Task ContinueWatching_NextEpisodeDownloaded_NoPlaceholder()
     {
-        existingFiles.Add("/downloads/ep-31.mp4");
-        existingFiles.Add("/downloads/ep-32.mp4");
+        existingFiles.Add(Path.Combine(layout.VideosDirectory, "ep-31.mp4"));
+        existingFiles.Add(Path.Combine(layout.VideosDirectory, "ep-32.mp4"));
         await AddManifestEntryAsync(
-            31, "tvshowepisode", "completed", "/downloads/ep-31.mp4",
+            31, "tvshowepisode", "completed", Path.Combine(layout.VideosDirectory, "ep-31.mp4"),
             showId: 11, showTitle: "Serie", seasonNumber: 1, episodeNumber: 1);
         await AddManifestEntryAsync(
-            32, "tvshowepisode", "completed", "/downloads/ep-32.mp4",
+            32, "tvshowepisode", "completed", Path.Combine(layout.VideosDirectory, "ep-32.mp4"),
             showId: 11, showTitle: "Serie", seasonNumber: 1, episodeNumber: 2);
         await WriteShowAsync(new CachedShowEntry
         {
@@ -208,8 +209,8 @@ public class OfflineContinueWatchingServiceTests : IDisposable
     [Fact]
     public async Task ContinueWatching_Progress_FromPendingOutbox()
     {
-        existingFiles.Add("/downloads/movie-7.mp4");
-        await AddManifestEntryAsync(7, "movie", "completed", "/downloads/movie-7.mp4");
+        existingFiles.Add(Path.Combine(layout.VideosDirectory, "movie-7.mp4"));
+        await AddManifestEntryAsync(7, "movie", "completed", Path.Combine(layout.VideosDirectory, "movie-7.mp4"));
         await backup.Connection.InsertAsync(new PendingProgressSyncEntry
         {
             VideoId = 7,
@@ -229,8 +230,8 @@ public class OfflineContinueWatchingServiceTests : IDisposable
     [Fact]
     public async Task ContinueWatching_Progress_FallsBackToCachedServerState()
     {
-        existingFiles.Add("/downloads/movie-7.mp4");
-        await AddManifestEntryAsync(7, "movie", "completed", "/downloads/movie-7.mp4");
+        existingFiles.Add(Path.Combine(layout.VideosDirectory, "movie-7.mp4"));
+        await AddManifestEntryAsync(7, "movie", "completed", Path.Combine(layout.VideosDirectory, "movie-7.mp4"));
         await cache.Connection.InsertOrReplaceAsync(new CachedListEntry
         {
             Key = ServerSyncService.ContinueWatchingCacheKey,

@@ -58,7 +58,7 @@ public class PlaybackSourceServiceTests : IDisposable
     }
 
     private PlaybackSourceService CreateService(Func<string, bool>? fileExists = null) =>
-        new(authSession, secrets, cache, fileExists ?? (_ => false));
+        new(authSession, secrets, cache, layout, fileExists ?? (_ => false));
 
     private async Task LoginAsync()
     {
@@ -168,14 +168,15 @@ public class PlaybackSourceServiceTests : IDisposable
             PositionSeconds = 300,
             Entry = new Movie { Id = 42, Name = "Film" }
         });
-        await SeedDownloadAsync(42, "movie", "completed", @"C:\downloads\film.mp4");
+        var localPath = Path.Combine(layout.VideosDirectory, "film.mp4");
+        await SeedDownloadAsync(42, "movie", "completed", localPath);
 
-        var source = await CreateService(fileExists: path => path == @"C:\downloads\film.mp4")
+        var source = await CreateService(fileExists: path => path == localPath)
             .ResolveAsync("movie", 42, TestContext.Current.CancellationToken);
 
         Assert.NotNull(source);
         Assert.Equal(PlaybackSourceKind.LocalFile, source.Kind);
-        Assert.Equal(@"C:\downloads\film.mp4", source.Location);
+        Assert.Equal(localPath, source.Location);
         Assert.Equal(TimeSpan.FromSeconds(300), source.ResumePosition);
     }
 
@@ -285,7 +286,7 @@ public class PlaybackSourceServiceTests : IDisposable
         await LoginAsync();
         handler.EnqueueJson(HttpStatusCode.OK, Array.Empty<ContinueWatchingEntry>());
         var service = new PlaybackSourceService(
-            authSession, secrets, cache, _ => false, logging.CreateLogger<PlaybackSourceService>());
+            authSession, secrets, cache, layout, _ => false, logging.CreateLogger<PlaybackSourceService>());
 
         var source = await service.ResolveAsync("movie", 42, TestContext.Current.CancellationToken);
 

@@ -1,5 +1,11 @@
 # Änderungsprotokoll
 
+## 2026-10-17 — Download-Manifest heilt veraltete Dateipfade nach Container-Umzug
+
+- **Ursache:** `DownloadManifestEntry.FilePath` speichert absolute Pfade; iOS verschiebt den Datencontainer bei App-Updates, womit alle Pfade veralten — abgeschlossene Downloads wurden als `missing_file` korrigiert und neu geladen, vorhandene Dateien als „nicht zugeordnet" ausgewiesen.
+- **Fix:** Neue Auflösung `DownloadManifestPaths.Resolve` bildet den Manifest-Pfad über den Dateinamen auf das aktuelle `VideosDirectory` ab; `ReconcileAsync` heilt veraltete `FilePath`-Werte persistent, `PurgeOrphansAsync` gleicht per Dateiname ab, `EnqueueAsync`-Dedup, `DeleteAsync`, `DeleteAllAsync`, `CompleteExternalTransferAsync` und der Transfer-Schreibpfad nutzen den aufgelösten Pfad. `PlaybackSourceService`, `MediaDetailsService` und `OfflineContinueWatchingService` erhalten `AppStorageLayout` injiziert und lösen ebenfalls auf.
+- **Tests:** 3 neue Regressionstests in `DownloadServiceReconcileTests` (Heilung, Dedup, Purge) plus angepasste Reader-Fixtures; Gesamt: 1334 Unit-Tests grün.
+
 ## 2026-10-17 — Auto-Download lädt die aktuelle Weiterschauen-Episode mit und zählt sie ins Episoden-Budget (Issue #56)
 
 - **Aktuelle Episode ist erste Vorlauf-Kandidatin:** Der `AutoDownloadService` (`VideoPlayer.Mvu/AutoDownloadService.cs`) plant für Episoden-Einträge der Weiterschauen-Liste nicht mehr nur die Folge-Episoden ein, sondern beginnt die Kandidatenmenge bei der aktuellen Episode — auf dem Serien-Pfad (`EnqueueEpisodesFromCurrentAsync`, vormals `EnqueueNextEpisodesAsync`, Kandidaten ab `index` statt `index + 1`, mit Titel- und `DownloadSeriesContext`-Aufbau auch am Selbst-Eintrag) ebenso wie auf dem Playlist-Pfad (`EnqueuePlaylistEntriesFromCurrentAsync`, vormals `EnqueueNextPlaylistEntriesAsync`, der gefundene aktuelle Eintrag durchläuft die reguläre Ladbarkeits-/Einreih-Behandlung als erster Kandidat). `AppSettings.PreloadEpisodeCount` begrenzt damit die Gesamtzahl der Kandidaten je Weiterschauen-Eintrag **einschließlich** der aktuellen Episode — bei unverändertem Wert wird eine Folge-Episode weniger, dafür die aktuelle Episode vorgeladen; ein nicht ladbarer aktueller Playlist-Eintrag wird wie ein Folge-Eintrag ohne Budget-Verbrauch übersprungen.

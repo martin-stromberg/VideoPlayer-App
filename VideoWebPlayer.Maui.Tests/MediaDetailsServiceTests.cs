@@ -24,12 +24,13 @@ public class MediaDetailsServiceTests : IDisposable
     private readonly StubHttpMessageHandler handler = new();
     private readonly AuthSessionService authSession;
     private readonly CacheDatabase cache;
+    private readonly AppStorageLayout layout;
 
     /// <summary>Initialisiert eine neue Instanz der Testklasse <c>MediaDetailsServiceTests</c>.</summary>
     public MediaDetailsServiceTests()
     {
         root = Path.Combine(Path.GetTempPath(), "videoplayer-mediadetails-tests", Guid.NewGuid().ToString("N"));
-        var layout = new AppStorageLayout(
+        layout = new AppStorageLayout(
             backupRoot: Path.Combine(root, "backup"),
             noBackupRoot: Path.Combine(root, "nobackup"),
             cacheRoot: Path.Combine(root, "cache"),
@@ -56,7 +57,7 @@ public class MediaDetailsServiceTests : IDisposable
         }
     }
 
-    private MediaDetailsService CreateService() => new(authSession, cache);
+    private MediaDetailsService CreateService() => new(authSession, cache, layout);
 
     private async Task LoginAsync()
     {
