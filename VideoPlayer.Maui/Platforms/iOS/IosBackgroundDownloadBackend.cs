@@ -174,10 +174,10 @@ public sealed class IosBackgroundDownloadBackend : NSObject, IDownloadBackend, I
         {
             transfer.Cancellation.Dispose();
             TryDelete(transfer.TargetPath);
-            var code = error.Code == (nint)NSUrlError.Cancelled
-                ? DownloadService.ErrorNetwork
-                : DownloadService.ErrorNetwork;
-            transfer.Tcs.TrySetResult(new DownloadBackendResult(0, 0, code));
+            // Abbrüche über CancelAsync sind bereits aus `pending` entfernt —
+            // hier landen nur echte Transfer-Fehler.
+            transfer.Tcs.TrySetResult(
+                new DownloadBackendResult(0, 0, DownloadService.ErrorNetwork));
         }
         else if (CompletionSink is { } sink)
         {
