@@ -18,7 +18,7 @@ Planung, Prüfungen, Lifecycle-Durchläufe) werden daher vom Hauptagenten selbst
 | [x] | 5 | Grobe Projektplanung | `project-plan.md` |
 | [x] | 5a | Offene Punkte prüfen und ggf. Planung wiederholen | `project-plan.md` (aktualisiert) |
 | [x] | 5b | Projektplan gegen Anforderung prüfen | `project-plan-check.md` |
-| [ ] | 5c | Planungscommit | – |
+| [x] | 5c | Planungscommit | – |
 | [x] | 6 | Entwicklungsschritte-Tracking anlegen | `steps.md` |
 | [ ] | 7 | Entwicklungsschritte abarbeiten (Schleife über lifecycle) | Codeänderungen je Schritt |
 | [ ] | – | Projekt-Verzeichnis aufräumen | – |
