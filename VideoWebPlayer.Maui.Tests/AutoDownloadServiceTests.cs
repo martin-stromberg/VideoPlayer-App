@@ -172,7 +172,7 @@ public class AutoDownloadServiceTests : IDisposable
         Assert.Contains("access_token=jwt", request.PathAndQuery);
     }
 
-    /// <summary>Prüft Auto-Downloads: Episode löst die Serie auf und reiht die nächsten <c>PreloadEpisodeCount</c> Folge-Episoden ein.</summary>
+    /// <summary>Prüft Auto-Downloads: Episode löst die Serie auf und reiht die aktuelle Episode und die folgenden Episoden bis zu <c>PreloadEpisodeCount</c> ein.</summary>
     [Fact]
     public async Task Run_EpisodeCandidate_EnqueuesUpcomingEpisodes()
     {
@@ -195,16 +195,16 @@ public class AutoDownloadServiceTests : IDisposable
         await service.RunAsync(settings);
 
         var entries = await EntriesAsync();
-        Assert.Equal(2, entries.Count); // PreloadEpisodeCount = 2 → die zwei Folge-Episoden
-        Assert.Equal(33, entries[0].VideoId);
-        Assert.Equal(34, entries[1].VideoId);
+        Assert.Equal(2, entries.Count); // PreloadEpisodeCount = 2 → aktuelle + eine Folge-Episode
+        Assert.Equal(32, entries[0].VideoId);
+        Assert.Equal(33, entries[1].VideoId);
         Assert.All(entries, e => Assert.Equal("tvshowepisode", e.VideoType));
         Assert.All(entries, e => Assert.StartsWith("Probe ", e.Title));
         // Serien-Detail-Request plus die gestarteten Stream-Requests.
         Assert.Contains(handler.Requests, r => r.PathAndQuery.Contains("api/items/tvshow/11"));
     }
 
-    /// <summary>Prüft Auto-Downloads: nach der letzten Episode einer Staffel geht es staffelübergreifend weiter.</summary>
+    /// <summary>Prüft Auto-Downloads: nach der letzten Episode einer Staffel geht es staffelübergreifend weiter (aktuelle Episode zuerst).</summary>
     [Fact]
     public async Task Run_EpisodeCandidate_CrossesIntoNextSeason()
     {
@@ -224,16 +224,22 @@ public class AutoDownloadServiceTests : IDisposable
         handler.EnqueueJson(HttpStatusCode.OK,
             ShowWithEpisodes(11, "Probe", (1, 5, 35, "S1E5"), (1, 6, 36, "S1E6"), (2, 1, 37, "S2E1"), (2, 2, 38, "S2E2")));
 
-        var oneEpisode = settings with { PreloadEpisodeCount = 1 };
-        await service.RunAsync(oneEpisode);
+        await service.RunAsync(settings);
 
-        // Kein Kandidat mehr in Staffel 1 → der flache Nachfolger S2E1.
-        var entry = Assert.Single(await EntriesAsync());
-        Assert.Equal(37, entry.VideoId);
-        Assert.Equal(11, entry.ShowId);
-        Assert.Equal("Probe", entry.ShowTitle);
-        Assert.Equal(2, entry.SeasonNumber);
-        Assert.Equal(1, entry.EpisodeNumber);
+        // Aktuelle Episode zuerst, danach der flache Nachfolger aus
+        // Staffel 2 (kein Kandidat mehr in Staffel 1).
+        var entries = await EntriesAsync();
+        Assert.Equal(2, entries.Count);
+        Assert.Equal(36, entries[0].VideoId);
+        Assert.Equal(11, entries[0].ShowId);
+        Assert.Equal("Probe", entries[0].ShowTitle);
+        Assert.Equal(1, entries[0].SeasonNumber);
+        Assert.Equal(6, entries[0].EpisodeNumber);
+        Assert.Equal(37, entries[1].VideoId);
+        Assert.Equal(11, entries[1].ShowId);
+        Assert.Equal("Probe", entries[1].ShowTitle);
+        Assert.Equal(2, entries[1].SeasonNumber);
+        Assert.Equal(1, entries[1].EpisodeNumber);
     }
 
     /// <summary>Prüft Auto-Downloads: deaktiviert → kein Auftrag, kein Request.</summary>
@@ -340,9 +346,9 @@ public class AutoDownloadServiceTests : IDisposable
         Assert.Equal(tvShowRequests + 1, handler.Requests.Count(r => r.PathAndQuery.Contains("api/items/tvshow/")));
     }
 
-    /// <summary>Prüft Auto-Downloads: Episoden ohne Staffelbezug werden übersprungen.</summary>
+    /// <summary>Prüft Auto-Downloads: eine Episode ohne Staffelbezug reiht sich selbst ein (Orphan-Fallback) — die Folge-Auflösung entfällt.</summary>
     [Fact]
-    public async Task Run_EpisodeWithoutSeason_SkipsCandidate()
+    public async Task Run_EpisodeWithoutSeason_EnqueuesSelf()
     {
         await LoginAsync();
         await CacheContinueWatchingAsync(
@@ -352,11 +358,22 @@ public class AutoDownloadServiceTests : IDisposable
                 PositionSeconds = 60,
                 Entry = new TvShowEpisode { Id = 32, Name = "Pilot" }
             });
+        handler.Enqueue(_ => new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new ByteArrayContent([1, 2, 3])
+        });
 
         await service.RunAsync(settings);
+        // Der Transfer läuft asynchron — auf den Endzustand warten.
+        await WaitForAsync(async () =>
+            (await EntriesAsync()).SingleOrDefault()?.State == "completed");
 
-        Assert.Empty(await EntriesAsync());
-        Assert.Empty(handler.Requests);
+        var entry = Assert.Single(await EntriesAsync());
+        Assert.Equal(32, entry.VideoId);
+        Assert.Equal("tvshowepisode", entry.VideoType);
+        Assert.Null(entry.ShowId);
+        // Genau ein Request: der Stream-Download, kein Serien-Abruf.
+        Assert.DoesNotContain(handler.Requests, r => r.PathAndQuery.Contains("api/items/tvshow/"));
     }
 
     /// <summary>Hilfsmethode: baut die JSON-Antwort einer <c>entries/paged</c>-Seite (Server-Reihenfolge = Array-Reihenfolge).</summary>
@@ -434,11 +451,11 @@ public class AutoDownloadServiceTests : IDisposable
                 }
             });
         // Playlist-Reihenfolge weicht absichtlich von der Serienreihenfolge
-        // ab: Film 99 liegt zwischen den Episoden 33 und 34.
+        // ab: Film 99 liegt zwischen den Episoden 32 und 33.
         handler.EnqueueJson(HttpStatusCode.OK, PlaylistPageJson(false,
             PlaylistEntryJson(100, "TVShowEpisode", 30, "Alt"),
             PlaylistEntryJson(101, "TVShowEpisode", 32, "Pilot"),
-            PlaylistEntryJson(102, "Movie", 99, "Film Neunundneunzig"),
+            PlaylistEntryJson(102, "Movie", 99, "Film Neunundneunzig", sortOrder: 2),
             PlaylistEntryJson(103, "TVShowEpisode", 33, "Folge B",
                 parentMediaType: "TVShow", parentMediaId: 11, parentMediaTitle: "Probe",
                 sortOrder: 3, episodeNumber: 2)));
@@ -446,17 +463,17 @@ public class AutoDownloadServiceTests : IDisposable
         await service.RunAsync(settings);
 
         var entries = (await EntriesAsync()).OrderBy(e => e.Id).ToList();
-        Assert.Equal(2, entries.Count);
-        Assert.Equal(99, entries[0].VideoId);
-        Assert.Equal("movie", entries[0].VideoType);
-        Assert.Equal(33, entries[1].VideoId);
-        Assert.Equal("tvshowepisode", entries[1].VideoType);
+        Assert.Equal(2, entries.Count); // aktueller Eintrag + ein Folge-Eintrag
+        Assert.Equal(32, entries[0].VideoId);
+        Assert.Equal("tvshowepisode", entries[0].VideoType);
+        Assert.Equal(99, entries[1].VideoId);
+        Assert.Equal("movie", entries[1].VideoType);
         // Playlist-Bezug am Manifest; die Serienstruktur wird nicht abgefragt.
         Assert.Equal(5, entries[0].PlaylistId);
-        Assert.Equal(102, entries[0].PlaylistEntryId);
+        Assert.Equal(101, entries[0].PlaylistEntryId);
         Assert.Equal(5, entries[1].PlaylistId);
-        Assert.Equal(103, entries[1].PlaylistEntryId);
-        Assert.Equal(3, entries[1].PlaylistSortOrder);
+        Assert.Equal(102, entries[1].PlaylistEntryId);
+        Assert.Equal(2, entries[1].PlaylistSortOrder);
         Assert.DoesNotContain(handler.Requests, r => r.PathAndQuery.Contains("api/items/tvshow/"));
         Assert.Contains(handler.Requests, r => r.PathAndQuery.Contains("api/playlists/5/entries/paged"));
     }
@@ -494,8 +511,8 @@ public class AutoDownloadServiceTests : IDisposable
 
         var entries = (await EntriesAsync()).OrderBy(e => e.Id).ToList();
         Assert.Equal(2, entries.Count);
-        Assert.Equal(62, entries[0].VideoId);
-        Assert.Equal(63, entries[1].VideoId);
+        Assert.Equal(32, entries[0].VideoId);
+        Assert.Equal(62, entries[1].VideoId);
     }
 
     /// <summary>Prüft Auto-Downloads: Serien-Hints der Playlist-Einträge werden aus den Parent-Angaben ins Manifest übernommen.</summary>
@@ -524,10 +541,12 @@ public class AutoDownloadServiceTests : IDisposable
                 parentMediaType: "TVShow", parentMediaId: 11, parentMediaTitle: "Probe",
                 episodeNumber: 2)));
 
-        var oneEpisode = settings with { PreloadEpisodeCount = 1 };
-        await service.RunAsync(oneEpisode);
+        await service.RunAsync(settings);
 
-        var entry = Assert.Single(await EntriesAsync());
+        var entries = (await EntriesAsync()).OrderBy(e => e.Id).ToList();
+        Assert.Equal(2, entries.Count); // aktueller Eintrag + ein Folge-Eintrag
+        Assert.Equal(32, entries[0].VideoId);
+        var entry = entries[1];
         Assert.Equal(33, entry.VideoId);
         Assert.Equal(11, entry.ShowId);
         Assert.Equal("Probe", entry.ShowTitle);
@@ -536,7 +555,7 @@ public class AutoDownloadServiceTests : IDisposable
         Assert.Equal("Probe – Folge B", entry.Title);
     }
 
-    /// <summary>Prüft Auto-Downloads: ein playlist-gebundener Film lädt sich selbst plus die Folge-Einträge der Playlist.</summary>
+    /// <summary>Prüft Auto-Downloads: ein playlist-gebundener Film lädt sich selbst plus die Folge-Einträge der Playlist — der Film zählt ins <c>PreloadEpisodeCount</c>-Budget.</summary>
     [Fact]
     public async Task Run_PlaylistMovie_EnqueuesSelfAndNextEntries()
     {
@@ -559,10 +578,13 @@ public class AutoDownloadServiceTests : IDisposable
         await service.RunAsync(settings);
 
         var entries = (await EntriesAsync()).OrderBy(e => e.Id).ToList();
-        Assert.Equal(3, entries.Count);
+        // Der Film zählt ins Budget: bei PreloadEpisodeCount = 2 bleibt
+        // nach dem (deduplizierten) eigenen Eintrag nur ein Platz für
+        // den ersten Folge-Eintrag.
+        Assert.Equal(2, entries.Count);
         Assert.Equal(7, entries[0].VideoId);
         Assert.Equal(8, entries[1].VideoId);
-        Assert.Equal(9, entries[2].VideoId);
+        Assert.Single(entries, e => e.VideoId == 7);
         Assert.All(entries, e => Assert.Equal(5, e.PlaylistId));
     }
 
@@ -596,9 +618,9 @@ public class AutoDownloadServiceTests : IDisposable
         await service.RunAsync(settings);
 
         var entries = (await EntriesAsync()).OrderBy(e => e.Id).ToList();
-        Assert.Equal(2, entries.Count);
-        Assert.Equal(33, entries[0].VideoId);
-        Assert.Equal(34, entries[1].VideoId);
+        Assert.Equal(2, entries.Count); // aktuelle Episode + eine Folge-Episode
+        Assert.Equal(32, entries[0].VideoId);
+        Assert.Equal(33, entries[1].VideoId);
         Assert.All(entries, e => Assert.Null(e.PlaylistId));
         Assert.Contains(handler.Requests, r => r.PathAndQuery.Contains("api/items/tvshow/11"));
     }
@@ -629,10 +651,217 @@ public class AutoDownloadServiceTests : IDisposable
         var oneEpisode = settings with { PreloadEpisodeCount = 1 };
         await service.RunAsync(oneEpisode);
 
+        // Bei PreloadEpisodeCount = 1 ist nur die aktuelle Episode dran.
         var entry = Assert.Single(await EntriesAsync());
-        Assert.Equal(33, entry.VideoId);
+        Assert.Equal(32, entry.VideoId);
         Assert.Null(entry.PlaylistId);
         Assert.DoesNotContain(handler.Requests, r => r.PathAndQuery.Contains("api/playlists/"));
+    }
+
+    /// <summary>Prüft Auto-Downloads: die aktuelle Episode ist die erste Kandidatin — Titel und Serienkontext werden auch am Selbst-Eintrag gesetzt.</summary>
+    [Fact]
+    public async Task Run_EpisodeCandidate_EnqueuesCurrentFirst()
+    {
+        await LoginAsync();
+        await CacheContinueWatchingAsync(
+            new ContinueWatchingEntry
+            {
+                MediaType = "episode",
+                PositionSeconds = 120,
+                Entry = new TvShowEpisode
+                {
+                    Id = 32,
+                    Name = "Pilot",
+                    Season = new TvShowSeason { Id = 21, Number = 1, Show = new TvShow { Id = 11 } }
+                }
+            });
+        handler.EnqueueJson(HttpStatusCode.OK,
+            ShowWithEpisodes(11, "Probe", (1, 1, 32, "A"), (1, 2, 33, "B"), (1, 3, 34, "C")));
+
+        await service.RunAsync(settings);
+
+        // Manifest-Reihenfolge = Einplanungsreihenfolge: die aktuelle
+        // Episode steht vor den Folge-Episoden.
+        var entries = await EntriesAsync();
+        Assert.Equal(2, entries.Count);
+        var self = entries[0];
+        Assert.Equal(32, self.VideoId);
+        Assert.Equal("tvshowepisode", self.VideoType);
+        Assert.Equal("Probe – A", self.Title);
+        Assert.Equal(11, self.ShowId);
+        Assert.Equal("Probe", self.ShowTitle);
+        Assert.Equal(1, self.SeasonNumber);
+        Assert.Equal(1, self.EpisodeNumber);
+        Assert.Equal(33, entries[1].VideoId);
+        Assert.Equal("Probe – B", entries[1].Title);
+    }
+
+    /// <summary>Prüft Auto-Downloads: eine bereits fertig geladene aktuelle Episode wird dedupliziert, verbraucht aber trotzdem einen Platz des <c>PreloadEpisodeCount</c>-Budgets.</summary>
+    [Fact]
+    public async Task Run_EpisodeCandidate_AlreadyDownloaded_DeduplicatesAndCountsBudget()
+    {
+        await LoginAsync();
+        // Die aktuelle Episode liegt bereits fertig vor: Eintrag plus
+        // Datei über Einreihen mit Stub-Stream aufbauen.
+        handler.Enqueue(_ => new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new ByteArrayContent([1, 2, 3])
+        });
+        await downloadService.EnqueueAsync("tvshowepisode", 32, "Probe – A", settings);
+        await WaitForAsync(async () =>
+            (await EntriesAsync()).SingleOrDefault()?.State == "completed");
+        await CacheContinueWatchingAsync(
+            new ContinueWatchingEntry
+            {
+                MediaType = "episode",
+                PositionSeconds = 120,
+                Entry = new TvShowEpisode
+                {
+                    Id = 32,
+                    Name = "Pilot",
+                    Season = new TvShowSeason { Id = 21, Number = 1, Show = new TvShow { Id = 11 } }
+                }
+            });
+        handler.EnqueueJson(HttpStatusCode.OK,
+            ShowWithEpisodes(11, "Probe", (1, 1, 32, "A"), (1, 2, 33, "B"), (1, 3, 34, "C")));
+
+        await service.RunAsync(settings);
+
+        // Kein Doppel-Eintrag für die aktuelle Episode; ihr Budget-Platz
+        // ist verbraucht — nur eine Folge-Episode kommt hinzu.
+        var entries = (await EntriesAsync()).OrderBy(e => e.Id).ToList();
+        Assert.Equal(2, entries.Count);
+        Assert.Single(entries, e => e.VideoId == 32);
+        Assert.Equal("completed", entries[0].State);
+        Assert.Equal(33, entries[1].VideoId);
+    }
+
+    /// <summary>Prüft Auto-Downloads: der aktuelle Playlist-Eintrag steht selbst im Manifest und verbraucht einen Platz des <c>PreloadEpisodeCount</c>-Budgets.</summary>
+    [Fact]
+    public async Task Run_PlaylistEpisode_EnqueuesCurrentEntry()
+    {
+        await LoginAsync();
+        await CacheContinueWatchingAsync(
+            new ContinueWatchingEntry
+            {
+                MediaType = "episode",
+                PositionSeconds = 60,
+                PlaylistId = 5,
+                PlaylistName = "Mix",
+                PlaylistEntryId = 101,
+                Entry = new TvShowEpisode
+                {
+                    Id = 32,
+                    Name = "Pilot",
+                    Season = new TvShowSeason { Id = 21, Show = new TvShow { Id = 11 } }
+                }
+            });
+        handler.EnqueueJson(HttpStatusCode.OK, PlaylistPageJson(false,
+            PlaylistEntryJson(101, "TVShowEpisode", 32, "Pilot",
+                parentMediaType: "TVShow", parentMediaId: 11, parentMediaTitle: "Probe",
+                sortOrder: 1, episodeNumber: 1),
+            PlaylistEntryJson(102, "TVShowEpisode", 33, "Folge B",
+                parentMediaType: "TVShow", parentMediaId: 11, parentMediaTitle: "Probe",
+                sortOrder: 2, episodeNumber: 2),
+            PlaylistEntryJson(103, "TVShowEpisode", 34, "Folge C",
+                parentMediaType: "TVShow", parentMediaId: 11, parentMediaTitle: "Probe",
+                sortOrder: 3, episodeNumber: 3)));
+
+        await service.RunAsync(settings);
+
+        // PreloadEpisodeCount = 2 → aktueller Eintrag + ein Folge-Eintrag.
+        var entries = (await EntriesAsync()).OrderBy(e => e.Id).ToList();
+        Assert.Equal(2, entries.Count);
+        var self = entries[0];
+        Assert.Equal(32, self.VideoId);
+        Assert.Equal("tvshowepisode", self.VideoType);
+        Assert.Equal(5, self.PlaylistId);
+        Assert.Equal(101, self.PlaylistEntryId);
+        Assert.Equal(1, self.PlaylistSortOrder);
+        // Serien-Hints aus den Parent-Angaben des Eintrags.
+        Assert.Equal(11, self.ShowId);
+        Assert.Equal("Probe", self.ShowTitle);
+        Assert.Equal(1, self.EpisodeNumber);
+        Assert.Equal("Probe – Pilot", self.Title);
+        Assert.Equal(33, entries[1].VideoId);
+        Assert.Equal(102, entries[1].PlaylistEntryId);
+    }
+
+    /// <summary>Prüft Auto-Downloads: ein nicht ladbarer aktueller Playlist-Eintrag wird wie ein Folge-Eintrag übersprungen — ohne Budget-Verbrauch und ohne Serien-Rückfall.</summary>
+    [Fact]
+    public async Task Run_PlaylistEpisode_CurrentEntryNotAccessible_SkipsSelf()
+    {
+        await LoginAsync();
+        await CacheContinueWatchingAsync(
+            new ContinueWatchingEntry
+            {
+                MediaType = "episode",
+                PositionSeconds = 60,
+                PlaylistId = 5,
+                PlaylistName = "Mix",
+                PlaylistEntryId = 101,
+                Entry = new TvShowEpisode
+                {
+                    Id = 32,
+                    Name = "Pilot",
+                    Season = new TvShowSeason { Id = 21, Show = new TvShow { Id = 11 } }
+                }
+            });
+        handler.EnqueueJson(HttpStatusCode.OK, PlaylistPageJson(false,
+            PlaylistEntryJson(101, "TVShowEpisode", 32, "Pilot", isAccessible: false),
+            PlaylistEntryJson(102, "TVShowEpisode", 61, "Folge Eins",
+                parentMediaType: "TVShow", parentMediaId: 11, parentMediaTitle: "Probe"),
+            PlaylistEntryJson(103, "TVShowEpisode", 62, "Folge Zwei",
+                parentMediaType: "TVShow", parentMediaId: 11, parentMediaTitle: "Probe")));
+
+        await service.RunAsync(settings);
+
+        // Der gefundene (aber nicht ladbare) Eintrag verhindert den
+        // Serien-Rückfall; die Folge-Einträge füllen das volle Budget.
+        var entries = (await EntriesAsync()).OrderBy(e => e.Id).ToList();
+        Assert.Equal(2, entries.Count);
+        Assert.Equal(61, entries[0].VideoId);
+        Assert.Equal(62, entries[1].VideoId);
+        Assert.DoesNotContain(handler.Requests, r => r.PathAndQuery.Contains("api/items/tvshow/"));
+    }
+
+    /// <summary>Prüft Auto-Downloads: ein Playlist-Eintrag ohne Treffer und ohne Serienbezug reiht die aktuelle Episode mit Playlist-Bezug selbst ein.</summary>
+    [Fact]
+    public async Task Run_PlaylistEntryNotFoundNoShow_EnqueuesSelf()
+    {
+        await LoginAsync();
+        await CacheContinueWatchingAsync(
+            new ContinueWatchingEntry
+            {
+                MediaType = "episode",
+                PositionSeconds = 60,
+                PlaylistId = 5,
+                PlaylistName = "Mix",
+                PlaylistEntryId = 101,
+                Entry = new TvShowEpisode { Id = 32, Name = "Pilot" }
+            });
+        // Der Eintrag 101 ist nicht mehr Teil der Playlist; ein
+        // Serienbezug (ShowId) fehlt ebenfalls.
+        handler.EnqueueJson(HttpStatusCode.OK, PlaylistPageJson(false,
+            PlaylistEntryJson(100, "TVShowEpisode", 30, "Alt"),
+            PlaylistEntryJson(105, "TVShowEpisode", 40, "Anderes")));
+        handler.Enqueue(_ => new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new ByteArrayContent([1, 2, 3])
+        });
+
+        await service.RunAsync(settings);
+        // Der Transfer läuft asynchron — auf den Endzustand warten.
+        await WaitForAsync(async () =>
+            (await EntriesAsync()).SingleOrDefault()?.State == "completed");
+
+        var entry = Assert.Single(await EntriesAsync());
+        Assert.Equal(32, entry.VideoId);
+        Assert.Equal("tvshowepisode", entry.VideoType);
+        Assert.Equal(5, entry.PlaylistId);
+        Assert.Equal(101, entry.PlaylistEntryId);
+        Assert.Null(entry.ShowId);
+        Assert.DoesNotContain(handler.Requests, r => r.PathAndQuery.Contains("api/items/tvshow/"));
     }
 
     /// <summary>Prüft die Protokolleinträge: Lauf-Ergebnis und Mindestabstand-Auslassung landen als Information.</summary>
