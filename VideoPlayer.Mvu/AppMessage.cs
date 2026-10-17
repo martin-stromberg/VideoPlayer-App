@@ -1044,12 +1044,14 @@ public sealed record DownloadsPageOpenedMessage : AppMessage;
 /// <param name="UsedBytes">Durch Download-Dateien belegter Speicher.</param>
 /// <param name="QuotaGb">Konfiguriertes Speicherplatzkontingent in Gigabyte.</param>
 /// <param name="Error">Fehlertext bei Fehlschlag; <c>null</c> bei Erfolg.</param>
+/// <param name="OrphanedBytes">Bytes erkannter Restdaten ohne Manifest-Eintrag (Abgleich beim Laden).</param>
 /// <returns>Nachricht mit dem Ladeergebnis der Download-Liste.</returns>
 public sealed record DownloadsLoadedMessage(
     IReadOnlyList<DownloadListItem> Items,
     long UsedBytes,
     int QuotaGb,
-    string? Error) : AppMessage;
+    string? Error,
+    long OrphanedBytes = 0) : AppMessage;
 
 /// <summary>
 /// Der Anwender fordert den Download eines Mediums an („Herunterladen"
@@ -1129,6 +1131,12 @@ public sealed record DownloadRetryRequestedMessage(DownloadListItem Item) : AppM
 /// <param name="Item">Der zu löschende Download-Eintrag.</param>
 /// <returns>Nachricht für die Lösch-Anforderung.</returns>
 public sealed record DownloadDeleteRequestedMessage(DownloadListItem Item) : AppMessage;
+
+/// <summary>Der Anwender fordert das Löschen aller Downloads an (nach Rückfrage im UI).</summary>
+public sealed record DownloadsDeleteAllRequestedMessage : AppMessage;
+
+/// <summary>Der Anwender fordert die Bereinigung erkannter Restdaten ohne Manifest-Eintrag an.</summary>
+public sealed record DownloadsPurgeOrphansRequestedMessage : AppMessage;
 
 /// <summary>
 /// Der Anwender fordert den Protokollversand an („Protokoll senden" auf der

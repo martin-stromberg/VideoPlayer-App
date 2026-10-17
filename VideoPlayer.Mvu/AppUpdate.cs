@@ -295,6 +295,8 @@ public static class AppUpdate
             DownloadCancelRequestedMessage requested => UpdateDownloadCancelRequested(model, requested),
             DownloadRetryRequestedMessage requested => UpdateDownloadRetryRequested(model, requested),
             DownloadDeleteRequestedMessage requested => UpdateDownloadDeleteRequested(model, requested),
+            DownloadsDeleteAllRequestedMessage => UpdateDownloadsDeleteAllRequested(model),
+            DownloadsPurgeOrphansRequestedMessage => UpdateDownloadsPurgeOrphansRequested(model),
             SendLogProtocolRequestedMessage => UpdateSendLogProtocolRequested(model),
             SendLogProtocolCompletedMessage completed => UpdateSendLogProtocolCompleted(model, completed),
             LogoutRequestedMessage => UpdateLogoutRequested(model),
@@ -4116,6 +4118,7 @@ public static class AppUpdate
                     Items = message.Items,
                     UsedBytes = message.UsedBytes,
                     QuotaGb = message.QuotaGb,
+                    OrphanedBytes = message.OrphanedBytes,
                     Error = message.Error
                 }
             },
@@ -4230,6 +4233,22 @@ public static class AppUpdate
     {
         return message.Item.CanDelete
             ? new AppTransition(model, [new DeleteDownloadEffect(message.Item.MediaType, message.Item.MediaId)])
+            : AppTransition.Unchanged(model);
+    }
+
+    private static AppTransition UpdateDownloadsDeleteAllRequested(AppModel model)
+    {
+        // Die Rückfrage lief bereits im UI — hier nur der Effekt, wenn
+        // überhaupt Downloads oder Restdaten vorhanden sind.
+        return model.Downloads.HasItems || model.Downloads.OrphanedBytes > 0
+            ? new AppTransition(model, [new DeleteAllDownloadsEffect(model.Settings)])
+            : AppTransition.Unchanged(model);
+    }
+
+    private static AppTransition UpdateDownloadsPurgeOrphansRequested(AppModel model)
+    {
+        return model.Downloads.OrphanedBytes > 0
+            ? new AppTransition(model, [new PurgeOrphanedDownloadsEffect(model.Settings)])
             : AppTransition.Unchanged(model);
     }
 

@@ -33,9 +33,15 @@ auch offline, weil der Bestand lokal im Download-Manifest liegt.
 - Über der Liste steht die Kontingent-Belegung („x von y GB belegt");
   ein Offline-Banner kündigt an, dass wartende Downloads mit der
   Verbindung fortgesetzt werden.
+- Je Eintrag wird die Dateigröße angezeigt (bei laufenden Downloads
+  „x von y GB").
 - Aktionen je Eintrag: **Abbrechen** (wartend/läuft), **Erneut
   versuchen** (fehlgeschlagen/abgebrochen), **Löschen** (immer —
   entfernt Datei und Eintrag, laufende Transfers werden abgebrochen).
+- **„Alle löschen"** (Kopfbereich, mit Rückfrage) entfernt alle
+  Aufträge, Dateien und Restdaten.
+- **„Speicher bereinigen"** (unter der Belegungszeile, nur bei erkannten
+  Restdaten) entfernt nicht zugeordnete Dateien nach Rückfrage.
 
 ## Parallele Downloads, Abbruch und Wiederaufnahme
 
@@ -107,6 +113,32 @@ auch offline, weil der Bestand lokal im Download-Manifest liegt.
 Ist die Einstellung aktiv, wird der fertige Download einer Episode
 entfernt, sobald sie als „angesehen" gilt (Endfenster-Schwelle oder
 Wiedergabe-Ende). Laufende oder wartende Downloads bleiben unberührt.
+
+## Hintergrund-Downloads unter iOS
+
+Auf iOS läuft die Dateiübertragung in einer systemseitigen
+Hintergrund-Session: Downloads werden fortgesetzt, wenn die App in den
+Hintergrund wechselt oder suspendiert wird. Schließt das System einen
+Download, während die App beendet war, wird das Ergebnis beim nächsten
+Start ins Download-Manifest übernommen (Eintrag „Fertig" bzw.
+„Fehlgeschlagen"). Auf anderen Plattformen bleibt der prozessinterne
+Transfer aktiv; unterbrochene Downloads werden dort bei der nächsten
+Verbindung fortgesetzt (Neustart ab Position 0).
+
+## Abgleich des Ablageorts
+
+Beim App-Start und beim Öffnen der Downloads-Seite gleicht die App den
+Video-Ablageort mit dem Download-Manifest ab:
+
+- **Überholte Teildateien** (Reste abgebrochener, fehlgeschlagener oder
+  unterbrochener Aufträge) werden automatisch entfernt.
+- **Restdaten ohne Manifest-Eintrag** werden erkannt und mit ihrer Größe
+  unter der Belegungszeile ausgewiesen („davon x GB nicht zugeordnet") —
+  sie werden nicht automatisch gelöscht.
+- Als „Fertig" geführte Einträge ohne Datei werden als fehlgeschlagen
+  korrigiert und können über „Erneut versuchen" neu eingeplant werden.
+
+Laufende Transfers und fertige Downloads bleiben vom Abgleich unberührt.
 
 ## Ablage und Wiedergabe
 

@@ -1,3 +1,4 @@
+using VideoPlayer.Mvu;
 using VideoWebPlayer.Maui.Tests.Stubs;
 
 namespace VideoWebPlayer.Maui.Tests;
@@ -155,5 +156,91 @@ public class DownloadsContractTests
 
         Assert.Contains("NoBackupDirectory", code, StringComparison.Ordinal);
         Assert.Contains("videos", code, StringComparison.Ordinal);
+    }
+
+    /// <summary>Prüft DownloadService: Abgleich Ablageort ↔ Manifest ist implementiert und verdrahtet.</summary>
+    [Fact]
+    public void DownloadService_Reconcile_WiredInHandler()
+    {
+        var service = Read("VideoPlayer.Mvu", "DownloadService.cs");
+        var handler = Read("VideoPlayer.Maui", "Services", "ShellAppEffectHandler.cs");
+
+        Assert.Contains("ReconcileAsync", service, StringComparison.Ordinal);
+        Assert.Contains("ErrorMissingFile", service, StringComparison.Ordinal);
+        Assert.Contains("downloads.ReconcileAsync", handler, StringComparison.Ordinal);
+    }
+
+    /// <summary>Prüft DownloadsPage: Hinweiszeile für nicht zugeordnete Restdaten vorhanden.</summary>
+    [Fact]
+    public void DownloadsPage_ShowsOrphanedHint()
+    {
+        var xaml = Read("VideoPlayer.Maui", "Pages", "DownloadsPage.xaml");
+        var code = Read("VideoPlayer.Maui", "Pages", "DownloadsPage.xaml.cs");
+
+        Assert.Contains("OrphanedLabel", xaml, StringComparison.Ordinal);
+        Assert.Contains("model.Downloads.OrphanedText", code, StringComparison.Ordinal);
+    }
+
+    /// <summary>Prüft ErrorText: „missing_file" wird als verständlicher Hinweis übersetzt.</summary>
+    [Fact]
+    public void DownloadListItem_MissingFile_ErrorText()
+    {
+        var item = new DownloadListItem
+        {
+            EntryId = 1,
+            MediaType = "movie",
+            MediaId = 42,
+            Title = "Film",
+            State = DownloadState.Failed,
+            Error = DownloadService.ErrorMissingFile
+        };
+
+        Assert.NotNull(item.ErrorText);
+        Assert.Contains("nicht mehr vorhanden", item.ErrorText, StringComparison.Ordinal);
+    }
+
+    /// <summary>Prüft OrphanedText: ohne Restdaten ist die Zeile ausgeblendet (null).</summary>
+    [Fact]
+    public void DownloadsPageState_OrphanedText_WhenZero_Null()
+    {
+        Assert.Null(DownloadsPageState.Initial.OrphanedText);
+        Assert.Null(new DownloadsPageState { OrphanedBytes = 0 }.OrphanedText);
+    }
+
+    /// <summary>Prüft OrphanedText: mit Restdaten wird die nicht zugeordnete Größe genannt.</summary>
+    [Fact]
+    public void DownloadsPageState_OrphanedText_WhenSet_NamesBytes()
+    {
+        var state = new DownloadsPageState { OrphanedBytes = 2_147_483_648L };
+
+        Assert.NotNull(state.OrphanedText);
+        Assert.Contains("nicht zugeordnet", state.OrphanedText, StringComparison.Ordinal);
+        Assert.Contains("2,0 GB", state.OrphanedText, StringComparison.Ordinal);
+    }
+
+    /// <summary>Prüft iOS-Backend: Hintergrund-URL-Session und App-Delegate-Verdrahtung vorhanden.</summary>
+    [Fact]
+    public void IosBackgroundDownloadBackend_Wired()
+    {
+        var backend = Read("VideoPlayer.Maui", "Platforms", "iOS", "IosBackgroundDownloadBackend.cs");
+        var appDelegate = Read("VideoPlayer.Maui", "Platforms", "iOS", "AppDelegate.cs");
+        var maui = Read("VideoPlayer.Maui", "MauiProgram.cs");
+
+        Assert.Contains("CreateBackgroundSessionConfiguration", backend, StringComparison.Ordinal);
+        Assert.Contains("AllowsCellularAccess", backend, StringComparison.Ordinal);
+        Assert.Contains("CompletionSink", backend, StringComparison.Ordinal);
+        Assert.Contains("handleEventsForBackgroundURLSession", appDelegate, StringComparison.Ordinal);
+        Assert.Contains("IosBackgroundDownloadBackend", maui, StringComparison.Ordinal);
+        Assert.Contains("IDownloadBackend", maui, StringComparison.Ordinal);
+    }
+
+    /// <summary>Prüft DownloadService: Backend-Abstraktion und externe Transfer-Vervollständigung.</summary>
+    [Fact]
+    public void DownloadService_UsesBackend_AndCompletesExternal()
+    {
+        var code = Read("VideoPlayer.Mvu", "DownloadService.cs");
+
+        Assert.Contains("IDownloadBackend", code, StringComparison.Ordinal);
+        Assert.Contains("CompleteExternalTransferAsync", code, StringComparison.Ordinal);
     }
 }
