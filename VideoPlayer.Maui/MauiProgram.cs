@@ -137,6 +137,21 @@ namespace VideoPlayer.Maui
             // Manifest, parallele Transfers mit Quota/WLAN-Bedingung —
             // die Downloads-Seite speist sich über ItemChanged/ItemRemoved.
             // AutoDownloadService: Vorlauf der Weiterschauen-Episoden.
+            // iOS: Transfer-Backend delegiert an die systemseitige
+            // Hintergrund-Session (Downloads laufen bei suspendierter App).
+#if IOS || MACCATALYST
+            builder.Services.AddSingleton<Services.IosBackgroundDownloadBackend>(sp =>
+            {
+                var backend = new Services.IosBackgroundDownloadBackend();
+                Services.IosBackgroundDownloadBackend.Shared = backend;
+                backend.CompletionSink = (key, error, tempPath) =>
+                    sp.GetRequiredService<DownloadService>()
+                        .CompleteExternalTransferAsync(key, error, tempPath);
+                return backend;
+            });
+            builder.Services.AddSingleton<IDownloadBackend>(sp =>
+                sp.GetRequiredService<Services.IosBackgroundDownloadBackend>());
+#endif
             builder.Services.AddSingleton<DownloadService>();
             builder.Services.AddSingleton<AutoDownloadService>();
 
