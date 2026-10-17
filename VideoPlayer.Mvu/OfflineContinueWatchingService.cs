@@ -31,6 +31,7 @@ public sealed class OfflineContinueWatchingService
     private readonly CacheDatabase cache;
     private readonly BackupDatabase backup;
     private readonly HomeListService homeLists;
+    private readonly AppStorageLayout layout;
     private readonly Func<string, bool> fileExists;
     private readonly ILogger<OfflineContinueWatchingService> logger;
 
@@ -38,13 +39,15 @@ public sealed class OfflineContinueWatchingService
     /// <param name="cache">Cache-Ablage mit Download-Manifest und gecachten Listen.</param>
     /// <param name="backup">Backup-Ablage mit der Fortschritts-Outbox (<c>pending_progress</c>).</param>
     /// <param name="homeLists">Lesedienst der gecachten Favoriten- und Neuheiten-Listen.</param>
+    /// <param name="layout">Ablagelayout mit dem Video-Verzeichnis.</param>
     /// <param name="logger">Optionaler Logger für das Programmprotokoll.</param>
     public OfflineContinueWatchingService(
         CacheDatabase cache,
         BackupDatabase backup,
         HomeListService homeLists,
+        AppStorageLayout layout,
         ILogger<OfflineContinueWatchingService>? logger = null)
-        : this(cache, backup, homeLists, null, logger)
+        : this(cache, backup, homeLists, layout, null, logger)
     {
     }
 
@@ -52,18 +55,21 @@ public sealed class OfflineContinueWatchingService
     /// <param name="cache">Cache-Ablage mit Download-Manifest und gecachten Listen.</param>
     /// <param name="backup">Backup-Ablage mit der Fortschritts-Outbox.</param>
     /// <param name="homeLists">Lesedienst der gecachten Favoriten- und Neuheiten-Listen.</param>
+    /// <param name="layout">Ablagelayout mit dem Video-Verzeichnis.</param>
     /// <param name="fileExists">Dateiprüfung; <c>null</c> = <see cref="File.Exists(string?)"/>.</param>
     /// <param name="logger">Optionaler Logger für das Programmprotokoll.</param>
     internal OfflineContinueWatchingService(
         CacheDatabase cache,
         BackupDatabase backup,
         HomeListService homeLists,
+        AppStorageLayout layout,
         Func<string, bool>? fileExists,
         ILogger<OfflineContinueWatchingService>? logger = null)
     {
         this.cache = cache ?? throw new ArgumentNullException(nameof(cache));
         this.backup = backup ?? throw new ArgumentNullException(nameof(backup));
         this.homeLists = homeLists ?? throw new ArgumentNullException(nameof(homeLists));
+        this.layout = layout ?? throw new ArgumentNullException(nameof(layout));
         this.fileExists = fileExists ?? File.Exists;
         this.logger = logger ?? NullLogger<OfflineContinueWatchingService>.Instance;
     }
@@ -114,7 +120,7 @@ public sealed class OfflineContinueWatchingService
         var completed = rows
             .Where(r => DownloadStateNames.FromPersisted(r.State) == DownloadState.Completed
                 && r.FilePath is { Length: > 0 }
-                && fileExists(r.FilePath))
+                && fileExists(DownloadManifestPaths.Resolve(layout, r)))
             .OrderByDescending(r => r.UpdatedAtUtc)
             .ToList();
 

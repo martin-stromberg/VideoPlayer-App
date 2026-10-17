@@ -303,6 +303,68 @@ public class DownloadServiceReconcileTests : IDisposable
         Assert.Equal("completed", (await ReadEntryAsync())!.State);
     }
 
+    /// <summary>
+    /// Prüft den Container-Umzug (iOS: Update verschiebt den Datencontainer):
+    /// der gespeicherte Verzeichnisanteil des Manifest-Pfads ist veraltet,
+    /// die Datei liegt unter gleichem Namen im aktuellen Ablageort —
+    /// der Eintrag wird geheilt und die Datei nicht als Restdaten gezählt.
+    /// </summary>
+    [Fact]
+    public async Task Reconcile_RelocatedFile_HealsManifestPath()
+    {
+        var path = WriteFile("movie_42.mp4", 1024);
+        var stalePath = Path.Combine(root, "alter-container", "videos", "movie_42.mp4");
+        await InsertEntryAsync("completed", stalePath);
+        var service = CreateService();
+
+        var result = await service.ReconcileAsync();
+
+        Assert.Equal(0, result.OrphanedFileCount);
+        Assert.Equal(0, result.OrphanedBytes);
+        Assert.Equal(0, result.CorrectedCompletedCount);
+        var entry = await ReadEntryAsync();
+        Assert.Equal("completed", entry!.State);
+        Assert.Equal(path, entry.FilePath, ignoreCase: true);
+    }
+
+    /// <summary>
+    /// Prüft: ein fertiger Eintrag mit veraltetem Verzeichnisanteil wird beim
+    /// Einreihen als vorhanden erkannt statt erneut eingeplant zu werden.
+    /// </summary>
+    [Fact]
+    public async Task Enqueue_CompletedEntryWithRelocatedFile_NotRequeued()
+    {
+        await LoginAsync();
+        WriteFile("movie_42.mp4", 1024);
+        var stalePath = Path.Combine(root, "alter-container", "videos", "movie_42.mp4");
+        await InsertEntryAsync("completed", stalePath);
+        var service = CreateService();
+
+        var result = await service.EnqueueAsync("movie", 42, "Ein Film", new AppSettings());
+
+        Assert.Equal(DownloadService.NoticeAlreadyPresent, result.Notice);
+        Assert.Equal("completed", (await ReadEntryAsync())!.State);
+    }
+
+    /// <summary>
+    /// Prüft: die Restdaten-Bereinigung löscht keine Datei, deren
+    /// Manifest-Eintrag einen veralteten Verzeichnisanteil trägt.
+    /// </summary>
+    [Fact]
+    public async Task PurgeOrphans_RelocatedFile_IsKept()
+    {
+        var path = WriteFile("movie_42.mp4", 1024);
+        var stalePath = Path.Combine(root, "alter-container", "videos", "movie_42.mp4");
+        await InsertEntryAsync("completed", stalePath);
+        var service = CreateService();
+
+        var freed = await service.PurgeOrphansAsync();
+
+        Assert.Equal(0, freed);
+        Assert.True(File.Exists(path));
+        Assert.Equal("completed", (await ReadEntryAsync())!.State);
+    }
+
     private sealed class FakeNetworkMonitor : INetworkStatusMonitor
     {
         public bool IsOnline { get; set; } = true;

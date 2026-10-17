@@ -26,34 +26,40 @@ public sealed class MediaDetailsService
 {
     private readonly AuthSessionService authSession;
     private readonly CacheDatabase cache;
+    private readonly AppStorageLayout layout;
     private readonly Func<string, bool> fileExists;
     private readonly ILogger<MediaDetailsService> logger;
 
     /// <summary>Erstellt den Dienst.</summary>
     /// <param name="authSession">Sitzungsdienst mit dem angemeldeten API-Client.</param>
     /// <param name="cache">Cache-Ablage (Download-Manifest, Serienstruktur, Favoriten-Kopie).</param>
+    /// <param name="layout">Ablagelayout mit dem Video-Verzeichnis.</param>
     /// <param name="logger">Optionaler Logger für das Programmprotokoll.</param>
     public MediaDetailsService(
         AuthSessionService authSession,
         CacheDatabase cache,
+        AppStorageLayout layout,
         ILogger<MediaDetailsService>? logger = null)
-        : this(authSession, cache, null, logger)
+        : this(authSession, cache, layout, null, logger)
     {
     }
 
     /// <summary>Erstellt den Dienst mit injizierbarer Dateiprüfung (für Tests).</summary>
     /// <param name="authSession">Sitzungsdienst mit dem angemeldeten API-Client.</param>
     /// <param name="cache">Cache-Ablage (Download-Manifest, Serienstruktur, Favoriten-Kopie).</param>
+    /// <param name="layout">Ablagelayout mit dem Video-Verzeichnis.</param>
     /// <param name="fileExists">Dateiprüfung; <c>null</c> = <see cref="File.Exists(string?)"/>.</param>
     /// <param name="logger">Optionaler Logger für das Programmprotokoll.</param>
     internal MediaDetailsService(
         AuthSessionService authSession,
         CacheDatabase cache,
+        AppStorageLayout layout,
         Func<string, bool>? fileExists,
         ILogger<MediaDetailsService>? logger = null)
     {
         this.authSession = authSession ?? throw new ArgumentNullException(nameof(authSession));
         this.cache = cache ?? throw new ArgumentNullException(nameof(cache));
+        this.layout = layout ?? throw new ArgumentNullException(nameof(layout));
         this.fileExists = fileExists ?? File.Exists;
         this.logger = logger ?? NullLogger<MediaDetailsService>.Instance;
     }
@@ -434,7 +440,7 @@ public sealed class MediaDetailsService
         return entry is not null
             && DownloadStateNames.FromPersisted(entry.State) == DownloadState.Completed
             && entry.FilePath is { Length: > 0 }
-            && fileExists(entry.FilePath);
+            && fileExists(DownloadManifestPaths.Resolve(layout, entry));
     }
 
     /// <summary>
