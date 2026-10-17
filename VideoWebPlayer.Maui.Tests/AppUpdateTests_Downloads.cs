@@ -88,6 +88,18 @@ public class AppUpdateTests_Downloads
         Assert.True(transition.Model.Downloads.ShowEmpty is false);
     }
 
+    /// <summary>Prüft Loaded: erkannte Restdaten (OrphanedBytes) werden in den Zustand übernommen.</summary>
+    [Fact]
+    public void DownloadsLoaded_OrphanedBytes_InState()
+    {
+        var transition = AppUpdate.Update(
+            ConnectedModel() with { Downloads = DownloadsPageState.Initial with { IsLoading = true, Attempted = true } },
+            new DownloadsLoadedMessage([], 3072, 5, null, OrphanedBytes: 2048));
+
+        Assert.Equal(2048, transition.Model.Downloads.OrphanedBytes);
+        Assert.NotNull(transition.Model.Downloads.OrphanedText);
+    }
+
     /// <summary>Prüft Requested: verbunden → Einreihe-Effekt.</summary>
     [Fact]
     public void DownloadRequested_Connected_EnqueuesDownload()

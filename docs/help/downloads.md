@@ -108,6 +108,21 @@ Ist die Einstellung aktiv, wird der fertige Download einer Episode
 entfernt, sobald sie als „angesehen" gilt (Endfenster-Schwelle oder
 Wiedergabe-Ende). Laufende oder wartende Downloads bleiben unberührt.
 
+## Abgleich des Ablageorts
+
+Beim App-Start und beim Öffnen der Downloads-Seite gleicht die App den
+Video-Ablageort mit dem Download-Manifest ab:
+
+- **Überholte Teildateien** (Reste abgebrochener, fehlgeschlagener oder
+  unterbrochener Aufträge) werden automatisch entfernt.
+- **Restdaten ohne Manifest-Eintrag** werden erkannt und mit ihrer Größe
+  unter der Belegungszeile ausgewiesen („davon x GB nicht zugeordnet") —
+  sie werden nicht automatisch gelöscht.
+- Als „Fertig" geführte Einträge ohne Datei werden als fehlgeschlagen
+  korrigiert und können über „Erneut versuchen" neu eingeplant werden.
+
+Laufende Transfers und fertige Downloads bleiben vom Abgleich unberührt.
+
 ## Ablage und Wiedergabe
 
 - Dateien und Manifest liegen außerhalb des Backups: die Dateien im
