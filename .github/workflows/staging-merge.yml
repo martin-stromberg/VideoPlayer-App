@@ -33,10 +33,12 @@ jobs:
             @semantic-release/git \
             @semantic-release/github
 
+      # Retry-Wrapper: raeumt bei Fehlschlag verwaiste Tags auf und
+      # wiederholt den Lauf (siehe Skript-Kommentar).
       - name: Run Semantic Release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: semantic-release
+        run: bash .github/scripts/semantic-release-with-retry.sh
 
       - name: Determine release tag
         id: get-tag
