@@ -1,5 +1,12 @@
 # Änderungsprotokoll
 
+## 2026-10-17 — Altbestand `VideoWebPlayer.Maui` / `VideoWebPlayer.Client` entfernt (Issue #60)
+
+- **Altbestand gelöscht:** Die bisherige App `VideoWebPlayer.Maui` (117 Dateien) und der alte API-Client `VideoWebPlayer.Client` (12 Dateien) sind vollständig aus der Solution entfernt — sie hinkten dem neuen Client fachlich hinterher (u. a. fehlte der Playlist-Kontext im Fortschrittsreport) und verursachten doppelten Pflegeaufwand. Die neue App (`VideoPlayer.Maui` / `VideoPlayer.Mvu` / `VideoPlayer.ApiClient` / `VideoPlayer.Storage`) hatte keine Code-Abhängigkeit zum Altbestand.
+- **Testprojekt umbenannt:** `VideoWebPlayer.Maui.Tests` heißt jetzt `VideoPlayer.Maui.Tests` (Verzeichnis, `.csproj`, Assembly, Namespaces, `InternalsVisibleTo`-Einträge in `VideoPlayer.ApiClient`/`VideoPlayer.Mvu`, alle Referenzen in CI, README und Skript-Kommentaren). Die drei vom Altbestand abhängigen Testdateien wurden entfernt (`ContinueWatchingEventIngressTests`, `MauiSettingsContractTests`, Legacy-Fälle in `EnumCoverageTests`).
+- **CI/CD bereinigt:** `pr-checks.yml` baut nur noch die neue App und die Tests; `main-merge.yml`/`staging-merge.yml` publizieren keine Altbestand-Artefakte mehr — der `build-windows`-Job (APK/MSIX des Altbestands) entfällt komplett, der iOS-Simulator-`.app`-Upload liefert jetzt `VideoPlayer.Maui`. `Set-Version.ps1` versioniert nur noch die neue App.
+- **Verifikation:** 1334/1334 Unit-/Contract-Tests grün, Build ohne Warnungen, `dotnet format` sauber, `enum-coverage-check` grün.
+
 ## 2026-10-17 — Build-Fehler net10.0-maccatalyst: IosBackgroundDownloadBackend nicht verfügbar (Issue #61)
 
 - **Ursache:** `MauiProgram.cs` registrierte `IosBackgroundDownloadBackend` unter `#if IOS || MACCATALYST`; die Klasse liegt jedoch unter `Platforms/iOS/` und wird nur für `net10.0-ios` kompiliert — der MacCatalyst-Build brach mit 4× `CS0234`.

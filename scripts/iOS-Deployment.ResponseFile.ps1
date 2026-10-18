@@ -4,7 +4,7 @@
     Hilfsfunktionen fuer die MSBuild-Response-Datei (.rsp) des
     iOS-Deployments. Wird von iOS-Deployment.ps1 per Dot-Sourcing
     eingebunden, damit die Logik einzeln testbar bleibt
-    (VideoWebPlayer.Maui.Tests/IosDeploymentResponseFileTests.cs).
+    (VideoPlayer.Maui.Tests/IosDeploymentResponseFileTests.cs).
 
     Hintergrund: Ein Wert mit Anfuehrungszeichen, Raute oder
     Zeilenumbruch zerlegt die rsp-Zeile so, dass MSBuild nur noch

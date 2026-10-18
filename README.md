@@ -39,7 +39,7 @@ Die App koppelt sich beim Erststart über einen vom Server erzeugten Einmal-QR-C
 
 ```bash
 dotnet restore VideoPlayer.App.sln
-dotnet test VideoWebPlayer.Maui.Tests/VideoWebPlayer.Maui.Tests.csproj
+dotnet test VideoPlayer.Maui.Tests/VideoPlayer.Maui.Tests.csproj
 ```
 
 Windows-App:
@@ -56,10 +56,9 @@ dotnet build .\VideoPlayer.Maui\VideoPlayer.Maui.csproj -f net10.0-windows10.0.1
 | `VideoPlayer.Mvu` | Plattformneutrale MVU-Schicht: Modell, Update, Effekte; Authentifizierung, Synchronisation, Ereignisverbindung, Pairing-Flows |
 | `VideoPlayer.ApiClient` | Zugriff auf die öffentliche Server-API: Pairing/Bootstrap (ECDH-nistP256 + AES-256-GCM), Refresh/Logout, Server-Discovery |
 | `VideoPlayer.Storage` | Lokale Datenhaltung: SQLite-Cache, Einstellungen, Geheimnis-Ablage (`SecureStorage`), Download-Manifest, schaltbares Programmprotokoll (Datei-Logging mit Ablauf-Einträgen, Token-Maskierung und Rotation) |
-| `VideoWebPlayer.Maui` | Altbestand der bisherigen App — wird schrittweise durch `VideoPlayer.Maui` abgelöst |
 | `msTools.DeveloperApi` | Wiederverwendbarer Kern der lokalen Developer-API (Loopback-HTTP-Server, Routing, `devapi.json`, Snapshot-Provider) — plattformneutral, nur Debug/`DEV_API` |
 | `msTools.DeveloperApi.Maui` | MAUI-Handler der Developer-API (`/tree`, `/invoke`, `/set-text`, Elementbaum) — baut auf `msTools.DeveloperApi` auf |
-| `VideoWebPlayer.Maui.Tests` | Testprojekt (Contract-Tests der MAUI-Oberfläche, MVU-Verhalten, API-Client) |
+| `VideoPlayer.Maui.Tests` | Testprojekt (Contract-Tests der MAUI-Oberfläche, MVU-Verhalten, API-Client) |
 | `VideoPlayer.E2E.Tests` | Windows-End-to-End-Tests (FlaUI/UI-Automation gegen die echte App + lokalen Mock-Server, inkl. Wiedergabestart) |
 | `scripts/` | Deployment-Skripte (u. a. `iOS-Deployment.ps1` für Simulator-, Geräte- und Store-Builds) |
 
