@@ -95,7 +95,11 @@ Die Quellauflösung (`PlaybackSourceService`) wählt automatisch:
   gespeicherten Kopie (`cached_lists`). Der Sprung wird angewendet,
   sobald der Player wiedergabebereit ist; erreicht ein Medium die
   Bereitschaft nie, beginnt die Wiedergabe ohne Sprung am Anfang
-  (Degradation statt Absturz, siehe „Stabilität" unten).
+  (Degradation statt Absturz, siehe „Stabilität" unten). Schlägt der
+  Sprung selbst fehl oder läuft sein Zeitlimit ab, läuft die
+  Wiedergabe ebenfalls weiter — an der vom Player erreichten
+  Position, ohne Fehlerhinweis und ohne Episodenwechsel (siehe
+  „Fehlerfall").
 - **Fortschrittsmeldung:** alle 5 Sekunden wird die Position an den
   Server gemeldet, solange die Wiedergabe läuft; unveränderte
   Positionen (Pause) werden nicht erneut gesendet. Beim Ende und beim
@@ -178,9 +182,22 @@ automatisch auf die nächste Episode zurück, bei Playlist-Wiedergabe
 über den `advance`-Endpunkt auf den nächsten Playlist-Eintrag. Ohne
 Folge-Eintrag bleibt der Fehlerhinweis stehen und die Seite lässt sich
 normal verlassen.
-Fehler beim Wiedergabestart — etwa eine ungültige Quell-Adresse oder
-ein fehlgeschlagener Positions-Sprung — landen ebenfalls in diesem
-Fehlerhinweis; die Anwendung wird dadurch nicht beendet.
+Fehler beim Wiedergabestart — etwa eine ungültige oder nicht setzbare
+Quell-Adresse — landen ebenfalls in diesem Fehlerhinweis; die
+Anwendung wird dadurch nicht beendet.
+
+**Nicht-fataler Fortsetzungs-Sprung:** schlägt dagegen der Sprung auf
+die Fortsetzungsposition fehl oder überschreitet er sein Zeitlimit
+(10 Sekunden), wird die laufende Wiedergabe nicht unterbrochen — sie
+läuft an der vom Player erreichten Position weiter, ohne
+Fehlerhinweis und ohne Wechsel zur nächsten Episode bzw. zum nächsten
+Playlist-Eintrag. Hintergrund: die Vollendung des Sprungs kann bei
+Server-Streams ausbleiben, während der native Sprung bereits wirksam
+war — der Fehlschlag belegt daher keinen Abspielfehler. Sichtbar ist
+er ausschließlich als Warnung im Programmprotokoll; ein erneuter
+Versuch findet nicht statt. Der Episoden-/Playlist-Rückfall bleibt
+echten Abspielfehlern vorbehalten: nicht verfügbare oder nicht
+setzbare Quelle sowie das `MediaFailed`-Ereignis des Players.
 
 ## Picture-in-Picture / Mini-Player
 
@@ -234,19 +251,28 @@ den Sprung über `TryApplyPendingResumeSeek` an, sobald der Player
 `Playing` oder `Paused` meldet — beide Zustände implizieren
 `ReadyToPlay`. `ApplyResumeSeekAsync` läuft mit einer
 Abbruchschwelle von 10 Sekunden (`ResumeSeekTimeout`), weil die
-Toolkit-Vollendung des Seeks im Fehlerfall ausbleiben kann.
+Toolkit-Vollendung des Seeks im Fehlerfall ausbleiben kann. Timeout
+oder Fehlschlag des Sprungs degradieren still — sie lösen weder
+einen Fehlerhinweis noch den Episoden-Rückfall aus (siehe
+„Fehlerfall").
 
 Zusätzlich sind alle nativen `VideoElement`-Zugriffe fehlerisoliert
 (Quellenwechsel und Leeren der Quelle in `UpdateUi`, der
 Fortsetzungs-Seek, `ReportPosition` und die Zustandsabfrage im
 Fortschrittstakt) und `IsValidSourceLocation` prüft die Quell-Adresse
 vor der Übergabe ans Element (Server-Stream: absolute
-http/https-URL; lokale Datei: nicht leerer Pfad). Fehler dieser Pfade
-laufen als `PlaybackFailedMessage` in den MVU-Zyklus — sichtbar im
-Fehlerpanel bzw. mit Episoden-Rückfall — statt den Prozess zu
-beenden; das Flag `sourceApplyFailed` erzwingt dabei, dass die
-nächste Modelländerung den Quellenwechsel nach einem Fehlschlag
-erneut durchläuft (auch bei unveränderter oder leerender Adresse).
+http/https-URL; lokale Datei: nicht leerer Pfad). Fehler beim Setzen
+oder Zurücksetzen der Quelle laufen über `FailPlaybackStart` —
+ebenso das `MediaFailed`-Ereignis über `OnMediaFailed` — als
+`PlaybackFailedMessage` in den MVU-Zyklus, sichtbar im Fehlerpanel
+bzw. mit Episoden-Rückfall, statt den Prozess zu beenden; das Flag
+`sourceApplyFailed` erzwingt dabei, dass die nächste Modelländerung
+den Quellenwechsel nach einem Fehlschlag erneut durchläuft (auch bei
+unveränderter oder leerender Adresse). Die übrigen isolierten Pfade
+protokollieren ihren Fehlschlag nur als Warnung: der Fortsetzungs-
+Seek degradert still (kein `PlaybackFailedMessage`, kein
+Episoden-Rückfall), und Positionsmeldung bzw. Fortschrittstakt
+versuchen es im nächsten Takt erneut.
 
 ## MVU-Anbindung
 

@@ -349,6 +349,8 @@ public class PlayerContractTests
     /// Prüft PlayerPage: alle nativen Elementzugriffe sind fehlerisoliert
     /// — eine durchschlagende Ausnahme am <c>MediaElement</c> landet als
     /// <c>PlaybackFailedMessage</c> (Fehlerpanel) statt als Prozessabbruch.
+    /// Ausnahme: der Fortsetzungs-Seek degradiert nicht-fatal (siehe
+    /// <c>PlayerPage_ResumeSeekFailure_IsNonFatal</c>).
     /// </summary>
     [Fact]
     public void PlayerPage_NativeAccessesAreFailureIsolated()
@@ -359,7 +361,7 @@ public class PlayerContractTests
         Assert.Contains("try", updateUi, StringComparison.Ordinal);
         Assert.Contains("catch", updateUi, StringComparison.Ordinal);
         // Fehlerpfad → PlaybackFailedMessage (FailPlaybackStart meldet
-        // den Fehler und setzt appliedLocation für den Neuversuch zurück).
+        // den Fehler und setzt sourceApplyFailed für den Neuversuch).
         Assert.Contains("FailPlaybackStart", updateUi, StringComparison.Ordinal);
         Assert.Contains("PlaybackFailedMessage",
             MethodBody(code, "private void FailPlaybackStart"), StringComparison.Ordinal);
@@ -370,7 +372,10 @@ public class PlayerContractTests
         var seek = MethodBody(code, "private async Task ApplyResumeSeekAsync");
         Assert.Contains("try", seek, StringComparison.Ordinal);
         Assert.Contains("catch", seek, StringComparison.Ordinal);
-        Assert.Contains("PlaybackFailedMessage", seek, StringComparison.Ordinal);
+        // Der Fortsetzungs-Seek-Fehlschlag ist nicht-fatal (stille
+        // Degradation) — kein PlaybackFailedMessage-Dispatch mehr;
+        // gepinnt in PlayerPage_ResumeSeekFailure_IsNonFatal.
+        Assert.DoesNotContain("PlaybackFailedMessage", seek, StringComparison.Ordinal);
 
         var report = MethodBody(code, "private void ReportPosition");
         Assert.Contains("try", report, StringComparison.Ordinal);
@@ -389,6 +394,36 @@ public class PlayerContractTests
         Assert.Contains("CurrentState", gate, StringComparison.Ordinal);
         Assert.Contains("try", gate, StringComparison.Ordinal);
         Assert.Contains("catch", gate, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// Prüft PlayerPage: ein fehlschlagender oder zeitüberschreitender
+    /// Fortsetzungs-Seek ist nicht-fatal — <c>ApplyResumeSeekAsync</c>
+    /// protokolliert den Fehlschlag nur noch (Warn-Log) und dispatcht
+    /// kein <c>PlaybackFailedMessage</c>: die laufende Wiedergabe läuft
+    /// an der vom Player erreichten Position weiter, statt über
+    /// <c>UpdatePlaybackFailed</c> den Episoden-/Playlist-Rückfall
+    /// auszulösen. Der Rückfall bleibt den fatalen Pfaden
+    /// <c>FailPlaybackStart</c> (ungültige/nicht setzbare Quelle) und
+    /// <c>OnMediaFailed</c> vorbehalten — beide dispatchen die Meldung
+    /// weiterhin.
+    /// </summary>
+    [Fact]
+    public void PlayerPage_ResumeSeekFailure_IsNonFatal()
+    {
+        var code = PlayerPageCode();
+
+        var seek = MethodBody(code, "private async Task ApplyResumeSeekAsync");
+        Assert.Contains("try", seek, StringComparison.Ordinal);
+        Assert.Contains("catch", seek, StringComparison.Ordinal);
+        Assert.Contains("LogWarning", seek, StringComparison.Ordinal);
+        Assert.Contains("Fortsetzungs-Seek", seek, StringComparison.Ordinal);
+        Assert.DoesNotContain("PlaybackFailedMessage", seek, StringComparison.Ordinal);
+
+        Assert.Contains("PlaybackFailedMessage",
+            MethodBody(code, "private void FailPlaybackStart"), StringComparison.Ordinal);
+        Assert.Contains("PlaybackFailedMessage",
+            MethodBody(code, "private void OnMediaFailed"), StringComparison.Ordinal);
     }
 
     /// <summary>
