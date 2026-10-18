@@ -87,6 +87,15 @@ public static class AppUpdate
     /// </summary>
     private const int PlaybackEndedToleranceSeconds = 300;
 
+    /// <summary>
+    /// Erforderliche Anzahl aufeinanderfolgender plausibler Fortschritts-
+    /// takte im Endfenster, bevor die „angesehen"-Schwelle und die Auto-
+    /// Fortsetzung auslösen dürfen (<see cref="PlayerState.EndWindowStreak"/>).
+    /// Bewusst eine Konstante, keine Einstellung (Muster
+    /// <see cref="PlaybackEndedToleranceSeconds"/>).
+    /// </summary>
+    private const int EndWindowRequiredTicks = 2;
+
     /// <summary>Fehlertext des Protokollversands, wenn noch keine Protokolldatei vorhanden ist.</summary>
     public const string LogProtocolEmptyError = "Es ist noch kein Protokoll vorhanden.";
 
@@ -2593,7 +2602,8 @@ public static class AppUpdate
                     IsPictureInPicture = false,
                     Position = TimeSpan.Zero,
                     Duration = TimeSpan.Zero,
-                    LastReportedPositionSeconds = -1
+                    LastReportedPositionSeconds = -1,
+                    EndWindowStreak = 0
                 }
             },
             [new ResolvePlaybackSourceEffect(mediaType, next.MediaId, next.StartPositionSeconds)]);
@@ -3770,6 +3780,7 @@ public static class AppUpdate
                     Position = TimeSpan.Zero,
                     Duration = TimeSpan.Zero,
                     LastReportedPositionSeconds = -1,
+                    EndWindowStreak = 0,
                     UpcomingEpisodes = player.UpcomingEpisodes.Skip(1).ToList(),
                     Error = error
                 }
@@ -3784,8 +3795,16 @@ public static class AppUpdate
     /// (<see cref="AppSettings.WatchedEndWindowSeconds"/>) setzen und die
     /// Auto-Fortsetzung prüfen (Restlaufzeit &lt;
     /// <see cref="AppSettings.AutoResumeRemainingSeconds"/> → nächste
-    /// Episode). Medien kürzer als das jeweilige Fenster greifen ab dem
-    /// ersten Takt (Restlaufzeit liegt dann von Anfang an im Fenster).
+    /// Episode). Der Fenstereintritt ist plausibilisiert: erst
+    /// <see cref="EndWindowRequiredTicks"/> aufeinanderfolgende plausible
+    /// Takte (<see cref="IsProgressTickPlausible"/>) mit realem Fortschritt
+    /// im Fenster bestätigen ihn (<see cref="PlayerState.EndWindowStreak"/>) —
+    /// ein einzelner Takt mit eingefrorener/gesprungener Position oder
+    /// geschrumpfter Dauer löst weder Markierung noch Wechsel aus. Takte
+    /// einer abweichenden <see cref="PlaybackProgressMessage.MediaId"/>
+    /// (nachlaufende Meldungen des Vorgängermediums) und alle Takte
+    /// während der Quellauflösung bleiben ohne Fensterwirkung. Medien
+    /// kürzer als das jeweilige Fenster greifen ab dem zweiten Takt.
     /// </summary>
     /// <param name="model">Aktuelles App-Model.</param>
     /// <param name="message">Der Wiedergabe-Takt der Seite.</param>
@@ -3795,6 +3814,15 @@ public static class AppUpdate
         var player = model.Player;
         if (!player.IsActive)
         {
+            return AppTransition.Unchanged(model);
+        }
+
+        if (message.MediaId != player.MediaId)
+        {
+            // Nachlaufender Takt des Vorgängermediums nach einem Wechsel:
+            // vollständig verwerfen — weder State-Update noch Effekte
+            // (keine falsch attributierte Fortschrittsmeldung, keine
+            // „angesehen"-Markierung/Löschung der Folge-Identität).
             return AppTransition.Unchanged(model);
         }
 
@@ -3819,13 +3847,62 @@ public static class AppUpdate
                 updated.ProgressReportPlaylistId));
         }
 
+        return EvaluateEndWindow(model, player, updated, message, effects);
+    }
+
+    /// <summary>
+    /// Endfenster-Auswertung des Fortschrittstakts: baut die Bestätigungs-
+    /// Streak (<see cref="PlayerState.EndWindowStreak"/>) aus
+    /// aufeinanderfolgenden plausiblen Takten
+    /// (<see cref="IsProgressTickPlausible"/>) im Fenster
+    /// (<see cref="AppSettings.EndWindow"/>) auf und koppelt daran die
+    /// Auslöser — „angesehen"-Schwelle
+    /// (<see cref="AppSettings.WatchedEndWindowSeconds"/>) samt optionalem
+    /// Download-Aufräumen und Auto-Fortsetzung
+    /// (<see cref="AppSettings.AutoResumeRemainingSeconds"/>) über den
+    /// Playlist- bzw. Serienzweig. Alle übrigen Takte — Pausentakt ohne
+    /// Fortschritt, eingefrorene Position bei gemeldetem IsPlaying,
+    /// geschrumpfte Dauer, Rückwärtssprung, plausibler Takt außerhalb des
+    /// Fensters, unbekannte Dauer — setzen die Streak zurück; während der
+    /// Quellauflösung (<see cref="PlayerState.IsResolving"/>) ist jede
+    /// Fensterwirkung gesperrt.
+    /// </summary>
+    /// <param name="model">Aktuelles App-Model.</param>
+    /// <param name="player">Player-Zustand vor dem Takt (Streak-/Plausibilitäts-Basis).</param>
+    /// <param name="updated">Bereits um Position/Dauer/Zustand fortgeschriebener Player-Zustand.</param>
+    /// <param name="message">Der Wiedergabe-Takt der Seite.</param>
+    /// <param name="effects">Bereits gesammelte Effekte des Takts (wird um Fenster-Effekte ergänzt).</param>
+    /// <returns>Übergang mit aktualisiertem Player-State und Effekten.</returns>
+    private static AppTransition EvaluateEndWindow(
+        AppModel model, PlayerState player, PlayerState updated,
+        PlaybackProgressMessage message, List<AppEffect> effects)
+    {
         if (message.Duration > TimeSpan.Zero)
         {
             var remaining = message.Duration - message.Position;
+            var endWindow = model.Settings.EndWindow;
 
-            // „Angesehen": Ende abzüglich des eingestellten Fensters erreicht.
+            // Endfenster-Bestätigung: nur aufeinanderfolgende plausible
+            // Takte mit realem Fortschritt im Fenster bauen die Streak
+            // auf; alle übrigen Takte — Pausentakt ohne Fortschritt,
+            // eingefrorene Position bei gemeldetem IsPlaying, geschrumpfte
+            // Dauer, Rückwärtssprung, plausibler Takt außerhalb des
+            // Fensters — setzen sie zurück. Während der Quellauflösung
+            // (IsResolving) ist jede Fensterwirkung gesperrt.
+            updated = updated with
+            {
+                EndWindowStreak = !updated.IsResolving
+                    && IsProgressTickPlausible(player, message)
+                    && remaining <= endWindow
+                        ? player.EndWindowStreak + 1
+                        : 0
+            };
+
+            // „Angesehen": Ende abzüglich des eingestellten Fensters
+            // erreicht — bestätigt durch die erforderliche Streak.
             if (!updated.IsWatched
-                && remaining <= TimeSpan.FromSeconds(model.Settings.WatchedEndWindowSeconds))
+                && remaining <= TimeSpan.FromSeconds(model.Settings.WatchedEndWindowSeconds)
+                && updated.EndWindowStreak >= EndWindowRequiredTicks)
             {
                 updated = updated with { IsWatched = true };
                 // Optionales Aufräumen: einen abgeschlossenen Download
@@ -3849,7 +3926,8 @@ public static class AppUpdate
                 && updated.IsPlaylistPlayback
                 && !updated.PlaylistNextExhausted
                 && !updated.IsResolving
-                && remaining <= TimeSpan.FromSeconds(model.Settings.AutoResumeRemainingSeconds))
+                && remaining <= TimeSpan.FromSeconds(model.Settings.AutoResumeRemainingSeconds)
+                && updated.EndWindowStreak >= EndWindowRequiredTicks)
             {
                 var transition = AdvancePlaylistEntry(
                     MarkEpisodeWatchedInDetails(model, updated), updated, null);
@@ -3861,7 +3939,9 @@ public static class AppUpdate
             if (model.Settings.AutoResumeEnabled
                 && message.IsPlaying
                 && updated.HasNextEpisode
-                && remaining <= TimeSpan.FromSeconds(model.Settings.AutoResumeRemainingSeconds))
+                && !updated.IsResolving
+                && remaining <= TimeSpan.FromSeconds(model.Settings.AutoResumeRemainingSeconds)
+                && updated.EndWindowStreak >= EndWindowRequiredTicks)
             {
                 var transition = AdvanceToNextEpisode(
                     MarkEpisodeWatchedInDetails(model, updated), updated, null);
@@ -3869,6 +3949,10 @@ public static class AppUpdate
                     transition.Model,
                     [.. effects, .. transition.Effects]);
             }
+        }
+        else
+        {
+            updated = updated with { EndWindowStreak = 0 };
         }
 
         return new AppTransition(
@@ -3977,6 +4061,26 @@ public static class AppUpdate
             && player.Position >= TimeSpan.Zero
             && player.Duration - player.Position
                 <= TimeSpan.FromSeconds(PlaybackEndedToleranceSeconds);
+    }
+
+    /// <summary>
+    /// Plausibilitätsprüfung des Fortschrittstakts gegen den Vorgänger-
+    /// Zustand: plausibel ist der Takt nur bei bekannter Gesamtdauer,
+    /// nicht-negativer Position, realem Fortschritt (Position weiter als
+    /// zuletzt gemeldet — ein eingefrorener Wert bei laufender Wiedergabe
+    /// ist ein Stall-Symptom) und nicht geschrumpfter Dauer (die erste
+    /// bekannte Dauer gilt). Ausreißer-Takte eines gestörten Streams
+    /// dürfen die Endfenster-Streak nicht aufbauen.
+    /// </summary>
+    /// <param name="player">Bisheriger Player-Zustand (letzter gemeldeter Takt).</param>
+    /// <param name="message">Der zu prüfende Wiedergabe-Takt.</param>
+    /// <returns><see langword="true"/>, wenn der Takt einem plausiblen Fortschritt entspricht.</returns>
+    private static bool IsProgressTickPlausible(PlayerState player, PlaybackProgressMessage message)
+    {
+        return message.Duration > TimeSpan.Zero
+            && message.Position >= TimeSpan.Zero
+            && message.Position > player.Position
+            && (player.Duration <= TimeSpan.Zero || message.Duration >= player.Duration);
     }
 
     /// <summary>

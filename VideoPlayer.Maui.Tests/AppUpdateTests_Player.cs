@@ -69,7 +69,8 @@ public class AppUpdateTests_Player
         long mediaId = 31,
         IReadOnlyList<PlayerEpisodeRef>? upcoming = null,
         TimeSpan? duration = null,
-        TimeSpan? position = null) => new()
+        TimeSpan? position = null,
+        int endWindowStreak = 0) => new()
         {
             MediaType = "tvshowepisode",
             MediaId = mediaId,
@@ -78,6 +79,7 @@ public class AppUpdateTests_Player
             IsPlaying = true,
             Duration = duration ?? TimeSpan.FromMinutes(45),
             Position = position ?? TimeSpan.Zero,
+            EndWindowStreak = endWindowStreak,
             UpcomingEpisodes = upcoming ?? [],
             Source = new PlaybackSource
             {
@@ -245,7 +247,7 @@ public class AppUpdateTests_Player
 
         var transition = AppUpdate.Update(
             model,
-            new PlaybackProgressMessage(position, duration, true, false));
+            new PlaybackProgressMessage(position, duration, true, false, 31));
 
         var player = transition.Model.Player;
         Assert.Equal(position, player.Position);
@@ -269,7 +271,7 @@ public class AppUpdateTests_Player
         var transition = AppUpdate.Update(
             model,
             new PlaybackProgressMessage(
-                TimeSpan.FromMinutes(5), TimeSpan.FromMinutes(45), true, false));
+                TimeSpan.FromMinutes(5), TimeSpan.FromMinutes(45), true, false, 31));
 
         var report = Assert.IsType<ReportPlaybackProgressEffect>(
             Assert.Single(transition.Effects, e => e is ReportPlaybackProgressEffect));
@@ -288,13 +290,13 @@ public class AppUpdateTests_Player
         var transition = AppUpdate.Update(
             model,
             new PlaybackProgressMessage(
-                TimeSpan.FromMinutes(5), TimeSpan.FromMinutes(45), false, false));
+                TimeSpan.FromMinutes(5), TimeSpan.FromMinutes(45), false, false, 31));
 
         Assert.Empty(transition.Effects);
         Assert.False(transition.Model.Player.IsPlaying);
     }
 
-    /// <summary>Prüft PlaybackProgress: Ende im „angesehen"-Fenster → IsWatched.</summary>
+    /// <summary>Prüft PlaybackProgress: Ende im „angesehen"-Fenster → IsWatched (bestätigt ab dem zweiten Takt).</summary>
     [Fact]
     public void PlaybackProgress_MarksWatchedWithinWindow()
     {
@@ -306,20 +308,28 @@ public class AppUpdateTests_Player
         var outside = AppUpdate.Update(
             model,
             new PlaybackProgressMessage(
-                duration - TimeSpan.FromSeconds(window + 1), duration, true, false));
+                duration - TimeSpan.FromSeconds(window + 1), duration, true, false, 31));
         Assert.False(outside.Model.Player.IsWatched);
 
-        // Innerhalb des Fensters → „angesehen".
-        var inside = AppUpdate.Update(
+        // Erster plausibler Takt im Fenster → Streak 1, noch keine Markierung.
+        var first = AppUpdate.Update(
             model,
             new PlaybackProgressMessage(
-                duration - TimeSpan.FromSeconds(window), duration, true, false));
+                duration - TimeSpan.FromSeconds(window), duration, true, false, 31));
+        Assert.Equal(1, first.Model.Player.EndWindowStreak);
+        Assert.False(first.Model.Player.IsWatched);
+
+        // Zweiter aufeinanderfolgender Fenstertakt → „angesehen".
+        var inside = AppUpdate.Update(
+            first.Model,
+            new PlaybackProgressMessage(
+                duration - TimeSpan.FromSeconds(window - 1), duration, true, false, 31));
         Assert.True(inside.Model.Player.IsWatched);
     }
 
     // --- Auto-Fortsetzung ---
 
-    /// <summary>Prüft Auto-Fortsetzung: Restlaufzeit im Fenster + Schalter an → nächste Episode.</summary>
+    /// <summary>Prüft Auto-Fortsetzung: Restlaufzeit im Fenster + Schalter an → nächste Episode (ab dem zweiten Fenstertakt).</summary>
     [Fact]
     public void PlaybackProgress_AutoResumeAdvancesWhenEnabled()
     {
@@ -330,10 +340,18 @@ public class AppUpdateTests_Player
             Settings = new AppSettings { AutoResumeEnabled = true, AutoResumeRemainingSeconds = 300 }
         };
 
-        var transition = AppUpdate.Update(
+        // Der Fenstereintritt ist bestätigungspflichtig: der erste
+        // plausible Takt baut nur die Streak auf.
+        var first = AppUpdate.Update(
             model,
             new PlaybackProgressMessage(
-                duration - TimeSpan.FromSeconds(299), duration, true, false));
+                duration - TimeSpan.FromSeconds(299), duration, true, false, 31));
+        Assert.Equal(31, first.Model.Player.MediaId);
+
+        var transition = AppUpdate.Update(
+            first.Model,
+            new PlaybackProgressMessage(
+                duration - TimeSpan.FromSeconds(298), duration, true, false, 31));
 
         var player = transition.Model.Player;
         Assert.Equal(32, player.MediaId);
@@ -344,12 +362,12 @@ public class AppUpdateTests_Player
         Assert.Empty(player.UpcomingEpisodes);
     }
 
-    /// <summary>Prüft Auto-Fortsetzung: Schalter aus → kein Wechsel trotz Fenster-Unterschreitung.</summary>
+    /// <summary>Prüft Auto-Fortsetzung: Schalter aus → kein Wechsel trotz bestätigtem Fenstereintritt.</summary>
     [Fact]
     public void PlaybackProgress_AutoResumeDisabled_DoesNotAdvance()
     {
         var duration = TimeSpan.FromMinutes(45);
-        var model = WithPlayer(PlayingState(upcoming:
+        var model = WithPlayer(PlayingState(endWindowStreak: 1, upcoming:
             [new PlayerEpisodeRef { MediaId = 32, Title = "Folge 2" }])) with
         {
             Settings = new AppSettings { AutoResumeEnabled = false }
@@ -358,7 +376,7 @@ public class AppUpdateTests_Player
         var transition = AppUpdate.Update(
             model,
             new PlaybackProgressMessage(
-                duration - TimeSpan.FromSeconds(10), duration, true, false));
+                duration - TimeSpan.FromSeconds(10), duration, true, false, 31));
 
         Assert.Equal(31, transition.Model.Player.MediaId);
         Assert.DoesNotContain(transition.Effects, e => e is ResolvePlaybackSourceEffect);
@@ -369,7 +387,7 @@ public class AppUpdateTests_Player
     public void PlaybackProgress_AboveResumeWindow_DoesNotAdvance()
     {
         var duration = TimeSpan.FromMinutes(45);
-        var model = WithPlayer(PlayingState(upcoming:
+        var model = WithPlayer(PlayingState(endWindowStreak: 1, upcoming:
             [new PlayerEpisodeRef { MediaId = 32, Title = "Folge 2" }])) with
         {
             Settings = new AppSettings { AutoResumeEnabled = true, AutoResumeRemainingSeconds = 300 }
@@ -378,18 +396,20 @@ public class AppUpdateTests_Player
         var transition = AppUpdate.Update(
             model,
             new PlaybackProgressMessage(
-                duration - TimeSpan.FromSeconds(301), duration, true, false));
+                duration - TimeSpan.FromSeconds(301), duration, true, false, 31));
 
+        // Ein Takt außerhalb des Fensters setzt die Streak zurück.
+        Assert.Equal(0, transition.Model.Player.EndWindowStreak);
         Assert.Equal(31, transition.Model.Player.MediaId);
         Assert.DoesNotContain(transition.Effects, e => e is ResolvePlaybackSourceEffect);
     }
 
-    /// <summary>Prüft Auto-Fortsetzung: Takt im Pausenzustand → kein Wechsel trotz Fenster-Unterschreitung.</summary>
+    /// <summary>Prüft Auto-Fortsetzung: Takt im Pausenzustand → kein Wechsel trotz bestätigtem Fenstereintritt.</summary>
     [Fact]
     public void PlaybackProgress_PausedWithinWindow_DoesNotAdvance()
     {
         var duration = TimeSpan.FromMinutes(45);
-        var model = WithPlayer(PlayingState(upcoming:
+        var model = WithPlayer(PlayingState(endWindowStreak: 1, upcoming:
             [new PlayerEpisodeRef { MediaId = 32, Title = "Folge 2" }])) with
         {
             Settings = new AppSettings { AutoResumeEnabled = true, AutoResumeRemainingSeconds = 300 }
@@ -398,25 +418,288 @@ public class AppUpdateTests_Player
         var transition = AppUpdate.Update(
             model,
             new PlaybackProgressMessage(
-                duration - TimeSpan.FromSeconds(10), duration, false, false));
+                duration - TimeSpan.FromSeconds(10), duration, false, false, 31));
 
         Assert.Equal(31, transition.Model.Player.MediaId);
         Assert.DoesNotContain(transition.Effects, e => e is ResolvePlaybackSourceEffect);
     }
 
-    /// <summary>Prüft Auto-Fortsetzung: keine Folge-Episode → kein Wechsel.</summary>
+    /// <summary>Prüft Auto-Fortsetzung: keine Folge-Episode → kein Wechsel trotz bestätigtem Fenstereintritt.</summary>
     [Fact]
     public void PlaybackProgress_NoNextEpisode_DoesNotAdvance()
     {
         var duration = TimeSpan.FromMinutes(45);
-        var model = WithPlayer(PlayingState());
+        var model = WithPlayer(PlayingState(endWindowStreak: 1));
 
         var transition = AppUpdate.Update(
             model,
             new PlaybackProgressMessage(
-                duration - TimeSpan.FromSeconds(10), duration, true, false));
+                duration - TimeSpan.FromSeconds(10), duration, true, false, 31));
 
         Assert.Equal(31, transition.Model.Player.MediaId);
+        Assert.DoesNotContain(transition.Effects, e => e is ResolvePlaybackSourceEffect);
+    }
+
+    // --- Endfenster-Plausibilisierung (Takt-Plausibilität, Streak, Identität) ---
+
+    /// <summary>Prüft die Fenster-Plausibilisierung: ein einzelner Fenstertakt löst weder Wechsel noch „angesehen" aus.</summary>
+    [Fact]
+    public void PlaybackProgress_SingleWindowTick_DoesNotAdvance()
+    {
+        var duration = TimeSpan.FromMinutes(45);
+        var model = WithPlayer(PlayingState(upcoming:
+            [new PlayerEpisodeRef { MediaId = 32, Title = "Folge 2" }])) with
+        {
+            Settings = new AppSettings { AutoResumeEnabled = true }
+        };
+
+        var transition = AppUpdate.Update(
+            model,
+            new PlaybackProgressMessage(
+                duration - TimeSpan.FromSeconds(10), duration, true, false, 31));
+
+        var player = transition.Model.Player;
+        Assert.Equal(1, player.EndWindowStreak);
+        Assert.False(player.IsWatched);
+        Assert.Equal(31, player.MediaId);
+        Assert.DoesNotContain(transition.Effects, e => e is ResolvePlaybackSourceEffect);
+    }
+
+    /// <summary>Prüft die Fenster-Plausibilisierung: der zweite plausible Fenstertakt markiert „angesehen" und schaltet weiter.</summary>
+    [Fact]
+    public void PlaybackProgress_SecondWindowTick_AdvancesAndMarksWatched()
+    {
+        var duration = TimeSpan.FromMinutes(45);
+        // Mit geladenen Details bleibt die „angesehen"-Markierung der
+        // beendeten Episode beobachtbar (der neue Player-Stand der
+        // Folge-Episode führt IsWatched=false).
+        var model = WithDetails(ShowDetails()) with
+        {
+            Player = PlayingState(upcoming:
+                [new PlayerEpisodeRef { MediaId = 32, Title = "Folge 2" }]),
+            Settings = new AppSettings { AutoResumeEnabled = true }
+        };
+
+        var first = AppUpdate.Update(
+            model,
+            new PlaybackProgressMessage(
+                duration - TimeSpan.FromSeconds(11), duration, true, false, 31));
+        var transition = AppUpdate.Update(
+            first.Model,
+            new PlaybackProgressMessage(
+                duration - TimeSpan.FromSeconds(10), duration, true, false, 31));
+
+        var player = transition.Model.Player;
+        Assert.Equal(32, player.MediaId);
+        Assert.True(player.IsResolving);
+        Assert.Equal(0, player.EndWindowStreak);
+        Assert.Contains(transition.Effects, e =>
+            e is ResolvePlaybackSourceEffect r && r.MediaId == 32);
+        // Die beendete Episode wurde als gesehen markiert.
+        var seasons = transition.Model.MediaDetails.Details!.Seasons;
+        Assert.True(seasons[0].Episodes[0].IsWatched);
+        Assert.False(seasons[0].Episodes[1].IsWatched);
+    }
+
+    /// <summary>Prüft die Fenster-Plausibilisierung: ein eingefrorener Takt bei gemeldetem IsPlaying setzt die Streak zurück.</summary>
+    [Fact]
+    public void PlaybackProgress_FrozenPosition_ResetsStreak()
+    {
+        var duration = TimeSpan.FromMinutes(45);
+        var model = WithPlayer(PlayingState(upcoming:
+            [new PlayerEpisodeRef { MediaId = 32, Title = "Folge 2" }])) with
+        {
+            Settings = new AppSettings { AutoResumeEnabled = true }
+        };
+
+        var position = duration - TimeSpan.FromSeconds(20);
+        var first = AppUpdate.Update(
+            model,
+            new PlaybackProgressMessage(position, duration, true, false, 31));
+
+        // Eingefrorener Takt: Position unverändert bei IsPlaying → Streak 0.
+        var frozen = AppUpdate.Update(
+            first.Model,
+            new PlaybackProgressMessage(position, duration, true, false, 31));
+        Assert.Equal(0, frozen.Model.Player.EndWindowStreak);
+
+        // Der nächste plausible Takt baut die Streak erst wieder bei 1 auf.
+        var third = AppUpdate.Update(
+            frozen.Model,
+            new PlaybackProgressMessage(
+                position + TimeSpan.FromSeconds(5), duration, true, false, 31));
+
+        var player = third.Model.Player;
+        Assert.Equal(1, player.EndWindowStreak);
+        Assert.False(player.IsWatched);
+        Assert.Equal(31, player.MediaId);
+        Assert.DoesNotContain(third.Effects, e => e is ResolvePlaybackSourceEffect);
+    }
+
+    /// <summary>Prüft die Fenster-Plausibilisierung: eine geschrumpfte Dauer setzt die Streak zurück.</summary>
+    [Fact]
+    public void PlaybackProgress_ShrunkDuration_ResetsStreak()
+    {
+        var duration = TimeSpan.FromMinutes(45);
+        var model = WithPlayer(PlayingState(upcoming:
+            [new PlayerEpisodeRef { MediaId = 32, Title = "Folge 2" }])) with
+        {
+            Settings = new AppSettings { AutoResumeEnabled = true }
+        };
+
+        var first = AppUpdate.Update(
+            model,
+            new PlaybackProgressMessage(
+                duration - TimeSpan.FromSeconds(20), duration, true, false, 31));
+
+        // Geschrumpfte Dauer im Fenster → unplausibel, Streak 0.
+        var shrunk = AppUpdate.Update(
+            first.Model,
+            new PlaybackProgressMessage(
+                duration - TimeSpan.FromSeconds(15),
+                duration - TimeSpan.FromMinutes(5), true, false, 31));
+        Assert.Equal(0, shrunk.Model.Player.EndWindowStreak);
+
+        // Erst der nächste plausible Takt mit wieder korrekter Dauer
+        // beginnt die Bestätigung von Neuem (Streak 1).
+        var third = AppUpdate.Update(
+            shrunk.Model,
+            new PlaybackProgressMessage(
+                duration - TimeSpan.FromSeconds(10), duration, true, false, 31));
+
+        var player = third.Model.Player;
+        Assert.Equal(1, player.EndWindowStreak);
+        Assert.False(player.IsWatched);
+        Assert.Equal(31, player.MediaId);
+        Assert.DoesNotContain(third.Effects, e => e is ResolvePlaybackSourceEffect);
+    }
+
+    /// <summary>Prüft die Fenster-Plausibilisierung: ein einzelner Sprung direkt ins Fenster löst nicht sofort aus.</summary>
+    [Fact]
+    public void PlaybackProgress_PositionJump_SingleTick_NoAdvance()
+    {
+        var duration = TimeSpan.FromMinutes(45);
+        var model = WithPlayer(PlayingState(
+            position: TimeSpan.FromMinutes(10),
+            upcoming: [new PlayerEpisodeRef { MediaId = 32, Title = "Folge 2" }])) with
+        {
+            Settings = new AppSettings { AutoResumeEnabled = true }
+        };
+
+        // Einzelner Vorwärtssprung direkt ins Fenster → nur Streak 1.
+        var jumped = AppUpdate.Update(
+            model,
+            new PlaybackProgressMessage(
+                duration - TimeSpan.FromSeconds(10), duration, true, false, 31));
+
+        Assert.Equal(1, jumped.Model.Player.EndWindowStreak);
+        Assert.False(jumped.Model.Player.IsWatched);
+        Assert.Equal(31, jumped.Model.Player.MediaId);
+        Assert.DoesNotContain(jumped.Effects, e => e is ResolvePlaybackSourceEffect);
+
+        // Erst der zweite bestätigende Takt schaltet weiter.
+        var transition = AppUpdate.Update(
+            jumped.Model,
+            new PlaybackProgressMessage(
+                duration - TimeSpan.FromSeconds(5), duration, true, false, 31));
+
+        Assert.Equal(32, transition.Model.Player.MediaId);
+        Assert.Contains(transition.Effects, e =>
+            e is ResolvePlaybackSourceEffect r && r.MediaId == 32);
+    }
+
+    /// <summary>Prüft die Fenster-Plausibilisierung: ein Pausentakt ohne Fortschritt setzt die Streak zurück und löst nichts aus.</summary>
+    [Fact]
+    public void PlaybackProgress_PausedTick_ResetsStreak()
+    {
+        var duration = TimeSpan.FromMinutes(45);
+        var model = WithPlayer(PlayingState(upcoming:
+            [new PlayerEpisodeRef { MediaId = 32, Title = "Folge 2" }])) with
+        {
+            Settings = new AppSettings { AutoResumeEnabled = true }
+        };
+
+        var position = duration - TimeSpan.FromSeconds(20);
+        var first = AppUpdate.Update(
+            model,
+            new PlaybackProgressMessage(position, duration, true, false, 31));
+
+        // Pausentakt ohne Fortschritt → Streak 0, selbst kein Auslöser.
+        var paused = AppUpdate.Update(
+            first.Model,
+            new PlaybackProgressMessage(position, duration, false, false, 31));
+        Assert.Equal(0, paused.Model.Player.EndWindowStreak);
+        Assert.False(paused.Model.Player.IsWatched);
+        Assert.DoesNotContain(paused.Effects, e => e is ResolvePlaybackSourceEffect);
+
+        // Der nächste plausible Takt beginnt die Bestätigung von Neuem.
+        var third = AppUpdate.Update(
+            paused.Model,
+            new PlaybackProgressMessage(
+                position + TimeSpan.FromSeconds(5), duration, true, false, 31));
+
+        Assert.Equal(1, third.Model.Player.EndWindowStreak);
+        Assert.False(third.Model.Player.IsWatched);
+        Assert.Equal(31, third.Model.Player.MediaId);
+    }
+
+    /// <summary>Prüft den Identitäts-Guard: ein nachlaufender Takt des Vorgängermediums wird vollständig verworfen.</summary>
+    [Fact]
+    public void PlaybackProgress_WrongMediaId_IsDiscarded()
+    {
+        var duration = TimeSpan.FromMinutes(45);
+        var model = WithPlayer(PlayingState(mediaId: 32) with
+        {
+            // Zustand direkt nach dem Wechsel: Quellauflösung der
+            // Folge-Episode läuft — das Element meldet noch den
+            // Vorgänger (MediaId 31) mit dessen Endfenster-Werten.
+            Position = TimeSpan.Zero,
+            Duration = TimeSpan.Zero,
+            IsResolving = true,
+            UpcomingEpisodes = [new PlayerEpisodeRef { MediaId = 33, Title = "Folge 3" }]
+        }) with
+        {
+            Settings = new AppSettings
+            {
+                AutoResumeEnabled = true,
+                AutoDeleteWatchedEpisodes = true
+            }
+        };
+
+        var transition = AppUpdate.Update(
+            model,
+            new PlaybackProgressMessage(
+                duration - TimeSpan.FromSeconds(10), duration, true, false, 31));
+
+        Assert.Same(model, transition.Model);
+        Assert.Empty(transition.Effects);
+        Assert.False(transition.Model.Player.IsWatched);
+        Assert.Equal(32, transition.Model.Player.MediaId);
+    }
+
+    /// <summary>Prüft die IsResolving-Sperre: Takte während der Quellauflösung bleiben ohne Fensterwirkung.</summary>
+    [Fact]
+    public void PlaybackProgress_WhileResolving_NoWindowEffects()
+    {
+        var duration = TimeSpan.FromMinutes(45);
+        var model = WithPlayer(PlayingState(endWindowStreak: 1, upcoming:
+            [new PlayerEpisodeRef { MediaId = 32, Title = "Folge 2" }]) with
+        {
+            IsResolving = true
+        }) with
+        {
+            Settings = new AppSettings { AutoResumeEnabled = true }
+        };
+
+        var transition = AppUpdate.Update(
+            model,
+            new PlaybackProgressMessage(
+                duration - TimeSpan.FromSeconds(10), duration, true, false, 31));
+
+        var player = transition.Model.Player;
+        Assert.Equal(0, player.EndWindowStreak);
+        Assert.False(player.IsWatched);
+        Assert.Equal(31, player.MediaId);
         Assert.DoesNotContain(transition.Effects, e => e is ResolvePlaybackSourceEffect);
     }
 
@@ -607,17 +890,21 @@ public class AppUpdateTests_Player
         Assert.False(seasons[0].Episodes[1].IsWatched);
     }
 
-    /// <summary>Prüft PlaybackProgress: das Watched-Fenster markiert die Episode in den geladenen Details.</summary>
+    /// <summary>Prüft PlaybackProgress: das Watched-Fenster markiert die Episode in den geladenen Details (ab dem zweiten Fenstertakt).</summary>
     [Fact]
     public void PlaybackProgress_WatchedWindow_MarksEpisodeWatchedInDetails()
     {
         var duration = TimeSpan.FromMinutes(45);
         var model = WithDetails(ShowDetails()) with { Player = PlayingState() };
 
-        var transition = AppUpdate.Update(
+        var first = AppUpdate.Update(
             model,
             new PlaybackProgressMessage(
-                duration - TimeSpan.FromSeconds(300), duration, true, false));
+                duration - TimeSpan.FromSeconds(300), duration, true, false, 31));
+        var transition = AppUpdate.Update(
+            first.Model,
+            new PlaybackProgressMessage(
+                duration - TimeSpan.FromSeconds(295), duration, true, false, 31));
 
         Assert.True(transition.Model.Player.IsWatched);
         var seasons = transition.Model.MediaDetails.Details!.Seasons;

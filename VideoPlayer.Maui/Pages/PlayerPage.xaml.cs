@@ -35,6 +35,11 @@ public partial class PlayerPage : ContentPage
     private readonly IPictureInPictureService pictureInPicture;
     private readonly ILogger<PlayerPage> logger;
     private string? appliedLocation;
+    // Zuletzt am MediaElement angewendete MediaId — der Fortschrittstakt
+    // meldet sie mit, damit der MVU-Kern nachlaufende Takte des
+    // Vorgängermediums verwerfen kann (Zugriff nur UI-Thread, analog
+    // appliedLocation); 0 = noch keine Quelle angewendet.
+    private long appliedMediaId;
     // Gesetzt, wenn der letzte Quellenwechsel fehlschlug: erzwingt, dass
     // UpdateUi den Setz-/Leerpfad erneut durchläuft — auch wenn das Modell
     // dieselbe Adresse erneut liefert oder die Quelle leert (null == null
@@ -169,11 +174,37 @@ public partial class PlayerPage : ContentPage
         try
         {
             var state = VideoElement.CurrentState;
+            var position = VideoElement.Position;
+            var duration = VideoElement.Duration;
+            var model = mvuHost.Model;
+            // Einmal aus state ableiten — Protokoll und dispatchte
+            // Nachricht müssen dieselben Werte tragen.
+            var isPlaying = state == MediaElementState.Playing;
+            var isBuffering = state is MediaElementState.Buffering or MediaElementState.Opening;
+
+            // Diagnose des Endfenster-Takts: erst der zweite aufeinander-
+            // folgende plausible Takt im Fenster darf „angesehen"/Auto-
+            // Fortsetzung auslösen — das Protokoll soll die auslösenden
+            // Werte des gestörten Streams belegen (keine Quell-URLs).
+            if (duration > TimeSpan.Zero
+                && duration - position <= model.Settings.EndWindow)
+            {
+                logger.LogDebug(
+                    "Fortschrittstakt im Endfenster: Position {Position}, Dauer {Duration}, IsPlaying {IsPlaying}, IsBuffering {IsBuffering}, MediaId {MediaId}, EndWindowStreak {EndWindowStreak}.",
+                    position,
+                    duration,
+                    isPlaying,
+                    isBuffering,
+                    appliedMediaId,
+                    model.Player.EndWindowStreak);
+            }
+
             _ = mvuHost.DispatchAsync(new PlaybackProgressMessage(
-                VideoElement.Position,
-                VideoElement.Duration,
-                state == MediaElementState.Playing,
-                state is MediaElementState.Buffering or MediaElementState.Opening));
+                position,
+                duration,
+                isPlaying,
+                isBuffering,
+                appliedMediaId));
         }
         catch (Exception ex)
         {
@@ -231,6 +262,8 @@ public partial class PlayerPage : ContentPage
             {
                 VideoElement.Stop();
                 VideoElement.Source = null;
+                // Geleerte Quelle: keine Medienidentität mehr melden.
+                appliedMediaId = 0;
             }
             catch (Exception ex)
             {
@@ -253,6 +286,13 @@ public partial class PlayerPage : ContentPage
             VideoElement.Source = player.Source.Kind == PlaybackSourceKind.LocalFile
                 ? MediaSource.FromFile(location)
                 : MediaSource.FromUri(location);
+            // Identität der gemeldeten Takte erst nach dem erfolgreichen
+            // Quellenwechsel umschwenken: schlägt das Setzen fehl, spielt
+            // das Element das Altmedium weiter — nachlaufende Takte
+            // müssen dann noch die alte Id tragen, damit der
+            // Identitäts-Guard des MVU-Kerns sie verwerfen kann (statt
+            // Alt-Positionen unter der neuen MediaId anzurechnen).
+            appliedMediaId = player.MediaId;
         }
         catch (Exception ex)
         {

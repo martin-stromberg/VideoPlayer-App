@@ -999,12 +999,19 @@ public sealed record PlaybackSourceResolvedMessage(
 /// <param name="Duration">Gesamtdauer des Mediums.</param>
 /// <param name="IsPlaying"><c>true</c>, wenn die Wiedergabe läuft.</param>
 /// <param name="IsBuffering"><c>true</c>, wenn der Player puffert.</param>
+/// <param name="MediaId">
+/// Id des Mediums, dessen Wiedergabeelement die Werte meldet (die zuletzt
+/// am Element angewendete Identität); <c>0</c> = noch keine Quelle
+/// angewendet. Ein Takt mit abweichender Id wird verworfen — nachlaufende
+/// Meldungen des Vorgängermediums dürfen den Folgezustand nicht treffen.
+/// </param>
 /// <returns>Nachricht mit dem Wiedergabe-Takt.</returns>
 public sealed record PlaybackProgressMessage(
     TimeSpan Position,
     TimeSpan Duration,
     bool IsPlaying,
-    bool IsBuffering) : AppMessage;
+    bool IsBuffering,
+    long MediaId) : AppMessage;
 
 /// <summary>Die Wiedergabe ist regulär zu Ende (Medium abgespielt).</summary>
 public sealed record PlaybackEndedMessage : AppMessage;

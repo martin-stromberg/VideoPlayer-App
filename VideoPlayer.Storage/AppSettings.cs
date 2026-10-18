@@ -35,6 +35,18 @@ public sealed record AppSettings
     /// </summary>
     public int WatchedEndWindowSeconds { get; init; } = 300;
 
+    /// <summary>
+    /// Gemeinsames Endfenster der Wiedergabe-Auswertung: das Maximum aus
+    /// „angesehen"-Fenster (<see cref="WatchedEndWindowSeconds"/>) und
+    /// Auto-Fortsetzungsfenster (<see cref="AutoResumeRemainingSeconds"/>) —
+    /// Maßstab, ab welcher Restlaufzeit ein Fortschrittstakt als Fenstertakt
+    /// gilt (MVU-Kern und Diagnose-Log am App-Rand werten dasselbe Fenster
+    /// aus).
+    /// </summary>
+    /// <returns>Die größere der beiden konfigurierten Fenster als <see cref="TimeSpan"/>.</returns>
+    public TimeSpan EndWindow => TimeSpan.FromSeconds(
+        Math.Max(WatchedEndWindowSeconds, AutoResumeRemainingSeconds));
+
     /// <summary>Speicherplatzkontingent für Downloads in Gigabyte (1–500, Standard 5).</summary>
     public int DownloadQuotaGb { get; init; } = DefaultDownloadQuotaGb;
 

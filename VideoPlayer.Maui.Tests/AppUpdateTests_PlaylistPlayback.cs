@@ -528,19 +528,35 @@ public class AppUpdateTests_PlaylistPlayback
         Assert.False(next.Player.IsWatched);
     }
 
-    /// <summary>Prüft PlaybackProgress: am Titelende schaltet der Server zum Folgeeintrag weiter.</summary>
+    /// <summary>Prüft die Fenster-Bestätigung im Playlist-Kontext: einzelner Fenstertakt kein Advance, zwei plausible Takte → Advance.</summary>
     [Fact]
-    public void PlaybackProgress_NearEnd_InPlaylist_AdvancesPlaylist()
+    public void PlaybackProgress_NearEnd_TwoTicks_AdvancesPlaylist()
     {
         var model = PlayingInPlaylist();
 
-        var (next, effects) = AppUpdate.Update(
+        // Erster Fenstertakt: Streak 1 — noch kein Advance.
+        var first = AppUpdate.Update(
             model,
             new PlaybackProgressMessage(
                 Position: TimeSpan.FromSeconds(97),
                 Duration: TimeSpan.FromSeconds(100),
                 IsPlaying: true,
-                IsBuffering: false));
+                IsBuffering: false,
+                MediaId: 10));
+
+        Assert.Equal(1, first.Model.Player.EndWindowStreak);
+        Assert.False(first.Model.Player.IsResolving);
+        Assert.DoesNotContain(first.Effects, e => e is AdvancePlaylistEntryEffect);
+
+        // Zweiter plausibler Fenstertakt: bestätigt → Advance.
+        var (next, effects) = AppUpdate.Update(
+            first.Model,
+            new PlaybackProgressMessage(
+                Position: TimeSpan.FromSeconds(98),
+                Duration: TimeSpan.FromSeconds(100),
+                IsPlaying: true,
+                IsBuffering: false,
+                MediaId: 10));
 
         Assert.True(next.Player.IsResolving);
         Assert.Contains(effects, e => e is AdvancePlaylistEntryEffect);
@@ -552,14 +568,16 @@ public class AppUpdateTests_PlaylistPlayback
     {
         var model = PlayingInPlaylist(isResolving: true);
 
-        var (_, effects) = AppUpdate.Update(
+        var (next, effects) = AppUpdate.Update(
             model,
             new PlaybackProgressMessage(
                 Position: TimeSpan.FromSeconds(97),
                 Duration: TimeSpan.FromSeconds(100),
                 IsPlaying: true,
-                IsBuffering: false));
+                IsBuffering: false,
+                MediaId: 10));
 
+        Assert.Equal(0, next.Player.EndWindowStreak);
         Assert.DoesNotContain(effects, e => e is AdvancePlaylistEntryEffect);
     }
 
@@ -654,7 +672,8 @@ public class AppUpdateTests_PlaylistPlayback
                 Position: TimeSpan.FromSeconds(50),
                 Duration: TimeSpan.FromSeconds(100),
                 IsPlaying: true,
-                IsBuffering: false));
+                IsBuffering: false,
+                MediaId: 10));
 
         var report = Assert.IsType<ReportPlaybackProgressEffect>(Assert.Single(effects));
         Assert.Equal(7, report.PlaylistId);

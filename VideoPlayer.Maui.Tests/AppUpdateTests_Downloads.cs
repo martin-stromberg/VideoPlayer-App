@@ -500,9 +500,9 @@ public class AppUpdateTests_Downloads
         Assert.DoesNotContain(transition.Effects, e => e is RunAutoDownloadsEffect);
     }
 
-    /// <summary>Prüft Progress: gesehene Episode + Schalter → Lösch-Effekt.</summary>
+    /// <summary>Prüft die Fenster-Bestätigung: der Lösch-Effekt greift erst ab dem zweiten plausiblen Fenstertakt.</summary>
     [Fact]
-    public void PlaybackProgress_WatchedEpisode_EmitsAutoDelete()
+    public void PlaybackProgress_TwoWindowTicks_EmitsAutoDelete()
     {
         var model = ConnectedModel() with
         {
@@ -514,11 +514,21 @@ public class AppUpdateTests_Downloads
                 Attempted = true
             }
         };
-        var transition = AppUpdate.Update(
+
+        // Einzelner Fenstertakt: noch keine Markierung, kein Lösch-Effekt.
+        var first = AppUpdate.Update(
             model,
             new PlaybackProgressMessage(
-                TimeSpan.FromMinutes(88), TimeSpan.FromMinutes(90), true, false));
+                TimeSpan.FromMinutes(88), TimeSpan.FromMinutes(90), true, false, 33));
+        Assert.Equal(1, first.Model.Player.EndWindowStreak);
+        Assert.False(first.Model.Player.IsWatched);
+        Assert.DoesNotContain(first.Effects, e => e is DeleteWatchedDownloadEffect);
 
+        // Erst der zweite plausible Fenstertakt löst Markierung und Löschung aus.
+        var transition = AppUpdate.Update(
+            first.Model,
+            new PlaybackProgressMessage(
+                TimeSpan.FromMinutes(89), TimeSpan.FromMinutes(90), true, false, 33));
         Assert.True(transition.Model.Player.IsWatched);
         Assert.Contains(transition.Effects, e =>
             e is DeleteWatchedDownloadEffect d && d.MediaId == 33);
@@ -538,11 +548,16 @@ public class AppUpdateTests_Downloads
                 Attempted = true
             }
         };
-        var transition = AppUpdate.Update(
+        var first = AppUpdate.Update(
             model,
             new PlaybackProgressMessage(
-                TimeSpan.FromMinutes(88), TimeSpan.FromMinutes(90), true, false));
+                TimeSpan.FromMinutes(88), TimeSpan.FromMinutes(90), true, false, 33));
+        var transition = AppUpdate.Update(
+            first.Model,
+            new PlaybackProgressMessage(
+                TimeSpan.FromMinutes(89), TimeSpan.FromMinutes(90), true, false, 33));
 
+        Assert.True(transition.Model.Player.IsWatched);
         Assert.DoesNotContain(transition.Effects, e => e is DeleteWatchedDownloadEffect);
     }
 
@@ -560,11 +575,16 @@ public class AppUpdateTests_Downloads
                 Attempted = true
             }
         };
-        var transition = AppUpdate.Update(
+        var first = AppUpdate.Update(
             model,
             new PlaybackProgressMessage(
-                TimeSpan.FromMinutes(88), TimeSpan.FromMinutes(90), true, false));
+                TimeSpan.FromMinutes(88), TimeSpan.FromMinutes(90), true, false, 33));
+        var transition = AppUpdate.Update(
+            first.Model,
+            new PlaybackProgressMessage(
+                TimeSpan.FromMinutes(89), TimeSpan.FromMinutes(90), true, false, 33));
 
+        Assert.True(transition.Model.Player.IsWatched);
         Assert.DoesNotContain(transition.Effects, e => e is DeleteWatchedDownloadEffect);
     }
 
