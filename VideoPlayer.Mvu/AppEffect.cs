@@ -739,6 +739,16 @@ public sealed record DeleteAllDownloadsEffect(AppSettings Settings) : AppEffect;
 public sealed record PurgeOrphanedDownloadsEffect(AppSettings Settings) : AppEffect;
 
 /// <summary>
+/// Alle fehlgeschlagenen und abgebrochenen Downloads entfernen: deren
+/// Dateien und Manifest-Zeilen löschen; anschließend wird die Liste neu
+/// geladen (<c>DownloadsLoadedMessage</c>). Wartende, laufende und
+/// abgeschlossene Downloads bleiben unberührt.
+/// </summary>
+/// <param name="Settings">Aktuelle App-Einstellungen (für das Neu-Laden der Liste).</param>
+/// <returns>Effekt-Datensatz für die Fehler-Löschung.</returns>
+public sealed record DeleteFailedDownloadsEffect(AppSettings Settings) : AppEffect;
+
+/// <summary>
 /// Unterbrochene Downloads wiederaufnehmen: wartende und verwaist
 /// laufende Aufträge sowie nicht-Quota-Fehlschläge werden erneut
 /// eingeplant (der Server-Stream unterstützt keine Range-Fortsetzung —

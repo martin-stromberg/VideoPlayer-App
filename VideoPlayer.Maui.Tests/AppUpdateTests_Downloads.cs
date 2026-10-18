@@ -146,6 +146,44 @@ public class AppUpdateTests_Downloads
         Assert.Empty(transition.Effects);
     }
 
+    /// <summary>Prüft DeleteFailed: mit fehlerhaftem Eintrag wird der Fehler-Lösch-Effekt erzeugt.</summary>
+    [Fact]
+    public void DownloadsDeleteFailed_WithFailedItems_EmitsEffect()
+    {
+        var transition = AppUpdate.Update(
+            ConnectedModel() with
+            {
+                Downloads = DownloadsPageState.Initial with
+                {
+                    Items = [Item(1, state: DownloadState.Failed)]
+                }
+            },
+            new DownloadsDeleteFailedRequestedMessage());
+
+        Assert.IsType<DeleteFailedDownloadsEffect>(Assert.Single(transition.Effects));
+    }
+
+    /// <summary>Prüft DeleteFailed: nur aktive/fertige Einträge → kein Effekt.</summary>
+    [Fact]
+    public void DownloadsDeleteFailed_WithoutFailedItems_NoEffect()
+    {
+        var transition = AppUpdate.Update(
+            ConnectedModel() with
+            {
+                Downloads = DownloadsPageState.Initial with
+                {
+                    Items =
+                    [
+                        Item(1, state: DownloadState.Queued),
+                        Item(2, state: DownloadState.Completed)
+                    ]
+                }
+            },
+            new DownloadsDeleteFailedRequestedMessage());
+
+        Assert.Empty(transition.Effects);
+    }
+
     /// <summary>Prüft Requested: verbunden → Einreihe-Effekt.</summary>
     [Fact]
     public void DownloadRequested_Connected_EnqueuesDownload()

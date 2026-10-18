@@ -306,6 +306,7 @@ public static class AppUpdate
             DownloadDeleteRequestedMessage requested => UpdateDownloadDeleteRequested(model, requested),
             DownloadsDeleteAllRequestedMessage => UpdateDownloadsDeleteAllRequested(model),
             DownloadsPurgeOrphansRequestedMessage => UpdateDownloadsPurgeOrphansRequested(model),
+            DownloadsDeleteFailedRequestedMessage => UpdateDownloadsDeleteFailedRequested(model),
             SendLogProtocolRequestedMessage => UpdateSendLogProtocolRequested(model),
             SendLogProtocolCompletedMessage completed => UpdateSendLogProtocolCompleted(model, completed),
             LogoutRequestedMessage => UpdateLogoutRequested(model),
@@ -4356,6 +4357,15 @@ public static class AppUpdate
     {
         return model.Downloads.OrphanedBytes > 0
             ? new AppTransition(model, [new PurgeOrphanedDownloadsEffect(model.Settings)])
+            : AppTransition.Unchanged(model);
+    }
+
+    private static AppTransition UpdateDownloadsDeleteFailedRequested(AppModel model)
+    {
+        // Die Rückfrage lief bereits im UI — hier nur der Effekt, wenn
+        // überhaupt fehlerhafte oder abgebrochene Einträge vorhanden sind.
+        return model.Downloads.HasFailedItems
+            ? new AppTransition(model, [new DeleteFailedDownloadsEffect(model.Settings)])
             : AppTransition.Unchanged(model);
     }
 
