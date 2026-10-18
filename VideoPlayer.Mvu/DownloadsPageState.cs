@@ -36,6 +36,10 @@ public sealed record DownloadsPageState
     /// <summary>Die Liste enthält Einträge.</summary>
     public bool HasItems => Items.Count > 0;
 
+    /// <summary>Mindestens ein Eintrag ist fehlgeschlagen oder abgebrochen (Voraussetzung der Aktion „Alle Fehler löschen").</summary>
+    public bool HasFailedItems =>
+        Items.Any(i => i.State is DownloadState.Failed or DownloadState.Cancelled);
+
     /// <summary>Der letzte Ladelauf ist fehlgeschlagen.</summary>
     public bool HasError => Error is not null;
 

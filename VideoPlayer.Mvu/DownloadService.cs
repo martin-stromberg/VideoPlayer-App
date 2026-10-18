@@ -680,6 +680,59 @@ public sealed class DownloadService
     }
 
     /// <summary>
+    /// Entfernt alle fehlgeschlagenen und abgebrochenen Downloads in einem
+    /// Schritt: löscht deren Dateien und Manifest-Zeilen und meldet das
+    /// Entfernen je Eintrag über <see cref="ItemRemoved"/>. Wartende,
+    /// laufende und abgeschlossene Downloads bleiben unberührt — anders
+    /// als <see cref="DeleteAllAsync"/> werden keine Transfers abgebrochen.
+    /// </summary>
+    /// <param name="cancellationToken">Bricht die Manifest-Operationen ab.</param>
+    /// <returns>Die Anzahl entfernter Manifest-Einträge.</returns>
+    public async Task<int> DeleteFailedAsync(CancellationToken cancellationToken = default)
+    {
+        List<DownloadManifestEntry> failed;
+        try
+        {
+            var entries = await cache.Connection.Table<DownloadManifestEntry>().ToListAsync();
+            failed = entries
+                .Where(e => DownloadStateNames.FromPersisted(e.State)
+                    is DownloadState.Failed or DownloadState.Cancelled)
+                .ToList();
+        }
+        catch (Exception ex) when (ex is SQLite.SQLiteException or InvalidOperationException)
+        {
+            logger.LogWarning(ex, "Download-Manifest nicht lesbar — Löschung der Fehlereinträge übersprungen.");
+            return 0;
+        }
+
+        foreach (var entry in failed)
+        {
+            TryDeleteFile(entry.FilePath);
+        }
+
+        await manifestGate.WaitAsync(cancellationToken);
+        try
+        {
+            foreach (var entry in failed)
+            {
+                await cache.Connection.DeleteAsync(entry);
+            }
+        }
+        finally
+        {
+            manifestGate.Release();
+        }
+
+        foreach (var entry in failed)
+        {
+            RaiseItemRemoved(entry.VideoType, entry.VideoId);
+        }
+
+        logger.LogInformation("{Count} fehlgeschlagene/abgebrochene Downloads entfernt.", failed.Count);
+        return failed.Count;
+    }
+
+    /// <summary>
     /// Entfernt erkannte Restdaten: Dateien im Video-Ablageort ohne
     /// Manifest-Eintrag (Dateien verwalteter Downloads bleiben unberührt).
     /// </summary>

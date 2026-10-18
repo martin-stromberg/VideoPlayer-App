@@ -32,18 +32,31 @@
                     IsVisible="False" />
         </HorizontalStackLayout>
 
-        <!-- Gesamtaktion: alle Downloads löschen (mit Rückfrage) — nur
-             sichtbar, wenn Einträge oder Restdaten vorhanden sind. -->
-        <Button x:Name="DeleteAllButton"
-                Grid.Row="0"
-                HorizontalOptions="End"
-                Text="Alle löschen"
-                Style="{StaticResource GhostButton}"
-                TextColor="{StaticResource VpDanger}"
-                FontSize="12"
-                Padding="10,4"
-                Clicked="OnDeleteAllClicked"
-                IsVisible="False" />
+        <!-- Gesamtaktionen (jeweils mit Rückfrage): fehlerhafte bzw.
+             alle Downloads löschen — Sichtbarkeit zustandsabhängig im
+             Code-Behind. -->
+        <HorizontalStackLayout Grid.Row="0"
+                               HorizontalOptions="End"
+                               Spacing="8">
+            <Button x:Name="DeleteFailedButton"
+                    AutomationId="DeleteFailedButton"
+                    Text="Alle Fehler löschen"
+                    Style="{StaticResource GhostButton}"
+                    TextColor="{StaticResource VpDanger}"
+                    FontSize="12"
+                    Padding="10,4"
+                    Clicked="OnDeleteFailedClicked"
+                    IsVisible="False" />
+            <Button x:Name="DeleteAllButton"
+                    AutomationId="DeleteAllButton"
+                    Text="Alle löschen"
+                    Style="{StaticResource GhostButton}"
+                    TextColor="{StaticResource VpDanger}"
+                    FontSize="12"
+                    Padding="10,4"
+                    Clicked="OnDeleteAllClicked"
+                    IsVisible="False" />
+        </HorizontalStackLayout>
 
         <!-- Hinweis im Offline-Zustand: die Liste liegt lokal vor;
              wartende Downloads starten mit der Verbindung. -->
@@ -75,6 +88,7 @@
         </VerticalStackLayout>
 
         <Label x:Name="EmptyLabel"
+               AutomationId="EmptyLabel"
                Grid.Row="2"
                Text="Keine Downloads vorhanden. Medien lassen sich auf der Detailseite herunterladen."
                Style="{StaticResource Caption}"
@@ -88,6 +102,7 @@
              aktualisieren nur den betroffenen Eintrag in-place, ohne
              dass die Liste neu aufgebaut wird (Flackern). -->
         <CollectionView x:Name="DownloadsCollection"
+                        AutomationId="DownloadsCollection"
                         Grid.Row="3">
             <CollectionView.ItemTemplate>
                 <DataTemplate x:DataType="mvu:DownloadItemViewModel">

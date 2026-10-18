@@ -594,6 +594,97 @@ public class DownloadServiceTests : IDisposable
         Assert.NotNull(await ReadEntryAsync("tvshowepisode", 33));
     }
 
+    /// <summary>Prüft Fehler-Löschung: failed- und cancelled-Einträge werden samt Datei entfernt, andere bleiben.</summary>
+    [Fact]
+    public async Task DeleteFailed_FailedAndCancelled_RemovesOnlyThose()
+    {
+        var failedPath = Path.Combine(layout.VideosDirectory, "movie_1.mp4");
+        var cancelledPath = Path.Combine(layout.VideosDirectory, "movie_2.mp4");
+        var completedPath = Path.Combine(layout.VideosDirectory, "movie_3.mp4");
+        await File.WriteAllBytesAsync(failedPath, new byte[10]);
+        await File.WriteAllBytesAsync(cancelledPath, new byte[10]);
+        await File.WriteAllBytesAsync(completedPath, new byte[10]);
+        await cache.Connection.InsertAsync(new DownloadManifestEntry
+        {
+            VideoId = 1,
+            VideoType = "movie",
+            Title = "Fehlerhaft",
+            FilePath = failedPath,
+            State = "failed",
+            Error = DownloadService.ErrorNetwork,
+            UpdatedAtUtc = DateTime.UtcNow
+        });
+        await cache.Connection.InsertAsync(new DownloadManifestEntry
+        {
+            VideoId = 2,
+            VideoType = "movie",
+            Title = "Abgebrochen",
+            FilePath = cancelledPath,
+            State = "cancelled",
+            UpdatedAtUtc = DateTime.UtcNow
+        });
+        await cache.Connection.InsertAsync(new DownloadManifestEntry
+        {
+            VideoId = 3,
+            VideoType = "movie",
+            Title = "Fertig",
+            FilePath = completedPath,
+            State = "completed",
+            SizeBytes = 10,
+            UpdatedAtUtc = DateTime.UtcNow
+        });
+        await cache.Connection.InsertAsync(new DownloadManifestEntry
+        {
+            VideoId = 4,
+            VideoType = "movie",
+            Title = "Wartend",
+            FilePath = Path.Combine(layout.VideosDirectory, "movie_4.mp4"),
+            State = "queued",
+            UpdatedAtUtc = DateTime.UtcNow
+        });
+        var service = CreateService();
+        var removed = new List<DownloadRemovedEventArgs>();
+        service.ItemRemoved += (_, e) => removed.Add(e);
+
+        var count = await service.DeleteFailedAsync();
+
+        Assert.Equal(2, count);
+        Assert.False(File.Exists(failedPath));
+        Assert.False(File.Exists(cancelledPath));
+        Assert.True(File.Exists(completedPath));
+        Assert.Null(await ReadEntryAsync("movie", 1));
+        Assert.Null(await ReadEntryAsync("movie", 2));
+        Assert.NotNull(await ReadEntryAsync("movie", 3));
+        Assert.NotNull(await ReadEntryAsync("movie", 4));
+        Assert.Equal(2, removed.Count);
+        Assert.Contains(removed, e => e.MediaId == 1 && e.MediaType == "movie");
+        Assert.Contains(removed, e => e.MediaId == 2 && e.MediaType == "movie");
+    }
+
+    /// <summary>Prüft Fehler-Löschung: ohne fehlerhafte Einträge bleibt alles unberührt.</summary>
+    [Fact]
+    public async Task DeleteFailed_NoMatchingEntries_ReturnsZero()
+    {
+        await cache.Connection.InsertAsync(new DownloadManifestEntry
+        {
+            VideoId = 3,
+            VideoType = "movie",
+            Title = "Fertig",
+            FilePath = Path.Combine(layout.VideosDirectory, "movie_3.mp4"),
+            State = "completed",
+            UpdatedAtUtc = DateTime.UtcNow
+        });
+        var service = CreateService();
+        var removed = new List<DownloadRemovedEventArgs>();
+        service.ItemRemoved += (_, e) => removed.Add(e);
+
+        var count = await service.DeleteFailedAsync();
+
+        Assert.Equal(0, count);
+        Assert.Empty(removed);
+        Assert.NotNull(await ReadEntryAsync("movie", 3));
+    }
+
     /// <summary>Prüft Retry: fehlgeschlagener Download wird erneut eingeplant.</summary>
     [Fact]
     public async Task Enqueue_FailedEntry_Retries()
