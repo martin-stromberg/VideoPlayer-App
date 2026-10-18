@@ -40,6 +40,10 @@ auch offline, weil der Bestand lokal im Download-Manifest liegt.
   entfernt Datei und Eintrag, laufende Transfers werden abgebrochen).
 - **„Alle löschen"** (Kopfbereich, mit Rückfrage) entfernt alle
   Aufträge, Dateien und Restdaten.
+- **„Alle Fehler löschen"** (Kopfbereich, mit Rückfrage — nur sichtbar,
+  wenn fehlerhafte Einträge vorliegen) entfernt alle fehlgeschlagenen
+  und abgebrochenen Downloads samt Dateien und Manifest-Einträgen;
+  wartende, laufende und fertige Downloads bleiben unberührt.
 - **„Speicher bereinigen"** (unter der Belegungszeile, nur bei erkannten
   Restdaten) entfernt nicht zugeordnete Dateien nach Rückfrage.
 

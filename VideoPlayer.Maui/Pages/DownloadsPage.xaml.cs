@@ -82,6 +82,7 @@ public partial class DownloadsPage : ContentPage
         OrphanedLabel.IsVisible = showOrphans;
         PurgeOrphansButton.IsVisible = showOrphans;
         DeleteAllButton.IsVisible = model.Downloads.HasItems || showOrphans;
+        DeleteFailedButton.IsVisible = model.Downloads.HasFailedItems;
         ErrorPanel.IsVisible = model.Downloads.HasError && !model.Downloads.IsLoading;
         ErrorLabel.Text = model.Downloads.Error;
         EmptyLabel.IsVisible = model.Downloads.ShowEmpty;
@@ -131,6 +132,24 @@ public partial class DownloadsPage : ContentPage
         if (confirmed)
         {
             _ = mvuHost.DispatchAsync(new DownloadsDeleteAllRequestedMessage());
+        }
+    }
+
+    /// <summary>
+    /// „Alle Fehler löschen" mit Rückfrage — Muster: OnDeleteAllClicked.
+    /// </summary>
+    /// <param name="sender">Der auslösende Schalter.</param>
+    /// <param name="e">Die Ereignisdaten.</param>
+    private async void OnDeleteFailedClicked(object? sender, EventArgs e)
+    {
+        var confirmed = await DisplayAlertAsync(
+            "Alle fehlerhaften Downloads löschen?",
+            "Alle fehlgeschlagenen und abgebrochenen Downloads werden dauerhaft entfernt.",
+            "Löschen",
+            "Abbrechen");
+        if (confirmed)
+        {
+            _ = mvuHost.DispatchAsync(new DownloadsDeleteFailedRequestedMessage());
         }
     }
 

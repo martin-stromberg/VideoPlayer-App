@@ -316,6 +316,9 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
             case PurgeOrphanedDownloadsEffect purge:
                 await PurgeOrphanedDownloadsAsync(purge.Settings, cancellationToken);
                 break;
+            case DeleteFailedDownloadsEffect deleteFailed:
+                await DeleteFailedDownloadsAsync(deleteFailed.Settings, cancellationToken);
+                break;
             case ResumeDownloadsEffect resume:
                 await ResumeDownloadsAsync(resume.Settings, cancellationToken);
                 break;
@@ -1569,6 +1572,20 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
         catch (Exception ex)
         {
             logger.LogError(ex, "Restdaten bereinigen fehlgeschlagen");
+        }
+    }
+
+    private async Task DeleteFailedDownloadsAsync(AppSettings settings, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await downloads.DeleteFailedAsync(cancellationToken);
+            // Liste + Belegung neu laden.
+            await LoadDownloadsAsync(settings);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Fehlerhafte Downloads löschen fehlgeschlagen");
         }
     }
 

@@ -170,6 +170,46 @@ public class DownloadsContractTests
         Assert.Contains("downloads.ReconcileAsync", handler, StringComparison.Ordinal);
     }
 
+    /// <summary>Prüft DownloadsPage: Aktion „Alle Fehler löschen" ist verdrahtet (Schalter, Rückfrage, Message, Sichtbarkeit, Effekt-Handler).</summary>
+    [Fact]
+    public void DownloadsPage_WiresDeleteFailed()
+    {
+        var xaml = Read("VideoPlayer.Maui", "Pages", "DownloadsPage.xaml");
+        var code = Read("VideoPlayer.Maui", "Pages", "DownloadsPage.xaml.cs");
+        var handler = Read("VideoPlayer.Maui", "Services", "ShellAppEffectHandler.cs");
+
+        Assert.Contains("DeleteFailedButton", xaml, StringComparison.Ordinal);
+        Assert.Contains("OnDeleteFailedClicked", xaml, StringComparison.Ordinal);
+        Assert.Contains("DownloadsDeleteFailedRequestedMessage", code, StringComparison.Ordinal);
+        Assert.Contains("DisplayAlertAsync", code, StringComparison.Ordinal);
+        Assert.Contains("DeleteFailedButton.IsVisible", code, StringComparison.Ordinal);
+        Assert.Contains("HasFailedItems", code, StringComparison.Ordinal);
+        Assert.Contains("DeleteFailedDownloadsEffect", handler, StringComparison.Ordinal);
+        Assert.Contains("DeleteFailedAsync", handler, StringComparison.Ordinal);
+    }
+
+    /// <summary>Prüft HasFailedItems: nur fehlgeschlagene/abgebrochene Einträge aktivieren die Sammelaktion.</summary>
+    [Fact]
+    public void DownloadsPageState_HasFailedItems_OnlyFailedOrCancelled()
+    {
+        static DownloadListItem Entry(DownloadState state) => new()
+        {
+            EntryId = 1,
+            MediaType = "movie",
+            MediaId = 42,
+            Title = "Film",
+            State = state
+        };
+
+        Assert.True(new DownloadsPageState { Items = [Entry(DownloadState.Failed)] }.HasFailedItems);
+        Assert.True(new DownloadsPageState { Items = [Entry(DownloadState.Cancelled)] }.HasFailedItems);
+        Assert.False(DownloadsPageState.Initial.HasFailedItems);
+        Assert.False(new DownloadsPageState
+        {
+            Items = [Entry(DownloadState.Queued), Entry(DownloadState.Completed)]
+        }.HasFailedItems);
+    }
+
     /// <summary>Prüft DownloadsPage: Hinweiszeile für nicht zugeordnete Restdaten vorhanden.</summary>
     [Fact]
     public void DownloadsPage_ShowsOrphanedHint()
