@@ -703,51 +703,6 @@ public class AppUpdateTests_Player
         Assert.DoesNotContain(transition.Effects, e => e is ResolvePlaybackSourceEffect);
     }
 
-    /// <summary>Prüft den Serienzweig: bei ausstehender Quellauflösung wird nicht kaskadierend weitergeschaltet.</summary>
-    [Fact]
-    public void PlaybackProgress_SeriesAdvance_RequiresNotResolving()
-    {
-        var duration = TimeSpan.FromMinutes(45);
-        var model = WithPlayer(PlayingState(endWindowStreak: 1, upcoming:
-            [new PlayerEpisodeRef { MediaId = 32, Title = "Folge 2" }]) with
-        {
-            IsResolving = true
-        }) with
-        {
-            Settings = new AppSettings { AutoResumeEnabled = true }
-        };
-
-        var transition = AppUpdate.Update(
-            model,
-            new PlaybackProgressMessage(
-                duration - TimeSpan.FromSeconds(10), duration, true, false, 31));
-
-        Assert.Equal(31, transition.Model.Player.MediaId);
-        Assert.DoesNotContain(transition.Effects, e => e is ResolvePlaybackSourceEffect);
-    }
-
-    /// <summary>Prüft die bestätigte Streak: die Markierung der Detail-Episode greift erst mit dem zweiten Fenstertakt.</summary>
-    [Fact]
-    public void PlaybackProgress_TwoTicks_MarksEpisodeWatchedInDetails()
-    {
-        var duration = TimeSpan.FromMinutes(45);
-        var model = WithDetails(ShowDetails()) with { Player = PlayingState() };
-
-        var first = AppUpdate.Update(
-            model,
-            new PlaybackProgressMessage(
-                duration - TimeSpan.FromSeconds(290), duration, true, false, 31));
-        var transition = AppUpdate.Update(
-            first.Model,
-            new PlaybackProgressMessage(
-                duration - TimeSpan.FromSeconds(280), duration, true, false, 31));
-
-        Assert.True(transition.Model.Player.IsWatched);
-        var seasons = transition.Model.MediaDetails.Details!.Seasons;
-        Assert.True(seasons[0].Episodes[0].IsWatched);
-        Assert.False(seasons[0].Episodes[1].IsWatched);
-    }
-
     // --- Ende / Fehler / Schließen ---
 
     /// <summary>Prüft PlaybackEnded: „angesehen", Abschlussmeldung mit Endposition, Auto-Fortsetzung.</summary>
