@@ -29,6 +29,7 @@ public sealed class PlaybackSourceService
     private readonly AuthSessionService authSession;
     private readonly AppSecretsService secrets;
     private readonly CacheDatabase cache;
+    private readonly AppStorageLayout layout;
     private readonly Func<string, bool> fileExists;
     private readonly ILogger<PlaybackSourceService> logger;
 
@@ -36,13 +37,15 @@ public sealed class PlaybackSourceService
     /// <param name="authSession">Sitzungsdienst mit dem angemeldeten API-Client und der Server-Basisadresse.</param>
     /// <param name="secrets">Ablage des Anmelde-Tokens (Fallback, wenn kein Client angemeldet ist).</param>
     /// <param name="cache">Cache-Ablage mit Download-Manifest und gecachten Listen.</param>
+    /// <param name="layout">Ablagelayout mit dem Video-Verzeichnis.</param>
     /// <param name="logger">Optionaler Logger für das Programmprotokoll.</param>
     public PlaybackSourceService(
         AuthSessionService authSession,
         AppSecretsService secrets,
         CacheDatabase cache,
+        AppStorageLayout layout,
         ILogger<PlaybackSourceService>? logger = null)
-        : this(authSession, secrets, cache, null, logger)
+        : this(authSession, secrets, cache, layout, null, logger)
     {
     }
 
@@ -50,18 +53,21 @@ public sealed class PlaybackSourceService
     /// <param name="authSession">Sitzungsdienst mit dem angemeldeten API-Client und der Server-Basisadresse.</param>
     /// <param name="secrets">Ablage des Anmelde-Tokens.</param>
     /// <param name="cache">Cache-Ablage mit Download-Manifest und gecachten Listen.</param>
+    /// <param name="layout">Ablagelayout mit dem Video-Verzeichnis.</param>
     /// <param name="fileExists">Existenzprüfung für lokale Dateien; <c>null</c> = <see cref="File.Exists(string?)"/>.</param>
     /// <param name="logger">Optionaler Logger für das Programmprotokoll.</param>
     internal PlaybackSourceService(
         AuthSessionService authSession,
         AppSecretsService secrets,
         CacheDatabase cache,
+        AppStorageLayout layout,
         Func<string, bool>? fileExists,
         ILogger<PlaybackSourceService>? logger = null)
     {
         this.authSession = authSession ?? throw new ArgumentNullException(nameof(authSession));
         this.secrets = secrets ?? throw new ArgumentNullException(nameof(secrets));
         this.cache = cache ?? throw new ArgumentNullException(nameof(cache));
+        this.layout = layout ?? throw new ArgumentNullException(nameof(layout));
         this.fileExists = fileExists ?? File.Exists;
         this.logger = logger ?? NullLogger<PlaybackSourceService>.Instance;
     }
@@ -259,8 +265,8 @@ public sealed class PlaybackSourceService
                 MediaTypeNames.Normalize(e.VideoType) == type
                 && string.Equals(e.State, "completed", StringComparison.OrdinalIgnoreCase)
                 && !string.IsNullOrWhiteSpace(e.FilePath)
-                && fileExists(e.FilePath));
-            return entry?.FilePath;
+                && fileExists(DownloadManifestPaths.Resolve(layout, e)));
+            return entry is null ? null : DownloadManifestPaths.Resolve(layout, entry);
         }
         catch (Exception ex)
         {

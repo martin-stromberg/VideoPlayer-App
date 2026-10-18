@@ -265,12 +265,14 @@ public class VideoPlayerApiClient
     /// <param name="mediaId">ID des Mediums.</param>
     /// <param name="positionSeconds">Aktuelle Wiedergabeposition in Sekunden.</param>
     /// <param name="durationSeconds">Gesamtdauer des Mediums in Sekunden.</param>
+    /// <param name="playlistId">ID der Playlist des Wiedergabekontexts; <c>null</c> bei kontextloser Wiedergabe.</param>
     /// <param name="cancellationToken">Abbruchtoken.</param>
     public async Task ReportPlaybackProgressAsync(
         string mediaType,
         long mediaId,
         long positionSeconds,
         long durationSeconds,
+        long? playlistId = null,
         CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(mediaType);
@@ -283,7 +285,8 @@ public class VideoPlayerApiClient
                 MediaType = mediaType,
                 MediaId = mediaId,
                 PositionSeconds = positionSeconds,
-                DurationSeconds = durationSeconds
+                DurationSeconds = durationSeconds,
+                PlaylistId = playlistId
             },
             cancellationToken);
     }

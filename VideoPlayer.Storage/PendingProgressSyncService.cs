@@ -37,11 +37,13 @@ public sealed class PendingProgressSyncService
     /// <param name="videoId">ID des Videos.</param>
     /// <param name="position">Wiedergabeposition.</param>
     /// <param name="duration">Gesamtdauer des Mediums.</param>
+    /// <param name="playlistId">ID der Playlist des Wiedergabekontexts; <c>null</c> bei kontextloser Wiedergabe.</param>
     public async Task EnqueueAsync(
         string videoType,
         int videoId,
         TimeSpan position,
-        TimeSpan duration)
+        TimeSpan duration,
+        long? playlistId = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(videoType);
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(videoId);
@@ -59,7 +61,8 @@ public sealed class PendingProgressSyncService
                 VideoId = videoId,
                 PositionTicks = position.Ticks,
                 DurationTicks = duration.Ticks,
-                UpdatedAtUtc = DateTime.UtcNow
+                UpdatedAtUtc = DateTime.UtcNow,
+                PlaylistId = playlistId
             });
         });
 

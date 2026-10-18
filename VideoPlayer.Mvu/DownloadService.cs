@@ -320,7 +320,7 @@ public sealed class DownloadService
                 {
                     return Logged(new DownloadEnqueueResult { Item = ToItem(existing), Notice = NoticeAlreadyQueued });
                 }
-                if (state == DownloadState.Completed && fileExists(existing.FilePath))
+                if (state == DownloadState.Completed && fileExists(DownloadManifestPaths.Resolve(layout, existing)))
                 {
                     return Logged(new DownloadEnqueueResult { Item = ToItem(existing), Notice = NoticeAlreadyPresent });
                 }
@@ -472,7 +472,7 @@ public sealed class DownloadService
         }
 
         var entry = await FindEntryAsync(type, mediaId);
-        TryDeleteFile(entry?.FilePath ?? FilePathFor(type, mediaId));
+        TryDeleteFile(entry is null ? FilePathFor(type, mediaId) : DownloadManifestPaths.Resolve(layout, entry));
         if (entry is null)
         {
             return false;
@@ -614,6 +614,7 @@ public sealed class DownloadService
         {
             try
             {
+                entry.FilePath = DownloadManifestPaths.Resolve(layout, entry);
                 File.Copy(tempPath, entry.FilePath, overwrite: true);
                 entry.SizeBytes = new FileInfo(entry.FilePath).Length;
                 await SetStateAsync(entry, DownloadState.Completed, null);
@@ -656,7 +657,7 @@ public sealed class DownloadService
 
         foreach (var entry in entries)
         {
-            TryDeleteFile(entry.FilePath);
+            TryDeleteFile(DownloadManifestPaths.Resolve(layout, entry));
         }
 
         await manifestGate.WaitAsync(cancellationToken);
@@ -754,15 +755,17 @@ public sealed class DownloadService
             return 0;
         }
 
-        var manifestPaths = new HashSet<string>(
-            entries.Select(e => e.FilePath).Where(p => !string.IsNullOrWhiteSpace(p)),
+        // Abgleich über den Dateinamen: der gespeicherte Verzeichnisanteil
+        // kann nach einem Plattform-Container-Umzug veraltet sein.
+        var manifestFileNames = new HashSet<string>(
+            entries.Select(e => Path.GetFileName(e.FilePath)).Where(n => !string.IsNullOrWhiteSpace(n)),
             StringComparer.OrdinalIgnoreCase);
 
         var freed = 0L;
         var count = 0;
         foreach (var path in files)
         {
-            if (manifestPaths.Contains(path))
+            if (manifestFileNames.Contains(Path.GetFileName(path)))
             {
                 continue;
             }
@@ -817,9 +820,12 @@ public sealed class DownloadService
             return new DownloadReconcileResult();
         }
 
-        var manifestPaths = new HashSet<string>(
-            entries.Select(e => e.FilePath).Where(p => !string.IsNullOrWhiteSpace(p)),
-            StringComparer.OrdinalIgnoreCase);
+        // Abgleich über den Dateinamen: der gespeicherte Verzeichnisanteil
+        // kann nach einem Plattform-Container-Umzug veraltet sein.
+        var entryByFileName = entries
+            .Where(e => !string.IsNullOrWhiteSpace(Path.GetFileName(e.FilePath)))
+            .GroupBy(e => Path.GetFileName(e.FilePath), StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(g => g.Key, g => g.First(), StringComparer.OrdinalIgnoreCase);
 
         string[] files;
         try
@@ -833,11 +839,6 @@ public sealed class DownloadService
             logger.LogWarning(ex, "Video-Verzeichnis nicht lesbar — Abgleich übersprungen.");
             return new DownloadReconcileResult();
         }
-
-        var entryByPath = entries
-            .Where(e => !string.IsNullOrWhiteSpace(e.FilePath))
-            .GroupBy(e => e.FilePath, StringComparer.OrdinalIgnoreCase)
-            .ToDictionary(g => g.Key, g => g.First(), StringComparer.OrdinalIgnoreCase);
 
         foreach (var path in files)
         {
@@ -853,7 +854,7 @@ public sealed class DownloadService
                 continue;
             }
 
-            if (!manifestPaths.Contains(path))
+            if (!entryByFileName.TryGetValue(Path.GetFileName(path), out var entry))
             {
                 // Kein Manifest-Bezug → verwaiste Restdaten: erfassen,
                 // aber nicht entfernen (Anwender entscheidet).
@@ -862,7 +863,24 @@ public sealed class DownloadService
                 continue;
             }
 
-            var entry = entryByPath[path];
+            // Container-Umzug (iOS verschiebt den Datencontainer bei Updates):
+            // der gespeicherte Verzeichnisanteil ist veraltet — auf den
+            // tatsächlichen Ablageort heilen.
+            if (!string.Equals(entry.FilePath, path, StringComparison.OrdinalIgnoreCase))
+            {
+                entry.FilePath = path;
+                entry.UpdatedAtUtc = DateTime.UtcNow;
+                await manifestGate.WaitAsync(cancellationToken);
+                try
+                {
+                    await cache.Connection.UpdateAsync(entry);
+                }
+                finally
+                {
+                    manifestGate.Release();
+                }
+            }
+
             var state = DownloadStateNames.FromPersisted(entry.State);
             var isRunning = state == DownloadState.Downloading
                 && runningTransfers.ContainsKey(Key(entry.VideoType, entry.VideoId));
@@ -882,7 +900,7 @@ public sealed class DownloadService
         foreach (var entry in entries)
         {
             if (DownloadStateNames.FromPersisted(entry.State) == DownloadState.Completed
-                && !fileExists(entry.FilePath))
+                && !fileExists(DownloadManifestPaths.Resolve(layout, entry)))
             {
                 await SetStateAsync(entry, DownloadState.Failed, ErrorMissingFile);
                 correctedCompleted++;
@@ -1014,6 +1032,10 @@ public sealed class DownloadService
             RaiseItemChanged(ToItem(entry));
 
             Directory.CreateDirectory(layout.VideosDirectory);
+            // Wieder eingeplante Einträge können einen veralteten
+            // Verzeichnisanteil tragen — Schreibziel im aktuellen
+            // Ablageort auflösen und den Eintrag damit heilen.
+            entry.FilePath = DownloadManifestPaths.Resolve(layout, entry);
             var quotaExceeded = false;
             var scannedUsed = usedAtStart;
             var downloadedAtScan = 0L;

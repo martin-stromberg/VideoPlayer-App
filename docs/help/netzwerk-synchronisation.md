@@ -51,6 +51,12 @@ Meldung in einer **persistenten Warteschlange** in der backup-pflichtigen
 Datenbank (`pending_progress`):
 
 - Pro Medium wird nur der jeweils neueste Stand vorgehalten.
+- Jeder Eintrag bewahrt neben Position und Dauer auch den
+  Playlist-Bezug der Wiedergabe (Spalte `PlaylistId`, `NULL` bei
+  kontextloser Wiedergabe); beim Nachsenden wird er wieder mitgemeldet,
+  damit der Server den playlist-gebundenen Weiterschauen-Eintrag
+  fortschreibt. Wechselt der Kontext desselben Mediums, gewinnt der
+  zuletzt eingereihte Stand.
 - Die Einträge überstehen App-Neustarts und Backup-Wiederherstellungen.
 - Bei der Synchronisation werden sie in chronologischer Reihenfolge
   nachgesendet; erst nach erfolgreicher Übertragung wird ein Eintrag

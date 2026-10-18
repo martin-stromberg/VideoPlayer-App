@@ -124,6 +124,7 @@ public sealed class ServerSyncService
                     entry.VideoId,
                     (long)TimeSpan.FromTicks(entry.PositionTicks).TotalSeconds,
                     (long)TimeSpan.FromTicks(entry.DurationTicks).TotalSeconds,
+                    entry.PlaylistId,
                     cancellationToken);
                 sent++;
             }

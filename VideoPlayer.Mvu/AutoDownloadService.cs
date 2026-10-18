@@ -9,17 +9,19 @@ namespace VideoPlayer.Mvu;
 /// <summary>
 /// Automatische Downloads (Service Layer): lädt bei aktivierter
 /// Einstellung (<see cref="AppSettings.AutoDownloadEnabled"/>) die
-/// nächsten Folge-Videos der Weiterschauen-Einträge vor — je Eintrag
-/// bis zu <see cref="AppSettings.PreloadEpisodeCount"/>. Einträge mit
+/// aktuelle und die folgenden Videos der Weiterschauen-Einträge vor —
+/// je Eintrag bis zu <see cref="AppSettings.PreloadEpisodeCount"/>
+/// Kandidaten einschließlich des aktuellen Titels. Einträge mit
 /// Playlist-Bezug (<see cref="HomeMediaItem.PlaylistId"/> +
-/// <see cref="HomeMediaItem.PlaylistEntryId"/>) erhalten ihre Folge-
-/// Videos aus der Playlist-Reihenfolge
+/// <see cref="HomeMediaItem.PlaylistEntryId"/>) erhalten ihre aktuellen
+/// und folgenden Videos aus der Playlist-Reihenfolge
 /// (<c>api/playlists/{id}/entries/paged</c>, Server-Reihenfolge);
 /// Einträge ohne Playlist-Bezug aus dem Serienkontext
 /// (<c>api/items/tvshow/{showId}</c>, staffelübergreifend nach Staffel-/
 /// Episodennummer — wie die Fortsetzungsliste der Detailseite).
-/// Film-Einträge der Weiterschauen-Liste laden den Film selbst (bei
-/// Playlist-Bezug zusätzlich die Folge-Einträge der Playlist). Bei
+/// Film-Einträge der Weiterschauen-Liste laden den Film selbst; bei
+/// Playlist-Bezug zählt der Film ins Budget — Film + Folge-Einträge
+/// zusammen ≤ <see cref="AppSettings.PreloadEpisodeCount"/>. Bei
 /// aktivem „Downloads nur im WLAN"
 /// (<see cref="AppSettings.WifiOnlyDownloads"/>) läuft der Vorlauf nur
 /// bei WLAN-Verbindung. Die Weiterschauen-Liste wird aus der Cache-
@@ -139,26 +141,20 @@ public sealed class AutoDownloadService
                 {
                     if (type == "movie")
                     {
-                        var movieResult = await downloads.EnqueueAsync(
-                            "movie", item.Id, item.Title, settings,
-                            playlistContext: hasPlaylistBinding
-                                ? new DownloadPlaylistContext(item.PlaylistId, item.PlaylistEntryId, null)
-                                : null,
-                            cancellationToken: cancellationToken);
-                        if (movieResult.Notice == DownloadService.NoticeEnqueued)
+                        if (await EnqueueSelfAsync(item, "movie", settings, cancellationToken))
                         {
                             enqueued++;
                         }
 
                         if (hasPlaylistBinding)
                         {
-                            enqueued += await EnqueueNextPlaylistEntriesAsync(item, settings, cancellationToken) ?? 0;
+                            enqueued += await EnqueuePlaylistEntriesFromCurrentAsync(item, settings, cancellationToken) ?? 0;
                         }
                     }
                     else if (type == "tvshowepisode")
                     {
                         var playlistResult = hasPlaylistBinding
-                            ? await EnqueueNextPlaylistEntriesAsync(item, settings, cancellationToken)
+                            ? await EnqueuePlaylistEntriesFromCurrentAsync(item, settings, cancellationToken)
                             : null;
                         if (playlistResult is { } playlistEnqueued)
                         {
@@ -166,7 +162,18 @@ public sealed class AutoDownloadService
                         }
                         else if (item.ShowId is > 0)
                         {
-                            enqueued += await EnqueueNextEpisodesAsync(item, settings, cancellationToken);
+                            enqueued += await EnqueueEpisodesFromCurrentAsync(item, settings, cancellationToken);
+                        }
+                        else
+                        {
+                            // Weder Playlist-Treffer noch Serienbezug:
+                            // die aktuelle Episode reiht sich selbst
+                            // ein — der Download braucht keinen
+                            // Folge-Kontext.
+                            if (await EnqueueSelfAsync(item, "tvshowepisode", settings, cancellationToken))
+                            {
+                                enqueued++;
+                            }
                         }
                     }
                 }
@@ -190,15 +197,16 @@ public sealed class AutoDownloadService
     }
 
     /// <summary>
-    /// Reiht die nächsten Episoden eines Weiterschauen-Episoden-Eintrags
-    /// ein: Serienkontext laden, alle Episoden staffelübergreifend ordnen
-    /// und bis zu <c>PreloadEpisodeCount</c> Folge-Episoden einreihen.
+    /// Reiht die aktuelle und die folgenden Episoden eines
+    /// Weiterschauen-Episoden-Eintrags ein: Serienkontext laden, alle
+    /// Episoden staffelübergreifend ordnen und ab der aktuellen Episode
+    /// bis zu <c>PreloadEpisodeCount</c> Episoden einreihen.
     /// </summary>
     /// <param name="item">Der Weiterschauen-Eintrag (Episode).</param>
     /// <param name="settings">Aktuelle App-Einstellungen.</param>
     /// <param name="cancellationToken">Bricht den Lauf ab.</param>
-    /// <returns>Anzahl der eingereihten Folge-Episoden.</returns>
-    private async Task<int> EnqueueNextEpisodesAsync(
+    /// <returns>Anzahl der eingereihten Episoden (aktuelle Episode eingeschlossen).</returns>
+    private async Task<int> EnqueueEpisodesFromCurrentAsync(
         HomeMediaItem item,
         AppSettings settings,
         CancellationToken cancellationToken)
@@ -227,7 +235,7 @@ public sealed class AutoDownloadService
 
         var enqueued = 0;
         var showName = show.Name;
-        foreach (var (season, episode) in episodes.Skip(index + 1).Take(settings.PreloadEpisodeCount))
+        foreach (var (season, episode) in episodes.Skip(index).Take(settings.PreloadEpisodeCount))
         {
             var title = string.IsNullOrWhiteSpace(episode.Name)
                 ? $"{showName} – Episode {episode.Number}"
@@ -245,7 +253,7 @@ public sealed class AutoDownloadService
         if (enqueued > 0)
         {
             logger.LogInformation(
-                "{EnqueuedCount} Folge-Episoden für Episode {MediaId} eingeplant.",
+                "{EnqueuedCount} aktuelle und folgende Episoden für Episode {MediaId} eingeplant.",
                 enqueued,
                 item.Id);
         }
@@ -254,12 +262,13 @@ public sealed class AutoDownloadService
     }
 
     /// <summary>
-    /// Reiht die nächsten Einträge eines playlist-gebundenen
-    /// Weiterschauen-Eintrags in Playlist-Reihenfolge ein: die Einträge
-    /// der Playlist werden seitenweise in Server-Reihenfolge geladen,
-    /// bis der aktuelle Eintrag (<see cref="HomeMediaItem.PlaylistEntryId"/>)
-    /// gefunden ist; die folgenden ladbaren und zugänglichen Einträge
-    /// (<c>movie</c>/<c>tvshowepisode</c>) werden bis zu
+    /// Reiht den aktuellen Eintrag und die folgenden Einträge eines
+    /// playlist-gebundenen Weiterschauen-Eintrags in Playlist-
+    /// Reihenfolge ein: die Einträge der Playlist werden seitenweise in
+    /// Server-Reihenfolge geladen, bis der aktuelle Eintrag
+    /// (<see cref="HomeMediaItem.PlaylistEntryId"/>) gefunden ist; ab
+    /// einschließlich dieses Eintrags werden die ladbaren und
+    /// zugänglichen Einträge (<c>movie</c>/<c>tvshowepisode</c>) bis zu
     /// <c>PreloadEpisodeCount</c> mit ihrem Playlist-Bezug eingeplant.
     /// Der Serien-Abruf entfällt — Serien-Hints kommen aus den
     /// <c>ParentMedia*</c>-Feldern der Einträge.
@@ -268,12 +277,12 @@ public sealed class AutoDownloadService
     /// <param name="settings">Aktuelle App-Einstellungen.</param>
     /// <param name="cancellationToken">Bricht den Lauf ab.</param>
     /// <returns>
-    /// Anzahl der eingereihten Folge-Einträge, wenn der aktuelle Eintrag
+    /// Anzahl der eingereihten Einträge, wenn der aktuelle Eintrag
     /// in der Playlist gefunden wurde (Playlist-Pfad greift — auch ohne
     /// verbleibende Folge-Einträge); <c>null</c> = Rückfall auf den
     /// Serien-Pfad.
     /// </returns>
-    private async Task<int?> EnqueueNextPlaylistEntriesAsync(
+    private async Task<int?> EnqueuePlaylistEntriesFromCurrentAsync(
         HomeMediaItem item,
         AppSettings settings,
         CancellationToken cancellationToken)
@@ -309,7 +318,18 @@ public sealed class AutoDownloadService
                 if (!found)
                 {
                     found = entry.Id == currentEntryId;
-                    continue;
+                    if (!found)
+                    {
+                        continue;
+                    }
+
+                    // Der gefundene aktuelle Eintrag ist selbst erster
+                    // Kandidat — bei bestandener Ladbarkeitsprüfung
+                    // (unten) verbraucht er einen Budget-Platz, auch
+                    // wenn die Deduplizierung die Einreihung verwirft
+                    // (bereits direkt eingereihter Film); ein nicht
+                    // ladbarer Eintrag wird ohne Budget-Verbrauch
+                    // übersprungen.
                 }
 
                 if (remaining <= 0)
@@ -350,7 +370,7 @@ public sealed class AutoDownloadService
         if (enqueued > 0)
         {
             logger.LogInformation(
-                "{EnqueuedCount} Playlist-Folge-Einträge für Playlist {PlaylistId} eingeplant.",
+                "{EnqueuedCount} Playlist-Einträge ab dem aktuellen Eintrag für Playlist {PlaylistId} eingeplant.",
                 enqueued,
                 item.PlaylistId);
         }
@@ -399,5 +419,32 @@ public sealed class AutoDownloadService
         }
 
         return new DownloadSeriesContext(showId, showTitle, null, entry.EpisodeNumber);
+    }
+
+    /// <summary>
+    /// Reiht den Weiterschauen-Eintrag selbst direkt ein — für Filme
+    /// (der Film ist sein eigener Download) und für Episoden ohne
+    /// Playlist-Treffer und ohne Serienbezug (Orphan-Fallback). Bei
+    /// Playlist-Bindung erhält der Download seinen Playlist-Bezug.
+    /// </summary>
+    /// <param name="item">Der Weiterschauen-Eintrag.</param>
+    /// <param name="mediaType">Normalisierter Medientyp (<c>movie</c>/<c>tvshowepisode</c>).</param>
+    /// <param name="settings">Aktuelle App-Einstellungen.</param>
+    /// <param name="cancellationToken">Bricht den Lauf ab.</param>
+    /// <returns><c>true</c>, wenn der Eintrag neu eingeplant wurde (<see cref="DownloadService.NoticeEnqueued"/>).</returns>
+    private async Task<bool> EnqueueSelfAsync(
+        HomeMediaItem item,
+        string mediaType,
+        AppSettings settings,
+        CancellationToken cancellationToken)
+    {
+        var hasPlaylistBinding = item.PlaylistId is > 0 && item.PlaylistEntryId is > 0;
+        var result = await downloads.EnqueueAsync(
+            mediaType, item.Id, item.Title, settings,
+            playlistContext: hasPlaylistBinding
+                ? new DownloadPlaylistContext(item.PlaylistId, item.PlaylistEntryId, null)
+                : null,
+            cancellationToken: cancellationToken);
+        return result.Notice == DownloadService.NoticeEnqueued;
     }
 }

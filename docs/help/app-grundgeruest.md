@@ -1,9 +1,9 @@
 # Neues App-Grundgerüst (Entwicklungsschritt 2)
 
-Die neue VideoPlayer-App wird schrittweise neu aufgebaut. Dieser Schritt liefert
+Die VideoPlayer-App wurde schrittweise neu aufgebaut. Dieser Schritt lieferte
 das Grundgerüst: Startvorgang, Hauptnavigation und Platzhalterseiten. Die
-bislang vorhandene App (`VideoWebPlayer.Maui`) bleibt unverändert bestehen und
-wird erst später abgelöst.
+bislang vorhandene Alt-App (`VideoWebPlayer.Maui`) ist inzwischen vollständig
+abgelöst und aus dem Repository entfernt.
 
 ## Start der App
 

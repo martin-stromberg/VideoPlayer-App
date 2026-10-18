@@ -95,6 +95,6 @@ System-Helldesign Restwerte aktiviert.
 **Regel:** In Seiten und Steuerelementen dürfen keine hartcodierten
 Hexfarben oder benannten Farbliterale mehr verwendet werden — jede Farbe
 kommt per `{StaticResource Vp*}` aus den Tokens. Die Contract-Tests
-`DesignTokensContractTests` (`VideoWebPlayer.Maui.Tests`) pinnen die
+`DesignTokensContractTests` (`VideoPlayer.Maui.Tests`) pinnen die
 Token-Werte, die Radien (Buttons 10, Karten 14, Poster 12,
 Chips/Badges/Icon-Buttons 999) und verbieten verstreute Farbwerte.

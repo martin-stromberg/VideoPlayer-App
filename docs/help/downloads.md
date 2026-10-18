@@ -3,8 +3,8 @@
 Die neue VideoPlayer-App kann Medien für die Offline-Nutzung
 herunterladen: ein plattformneutraler `DownloadService` führt die
 Downloads als persistente Aufträge aus, die Menüseite **„Downloads"**
-verwaltet sie, und automatische Vorlauf-Läufe halten die nächsten
-Weiterschauen-Episoden vor.
+verwaltet sie, und automatische Vorlauf-Läufe halten die aktuelle und
+die folgenden Weiterschauen-Episoden vor.
 
 ## Download starten
 
@@ -86,21 +86,26 @@ auch offline, weil der Bestand lokal im Download-Manifest liegt.
 
 ## Automatische Downloads (Vorlauf)
 
-- Ist „Automatische Downloads" aktiviert, lädt die App die nächsten
-  **N** Episoden je Weiterschauen-Eintrag vor — die Anzahl kommt aus
-  der Einstellung „Vorzuladende Episoden" (staffelübergreifend, in
-  Episodenreihenfolge, Serienkontext vom Server).
+- Ist „Automatische Downloads" aktiviert, lädt die App die aktuelle
+  Episode und die folgenden Episoden je Weiterschauen-Eintrag vor —
+  insgesamt bis zu **N** je Weiterschauen-Eintrag; die Anzahl kommt aus
+  der Einstellung „Anzahl vorzuladender Episoden" (staffelübergreifend,
+  in Episodenreihenfolge, Serienkontext vom Server).
 - **Playlist-Bezug:** Stammt ein Weiterschauen-Eintrag aus einer
   Playlist, folgt der Vorlauf der **Playlist-Reihenfolge** statt der
-  Serienreihenfolge — die Folge-Einträge werden ab dem aktuellen
-  Playlist-Eintrag in Server-Reihenfolge eingeplant (nur ladbare,
-  zugängliche Einträge — Filme und Episoden; Serien-, Staffel- und
-  gesperrte Einträge werden übersprungen). Ein playlist-gebundener
-  Film lädt sich selbst plus die folgenden Playlist-Einträge. Ist der
+  Serienreihenfolge — die Einträge werden ab einschließlich des
+  aktuellen Playlist-Eintrags in Server-Reihenfolge eingeplant (nur
+  ladbare, zugängliche Einträge — Filme und Episoden; Serien-, Staffel-
+  und gesperrte Einträge werden übersprungen). Ein playlist-gebundener
+  Film lädt sich selbst plus die folgenden Playlist-Einträge — der Film
+  zählt dabei ins Budget der **N** Einträge. Ist der
   Eintragsbezug verwaist (Medium nicht mehr in der Playlist) oder die
   Playlist nicht erreichbar, gilt wieder die Serienreihenfolge.
 - Film-Einträge der Weiterschauen-Liste ohne Playlist-Bezug laden den
   Film selbst.
+- Episoden-Einträge, deren Serien- oder Playlist-Bezug nicht auflösbar
+  ist, laden die aktuelle Episode selbst — ein Folge-Kontext ist dafür
+  nicht erforderlich; vorgeladene Folge-Episoden entfallen dann.
 - Der Vorlauf läuft nach der Synchronisation, nach Server-Ereignissen
   mit Listen-Änderung und beim Einschalten der Einstellung; er ist
   gedrosselt (mindestens 60 Sekunden Abstand) und respektiert die

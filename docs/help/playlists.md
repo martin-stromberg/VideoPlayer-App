@@ -162,20 +162,33 @@ Serienreihenfolge des Mediums. Ist das Medium inzwischen nicht mehr
 Teil der Playlist (`playlistEntryId` fehlt), gilt wie bisher der
 detailseiten-unabhängige Serienkontext.
 
+Der Bezug wirkt auch in der Gegenrichtung: Fortschrittsmeldungen aus
+einer laufenden Playlist-Wiedergabe tragen die `PlaylistId` des
+aktiven Kontexts mit (`POST api/continue-watching/progress`, alle
+Meldepfade — Takt, Ende und Player-Schluss). Der Server schreibt
+damit den playlist-gebundenen Weiterschauen-Eintrag fort, statt
+daneben einen zweiten, kontextlosen Eintrag für dasselbe Medium
+anzulegen. Auch offline eingereihte Meldungen behalten den Bezug —
+die Fortschritts-Warteschlange `pending_progress` speichert die
+`PlaylistId` mit und übergibt sie beim Nachsenden. Meldungen ohne
+Playlist-Kontext bleiben unverändert kontextlos.
+
 ## Downloads mit Playlist-Bezug (Schritt 7)
 
 Der automatische Download-Vorlauf folgt bei playlist-gebundenen
 Weiterschauen-Einträgen der **Playlist-Reihenfolge**: statt der
-nächsten Serien-Episoden reiht er die nächsten ladbaren und
-zugänglichen Einträge der Playlist (`api/playlists/{id}/entries/paged`,
-Server-Reihenfolge ab dem aktuellen Eintrag) ein — bis zur Anzahl
-„Vorzuladende Episoden". Playlist-gebundene Filme laden sich selbst
-plus die folgenden Playlist-Einträge. Der Bezug landet als
+Serienreihenfolge reiht er den aktuellen Eintrag und die folgenden
+ladbaren und zugänglichen Einträge der Playlist
+(`api/playlists/{id}/entries/paged`, Server-Reihenfolge ab
+einschließlich des aktuellen Eintrags) ein — insgesamt bis zur Anzahl
+„Anzahl vorzuladender Episoden". Playlist-gebundene Filme laden sich
+selbst plus die folgenden Playlist-Einträge — der Film zählt dabei ins
+Budget. Der Bezug landet als
 `PlaylistId`/`PlaylistEntryId`/`PlaylistSortOrder` im Download-Manifest
 (`download_manifest`, Spalten werden in Bestandsinstallationen
 nachgezogen). Bei verwaistem Eintragsbezug oder nicht erreichbarer
-Playlist gilt der Serien-Pfad; Einträge ohne Playlist-Bezug bleiben
-unverändert. Details siehe `downloads.md`.
+Playlist gilt der Serien-Pfad; Einträge ohne Playlist-Bezug folgen dem
+Serien-Pfad. Details siehe `downloads.md`.
 
 ## MVU-Anbindung
 

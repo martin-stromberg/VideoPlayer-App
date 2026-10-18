@@ -391,8 +391,10 @@ public partial class PlayerPage : ContentPage
     /// Führt den Fortsetzungs-Seek mit Zeitlimit aus: die Toolkit-
     /// Vollendung kann im Fehlerfall ausbleiben — ohne Abbruchschwelle
     /// hinge das await ewig und blockierte die interne Seek-Semaphore
-    /// für alle Folge-Seeks. Timeout oder Fehler werden als
-    /// Wiedergabefehler gemeldet statt den Prozess abzubrechen.
+    /// für alle Folge-Seeks. Timeout oder Fehler degradieren still:
+    /// ein fehlschlagender Fortsetzungs-Sprung ist nicht-fatal — die
+    /// laufende Wiedergabe bleibt unangetastet und läuft an der vom
+    /// Player erreichten Position weiter (kein Episoden-Rückfall).
     /// </summary>
     /// <param name="position">Zielposition des Fortsetzungs-Sprungs.</param>
     /// <returns>Eine Aufgabe, die nach dem Sprung oder Fehlschlag abschließt.</returns>
@@ -407,10 +409,6 @@ public partial class PlayerPage : ContentPage
         catch (Exception ex)
         {
             logger.LogWarning(ex, "Fortsetzungs-Seek auf {Position} fehlgeschlagen.", position);
-            if (subscribed)
-            {
-                _ = mvuHost.DispatchAsync(new PlaybackFailedMessage());
-            }
         }
     }
 

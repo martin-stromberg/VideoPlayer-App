@@ -53,12 +53,14 @@ public sealed class ProgressReportService
     /// <param name="videoId">Id des Videos.</param>
     /// <param name="position">Aktuelle Wiedergabeposition.</param>
     /// <param name="duration">Gesamtdauer des Videos.</param>
+    /// <param name="playlistId">Id der Playlist des Wiedergabekontexts; <c>null</c> bei kontextloser Wiedergabe.</param>
     /// <param name="cancellationToken">Bricht die Meldung ab.</param>
     public async Task ReportProgressAsync(
         string videoType,
         int videoId,
         TimeSpan position,
         TimeSpan duration,
+        long? playlistId = null,
         CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(videoType);
@@ -75,6 +77,7 @@ public sealed class ProgressReportService
                     videoId,
                     (long)position.TotalSeconds,
                     (long)duration.TotalSeconds,
+                    playlistId,
                     cancellationToken);
                 loggedOutcomes.Remove(key);
                 return;
@@ -115,7 +118,7 @@ public sealed class ProgressReportService
         // weiterer Eintrag pro Fortschrittstakt.
         try
         {
-            await pendingQueue.EnqueueAsync(videoType, videoId, position, duration);
+            await pendingQueue.EnqueueAsync(videoType, videoId, position, duration, playlistId);
             loggedOutcomes.Remove(key);
         }
         catch (Exception ex)

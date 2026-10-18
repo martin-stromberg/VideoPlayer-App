@@ -33,10 +33,12 @@ jobs:
             @semantic-release/git \
             @semantic-release/github
 
+      # Retry-Wrapper: raeumt bei Fehlschlag verwaiste Tags auf und
+      # wiederholt den Lauf (siehe Skript-Kommentar).
       - name: Run Semantic Release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: semantic-release
+        run: bash .github/scripts/semantic-release-with-retry.sh
 
       - name: Determine release tag
         id: get-tag
@@ -45,48 +47,6 @@ jobs:
           tag=$(git describe --tags --match 'v*' --abbrev=0)
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
           echo "version=${tag#v}" >> "$GITHUB_OUTPUT"
-
-  build-windows:
-    needs: release
-    runs-on: windows-latest
-    steps:
-      - name: Checkout release tag
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ needs.release.outputs.tag }}
-
-      - name: Setup .NET
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: '10.0.x'
-
-      - name: Install .NET MAUI workload
-        run: dotnet workload install maui
-
-      - name: Set application version
-        run: pwsh .github/scripts/Set-Version.ps1 -Version '${{ needs.release.outputs.tag }}'
-
-      - name: Publish Android
-        run: dotnet publish VideoWebPlayer.Maui/VideoWebPlayer.Maui.csproj --configuration Release --framework net10.0-android
-
-      - name: Publish Windows
-        run: dotnet publish VideoWebPlayer.Maui/VideoWebPlayer.Maui.csproj --configuration Release --framework net10.0-windows10.0.19041.0
-
-      - name: Upload Android artifact
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          $apk = Get-ChildItem -Path VideoWebPlayer.Maui/bin/Release/net10.0-android -Filter *.apk -Recurse | Select-Object -First 1
-          if ($apk) { gh release upload '${{ needs.release.outputs.tag }}' $apk.FullName --clobber }
-        shell: pwsh
-
-      - name: Upload Windows artifact
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          $msix = Get-ChildItem -Path VideoWebPlayer.Maui/bin/Release/net10.0-windows10.0.19041.0 -Filter *.msix -Recurse | Select-Object -First 1
-          if ($msix) { gh release upload '${{ needs.release.outputs.tag }}' $msix.FullName --clobber }
-        shell: pwsh
 
   build-ios:
     needs: release
@@ -109,16 +69,13 @@ jobs:
         run: pwsh .github/scripts/Set-Version.ps1 -Version '${{ needs.release.outputs.tag }}'
 
       - name: Build iOS
-        run: dotnet build VideoWebPlayer.Maui/VideoWebPlayer.Maui.csproj --configuration Release --framework net10.0-ios --runtime iossimulator-arm64
-
-      - name: Build iOS (VideoPlayer.Maui)
         run: dotnet build VideoPlayer.Maui/VideoPlayer.Maui.csproj --configuration Release --framework net10.0-ios --runtime iossimulator-arm64
 
       - name: Upload iOS artifact
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          app=$(find VideoWebPlayer.Maui/bin/Release/net10.0-ios -name '*.app' -type d | head -n 1)
+          app=$(find VideoPlayer.Maui/bin/Release/net10.0-ios -name '*.app' -type d | head -n 1)
           if [ -n "$app" ]; then
             zip -r "${app}.zip" "$app"
             gh release upload '${{ needs.release.outputs.tag }}' "${app}.zip" --clobber
@@ -169,7 +126,7 @@ jobs:
         shell: bash
 
   back-merge:
-    needs: [build-windows, build-ios]
+    needs: [build-ios]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout

@@ -139,7 +139,7 @@ namespace VideoPlayer.Maui
             // AutoDownloadService: Vorlauf der Weiterschauen-Episoden.
             // iOS: Transfer-Backend delegiert an die systemseitige
             // Hintergrund-Session (Downloads laufen bei suspendierter App).
-#if IOS || MACCATALYST
+#if IOS
             builder.Services.AddSingleton<Services.IosBackgroundDownloadBackend>(sp =>
             {
                 var backend = new Services.IosBackgroundDownloadBackend();
