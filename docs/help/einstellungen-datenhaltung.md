@@ -160,7 +160,7 @@ beeinflussen sich nicht gegenseitig.
   versorgen). `ShowDetailsCache` als statische Hilfsklasse erhält den
   Logger als Methodenparameter der Aufrufer. Frühere
   `Debug.WriteLine`-Diagnosen sind vollständig ersetzt
-  (Ausnahmen: Altbestand `VideoWebPlayer.Maui`, Discovery in
+  (Ausnahme: Discovery in
   `VideoPlayer.ApiClient`); der Contract-Test
   `NoDebugWriteLine_RemainsInAppSources` pinnt den Restbestand.
 - **Breadcrumb-Prinzip:** Genau ein Eintrag je Ereignis an genau einer

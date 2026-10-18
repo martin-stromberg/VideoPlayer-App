@@ -2,10 +2,10 @@ namespace VideoPlayer.ApiClient.Models;
 
 /// <summary>
 /// Zentrale String-Konstanten für die Sortiermodi von Playlists,
-/// spiegelt <c>VideoWebPlayer.Data.PlaylistSortMode</c>. Dient an der
+/// spiegelt den serverseitigen <c>PlaylistSortMode</c>. Dient an der
 /// Client/Server-JSON-Grenze dazu, die rohen Literalwerte nicht zu
 /// duplizieren. Entspricht der Referenz-Klasse
-/// <c>PlaylistSortModeValues</c> des Web-Clients.
+/// <c>PlaylistSortModeValues</c> des Servers.
 /// </summary>
 public static class PlaylistSortModeValues
 {

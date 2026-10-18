@@ -17,9 +17,8 @@ $patch = [int]$matches[3]
 $applicationDisplayVersion = "$major.$minor.$patch"
 $applicationVersion = $major * 10000 + $minor * 100 + $patch
 
-# Alle App-Projektdateien versionieren (die Alt-App solange sie noch existiert).
+# Alle App-Projektdateien versionieren.
 $csprojPaths = @(
-    'VideoWebPlayer.Maui/VideoWebPlayer.Maui.csproj',
     'VideoPlayer.Maui/VideoPlayer.Maui.csproj'
 ) | Where-Object { Test-Path $_ }
 
