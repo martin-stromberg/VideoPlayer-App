@@ -99,6 +99,10 @@ public class PlayerContractTests
 
         Assert.Contains("PlayerPageOpenedMessage", code, StringComparison.Ordinal);
         Assert.Contains("PlaybackProgressMessage", code, StringComparison.Ordinal);
+        // Der Fortschrittstakt bindet die gemeldeten Werte an die zuletzt
+        // angewendete Medienidentität — nachlaufende Takte des
+        // Vorgängermediums werden im MVU-Kern verworfen.
+        Assert.Contains("appliedMediaId", code, StringComparison.Ordinal);
         Assert.Contains("PlaybackEndedMessage", code, StringComparison.Ordinal);
         Assert.Contains("PlaybackFailedMessage", code, StringComparison.Ordinal);
         Assert.Contains("PictureInPictureRequestedMessage", code, StringComparison.Ordinal);
@@ -447,6 +451,31 @@ public class PlayerContractTests
 
         var updateUi = MethodBody(code, "private void UpdateUi");
         Assert.Contains("sourceApplyFailed", updateUi, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// Prüft PlayerPage: <c>appliedMediaId</c> darf erst nach dem
+    /// erfolgreichen Quellenwechsel am MediaElement umgeschwenkt werden.
+    /// Schlägt <c>VideoElement.Source = …</c> fehl, spielt das Element das
+    /// Altmedium weiter — ein dann noch laufender Fortschrittstakt muss
+    /// die alte Id melden, damit der Identitäts-Guard des MVU-Kerns die
+    /// Alt-Takte verwirft (statt Alt-Positionen der neuen MediaId
+    /// anzurechnen). Regression: die Zuweisung stand optimistisch vor
+    /// dem Quellenwechsel — Fehlschlag-Pfade meldeten Alt-Positionen
+    /// bereits unter der neuen Id.
+    /// </summary>
+    [Fact]
+    public void PlayerPage_AppliedMediaId_AssignedAfterSourceSet()
+    {
+        var code = PlayerPageCode();
+        var updateUi = MethodBody(code, "private void UpdateUi");
+
+        var sourceSet = updateUi.LastIndexOf("VideoElement.Source =", StringComparison.Ordinal);
+        var idAssign = updateUi.IndexOf("appliedMediaId = player.MediaId", StringComparison.Ordinal);
+        Assert.True(sourceSet >= 0, "Quellenzuweisung am MediaElement nicht gefunden.");
+        Assert.True(
+            idAssign > sourceSet,
+            "appliedMediaId muss erst nach dem erfolgreichen Setzen der Quelle zugewiesen werden.");
     }
 
     /// <summary>

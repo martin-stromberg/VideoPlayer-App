@@ -125,6 +125,14 @@ public sealed record PlayerState
     /// </summary>
     public double LastReportedPositionSeconds { get; init; } = -1;
 
+    /// <summary>
+    /// Anzahl aufeinanderfolgender plausibler Fortschrittstakte innerhalb
+    /// des Endfensters — Bestätigungsgrundlage der „angesehen"-Schwelle
+    /// und der Auto-Fortsetzung (ein einzelner Ausreißer-Takt darf nicht
+    /// auslösen).
+    /// </summary>
+    public int EndWindowStreak { get; init; }
+
     /// <summary>Eine Wiedergabe ist angefordert (State belegt).</summary>
     public bool IsActive => MediaId > 0 && MediaType is not null;
 }

@@ -77,6 +77,29 @@ public class AppSettingsTests
         Assert.Equal(expected, new AppSettings { DownloadQuotaGb = input }.Normalize().DownloadQuotaGb);
     }
 
+    /// <summary>
+    /// Prüft EndWindow: liefert das Maximum aus „angesehen"-Fenster und
+    /// Auto-Fortsetzungsfenster — die gemeinsame Fensterableitung des
+    /// MVU-Kerns und des Diagnose-Logs am App-Rand.
+    /// </summary>
+    /// <param name="watched">„Angesehen"-Fenster in Sekunden.</param>
+    /// <param name="autoResume">Auto-Fortsetzungsfenster in Sekunden.</param>
+    /// <param name="expectedSeconds">Erwartetes Fenster in Sekunden.</param>
+    [Theory]
+    [InlineData(300, 120, 300)]
+    [InlineData(60, 600, 600)]
+    [InlineData(300, 300, 300)]
+    public void EndWindow_IsMaxOfBothWindows(int watched, int autoResume, int expectedSeconds)
+    {
+        var settings = new AppSettings
+        {
+            WatchedEndWindowSeconds = watched,
+            AutoResumeRemainingSeconds = autoResume
+        };
+
+        Assert.Equal(TimeSpan.FromSeconds(expectedSeconds), settings.EndWindow);
+    }
+
     /// <summary>Prüft Normalize: lässt boolesche Werte unverändert.</summary>
     [Fact]
     public void Normalize_LeavesBooleansUntouched()

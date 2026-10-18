@@ -121,7 +121,11 @@ Die Quellauflösung (`PlaybackSourceService`) wählt automatisch:
 - **„Angesehen":** erreicht die Position das Ende abzüglich des
   eingestellten Zeitfensters („Als angesehen"-Einstellung), wird das
   Medium als angesehen markiert — die Anzeige erscheint dezent im
-  Kopfbereich.
+  Kopfbereich. Der Fenstereintritt ist dabei bestätigt: erst zwei
+  aufeinanderfolgende Fortschrittstakte mit real weitergelaufener
+  Position und nicht geschrumpfter Dauer gelten als erreichtes Ende —
+  ein einzelner Ausreißertakt eines gestörten Streams markiert nicht
+  (siehe „Automatische Fortsetzung").
 
 ## Automatische Fortsetzung
 
@@ -137,6 +141,48 @@ die Fortsetzung den Folge-Eintrag über den serverseitigen
 `advance`-Endpunkt in der Playlist-Reihenfolge (nicht die
 Serienreihenfolge); meldet der Server keinen Folgeeintrag, endet die
 Wiedergabe.
+
+**Bestätigter Fenstereintritt:** der Eintritt ins Endfenster gilt
+erst ab dem zweiten aufeinanderfolgenden Fortschrittstakt
+(5-Sekunden-Raster) als erreicht — der Takt muss eine tatsächlich
+weitergelaufene Position und eine nicht geschrumpfte Gesamtdauer
+melden. Einzelne Takte mit eingefrorener oder gesprungener Position
+bzw. verkürzter Dauer — etwa bei einem gestörten Stream, der im
+Wiedergabezustand verharrt — bestätigen das Ende nicht: sie lösen
+weder die Fortsetzung noch die „angesehen"-Markierung samt
+eventueller Download-Löschung aus, und die Wiedergabe läuft weiter.
+Jeder nicht plausible Takt — auch ein Pausentakt, ein Seek zurück
+oder ein Takt außerhalb des Fensters — lässt die Bestätigung von
+vorn beginnen; während der Quellauflösung eines Folgetitels ist die
+Fensterwertung gesperrt. Zusätzlich ist jeder Takt an das aktuelle
+Medium gebunden: nachlaufende Positionsmeldungen eines bereits
+gewechselten Vorgängermediums werden verworfen und können das neue
+Medium weder als gesehen markieren noch dessen Download löschen
+oder einen weiteren Wechsel auslösen.
+
+Damit verschiebt sich der Wechsel um höchstens ein Taktintervall
+(~5 Sekunden) nach hinten — bei den üblichen Zeitfenstern von
+mehreren Minuten fachlich unerheblich. Medien, die kürzer als zwei
+Taktintervalle Restlaufzeit im Fenster laufen, sowie ein vor dem
+Ende pausiertes oder geschlossenes Medium werden taktseitig nicht
+mehr markiert bzw. weitergeschaltet — in diesen Fällen greift das
+unveränderte, ebenfalls plausibilisierte Ende-Ereignis (siehe
+„Wiedergabeende").
+
+Technischer Hintergrund: `PlayerState.EndWindowStreak` zählt die
+aufeinanderfolgenden plausiblen Fenstertakte; `IsProgressTickPlausible`
+und `EvaluateEndWindow` in `AppUpdate` koppeln Markierung,
+Download-Löschung und beide Fortsetzungspfade an die interne
+Konstante `EndWindowRequiredTicks` (= 2; Streak-Fenster über
+`AppSettings.EndWindow` = größeres der beiden eingestellten
+Fenster). Die Medienbindung läuft über die `MediaId` der
+`PlaybackProgressMessage` — die `PlayerPage` meldet die zuletzt am
+`MediaElement` tatsächlich angewendete `MediaId` (`appliedMediaId`,
+erst nach erfolgreichem Quellenwechsel gesetzt); ein Takt mit
+fremder Id wird vollständig verworfen und erreicht auch die
+Fortschrittsmeldung an den Server nicht. Zur Diagnose schreibt
+`ReportPosition` innerhalb des Fensters einen Debug-Protokolleintrag
+mit Position, Dauer, Lauf-/Pufferzustand, `MediaId` und Streak.
 
 ## Wiedergabeende
 
@@ -279,13 +325,16 @@ versuchen es im nächsten Takt erneut.
 Der Wiedergabe-Zustand liegt in `AppModel.Player` (`PlayerState`):
 Medium, aufgelöste Quelle (`PlaybackSource` mit
 `PlaybackSourceKind.ServerStream`/`LocalFile`), Position/Dauer,
-Lauf-/Pufferzustand, „angesehen"-Markierung, PiP-Status,
+Lauf-/Pufferzustand, „angesehen"-Markierung, Bestätigungs-Streak
+des Endfensters (`EndWindowStreak`), PiP-Status,
 Fortsetzungsliste (`UpcomingEpisodes` aus dem Serienkontext der
 Detailseite), Playlist-Kontext (`PlaylistId`, `PlaylistName`,
 `PlaylistEntryId`, `PlaylistPosition`, `PlaylistTotalCount`,
 `PlaylistNextExhausted`) und Fehlertext. Die Seite dispatcht
 ausschließlich Messages (`PlayRequested`, `PlaylistNextRequested`,
-`PlaylistPreviousRequested`, `PlaybackProgress`, `PlaybackEnded`,
+`PlaylistPreviousRequested`, `PlaybackProgress` — trägt die `MediaId`
+des aktuell am Element angewendeten Mediums, sodass nachlaufende
+Takte des Vorgängermediums verworfen werden —, `PlaybackEnded`,
 `PlaybackFailed`, `PictureInPictureRequested`, `PlayerClosed` u. a.);
 die Effekte `NavigateToPlayer`, `ResolvePlaybackSource`,
 `StartPlaylistPlayback`, `LoadNextPlaylistEntry`,
