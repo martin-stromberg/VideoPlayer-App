@@ -1,0 +1,21 @@
+# Bestandsaufnahme: Frühzeitiger Wechsel zum nächsten Video trotz Seek-Fix (zweiter Vorfall)
+
+Analysiert wurde der Auto-Fortsetzungs-/„angesehen"-Pfad der Wiedergabe (MVU-Kern, App-Rand, Einstellungen, Tests) sowie das Vorfallprotokoll `videoplayer (6).log` — bezogen auf die Anforderung in `requirement.md` (Episodenwechsel 21600 → 21603 am 2026-10-18 um 13:42:48 ohne `MediaEnded`/`MediaFailed`).
+
+## Zusammenfassung
+
+- **Der positionsgetriebene Fenstereintritt ist ungeschützt:** `AppUpdate.UpdatePlaybackProgress` (`VideoPlayer.Mvu/AppUpdate.cs`, Z. 3792–3876) wertet pro Takt `remaining = message.Duration - message.Position` aus. Ein einziger Takt mit `remaining <= WatchedEndWindowSeconds` setzt `IsWatched` (und löst optional `DeleteWatchedDownloadEffect` aus, Z. 3821–3836); ein einziger Takt mit `remaining <= AutoResumeRemainingSeconds` bei `IsPlaying` löst sofort `AdvancePlaylistEntry` (Z. 3846–3858) bzw. `AdvanceToNextEpisode` (Z. 3860–3870) aus — ohne jede Plausibilitäts-, Stabilitäts- oder Identitätsprüfung der Positions-/Dauer-Meldung.
+- **Referenzmuster vorhanden:** `IsPlaybackEndPlausible` (Z. 3973–3979) mit `PlaybackEndedToleranceSeconds = 300` (Z. 88) schützt nur den `PlaybackEndedMessage`-Pfad (`UpdatePlaybackEnded`, Z. 3896–3960). Der Takt-Pfad hat kein Gegenstück.
+- **`IsBuffering` wird gespeichert, aber nicht ausgewertet:** Der Takt übernimmt `IsBuffering` (Z. 3805), weder `IsWatched`- noch Auto-Fortsetzungs-Prüfung konsultieren es. `IsResolving` sperrt nur den Playlist-Zweig (Z. 3850) — der Serienzweig (`HasNextEpisode`, Z. 3862) und die `IsWatched`-Schwelle (Z. 3826) prüfen es nicht.
+- **Keine Identitätsbindung des Takts ans Medium:** `Position`/`Duration` kommen ungeprüft aus der Nachricht. Nach `AdvanceToNextEpisode` (Z. 3735–3777) stehen bereits `MediaId`/`Title` des Folgetitels im State (`IsWatched = false`, `Position`/`Duration = 0`), während das native Element noch das alte Medium spielt — ein nachlaufender Takt mit den alten Werten kann die Folge-Episode als gesehen markieren und deren Download löschen. Das Protokoll (Download von 21603 entfernt, *bevor* dessen Quellauflösung abgeschlossen war) ist damit vereinbar.
+- **`PlayerState` kennt keine Takt-Historie:** Für eine Streak-/Monotonieprüfung fehlt ein Zustandsfeld; vorhanden ist nur `LastReportedPositionSeconds` (Throttling der Server-Fortschrittsmeldung, `PlayerState.cs` Z. 126).
+- **Einstellungen vorhanden:** `AutoResumeEnabled` (Default `true`), `AutoResumeRemainingSeconds` (Default 300, Clamp 30–3600), `WatchedEndWindowSeconds` (Default 300, Clamp 30–3600), `AutoDeleteWatchedEpisodes` (Default `false`) in `VideoPlayer.Storage/AppSettings.cs`.
+- **Protokoll-Befund:** Kein „Wiedergabe beendet"-/„Wiedergabe fehlgeschlagen"-Eintrag vor dem Wechsel — nur der Takt-Pfad kommt infrage. Vier `AVPlayerItemPlaybackStalledNotification`-Warnungen (13:36–13:39) belegen den gestörten Stream. Das Protokoll enthält **keine** Positions-/Dauer-Werte — die Auslöser-Konstellation ist daraus nicht ablesbar.
+- **Tests:** Update-Tests decken Fenstereintritt, Schalter, Pause, Playlist-Advance, Ende-Plausibilität und Auto-Delete ab (alle gehen von einem einzelnen auslösenden Takt aus — bei Einführung einer Streak-Prüfung anzupassen). E2E-Tests zur Auto-Fortsetzung existieren (`PlaylistPlaybackTests`, `ContinueWatchingPlaybackTests`); ein Stall-/Fehlmeldungs-Szenario ist E2E-seitig nicht nachgestellt.
+
+## Details
+
+- [Logik: MVU-Update-Pfade und App-Rand](inventory/logic.md) — `UpdatePlaybackProgress`, `UpdatePlaybackEnded`, `IsPlaybackEndPlausible`, `UpdatePlaybackFailed`, `AdvanceToNextEpisode`, `AdvancePlaylistEntry`, `MarkEpisodeWatchedInDetails`, weitere Player-Wechsel-/Reset-Stellen, `PlayerPage`-Meldepfad, Download-Löschpfad.
+- [Datenmodell und Meldungen](inventory/models.md) — `PlayerState`, `AppSettings`, `PlaybackProgressMessage`, betroffene `AppEffect`-Records, `PlaybackEndedToleranceSeconds`.
+- [Tests](inventory/tests.md) — `AppUpdateTests_Player`, `AppUpdateTests_PlaylistPlayback`, `AppUpdateTests_Downloads`, `PlayerContractTests`, `AppSettingsTests`, E2E-Tests.
+- [Protokoll-Befund](inventory/logfindings.md) — Timeline des Vorfalls aus `videoplayer (6).log` und Ableitung des Wechselpfads.
