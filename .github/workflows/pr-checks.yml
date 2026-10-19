@@ -20,7 +20,7 @@ jobs:
           dotnet-version: '10.0.x'
 
       - name: Install .NET MAUI workload
-        run: dotnet workload install maui
+        run: dotnet workload install maui --skip-manifest-update
 
       - name: Restore
         run: dotnet restore

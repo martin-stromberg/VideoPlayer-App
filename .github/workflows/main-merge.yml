@@ -63,7 +63,7 @@ jobs:
           dotnet-version: '10.0.x'
 
       - name: Install .NET MAUI workload
-        run: dotnet workload install maui
+        run: dotnet workload install maui --skip-manifest-update
 
       - name: Set application version
         run: pwsh .github/scripts/Set-Version.ps1 -Version '${{ needs.release.outputs.tag }}'
