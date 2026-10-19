@@ -35,7 +35,6 @@ public partial class SettingsPage : ContentPage
 
         WireNumeric(PreloadEpisodeCountEntry, OnPreloadEpisodeCountCompleted);
         WireNumeric(DownloadQuotaGbEntry, OnDownloadQuotaCompleted);
-        WireNumeric(AutoResumeRemainingEntry, OnAutoResumeRemainingCompleted);
         WireNumeric(WatchedEndWindowEntry, OnWatchedEndWindowCompleted);
     }
 
@@ -78,7 +77,6 @@ public partial class SettingsPage : ContentPage
 
             SetTextIfNotFocused(PreloadEpisodeCountEntry, settings.PreloadEpisodeCount);
             SetTextIfNotFocused(DownloadQuotaGbEntry, settings.DownloadQuotaGb);
-            SetTextIfNotFocused(AutoResumeRemainingEntry, settings.AutoResumeRemainingSeconds);
             SetTextIfNotFocused(WatchedEndWindowEntry, settings.WatchedEndWindowSeconds);
         }
         finally
@@ -139,11 +137,6 @@ public partial class SettingsPage : ContentPage
     private void OnDownloadQuotaCompleted(object? sender, EventArgs e)
     {
         SaveNumeric(DownloadQuotaGbEntry, v => s => s with { DownloadQuotaGb = v });
-    }
-
-    private void OnAutoResumeRemainingCompleted(object? sender, EventArgs e)
-    {
-        SaveNumeric(AutoResumeRemainingEntry, v => s => s with { AutoResumeRemainingSeconds = v });
     }
 
     private void OnWatchedEndWindowCompleted(object? sender, EventArgs e)

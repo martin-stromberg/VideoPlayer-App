@@ -183,11 +183,11 @@ public partial class PlayerPage : ContentPage
             var isBuffering = state is MediaElementState.Buffering or MediaElementState.Opening;
 
             // Diagnose des Endfenster-Takts: erst der zweite aufeinander-
-            // folgende plausible Takt im Fenster darf „angesehen"/Auto-
-            // Fortsetzung auslösen — das Protokoll soll die auslösenden
+            // folgende plausible Takt im „angesehen"-Fenster darf die
+            // Markierung auslösen — das Protokoll soll die auslösenden
             // Werte des gestörten Streams belegen (keine Quell-URLs).
             if (duration > TimeSpan.Zero
-                && duration - position <= model.Settings.EndWindow)
+                && duration - position <= TimeSpan.FromSeconds(model.Settings.WatchedEndWindowSeconds))
             {
                 logger.LogDebug(
                     "Fortschrittstakt im Endfenster: Position {Position}, Dauer {Duration}, IsPlaying {IsPlaying}, IsBuffering {IsBuffering}, MediaId {MediaId}, EndWindowStreak {EndWindowStreak}.",

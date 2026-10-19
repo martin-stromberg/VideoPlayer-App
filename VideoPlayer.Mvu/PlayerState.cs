@@ -128,8 +128,7 @@ public sealed record PlayerState
     /// <summary>
     /// Anzahl aufeinanderfolgender plausibler Fortschrittstakte innerhalb
     /// des Endfensters — Bestätigungsgrundlage der „angesehen"-Schwelle
-    /// und der Auto-Fortsetzung (ein einzelner Ausreißer-Takt darf nicht
-    /// auslösen).
+    /// (ein einzelner Ausreißer-Takt darf nicht auslösen).
     /// </summary>
     public int EndWindowStreak { get; init; }
 

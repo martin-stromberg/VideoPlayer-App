@@ -94,8 +94,9 @@ public sealed class PlaylistPlaybackTests : E2ETestBase
 
         await app.DevApi.InvokeAsync("PlaylistDetailsPlayButton", cancellationToken: Ct);
 
-        // Stabiler Endzustand: das kurze Testvideo läuft über die
-        // Auto-Fortsetzung bis zum letzten Eintrag durch — der erste
+        // Stabiler Endzustand: das kurze Testvideo läuft je bis zum
+        // tatsächlichen Ende (MediaEnded) und wechselt dann über die
+        // Auto-Fortsetzung weiter — bis zum letzten Eintrag; der erste
         // abspielbare Eintrag (501) ist Zwischenzustand und wird über
         // die angefragten Pfade nachgewiesen.
         var model = await app.DevApi.WaitForModelAsync(
@@ -155,8 +156,8 @@ public sealed class PlaylistPlaybackTests : E2ETestBase
     /// navigieren über <c>play/next</c>/<c>play/previous</c> innerhalb der
     /// Playlist-Reihenfolge. Vom stabilen Endzustand (letzter Eintrag)
     /// führt „Zurück" zum vorherigen Eintrag, „Weiter" von dort wieder
-    /// zum letzten — der Fortschritts-Takt (5 s) lässt den Wechsel
-    /// beobachtbar, bevor die Auto-Fortsetzung erneut zugreift.
+    /// zum letzten — der Wechsel ist beobachtbar, bevor die
+    /// Auto-Fortsetzung am nächsten Medienende erneut zugreift.
     /// </summary>
     [Fact]
     public async Task NextAndPreviousButtons_NavigatePlaylist()
@@ -229,9 +230,10 @@ public sealed class PlaylistPlaybackTests : E2ETestBase
         await OpenPlaylistDetailsAsync(app, server, PlaylistId, 2);
         await app.DevApi.InvokeAsync("PlaylistDetailsPlayButton", cancellationToken: Ct);
 
-        // Das kurze Testvideo liegt sofort im Fortsetzungsfenster → der
-        // Player schaltet über den advance-Endpunkt zum Folge-Eintrag
-        // weiter; der stabile Endzustand ist der letzte Eintrag.
+        // Das kurze Testvideo erreicht rasch sein tatsächliches Ende
+        // (MediaEnded) → der Player schaltet über den advance-Endpunkt
+        // zum Folge-Eintrag weiter; der stabile Endzustand ist der
+        // letzte Eintrag.
         var model = await app.DevApi.WaitForModelAsync(
             m => m.PlayerIsActive && m.PlayerMediaId == 502 && m.PlayerPlaylistEntryId == 6,
             TimeSpan.FromSeconds(60),
@@ -355,8 +357,9 @@ public sealed class PlaylistPlaybackTests : E2ETestBase
             "Wiedergabe im Playlist-Kontext gestartet", Ct);
         Assert.False(app.Process.HasExited, "Die App wurde beim Wiedergabestart beendet.");
 
-        // Auto-Fortsetzung: das Folgevideo kommt aus der Playlist
-        // (advance-Endpunkt, Folge = Film 502) — nicht aus der Serie.
+        // Auto-Fortsetzung am Medienende: das Folgevideo kommt aus der
+        // Playlist (advance-Endpunkt, Folge = Film 502) — nicht aus
+        // der Serie.
         var model = await app.DevApi.WaitForModelAsync(
             m => m.PlayerIsActive && m.PlayerMediaId == 502 && m.PlayerPlaylistEntryId == 6,
             TimeSpan.FromSeconds(60),

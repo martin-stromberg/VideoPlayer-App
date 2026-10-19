@@ -31,11 +31,9 @@ sofort übernommen und bleiben nach dem Neustart der App erhalten.
 
 ### Wiedergabe
 
-- **Auto-Fortsetzung** — setzt begonnene Videos automatisch an der letzten
-  Position fort (Standard: ein).
-- **Zeitfenster Auto-Fortsetzung** — Restlaufzeit in Sekunden, unterhalb derer
-  nicht mehr fortgesetzt, sondern von vorn gestartet wird (30–3600,
-  Standard 300).
+- **Auto-Fortsetzung** — wechselt am Wiedergabeende automatisch zum
+  nächsten Titel (nächste Episode bzw. nächster Playlist-Eintrag;
+  Standard: ein).
 - **Als angesehen ab … Sekunden vor Ende** — ein Video gilt als angesehen,
   wenn das Ende abzüglich dieses Fensters erreicht ist (30–3600,
   Standard 300).

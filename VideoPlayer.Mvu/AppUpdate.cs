@@ -81,16 +81,17 @@ public static class AppUpdate
     /// liegt. Der feste Wert orientiert sich am Standard des Angesehen-
     /// Endfensters (<see cref="AppSettings.WatchedEndWindowSeconds"/>,
     /// 300 s) — innerhalb dieses Fensters markiert der Fortschrittstakt
-    /// das Medium ohnehin als angesehen bzw. greift die Auto-Fortsetzung
-    /// bereits, sodass ein Ende-Ereignis dort zum Normalablauf konsistent
-    /// ist. Die Schwelle ist bewusst eine Konstante, keine Einstellung.
+    /// das Medium ohnehin als angesehen, sodass ein Ende-Ereignis dort
+    /// zum Normalablauf konsistent ist. Die Schwelle ist der alleinige
+    /// Wechsel-Gate der Auto-Fortsetzung und bewusst eine Konstante,
+    /// keine Einstellung.
     /// </summary>
     private const int PlaybackEndedToleranceSeconds = 300;
 
     /// <summary>
     /// Erforderliche Anzahl aufeinanderfolgender plausibler Fortschritts-
-    /// takte im Endfenster, bevor die „angesehen"-Schwelle und die Auto-
-    /// Fortsetzung auslösen dürfen (<see cref="PlayerState.EndWindowStreak"/>).
+    /// takte im Endfenster, bevor die „angesehen"-Schwelle auslösen darf
+    /// (<see cref="PlayerState.EndWindowStreak"/>).
     /// Bewusst eine Konstante, keine Einstellung (Muster
     /// <see cref="PlaybackEndedToleranceSeconds"/>).
     /// </summary>
@@ -3791,20 +3792,20 @@ public static class AppUpdate
     /// <summary>
     /// Positions-Takt der Wiedergabeseite: Position/Dauer/Laufzustand
     /// übernehmen, geänderte Position melden (Throttling über die zuletzt
-    /// gemeldete Position), die „angesehen"-Schwelle
-    /// (<see cref="AppSettings.WatchedEndWindowSeconds"/>) setzen und die
-    /// Auto-Fortsetzung prüfen (Restlaufzeit &lt;
-    /// <see cref="AppSettings.AutoResumeRemainingSeconds"/> → nächste
-    /// Episode). Der Fenstereintritt ist plausibilisiert: erst
+    /// gemeldete Position) und die „angesehen"-Schwelle
+    /// (<see cref="AppSettings.WatchedEndWindowSeconds"/>) setzen. Der
+    /// Fenstereintritt ist plausibilisiert: erst
     /// <see cref="EndWindowRequiredTicks"/> aufeinanderfolgende plausible
     /// Takte (<see cref="IsProgressTickPlausible"/>) mit realem Fortschritt
     /// im Fenster bestätigen ihn (<see cref="PlayerState.EndWindowStreak"/>) —
     /// ein einzelner Takt mit eingefrorener/gesprungener Position oder
-    /// geschrumpfter Dauer löst weder Markierung noch Wechsel aus. Takte
+    /// geschrumpfter Dauer löst die Markierung nicht aus. Takte
     /// einer abweichenden <see cref="PlaybackProgressMessage.MediaId"/>
     /// (nachlaufende Meldungen des Vorgängermediums) und alle Takte
     /// während der Quellauflösung bleiben ohne Fensterwirkung. Medien
-    /// kürzer als das jeweilige Fenster greifen ab dem zweiten Takt.
+    /// kürzer als das Fenster greifen ab dem zweiten Takt. Der Wechsel
+    /// zum nächsten Titel erfolgt ausschließlich über das
+    /// Wiedergabeende (<see cref="UpdatePlaybackEnded"/>).
     /// </summary>
     /// <param name="model">Aktuelles App-Model.</param>
     /// <param name="message">Der Wiedergabe-Takt der Seite.</param>
@@ -3855,17 +3856,16 @@ public static class AppUpdate
     /// Streak (<see cref="PlayerState.EndWindowStreak"/>) aus
     /// aufeinanderfolgenden plausiblen Takten
     /// (<see cref="IsProgressTickPlausible"/>) im Fenster
-    /// (<see cref="AppSettings.EndWindow"/>) auf und koppelt daran die
-    /// Auslöser — „angesehen"-Schwelle
-    /// (<see cref="AppSettings.WatchedEndWindowSeconds"/>) samt optionalem
-    /// Download-Aufräumen und Auto-Fortsetzung
-    /// (<see cref="AppSettings.AutoResumeRemainingSeconds"/>) über den
-    /// Playlist- bzw. Serienzweig. Alle übrigen Takte — Pausentakt ohne
+    /// (<see cref="AppSettings.WatchedEndWindowSeconds"/>) auf und koppelt
+    /// daran die „angesehen"-Schwelle samt optionalem Download-Aufräumen.
+    /// Alle übrigen Takte — Pausentakt ohne
     /// Fortschritt, eingefrorene Position bei gemeldetem IsPlaying,
     /// geschrumpfte Dauer, Rückwärtssprung, plausibler Takt außerhalb des
     /// Fensters, unbekannte Dauer — setzen die Streak zurück; während der
     /// Quellauflösung (<see cref="PlayerState.IsResolving"/>) ist jede
-    /// Fensterwirkung gesperrt.
+    /// Fensterwirkung gesperrt. Ein Wechsel zum nächsten Titel wird hier
+    /// nicht ausgelöst — er erfolgt ausschließlich am Wiedergabeende
+    /// (<see cref="UpdatePlaybackEnded"/>).
     /// </summary>
     /// <param name="model">Aktuelles App-Model.</param>
     /// <param name="player">Player-Zustand vor dem Takt (Streak-/Plausibilitäts-Basis).</param>
@@ -3880,7 +3880,7 @@ public static class AppUpdate
         if (message.Duration > TimeSpan.Zero)
         {
             var remaining = message.Duration - message.Position;
-            var endWindow = model.Settings.EndWindow;
+            var endWindow = TimeSpan.FromSeconds(model.Settings.WatchedEndWindowSeconds);
 
             // Endfenster-Bestätigung: nur aufeinanderfolgende plausible
             // Takte mit realem Fortschritt im Fenster bauen die Streak
@@ -3901,7 +3901,7 @@ public static class AppUpdate
             // „Angesehen": Ende abzüglich des eingestellten Fensters
             // erreicht — bestätigt durch die erforderliche Streak.
             if (!updated.IsWatched
-                && remaining <= TimeSpan.FromSeconds(model.Settings.WatchedEndWindowSeconds)
+                && remaining <= endWindow
                 && updated.EndWindowStreak >= EndWindowRequiredTicks)
             {
                 updated = updated with { IsWatched = true };
@@ -3911,43 +3911,6 @@ public static class AppUpdate
                 {
                     effects.Add(new DeleteWatchedDownloadEffect(updated.MediaType, updated.MediaId));
                 }
-            }
-
-            // Auto-Fortsetzung: Restlaufzeit unterschreitet das Fenster
-            // → der nächste Titel startet (bei aktiviertem Schalter).
-            // Nur bei laufender Wiedergabe — ein Takt im Pausenzustand
-            // (StateChanged) darf nicht zum nächsten Titel weiterschalten.
-            // Im Playlist-Kontext übernimmt der Server die Folge-Ermittlung
-            // (Reihenfolge der Playlist); ein ausstehender Lauf
-            // (IsResolving) bzw. ein erschöpftes Listenende
-            // (PlaylistNextExhausted) unterbinden weitere Versendungen.
-            if (model.Settings.AutoResumeEnabled
-                && message.IsPlaying
-                && updated.IsPlaylistPlayback
-                && !updated.PlaylistNextExhausted
-                && !updated.IsResolving
-                && remaining <= TimeSpan.FromSeconds(model.Settings.AutoResumeRemainingSeconds)
-                && updated.EndWindowStreak >= EndWindowRequiredTicks)
-            {
-                var transition = AdvancePlaylistEntry(
-                    MarkEpisodeWatchedInDetails(model, updated), updated, null);
-                return new AppTransition(
-                    transition.Model,
-                    [.. effects, .. transition.Effects]);
-            }
-
-            if (model.Settings.AutoResumeEnabled
-                && message.IsPlaying
-                && updated.HasNextEpisode
-                && !updated.IsResolving
-                && remaining <= TimeSpan.FromSeconds(model.Settings.AutoResumeRemainingSeconds)
-                && updated.EndWindowStreak >= EndWindowRequiredTicks)
-            {
-                var transition = AdvanceToNextEpisode(
-                    MarkEpisodeWatchedInDetails(model, updated), updated, null);
-                return new AppTransition(
-                    transition.Model,
-                    [.. effects, .. transition.Effects]);
             }
         }
         else
@@ -4015,8 +3978,8 @@ public static class AppUpdate
             effects.Add(new DeleteWatchedDownloadEffect(updated.MediaType, updated.MediaId));
         }
 
-        // Am Ende liegt die Restlaufzeit bei 0 — die Auto-Fortsetzung
-        // greift damit wie im Takt (Fenster ist stets > 0). Im
+        // Am Ende liegt die Restlaufzeit bei 0 — hier wechselt die
+        // Auto-Fortsetzung zum nächsten Titel (einziger Wechselpfad). Im
         // Playlist-Kontext übernimmt der Server die Folge-Ermittlung.
         if (model.Settings.AutoResumeEnabled
             && updated.IsPlaylistPlayback
