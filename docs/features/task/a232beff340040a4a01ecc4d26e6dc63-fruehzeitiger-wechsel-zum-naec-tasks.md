@@ -1,39 +1,48 @@
-# Tasks: Frühzeitiger Wechsel zum nächsten Video trotz Seek-Fix (zweiter Vorfall)
+# Tasks: Auto-Fortsetzung nur am tatsächlichen Medienende — konfigurierbarer Vorlauf entfernen
 
 | # | Bereich | Aufgabe | Status | Testnachweis |
 |---|---------|---------|--------|--------------|
-| 1 | Datenmodell | `EndWindowStreak` (`int`, Default 0) auf `PlayerState` ergänzen | Erledigt | `AppUpdateTests_Player.PlaybackProgress_SingleWindowTick_DoesNotAdvance` (Streak-Aufbau) |
-| 2 | Logik | Konstante `EndWindowRequiredTicks = 2` in `AppUpdate` ergänzen | Erledigt | `AppUpdateTests_Player.PlaybackProgress_SecondWindowTick_AdvancesAndMarksWatched` |
-| 3 | Logik | Hilfsmethode `IsProgressTickPlausible` in `AppUpdate` implementieren | Erledigt | `AppUpdateTests_Player.PlaybackProgress_FrozenPosition_ResetsStreak`, `PlaybackProgress_ShrunkDuration_ResetsStreak` |
-| 4 | Meldung | `PlaybackProgressMessage` um `MediaId` (`long`) erweitern | Erledigt | `AppUpdateTests_Player.PlaybackProgress_WrongMediaId_IsDiscarded` |
-| 5 | Logik | `UpdatePlaybackProgress`: Identitäts-Guard (`message.MediaId != player.MediaId` → `Unchanged`) einbauen | Erledigt | `AppUpdateTests_Player.PlaybackProgress_WrongMediaId_IsDiscarded` |
-| 6 | Logik | `UpdatePlaybackProgress`: Streak-Auswertung einbauen (plausibler Fenstertakt +1, alle übrigen Takte — inkl. Pausentakte — 0; `IsResolving` → 0 und keine Fensterauswertung) | Erledigt | `AppUpdateTests_Player.PlaybackProgress_PausedTick_ResetsStreak`, `PlaybackProgress_WhileResolving_NoWindowEffects` |
-| 7 | Logik | `UpdatePlaybackProgress`: `IsWatched`/`DeleteWatchedDownloadEffect` an `EndWindowStreak >= EndWindowRequiredTicks` koppeln | Erledigt | `AppUpdateTests_Downloads.PlaybackProgress_TwoWindowTicks_EmitsAutoDelete` |
-| 8 | Logik | `UpdatePlaybackProgress`: Playlist-Advance um Streak-Bedingung ergänzen; Serien-Advance um Streak-Bedingung und `!updated.IsResolving` ergänzen | Erledigt | `AppUpdateTests_PlaylistPlayback.PlaybackProgress_NearEnd_TwoTicks_AdvancesPlaylist`, `AppUpdateTests_Player.PlaybackProgress_SeriesAdvance_RequiresNotResolving` |
-| 9 | Logik | `AdvanceToNextEpisode`: `EndWindowStreak = 0` beim Medienwechsel zurücksetzen | Erledigt | `AppUpdateTests_Player.PlaybackProgress_SecondWindowTick_AdvancesAndMarksWatched` (assertiert Streak 0 nach dem Wechsel) |
-| 10 | Logik | `UpdatePlaylistNavigationCompleted`: `EndWindowStreak = 0` beim Eintragswechsel zurücksetzen | Erledigt | Kein direkter Test (kein NavigationCompleted-Test startet mit Streak > 0; indirekt über `PlaybackProgress_NearEnd_TwoTicks_AdvancesPlaylist`) |
-| 11 | App-Rand | `PlayerPage`: Feld `appliedMediaId` anlegen und in `UpdateUi` beim Quellen-Setzen/Leeren pflegen | Erledigt | `PlayerContractTests.PlayerPage_DispatchesPlaybackMessages` (pinnt `appliedMediaId` im Seitencode) |
-| 12 | App-Rand | `PlayerPage.ReportPosition`: `PlaybackProgressMessage` mit `appliedMediaId` dispatchen | Erledigt | `PlayerContractTests.PlayerPage_DispatchesPlaybackMessages` |
-| 13 | App-Rand | `PlayerPage.ReportPosition`: `LogDebug`-Diagnoselog bei `remaining <=` Fenster (Position, Dauer, Zustand, `appliedMediaId`, `EndWindowStreak`) | Erledigt | Kein direkter Test (Logging am App-Rand; indirekt über `PlayerPage_DispatchesPlaybackMessages`) |
-| 14 | Tests | `PlayingState`-Hilfsmethode in `AppUpdateTests_Player` um `endWindowStreak`-/`mediaId`-Parameter erweitern | Erledigt | Wird von `PlaybackProgress_WhileResolving_NoWindowEffects` u. a. genutzt (`endWindowStreak: 1`) |
-| 15 | Tests | `PlayingInPlaylist`-Hilfsmethode in `AppUpdateTests_PlaylistPlayback` an `mediaId`-konsistente Takte anpassen | Erledigt | `PlaybackProgress_NearEnd_InPlaylist_AdvancesPlaylist` u. a. melden `MediaId: 10` passend zum Fixture |
-| 16 | Tests | Alle `PlaybackProgressMessage`-Aufrufstellen in den bestehenden Update-Tests auf die neue `mediaId`-Signatur umstellen | Erledigt | Alle 48 Aufrufstellen führen den 5. Parameter (Repo-weite Prüfung); Kompilieren der Testsuite |
-| 17 | Tests | `PlaybackProgress_MarksWatchedWithinWindow` auf Zwei-Takt-Sequenz umstellen | Erledigt | `AppUpdateTests_Player.PlaybackProgress_MarksWatchedWithinWindow` |
-| 18 | Tests | `PlaybackProgress_AutoResumeAdvancesWhenEnabled` auf Zwei-Takt-Sequenz umstellen | Erledigt | `AppUpdateTests_Player.PlaybackProgress_AutoResumeAdvancesWhenEnabled` |
-| 19 | Tests | `PlaybackProgress_WatchedWindow_MarksEpisodeWatchedInDetails` auf Zwei-Takt-Sequenz umstellen | Erledigt | `AppUpdateTests_Player.PlaybackProgress_WatchedWindow_MarksEpisodeWatchedInDetails` |
-| 20 | Tests | `PlaybackProgress_WatchedEpisode_EmitsAutoDelete` (sowie `WatchedMovie_NoAutoDelete`, `AutoDeleteDisabled_NoEffect`) auf neue Signatur/Streak umstellen | Erledigt | `AppUpdateTests_Downloads.PlaybackProgress_WatchedEpisode_EmitsAutoDelete`, `PlaybackProgress_WatchedMovie_NoAutoDelete`, `PlaybackProgress_AutoDeleteDisabled_NoEffect` |
-| 21 | Tests | `PlaybackProgress_NearEnd_InPlaylist_AdvancesPlaylist` (sowie `NearEnd_WhileResolving`, `InPlaylist_ReportsPlaylistId`) auf neue Signatur/Streak umstellen | Erledigt | `AppUpdateTests_PlaylistPlayback.PlaybackProgress_NearEnd_InPlaylist_AdvancesPlaylist`, `PlaybackProgress_NearEnd_WhileResolving_NoSecondAdvance`, `PlaybackProgress_InPlaylist_ReportsPlaylistId` |
-| 22 | Tests | `PlayerPage_DispatchesPlaybackMessages` (`PlayerContractTests`) an `mediaId`-Dispatch anpassen | Erledigt | `PlayerContractTests.PlayerPage_DispatchesPlaybackMessages` (Assert auf `appliedMediaId`) |
-| 23 | Tests | Neuer Test: einzelner Fenstertakt löst weder Wechsel noch `IsWatched` aus (`PlaybackProgress_SingleWindowTick_DoesNotAdvance`) | Erledigt | `AppUpdateTests_Player.PlaybackProgress_SingleWindowTick_DoesNotAdvance` |
-| 24 | Tests | Neuer Test: zwei plausible Fenstertakte → `IsWatched` + `AdvanceToNextEpisode` (`PlaybackProgress_SecondWindowTick_AdvancesAndMarksWatched`) | Erledigt | `AppUpdateTests_Player.PlaybackProgress_SecondWindowTick_AdvancesAndMarksWatched` |
-| 25 | Tests | Neuer Test: eingefrorener Takt bei `IsPlaying = true` setzt Streak zurück (`PlaybackProgress_FrozenPosition_ResetsStreak`) | Erledigt | `AppUpdateTests_Player.PlaybackProgress_FrozenPosition_ResetsStreak` |
-| 26 | Tests | Neuer Test: geschrumpfte `Duration` setzt Streak zurück (`PlaybackProgress_ShrunkDuration_ResetsStreak`) | Erledigt | `AppUpdateTests_Player.PlaybackProgress_ShrunkDuration_ResetsStreak` |
-| 27 | Tests | Neuer Test: einzelner Vorwärtssprung ins Fenster löst nicht sofort aus (`PlaybackProgress_PositionJump_SingleTick_NoAdvance`) | Erledigt | `AppUpdateTests_Player.PlaybackProgress_PositionJump_SingleTick_NoAdvance` |
-| 28 | Tests | Neuer Test: Pausentakt setzt Streak zurück und löst nichts aus (`PlaybackProgress_PausedTick_ResetsStreak`) | Erledigt | `AppUpdateTests_Player.PlaybackProgress_PausedTick_ResetsStreak` |
-| 29 | Tests | Neuer Test: Takt mit abweichender `MediaId` wird verworfen (`PlaybackProgress_WrongMediaId_IsDiscarded`) | Erledigt | `AppUpdateTests_Player.PlaybackProgress_WrongMediaId_IsDiscarded` |
-| 30 | Tests | Neuer Test: Takt bei `IsResolving` ohne Fensterwirkung (`PlaybackProgress_WhileResolving_NoWindowEffects`) | Erledigt | `AppUpdateTests_Player.PlaybackProgress_WhileResolving_NoWindowEffects` |
-| 31 | Tests | Neuer Test: Serienzweig schaltet bei `IsResolving` nicht weiter (`PlaybackProgress_SeriesAdvance_RequiresNotResolving`) | Erledigt | `AppUpdateTests_Player.PlaybackProgress_SeriesAdvance_RequiresNotResolving` |
-| 32 | Tests | Neuer Test: `DeleteWatchedDownloadEffect` erst ab zweitem Fenstertakt (`PlaybackProgress_TwoWindowTicks_EmitsAutoDelete`) | Erledigt | `AppUpdateTests_Downloads.PlaybackProgress_TwoWindowTicks_EmitsAutoDelete` |
-| 33 | Tests | Neuer Test: Playlist-Advance erst ab zweitem Fenstertakt (`PlaybackProgress_NearEnd_TwoTicks_AdvancesPlaylist`) | Erledigt | `AppUpdateTests_PlaylistPlayback.PlaybackProgress_NearEnd_TwoTicks_AdvancesPlaylist` |
-| 34 | E2E-Tests | Auto-Advance-E2E-Tests (`PlaybackEnd_AdvancesToNextPlaylistEntry`, `TapContinueWatchingEpisode_...`, `ContinueWatchingPlaylistEntry_...`) auf verlängerte Wechselzeit (≥ 2 Takte) prüfen und Timeouts ggf. erhöhen | Erledigt | `PlaylistPlaybackTests.PlaybackEnd_AdvancesToNextPlaylistEntry`, `ContinueWatchingPlaybackTests.TapContinueWatchingEpisode_OpensDetailsAndStartsPlaybackAndAdvancesToNextEpisode`, `PlaylistPlaybackTests.ContinueWatchingPlaylistEntry_AdvancesByPlaylistOrder_NotSeries` — Wartezeiten von 60 s decken die ~10-s-Wechselzeit, keine Anpassung erforderlich |
-| 35 | Tests | Testlauf `dotnet test VideoPlayer.Maui.Tests` ausführen und Ergebnis dokumentieren | Erledigt | `test-results.md`: 1443 Tests gesamt, alle bestanden — 1379 `VideoPlayer.Maui.Tests` (`dotnet test --no-build`, net10.0) + 64 `VideoPlayer.E2E.Tests` (1 UI-Automatisierungs-Flake im Erstlauf, im isolierten Wiederholungslauf bestanden); Abdeckung 89,7 % |
+| 1 | Datenmodell | `AppSettings.AutoResumeRemainingSeconds` (Property inkl. Doc) entfernen | Offen | — |
+| 2 | Datenmodell | `AppSettings.Normalize()`: Clamp-Zeile `AutoResumeRemainingSeconds` entfernen | Offen | — |
+| 3 | Datenmodell | `AppSettings.EndWindow` (abgeleitete Max-Fenster-Property) entfernen | Offen | — |
+| 4 | Datenmodell | `PlayerState.EndWindowStreak`: Doc-Kommentar anpassen (dient nur noch der „angesehen"-Schwelle) | Offen | — |
+| 5 | Persistenz | `AppSettingsService.AutoResumeRemainingSecondsKey` entfernen | Offen | — |
+| 6 | Persistenz | `AppSettingsService.Load()`: `AutoResumeRemainingSeconds`-Zeile entfernen (verwaister Schlüssel ohne Migration) | Offen | — |
+| 7 | Persistenz | `AppSettingsService.Save()`: `AutoResumeRemainingSeconds`-Zeile entfernen | Offen | — |
+| 8 | Logik | `AppUpdate.EvaluateEndWindow`: Playlist-Advance-Block entfernen (Bedingung `remaining <= AutoResumeRemainingSeconds` + `AdvancePlaylistEntry`-Aufruf) | Offen | — |
+| 9 | Logik | `AppUpdate.EvaluateEndWindow`: Serien-Advance-Block entfernen (Bedingung `remaining <= AutoResumeRemainingSeconds` + `AdvanceToNextEpisode`-Aufruf) | Offen | — |
+| 10 | Logik | `AppUpdate.EvaluateEndWindow`: Streak-Fensterquelle von `model.Settings.EndWindow` auf `WatchedEndWindowSeconds` umstellen | Offen | — |
+| 11 | Logik | `AppUpdate`: Doc-Kommentare von `UpdatePlaybackProgress`, `EvaluateEndWindow`, `PlaybackEndedToleranceSeconds` und `EndWindowRequiredTicks` an den entfernten Vorlauf anpassen | Offen | — |
+| 12 | App-Rand | `PlayerPage.ReportPosition`: `LogDebug`-Fensterbedingung von `model.Settings.EndWindow` auf `WatchedEndWindowSeconds` umstellen und Kommentar anpassen | Offen | — |
+| 13 | UI | `SettingsPage.xaml`: `AutoResumeRemainingEntry`-Block entfernen (Entry samt Label und einer der beiden angrenzenden `BoxView`-Trennlinien; genau eine Trennlinie zwischen `AutoResumeSwitch` und `WatchedEndWindowEntry` belassen) | Offen | — |
+| 14 | UI | `SettingsPage.xaml.cs`: `WireNumeric(AutoResumeRemainingEntry, …)` im Konstruktor entfernen | Offen | — |
+| 15 | UI | `SettingsPage.xaml.cs`: `SetTextIfNotFocused(AutoResumeRemainingEntry, …)` in `PopulateFromModel` entfernen | Offen | — |
+| 16 | UI | `SettingsPage.xaml.cs`: Handler `OnAutoResumeRemainingCompleted` entfernen | Offen | — |
+| 17 | Tests | `AppSettingsTests.Defaults_AreExpected`: `AutoResumeRemainingSeconds`-Assert entfernen | Offen | — |
+| 18 | Tests | `AppSettingsTests.Normalize_ClampsAutoResumeRemainingSeconds` entfernen | Offen | — |
+| 19 | Tests | `AppSettingsTests.EndWindow_IsMaxOfBothWindows` entfernen | Offen | — |
+| 20 | Tests | `AppSettingsServiceTests.Save_ThenLoad_RoundTrips`: Fixture-Zeile `AutoResumeRemainingSeconds = 600` entfernen | Offen | — |
+| 21 | Tests | `SettingsStorageContractTests`: `"AutoResumeRemainingEntry"` aus `ExpectedAutomationIds` entfernen und Entry-Zählung 4 → 3 anpassen | Offen | — |
+| 22 | Tests | `AppUpdateTests_Player`: `AutoResumeRemainingSeconds`-Fixture-Belegungen entfernen (u. a. Z. 340, 393, 415) | Offen | — |
+| 23 | Tests | `AppUpdateTests_Player.PlaybackProgress_AutoResumeAdvancesWhenEnabled` zu Negativ-Test umwidmen (zwei Fenstertakte → kein Wechsel, MediaId 31, kein `ResolvePlaybackSourceEffect`) und umbenennen | Offen | — |
+| 24 | Tests | `AppUpdateTests_Player.PlaybackProgress_AutoResumeDisabled_DoesNotAdvance` entfernen (Schalter-Wirkung nur noch im Ende-Pfad — Abdeckung durch neuen Test, siehe #34) | Offen | — |
+| 25 | Tests | `AppUpdateTests_Player.PlaybackProgress_AboveResumeWindow_DoesNotAdvance` anpassen (Streak-Reset-Asserts bleiben, Fenster-Bezug auf Watched-Fenster, Kommentar) | Offen | — |
+| 26 | Tests | `AppUpdateTests_Player.PlaybackProgress_PausedWithinWindow_DoesNotAdvance` anpassen bzw. mit `PlaybackProgress_PausedTick_ResetsStreak` zusammenführen | Offen | — |
+| 27 | Tests | `AppUpdateTests_Player.PlaybackProgress_NoNextEpisode_DoesNotAdvance` entfernen oder umwidmen (Advance-Bedingung entfällt — Test wird trivial) | Offen | — |
+| 28 | Tests | `AppUpdateTests_Player.PlaybackProgress_SecondWindowTick_AdvancesAndMarksWatched`: Advance-Asserts entfernen (kein Wechsel, MediaId bleibt 31), Watched-/Details-Asserts behalten, umbenennen | Offen | — |
+| 29 | Tests | `AppUpdateTests_Player.PlaybackProgress_PositionJump_SingleTick_NoAdvance`: zweiten Abschnitt von „Wechsel" auf „angesehen markiert" umstellen | Offen | — |
+| 30 | Tests | `AppUpdateTests_Player`: übrige Takt-Tests (`SingleWindowTick`, `FrozenPosition`, `ShrunkDuration`, `PausedTick`, `WrongMediaId`, `WhileResolving`, `MarksWatchedWithinWindow`, `WatchedWindow_MarksEpisodeWatchedInDetails`) — fachlich gültig lassen, Kommentare an neue Invariante anpassen | Offen | — |
+| 31 | Tests | `AppUpdateTests_PlaylistPlayback.PlaybackProgress_NearEnd_TwoTicks_AdvancesPlaylist` zu Watched-/Negativ-Test umwidmen (`IsWatched`, kein `AdvancePlaylistEntryEffect`) und umbenennen | Offen | — |
+| 32 | Tests | `AppUpdateTests_PlaylistPlayback.PlaybackProgress_NearEnd_WhileResolving_NoSecondAdvance` und `PlaybackProgress_InPlaylist_ReportsPlaylistId`: Kommentare/Fixture an neue Invariante anpassen | Offen | — |
+| 33 | Tests | `AppUpdateTests_Downloads.PlaybackProgress_TwoWindowTicks_EmitsAutoDelete`: fachlich gültig lassen, Doc-Kommentar prüfen | Offen | — |
+| 34 | Tests | Neuer Test `AppUpdateTests_Player.PlaybackEnded_AutoResumeDisabled_DoesNotAdvance` (Ende + `AutoResumeEnabled=false` + Folge-Episode → Watched + Abschlussmeldung, kein Wechsel) | Offen | — |
+| 35 | Tests | `PlayerContractTests` gegen die geänderte `ReportPosition`-Fensterquelle verifizieren (kein `EndWindow`-Assert vorhanden — im Testlauf bestätigen) | Offen | — |
+| 36 | E2E-Tests | `PlaylistPlaybackTests.PlaybackEnd_AdvancesToNextPlaylistEntry`: Kommentar auf `MediaEnded`-Pfad umstellen, Timeout verifizieren | Offen | — |
+| 37 | E2E-Tests | `PlaylistPlaybackTests.ContinueWatchingPlaylistEntry_AdvancesByPlaylistOrder_NotSeries`: Kommentar anpassen, Timeout verifizieren | Offen | — |
+| 38 | E2E-Tests | `PlaylistPlaybackTests.PlayButton_StartsPlaybackAtFirstPlayableEntry` und `NextAndPreviousButtons_NavigatePlaylist`: Kommentare (Auto-Fortsetzung als Durchlauf-/Ausgangsstand) anpassen, Timeouts verifizieren | Offen | — |
+| 39 | E2E-Tests | `ContinueWatchingPlaybackTests.TapContinueWatchingEpisode_OpensDetailsAndStartsPlaybackAndAdvancesToNextEpisode`: Kommentar anpassen, Timeout verifizieren | Offen | — |
+| 40 | E2E-Tests | `VideoPlayer.E2E.Tests` ausführen — prüfen, ob die 60-s-Wartezeiten das echte `MediaEnded` des Testvideos abdecken (Timeouts ggf. erhöhen) | Offen | — |
+| 41 | Dokumentation | `docs/help/wiedergabe-pip.md`: Abschnitt „Automatische Fortsetzung" auf den reinen Ende-Pfad umstellen (positionsgetriebener Wechsel, eingestelltes Fenster und `AppSettings.EndWindow`-Verweis entfernen; Fensterbestätigung verbleibt bei „angesehen") | Offen | — |
+| 42 | Dokumentation | `docs/help/einstellungen-datenhaltung.md`: Eintrag „Zeitfenster Auto-Fortsetzung" entfernen, „Auto-Fortsetzung"-Eintrag präzisieren | Offen | — |
+| 43 | Dokumentation | `docs/help/index.md`: Einleitungssatz zu `wiedergabe-pip.md` anpassen („Auto-Fortsetzung erst bei bestätigtem Endfenster" → Ende-Pfad) | Offen | — |
+| 44 | Tests | `dotnet test VideoPlayer.Maui.Tests` ausführen und Ergebnis dokumentieren | Offen | — |
