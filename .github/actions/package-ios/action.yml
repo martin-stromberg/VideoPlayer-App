@@ -42,15 +42,15 @@ inputs:
   ios-workload-version:
     description: Microsoft.iOS.Sdk-Pack-/Manifestversion, die vor dem Restore gepinnt wird. Muss zu einem Release-Xcode auf dem Runner passen - der App Store lehnt Builds aus Beta-Xcode ab.
     required: false
-    default: '26.5.10318'
+    default: '27.0.10722'
 
 runs:
   using: composite
   steps:
-    # SDK-Band 10.0.1xx pinnen: die iOS-Workload-Manifeste werden pro
-    # SDK-Band publiziert; 26.x-Manifeste (Release-Xcode-kompatibel)
-    # existieren nur im 10.0.100-Feed, der 10.0.400-Feed kennt nur
-    # 27.x-Workloads, die Beta-Xcode verlangen (Store lehnt Beta ab).
+    # SDK-Band 10.0.1xx pinnen: der Host-Resolver wuerde sonst das
+    # neueste Runner-SDK waehlen, dessen Workload-Satz auf noch nicht
+    # publizierte Manifeste verweisen kann. Mit Band-Pin loest das
+    # Rollback-File das iOS-Manifest aus dem 10.0.100-Feed.
     - name: Setup .NET
       uses: actions/setup-dotnet@v6
       with:
@@ -68,9 +68,9 @@ runs:
       shell: bash
 
     # Workload-Version pinnen: 'workload install' aktualisiert die
-    # Manifeste immer auf 'latest' (aktuell 27.x mit Beta-Xcode-
-    # Anforderung - Store lehnt Beta ab) und wuerde den Pin wieder
-    # deinstallieren. Deshalb: erst per Rollback-File das iOS-Manifest
+    # Manifeste immer auf 'latest' und koennte ein noch nicht
+    # publiziertes Manifest oder eines mit Beta-Xcode-Anforderung
+    # ziehen. Deshalb: erst per Rollback-File das iOS-Manifest
     # pinnen, dann mit --skip-manifest-update installieren, damit exakt
     # die gepinnte Manifest-Version aufgeloest wird.
     - name: Install .NET MAUI workload
@@ -81,15 +81,14 @@ runs:
         dotnet workload install maui-ios ios --skip-manifest-update
         # iOS-Sdk-Packs mit neuerer Zielplattformversion (TPV) als der
         # gepinnten entfernen: die TPV-Resolution wuerde sonst das
-        # neueste Pack waehlen - unabhaengig vom gepinnten Manifest
-        # (net10.0_27.0 verlangt Beta-Xcode, der Store lehnt Beta ab).
+        # neueste Pack waehlen - unabhaengig vom gepinnten Manifest.
         # Packs kleinerer TPV muessen bleiben: Bibliotheken ohne
         # OutputType=Exe loesen ihre TPV ueber
         # _XamarinTargetPlatformVersionLibrary auf (statt
         # _XamarinTargetPlatformVersionExecutable, siehe
         # Xamarin.Shared.Sdk.TargetFrameworkInference.props) und
         # brauchen dafuer das zugehoerige Sdk-Pack - NETSDK1147 sonst.
-        pinned_tpv="$(printf '%s' "${{ inputs.ios-workload-version }}" | cut -d. -f1-2)"  # 26.5.10318 -> 26.5
+        pinned_tpv="$(printf '%s' "${{ inputs.ios-workload-version }}" | cut -d. -f1-2)"  # 27.0.10722 -> 27.0
         IFS=. read -r pmaj pmin _ <<< "$pinned_tpv"
         for d in "$HOME"/.dotnet/packs/Microsoft.iOS.Sdk.net10.0_*/; do
           [ -d "$d" ] || continue

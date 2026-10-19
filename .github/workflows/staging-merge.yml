@@ -67,7 +67,15 @@ jobs:
           dotnet-version: '10.0.x'
 
       - name: Install .NET MAUI workload
-        run: dotnet workload install maui --skip-manifest-update
+        # iOS-Manifest pinnen: 'workload install' laedt sonst das neueste
+        # Manifest (derzeit verweist 10.0.402.1 auf ein noch nicht
+        # publiziertes iOS-Manifest). Die Baseline ohne Manifest-Update
+        # installiert dagegen net10.0_26.0-Packs, die Xcode 26 verlangen -
+        # der Runner hat Xcode 27. 27.0.10722 liefert den Xcode-27-Pack.
+        run: |
+          printf '{"microsoft.net.sdk.ios": "27.0.10722"}' > "$RUNNER_TEMP/workload-rollback.json"
+          dotnet workload update --from-rollback-file "$RUNNER_TEMP/workload-rollback.json"
+          dotnet workload install maui --skip-manifest-update
 
       - name: Set application version
         run: pwsh .github/scripts/Set-Version.ps1 -Version '${{ needs.release.outputs.tag }}'
