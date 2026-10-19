@@ -34,7 +34,6 @@ public class AppSettingsServiceTests
             AutoDownloadEnabled = true,
             PreloadEpisodeCount = 7,
             AutoResumeEnabled = false,
-            AutoResumeRemainingSeconds = 600,
             WifiOnlyDownloads = false,
             WatchedEndWindowSeconds = 120,
             DownloadQuotaGb = 42,

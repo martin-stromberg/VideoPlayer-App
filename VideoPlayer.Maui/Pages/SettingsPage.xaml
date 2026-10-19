@@ -119,21 +119,6 @@
                                  Color="{StaticResource VpBorder}" />
 
                         <VerticalStackLayout Spacing="8">
-                            <Label Text="Zeitfenster Auto-Fortsetzung (Sekunden Restlaufzeit)"
-                                   Style="{StaticResource Caption}"
-                                   FontSize="13" />
-                            <Border Style="{StaticResource InputFrame}">
-                                <Entry x:Name="AutoResumeRemainingEntry"
-                                       AutomationId="AutoResumeRemainingEntry"
-                                       Keyboard="Numeric"
-                                       Placeholder="30 – 3600" />
-                            </Border>
-                        </VerticalStackLayout>
-
-                        <BoxView HeightRequest="1"
-                                 Color="{StaticResource VpBorder}" />
-
-                        <VerticalStackLayout Spacing="8">
                             <Label Text="Als angesehen ab … Sekunden vor Ende"
                                    Style="{StaticResource Caption}"
                                    FontSize="13" />

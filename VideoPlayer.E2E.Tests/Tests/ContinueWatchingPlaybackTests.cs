@@ -120,9 +120,9 @@ public sealed class ContinueWatchingPlaybackTests : E2ETestBase
             "Wiedergabe der Weiterschauen-Episode über der Detailansicht", Ct);
         Assert.False(app.Process.HasExited, "Die App wurde beim Wiedergabestart beendet.");
 
-        // Folgevideo-Funktion: das kurze Testvideo liegt im
-        // Fortsetzungsfenster → der Player wechselt über die
-        // nachgeladene Fortsetzungsliste zur Folge-Episode.
+        // Folgevideo-Funktion: das kurze Testvideo erreicht sein
+        // tatsächliches Ende (MediaEnded) → der Player wechselt über
+        // die nachgeladene Fortsetzungsliste zur Folge-Episode.
         model = await app.DevApi.WaitForModelAsync(
             m => m.PlayerIsActive && m.PlayerMediaId == NextEpisodeId && m.PlayerIsPlaying,
             TimeSpan.FromSeconds(60),

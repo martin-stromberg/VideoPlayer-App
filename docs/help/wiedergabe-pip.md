@@ -125,22 +125,25 @@ Die Quellauflösung (`PlaybackSourceService`) wählt automatisch:
   aufeinanderfolgende Fortschrittstakte mit real weitergelaufener
   Position und nicht geschrumpfter Dauer gelten als erreichtes Ende —
   ein einzelner Ausreißertakt eines gestörten Streams markiert nicht
-  (siehe „Automatische Fortsetzung").
+  (siehe „Bestätigter Fenstereintritt" weiter unten).
 
 ## Automatische Fortsetzung
 
 Bei Serien startet — sofern die Auto-Fortsetzung in den Einstellungen
-aktiviert ist — automatisch die nächste Episode, sobald die
-Restlaufzeit das eingestellte Zeitfenster unterschreitet (auch
-staffelübergreifend, in Episodenreihenfolge). Pausiert der Anwender,
-wird nicht weitergeschaltet — die Fortsetzung greift nur bei
-laufender Wiedergabe. Ausgeschaltet bleibt das Verhalten wie bisher.
+aktiviert ist — automatisch die nächste Episode, sobald die Wiedergabe
+das tatsächliche Ende des Mediums erreicht (auch
+staffelübergreifend, in Episodenreihenfolge). Ein positionsgetriebener
+Vorlauf existiert nicht: jedes Video läuft bis zum Ende; der Wechsel
+wird ausschließlich vom plausibilisierten Ende-Ereignis ausgelöst
+(siehe „Wiedergabeende"). Ausgeschaltet bleibt das Verhalten wie
+bisher — das Ende markiert dann nur „angesehen" und meldet die
+Endposition.
 
 **Playlist-Kontext:** läuft die Wiedergabe aus einer Playlist, holt
-die Fortsetzung den Folge-Eintrag über den serverseitigen
-`advance`-Endpunkt in der Playlist-Reihenfolge (nicht die
-Serienreihenfolge); meldet der Server keinen Folgeeintrag, endet die
-Wiedergabe.
+die Fortsetzung am Wiedergabeende den Folge-Eintrag über den
+serverseitigen `advance`-Endpunkt in der Playlist-Reihenfolge (nicht
+die Serienreihenfolge); meldet der Server keinen Folgeeintrag, endet
+die Wiedergabe.
 
 **Bestätigter Fenstereintritt:** der Eintritt ins Endfenster gilt
 erst ab dem zweiten aufeinanderfolgenden Fortschrittstakt
@@ -149,33 +152,29 @@ weitergelaufene Position und eine nicht geschrumpfte Gesamtdauer
 melden. Einzelne Takte mit eingefrorener oder gesprungener Position
 bzw. verkürzter Dauer — etwa bei einem gestörten Stream, der im
 Wiedergabezustand verharrt — bestätigen das Ende nicht: sie lösen
-weder die Fortsetzung noch die „angesehen"-Markierung samt
-eventueller Download-Löschung aus, und die Wiedergabe läuft weiter.
+die „angesehen"-Markierung samt eventueller Download-Löschung nicht
+aus, und die Wiedergabe läuft weiter.
 Jeder nicht plausible Takt — auch ein Pausentakt, ein Seek zurück
 oder ein Takt außerhalb des Fensters — lässt die Bestätigung von
 vorn beginnen; während der Quellauflösung eines Folgetitels ist die
 Fensterwertung gesperrt. Zusätzlich ist jeder Takt an das aktuelle
 Medium gebunden: nachlaufende Positionsmeldungen eines bereits
 gewechselten Vorgängermediums werden verworfen und können das neue
-Medium weder als gesehen markieren noch dessen Download löschen
-oder einen weiteren Wechsel auslösen.
+Medium weder als gesehen markieren noch dessen Download löschen.
 
-Damit verschiebt sich der Wechsel um höchstens ein Taktintervall
-(~5 Sekunden) nach hinten — bei den üblichen Zeitfenstern von
-mehreren Minuten fachlich unerheblich. Medien, die kürzer als zwei
-Taktintervalle Restlaufzeit im Fenster laufen, sowie ein vor dem
-Ende pausiertes oder geschlossenes Medium werden taktseitig nicht
-mehr markiert bzw. weitergeschaltet — in diesen Fällen greift das
+Medien, die kürzer als zwei Taktintervalle Restlaufzeit im Fenster
+laufen, sowie ein vor dem Ende pausiertes oder geschlossenes Medium
+werden taktseitig nicht markiert — in diesen Fällen greift das
 unveränderte, ebenfalls plausibilisierte Ende-Ereignis (siehe
-„Wiedergabeende").
+„Wiedergabeende"), das zugleich der einzige Auslöser der
+Fortsetzung ist.
 
 Technischer Hintergrund: `PlayerState.EndWindowStreak` zählt die
 aufeinanderfolgenden plausiblen Fenstertakte; `IsProgressTickPlausible`
-und `EvaluateEndWindow` in `AppUpdate` koppeln Markierung,
-Download-Löschung und beide Fortsetzungspfade an die interne
-Konstante `EndWindowRequiredTicks` (= 2; Streak-Fenster über
-`AppSettings.EndWindow` = größeres der beiden eingestellten
-Fenster). Die Medienbindung läuft über die `MediaId` der
+und `EvaluateEndWindow` in `AppUpdate` koppeln Markierung und
+Download-Löschung an die interne Konstante `EndWindowRequiredTicks`
+(= 2; Fenster über `AppSettings.WatchedEndWindowSeconds`). Die
+Medienbindung läuft über die `MediaId` der
 `PlaybackProgressMessage` — die `PlayerPage` meldet die zuletzt am
 `MediaElement` tatsächlich angewendete `MediaId` (`appliedMediaId`,
 erst nach erfolgreichem Quellenwechsel gesetzt); ein Takt mit

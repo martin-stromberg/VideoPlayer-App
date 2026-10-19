@@ -24,7 +24,6 @@ public class SettingsStorageContractTests
         "DownloadQuotaGbEntry",
         "AutoDeleteWatchedSwitch",
         "AutoResumeSwitch",
-        "AutoResumeRemainingEntry",
         "WatchedEndWindowEntry",
         "LoggingSwitch",
         "SendLogButton",
@@ -54,9 +53,9 @@ public class SettingsStorageContractTests
             Assert.Contains(id, automationIds);
         }
 
-        // Sechs Switches (inkl. Protokollierung) + vier numerische Eingabefelder.
+        // Sechs Switches (inkl. Protokollierung) + drei numerische Eingabefelder.
         Assert.Equal(6, page.Descendants(MauiNs + "Switch").Count());
-        Assert.Equal(4, page.Descendants(MauiNs + "Entry").Count());
+        Assert.Equal(3, page.Descendants(MauiNs + "Entry").Count());
         Assert.All(page.Descendants(MauiNs + "Entry"), e =>
             Assert.Equal("Numeric", (string?)e.Attribute("Keyboard")));
     }

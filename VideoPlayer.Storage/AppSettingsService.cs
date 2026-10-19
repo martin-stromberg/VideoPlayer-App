@@ -16,9 +16,6 @@ public sealed class AppSettingsService
     /// <summary>Ablageschlüssel für <see cref="AppSettings.AutoResumeEnabled"/>.</summary>
     public const string AutoResumeEnabledKey = "AutoResumeEnabled";
 
-    /// <summary>Ablageschlüssel für <see cref="AppSettings.AutoResumeRemainingSeconds"/>.</summary>
-    public const string AutoResumeRemainingSecondsKey = "AutoResumeRemainingSeconds";
-
     /// <summary>Ablageschlüssel für <see cref="AppSettings.WifiOnlyDownloads"/>.</summary>
     public const string WifiOnlyDownloadsKey = "WifiOnlyDownloads";
 
@@ -59,7 +56,6 @@ public sealed class AppSettingsService
             AutoDownloadEnabled = store.GetBool(Key(AutoDownloadEnabledKey), defaults.AutoDownloadEnabled),
             PreloadEpisodeCount = store.GetInt(Key(PreloadEpisodeCountKey), defaults.PreloadEpisodeCount),
             AutoResumeEnabled = store.GetBool(Key(AutoResumeEnabledKey), defaults.AutoResumeEnabled),
-            AutoResumeRemainingSeconds = store.GetInt(Key(AutoResumeRemainingSecondsKey), defaults.AutoResumeRemainingSeconds),
             WifiOnlyDownloads = store.GetBool(Key(WifiOnlyDownloadsKey), defaults.WifiOnlyDownloads),
             WatchedEndWindowSeconds = store.GetInt(Key(WatchedEndWindowSecondsKey), defaults.WatchedEndWindowSeconds),
             DownloadQuotaGb = store.GetInt(Key(DownloadQuotaGbKey), defaults.DownloadQuotaGb),
@@ -79,7 +75,6 @@ public sealed class AppSettingsService
         store.Set(Key(AutoDownloadEnabledKey), normalized.AutoDownloadEnabled);
         store.Set(Key(PreloadEpisodeCountKey), normalized.PreloadEpisodeCount);
         store.Set(Key(AutoResumeEnabledKey), normalized.AutoResumeEnabled);
-        store.Set(Key(AutoResumeRemainingSecondsKey), normalized.AutoResumeRemainingSeconds);
         store.Set(Key(WifiOnlyDownloadsKey), normalized.WifiOnlyDownloads);
         store.Set(Key(WatchedEndWindowSecondsKey), normalized.WatchedEndWindowSeconds);
         store.Set(Key(DownloadQuotaGbKey), normalized.DownloadQuotaGb);

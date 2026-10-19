@@ -17,14 +17,8 @@ public sealed record AppSettings
     /// <summary>Anzahl vorzuladender Episoden (1–10).</summary>
     public int PreloadEpisodeCount { get; init; } = 3;
 
-    /// <summary>Auto-Fortsetzung an/aus.</summary>
+    /// <summary>Auto-Fortsetzung am Wiedergabeende an/aus.</summary>
     public bool AutoResumeEnabled { get; init; } = true;
-
-    /// <summary>
-    /// Zeitfenster der Auto-Fortsetzung in Sekunden: greift, wenn die
-    /// Restlaufzeit eines Videos unterhalb dieses Fensters liegt (30–3600).
-    /// </summary>
-    public int AutoResumeRemainingSeconds { get; init; } = 300;
 
     /// <summary>Downloads nur im WLAN an/aus.</summary>
     public bool WifiOnlyDownloads { get; init; } = true;
@@ -34,18 +28,6 @@ public sealed record AppSettings
     /// wenn das Ende abzüglich dieses Fensters erreicht ist (30–3600).
     /// </summary>
     public int WatchedEndWindowSeconds { get; init; } = 300;
-
-    /// <summary>
-    /// Gemeinsames Endfenster der Wiedergabe-Auswertung: das Maximum aus
-    /// „angesehen"-Fenster (<see cref="WatchedEndWindowSeconds"/>) und
-    /// Auto-Fortsetzungsfenster (<see cref="AutoResumeRemainingSeconds"/>) —
-    /// Maßstab, ab welcher Restlaufzeit ein Fortschrittstakt als Fenstertakt
-    /// gilt (MVU-Kern und Diagnose-Log am App-Rand werten dasselbe Fenster
-    /// aus).
-    /// </summary>
-    /// <returns>Die größere der beiden konfigurierten Fenster als <see cref="TimeSpan"/>.</returns>
-    public TimeSpan EndWindow => TimeSpan.FromSeconds(
-        Math.Max(WatchedEndWindowSeconds, AutoResumeRemainingSeconds));
 
     /// <summary>Speicherplatzkontingent für Downloads in Gigabyte (1–500, Standard 5).</summary>
     public int DownloadQuotaGb { get; init; } = DefaultDownloadQuotaGb;
@@ -73,7 +55,6 @@ public sealed record AppSettings
     public AppSettings Normalize() => this with
     {
         PreloadEpisodeCount = Math.Clamp(PreloadEpisodeCount, 1, 10),
-        AutoResumeRemainingSeconds = Math.Clamp(AutoResumeRemainingSeconds, 30, 3600),
         WatchedEndWindowSeconds = Math.Clamp(WatchedEndWindowSeconds, 30, 3600),
         DownloadQuotaGb = Math.Clamp(DownloadQuotaGb, 1, 500)
     };

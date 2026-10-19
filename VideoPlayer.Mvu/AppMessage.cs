@@ -992,8 +992,9 @@ public sealed record PlaybackSourceResolvedMessage(
 /// <summary>
 /// Positions-Takt der Wiedergabeseite (Seiten-Timer während der
 /// Wiedergabe bzw. Zustandswechsel des MediaElement): aktualisiert
-/// Position/Dauer/Pufferung und prüft die „angesehen"-Schwelle und die
-/// Auto-Fortsetzung.
+/// Position/Dauer/Pufferung und prüft die „angesehen"-Schwelle
+/// (Endfenster-Markierung); der Wechsel zum Folgetitel erfolgt
+/// ausschließlich über das Wiedergabeende.
 /// </summary>
 /// <param name="Position">Aktuelle Wiedergabeposition.</param>
 /// <param name="Duration">Gesamtdauer des Mediums.</param>

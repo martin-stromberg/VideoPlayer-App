@@ -14,7 +14,6 @@ public class AppSettingsTests
         Assert.False(settings.AutoDownloadEnabled);
         Assert.Equal(3, settings.PreloadEpisodeCount);
         Assert.True(settings.AutoResumeEnabled);
-        Assert.Equal(300, settings.AutoResumeRemainingSeconds);
         Assert.True(settings.WifiOnlyDownloads);
         Assert.Equal(300, settings.WatchedEndWindowSeconds);
         Assert.Equal(5, settings.DownloadQuotaGb);
@@ -40,18 +39,6 @@ public class AppSettingsTests
         Assert.Equal(expected, new AppSettings { PreloadEpisodeCount = input }.Normalize().PreloadEpisodeCount);
     }
 
-    /// <summary>Prüft Normalize: begrenzt die AutoResume-Restsekunden.</summary>
-    /// <param name="input">Die Eingabe.</param>
-    /// <param name="expected">Der erwartete Wert.</param>
-    [Theory]
-    [InlineData(0, 30)]
-    [InlineData(4000, 3600)]
-    [InlineData(120, 120)]
-    public void Normalize_ClampsAutoResumeRemainingSeconds(int input, int expected)
-    {
-        Assert.Equal(expected, new AppSettings { AutoResumeRemainingSeconds = input }.Normalize().AutoResumeRemainingSeconds);
-    }
-
     /// <summary>Prüft Normalize: begrenzt das WatchedEnd-Fenster in Sekunden.</summary>
     /// <param name="input">Die Eingabe.</param>
     /// <param name="expected">Der erwartete Wert.</param>
@@ -75,29 +62,6 @@ public class AppSettingsTests
     public void Normalize_ClampsDownloadQuotaGb(int input, int expected)
     {
         Assert.Equal(expected, new AppSettings { DownloadQuotaGb = input }.Normalize().DownloadQuotaGb);
-    }
-
-    /// <summary>
-    /// Prüft EndWindow: liefert das Maximum aus „angesehen"-Fenster und
-    /// Auto-Fortsetzungsfenster — die gemeinsame Fensterableitung des
-    /// MVU-Kerns und des Diagnose-Logs am App-Rand.
-    /// </summary>
-    /// <param name="watched">„Angesehen"-Fenster in Sekunden.</param>
-    /// <param name="autoResume">Auto-Fortsetzungsfenster in Sekunden.</param>
-    /// <param name="expectedSeconds">Erwartetes Fenster in Sekunden.</param>
-    [Theory]
-    [InlineData(300, 120, 300)]
-    [InlineData(60, 600, 600)]
-    [InlineData(300, 300, 300)]
-    public void EndWindow_IsMaxOfBothWindows(int watched, int autoResume, int expectedSeconds)
-    {
-        var settings = new AppSettings
-        {
-            WatchedEndWindowSeconds = watched,
-            AutoResumeRemainingSeconds = autoResume
-        };
-
-        Assert.Equal(TimeSpan.FromSeconds(expectedSeconds), settings.EndWindow);
     }
 
     /// <summary>Prüft Normalize: lässt boolesche Werte unverändert.</summary>

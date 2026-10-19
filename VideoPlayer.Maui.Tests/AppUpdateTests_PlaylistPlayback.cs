@@ -528,13 +528,13 @@ public class AppUpdateTests_PlaylistPlayback
         Assert.False(next.Player.IsWatched);
     }
 
-    /// <summary>Prüft die Fenster-Bestätigung im Playlist-Kontext: einzelner Fenstertakt kein Advance, zwei plausible Takte → Advance.</summary>
+    /// <summary>Prüft die Fenster-Bestätigung im Playlist-Kontext: zwei plausible Fenstertakte markieren „angesehen", lösen aber keinen Wechsel aus — der erfolgt ausschließlich am Wiedergabeende.</summary>
     [Fact]
-    public void PlaybackProgress_NearEnd_TwoTicks_AdvancesPlaylist()
+    public void PlaybackProgress_NearEnd_TwoTicks_MarksWatchedOnly()
     {
         var model = PlayingInPlaylist();
 
-        // Erster Fenstertakt: Streak 1 — noch kein Advance.
+        // Erster Fenstertakt: Streak 1 — noch keine Markierung.
         var first = AppUpdate.Update(
             model,
             new PlaybackProgressMessage(
@@ -545,10 +545,12 @@ public class AppUpdateTests_PlaylistPlayback
                 MediaId: 10));
 
         Assert.Equal(1, first.Model.Player.EndWindowStreak);
+        Assert.False(first.Model.Player.IsWatched);
         Assert.False(first.Model.Player.IsResolving);
         Assert.DoesNotContain(first.Effects, e => e is AdvancePlaylistEntryEffect);
 
-        // Zweiter plausibler Fenstertakt: bestätigt → Advance.
+        // Zweiter plausibler Fenstertakt: bestätigt → „angesehen",
+        // aber kein Advance im Takt (Wechsel nur über PlaybackEnded).
         var (next, effects) = AppUpdate.Update(
             first.Model,
             new PlaybackProgressMessage(
@@ -558,13 +560,16 @@ public class AppUpdateTests_PlaylistPlayback
                 IsBuffering: false,
                 MediaId: 10));
 
-        Assert.True(next.Player.IsResolving);
-        Assert.Contains(effects, e => e is AdvancePlaylistEntryEffect);
+        Assert.True(next.Player.IsWatched);
+        Assert.Equal(2, next.Player.EndWindowStreak);
+        Assert.False(next.Player.IsResolving);
+        Assert.Equal(10, next.Player.MediaId);
+        Assert.DoesNotContain(effects, e => e is AdvancePlaylistEntryEffect);
     }
 
-    /// <summary>Prüft PlaybackProgress: während eines ausstehenden Navigationslaufs wird kein weiteres Advance versendet.</summary>
+    /// <summary>Prüft PlaybackProgress: während eines ausstehenden Navigationslaufs bleibt der Takt ohne Fensterwirkung.</summary>
     [Fact]
-    public void PlaybackProgress_NearEnd_WhileResolving_NoSecondAdvance()
+    public void PlaybackProgress_NearEnd_WhileResolving_NoWindowEffects()
     {
         var model = PlayingInPlaylist(isResolving: true);
 
@@ -659,12 +664,9 @@ public class AppUpdateTests_PlaylistPlayback
     [Fact]
     public void PlaybackProgress_InPlaylist_ReportsPlaylistId()
     {
-        var model = PlayingInPlaylist() with
-        {
-            // Auto-Fortsetzung abgeschaltet — der Meldungseffekt bleibt
-            // der einzige Effekt des Takts.
-            Settings = new AppSettings { AutoResumeEnabled = false }
-        };
+        var model = PlayingInPlaylist();
+        // Einzelner Fenstertakt — die Fortschrittsmeldung bleibt der
+        // einzige Effekt des Takts (kein Wechsel im Takt mehr).
 
         var (_, effects) = AppUpdate.Update(
             model,
