@@ -4227,7 +4227,8 @@ public static class AppUpdate
                 ShowId = message.ShowId,
                 ShowTitle = message.ShowTitle,
                 SeasonNumber = message.SeasonNumber,
-                EpisodeNumber = message.EpisodeNumber
+                EpisodeNumber = message.EpisodeNumber,
+                PictureId = message.PictureId
             }]);
     }
 
@@ -4296,7 +4297,10 @@ public static class AppUpdate
         return message.Item.CanRetry
             ? new AppTransition(
                 model,
-                [new EnqueueDownloadEffect(message.Item.MediaType, message.Item.MediaId, message.Item.Title, model.Settings)])
+                [new EnqueueDownloadEffect(message.Item.MediaType, message.Item.MediaId, message.Item.Title, model.Settings)
+                {
+                    PictureId = message.Item.PictureId
+                }])
             : AppTransition.Unchanged(model);
     }
 

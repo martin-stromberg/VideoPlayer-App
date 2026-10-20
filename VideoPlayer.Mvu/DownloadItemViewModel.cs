@@ -31,6 +31,15 @@ public sealed class DownloadItemViewModel : INotifyPropertyChanged
     /// <summary>Anzeigetitel des Downloads.</summary>
     public string Title => item.Title;
 
+    /// <summary>Bild-Id des Vorschaubilds (<c>api/pictures/{id}</c>); <c>null</c> = Platzhalter.</summary>
+    public long? PictureId => item.PictureId;
+
+    /// <summary>Ein Vorschaubild kann geladen werden.</summary>
+    public bool HasPicture => item.HasPicture;
+
+    /// <summary>Breite des Vorschaubild-Rahmens in dp (Episode 128, sonst 48 bei Höhe 72).</summary>
+    public double PreviewWidth => item.PreviewWidth;
+
     /// <summary>Übersetzte Medientyp-Bezeichnung (Anzeige neben dem Zustand).</summary>
     public string MediaTypeText => item.MediaTypeText;
 
@@ -48,6 +57,12 @@ public sealed class DownloadItemViewModel : INotifyPropertyChanged
 
     /// <summary>Ein Fehlerhinweis wird angezeigt.</summary>
     public bool HasError => item.HasError;
+
+    /// <summary>Größenanzeige des Eintrags; <c>null</c> = kein Label.</summary>
+    public string? SizeText => item.SizeText;
+
+    /// <summary>Eine Größenangabe wird angezeigt.</summary>
+    public bool HasSizeText => item.HasSizeText;
 
     /// <summary>Dem Anwender anzeigbarer Fehlertext; <c>null</c>, wenn kein Fehler vorliegt.</summary>
     public string? ErrorText => item.ErrorText;
@@ -84,6 +99,9 @@ public sealed class DownloadItemViewModel : INotifyPropertyChanged
         // unverändertem Wert schreiben denselben Wert erneut (no-op).
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Item)));
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Title)));
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(PictureId)));
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(HasPicture)));
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(PreviewWidth)));
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(MediaTypeText)));
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(StateText)));
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Progress)));
@@ -91,6 +109,8 @@ public sealed class DownloadItemViewModel : INotifyPropertyChanged
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(ShowProgress)));
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(HasError)));
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(ErrorText)));
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(SizeText)));
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(HasSizeText)));
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(CanCancel)));
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(CanRetry)));
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(CanDelete)));

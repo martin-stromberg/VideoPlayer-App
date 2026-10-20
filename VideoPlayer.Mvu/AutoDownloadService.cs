@@ -243,6 +243,7 @@ public sealed class AutoDownloadService
             var enqueueResult = await downloads.EnqueueAsync(
                 "tvshowepisode", episode.Id, title, settings,
                 new DownloadSeriesContext(show.Id, showName, season.Number, episode.Number),
+                pictureId: episode.GeneratedBackgroundPictureId ?? episode.PosterPictureId,
                 cancellationToken: cancellationToken);
             if (enqueueResult.Notice == DownloadService.NoticeEnqueued)
             {
@@ -347,6 +348,7 @@ public sealed class AutoDownloadService
                     type, entry.MediaId, PlaylistEntryTitle(entry), settings,
                     SeriesContextOf(entry),
                     new DownloadPlaylistContext(item.PlaylistId, entry.Id, entry.SortOrder),
+                    entry.ResolvedPictureId,
                     cancellationToken);
                 if (enqueueResult.Notice == DownloadService.NoticeEnqueued)
                 {
@@ -444,6 +446,7 @@ public sealed class AutoDownloadService
             playlistContext: hasPlaylistBinding
                 ? new DownloadPlaylistContext(item.PlaylistId, item.PlaylistEntryId, null)
                 : null,
+            pictureId: item.PosterPictureId,
             cancellationToken: cancellationToken);
         return result.Notice == DownloadService.NoticeEnqueued;
     }
