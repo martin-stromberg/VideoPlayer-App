@@ -7,50 +7,25 @@
              Title="Wiedergabe"
              x:DataType="mvu:MvuHost">
 
-    <Grid x:Name="PlayerRoot" BackgroundColor="{StaticResource VpBgDeep}">
+    <!-- Zweizeiliges Grundlayout: Die Titelleiste belegt eine eigene
+         Zeile am oberen Fensterrand, die Videofläche füllt den
+         restlichen Raum und grenzt mit ihrem oberen Rand an den
+         unteren Rand der Leiste (Issue #75). Die Leiste lag zuvor als
+         eingabedurchlässiges Overlay auf dem Video und wurde unter iOS
+         per Margin nach unten versetzt, weil sie die eingeblendete
+         native Top-Leiste des AVPlayerViewController überdeckte —
+         dieser Konflikt entfällt mit der eigenen Zeile vollständig. -->
+    <Grid x:Name="PlayerRoot" BackgroundColor="{StaticResource VpBgDeep}"
+          RowDefinitions="Auto,*">
 
-        <!-- Videofläche -->
-        <mct:MediaElement x:Name="VideoElement"
-                          ShouldAutoPlay="True"
-                          ShouldShowPlaybackControls="True"
-                          ShouldKeepScreenOn="True"
-                          MediaOpened="OnMediaOpened"
-                          MediaEnded="OnMediaEnded"
-                          MediaFailed="OnMediaFailed"
-                          StateChanged="OnMediaStateChanged" />
-
-        <!-- Lade-/Puffer-Anzeige (Quellauflösung oder Zwischenpufferung) -->
-        <ActivityIndicator x:Name="LoadingIndicator"
-                           IsRunning="{Binding Model.Player.IsResolving}"
-                           IsVisible="{Binding Model.Player.IsResolving}"
-                           Color="{StaticResource VpPrimary}"
-                           HeightRequest="48"
-                           WidthRequest="48" />
-
-        <!-- Kopf-Overlay: Titel und „angesehen"-Hinweis.
-             VerticalOptions="Start" ist Pflicht: Ohne Angabe füllt das Layout
-             (Default Fill) das gesamte Grid und fängt als Hit-Test-Blocker
-             alle Eingaben auf dem MediaElement ab. Das Kopfband selbst ist
-             eingabedurchlässig — InputTransparent steht dafür am
-             Elternlayout, nicht nur am inneren Border: Unter iOS hit-testet
-             ein Layout auch bei eingabedurchlässigem Inhalt in den eigenen
-             Bounds weiter und fing dort die Eingaben der nativen
-             Transportleiste (Vollbild-/PiP-Buttons) ab. Unter iOS
-             verschiebt das Code-Behind das Band zusätzlich per Margin
-             unter die native Top-Leiste, damit Scrim und WatchedBadge
-             die eingeblendeten nativen Buttons auch visuell nicht
-             überdecken (der Margin hier bleibt der Windows-/Standard-
-             pfad). Achtung: Ein interaktives Element darf sich nicht in
-             diesem Band befinden — unter Windows deaktiviert
-             InputTransparent auf dem Elternelement den gesamten
-             Teilbaum, ein InputTransparent="False" am Kind reaktiviert
-             es nicht. -->
-        <VerticalStackLayout x:Name="OverlayChrome"
-                             VerticalOptions="Start"
-                             InputTransparent="True"
+        <!-- Titelleiste: Titel, Playlist-Kontext und „angesehen"-Hinweis.
+             Im Mini-Player blendet UpdateUi die Leiste aus — die
+             Auto-Zeile kollabiert dann und die Videofläche füllt die
+             gesamte Seite. -->
+        <VerticalStackLayout x:Name="TitleChrome"
+                             Grid.Row="0"
                              Spacing="0">
-            <Border Padding="14"
-                    InputTransparent="True">
+            <Border Padding="14">
                 <!-- Scrim-Verlauf statt Vollfläche: dunkel oben,
                      auslaufend nach unten. -->
                 <Border.Background>
@@ -87,58 +62,82 @@
             </Border>
         </VerticalStackLayout>
 
-        <!-- Playlist-Navigation (nur bei Playlist-Wiedergabe sichtbar):
-             liegt wie der Mini-Player-Schalter als eigenes Element über
-             dem Video, damit sie nicht vom eingabedurchlässigen Kopfband
-             blockiert wird. Unter iOS versetzt das Code-Behind den
-             Top-Margin unter die native Top-Leiste — relativ zum
-             ebenfalls verschobenen Kopfband bleibt der Abstand gleich. -->
-        <HorizontalStackLayout x:Name="PlaylistNavigationBar"
-                               Spacing="10"
-                               Margin="0,64,16,0"
-                               HorizontalOptions="End"
-                               VerticalOptions="Start"
-                               IsVisible="False">
-            <Button x:Name="PreviousButton"
-                    AutomationId="PlayerPreviousButton"
-                    Text="Zurück"
+        <!-- Videofläche unterhalb der Titelleiste: das MediaElement füllt
+             die Zeile; die übrigen Elemente liegen als Overlay darüber. -->
+        <Grid x:Name="VideoSurface" Grid.Row="1">
+
+            <!-- Video -->
+            <mct:MediaElement x:Name="VideoElement"
+                              ShouldAutoPlay="True"
+                              ShouldShowPlaybackControls="True"
+                              ShouldKeepScreenOn="True"
+                              MediaOpened="OnMediaOpened"
+                              MediaEnded="OnMediaEnded"
+                              MediaFailed="OnMediaFailed"
+                              StateChanged="OnMediaStateChanged" />
+
+            <!-- Lade-/Puffer-Anzeige (Quellauflösung oder Zwischenpufferung) -->
+            <ActivityIndicator x:Name="LoadingIndicator"
+                               IsRunning="{Binding Model.Player.IsResolving}"
+                               IsVisible="{Binding Model.Player.IsResolving}"
+                               Color="{StaticResource VpPrimary}"
+                               HeightRequest="48"
+                               WidthRequest="48" />
+
+            <!-- Playlist-Navigation (nur bei Playlist-Wiedergabe sichtbar):
+                 liegt als eigenes Element über der Videofläche und nicht in
+                 der Titelleiste — sie bleibt so auch dort bedienbar, wo die
+                 Leiste ausgeblendet ist. Unter iOS versetzt das Code-Behind
+                 den Top-Margin unter die native Top-Leiste, die der
+                 AVPlayerViewController oben in der Videofläche einblendet. -->
+            <HorizontalStackLayout x:Name="PlaylistNavigationBar"
+                                   Spacing="10"
+                                   Margin="0,64,16,0"
+                                   HorizontalOptions="End"
+                                   VerticalOptions="Start"
+                                   IsVisible="False">
+                <Button x:Name="PreviousButton"
+                        AutomationId="PlayerPreviousButton"
+                        Text="Zurück"
+                        Style="{StaticResource SecondaryButton}"
+                        FontSize="12"
+                        HeightRequest="38"
+                        Clicked="OnPreviousClicked" />
+                <Button x:Name="NextButton"
+                        AutomationId="PlayerNextButton"
+                        Text="Weiter"
+                        Style="{StaticResource SecondaryButton}"
+                        FontSize="12"
+                        HeightRequest="38"
+                        Clicked="OnNextClicked" />
+            </HorizontalStackLayout>
+
+            <!-- Mini-Player-Schalter liegt als eigenes Element über der
+                 Videofläche oben rechts. -->
+            <Button x:Name="PipButton"
+                    Text="Mini-Player"
                     Style="{StaticResource SecondaryButton}"
                     FontSize="12"
                     HeightRequest="38"
-                    Clicked="OnPreviousClicked" />
-            <Button x:Name="NextButton"
-                    AutomationId="PlayerNextButton"
-                    Text="Weiter"
-                    Style="{StaticResource SecondaryButton}"
-                    FontSize="12"
-                    HeightRequest="38"
-                    Clicked="OnNextClicked" />
-        </HorizontalStackLayout>
+                    Margin="0,18,16,0"
+                    HorizontalOptions="End"
+                    VerticalOptions="Start"
+                    IsVisible="False"
+                    Clicked="OnPipClicked" />
 
-        <!-- Mini-Player-Schalter liegt als eigenes Element über dem Kopfband,
-             damit er nicht vom eingabedurchlässigen Border mit blockiert wird. -->
-        <Button x:Name="PipButton"
-                Text="Mini-Player"
-                Style="{StaticResource SecondaryButton}"
-                FontSize="12"
-                HeightRequest="38"
-                Margin="0,18,16,0"
-                HorizontalOptions="End"
-                VerticalOptions="Start"
-                IsVisible="False"
-                Clicked="OnPipClicked" />
+            <!-- Fehlerhinweis (Quelle nicht verfügbar / Wiedergabefehler) -->
+            <Border x:Name="ErrorPanel"
+                    VerticalOptions="End"
+                    Margin="16"
+                    Padding="14,10"
+                    StrokeShape="RoundRectangle 12"
+                    BackgroundColor="{StaticResource VpOverlay}"
+                    IsVisible="False">
+                <Label x:Name="ErrorLabel"
+                       Style="{StaticResource ErrorText}" />
+            </Border>
 
-        <!-- Fehlerhinweis (Quelle nicht verfügbar / Wiedergabefehler) -->
-        <Border x:Name="ErrorPanel"
-                VerticalOptions="End"
-                Margin="16"
-                Padding="14,10"
-                StrokeShape="RoundRectangle 12"
-                BackgroundColor="{StaticResource VpOverlay}"
-                IsVisible="False">
-            <Label x:Name="ErrorLabel"
-                   Style="{StaticResource ErrorText}" />
-        </Border>
+        </Grid>
 
     </Grid>
 

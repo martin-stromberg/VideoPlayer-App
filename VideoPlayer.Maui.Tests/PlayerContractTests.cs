@@ -115,62 +115,65 @@ public class PlayerContractTests
     }
 
     /// <summary>
-    /// Prüft PlayerPage: das Kopf-Overlay „OverlayChrome" blockiert nicht die
-    /// Videofläche — es füllt nicht das gesamte Grid (kein Default `Fill`)
-    /// und ist außerhalb seines Mini-Player-Schalters eingabedurchlässig.
-    /// Pinnt die Korrektur des Hit-Test-Blockers, der die nativen
-    /// Transportsteuerungen in der Vollansicht unbedienbar machte — unter
-    /// iOS hit-testet das Elternlayout auch bei eingabedurchlässigem Inhalt
-    /// in den eigenen Bounds weiter, daher steht InputTransparent am
-    /// Elternlayout selbst (Issue #45).
+    /// Prüft PlayerPage: die Titelleiste „TitleChrome" liegt nicht mehr als
+    /// Overlay auf der Videofläche, sondern in einer eigenen Zeile am oberen
+    /// Fensterrand — das PlayerRoot-Grid trägt die Zeilen „Auto,*", die
+    /// Leiste steht in Zeile 0 und die Videofläche („VideoSurface" mit dem
+    /// MediaElement) in Zeile 1, deren oberer Rand an den unteren Rand der
+    /// Leiste grenzt (Issue #75). Mit dem Wegfall der Überlagerung ist die
+    /// Leiste ein reguläres Layout — das frühere
+    /// VerticalOptions-/InputTransparent-Overlay-Handling (Issue #45) ist
+    /// entfernt.
     /// </summary>
     [Fact]
-    public void PlayerPage_OverlayChromeDoesNotCoverPlaybackSurface()
+    public void PlayerPage_TitleChromeSitsInOwnRowAbovePlaybackSurface()
     {
         var document = PlayerPageXaml();
 
-        var overlay = Named(document, MauiNs + "VerticalStackLayout", "OverlayChrome");
-        Assert.NotNull(overlay);
-
-        // Ohne VerticalOptions gilt der LayoutOptions-Default Fill:
-        // das Layout belegt das gesamte Grid über dem MediaElement.
-        Assert.Equal("Start", (string?)overlay.Attribute("VerticalOptions"));
-
-        // Das Elternlayout selbst ist eingabedurchlässig — unter iOS
-        // hit-testet ein Layout trotz transparentem Inhalt in den eigenen
-        // Bounds und würde sonst die Eingaben der nativen Transportleiste
-        // (Vollbild-/PiP-Buttons) abfangen.
-        Assert.Equal("True", (string?)overlay.Attribute("InputTransparent"));
-
-        // Das sichtbare Kopfband bleibt für Eingaben durchlässig.
-        var band = overlay.Element(MauiNs + "Border");
-        Assert.NotNull(band);
-        Assert.Equal("True", (string?)band.Attribute("InputTransparent"));
-
-        // Der Mini-Player-Schalter darf NICHT innerhalb des input-
-        // transparenten Bandes liegen: unter Windows deaktiviert
-        // IsHitTestVisible=false am Elternelement den gesamten Teilbaum —
-        // ein InputTransparent="False" am Kind reaktiviert ihn nicht.
-        // Der Schalter ist deshalb eigenes Grid-Element über dem Band.
-        Assert.Empty(band.Descendants(MauiNs + "Button"));
-
         var rootGrid = Named(document, MauiNs + "Grid", "PlayerRoot");
         Assert.NotNull(rootGrid);
-        var pipButton = Named(rootGrid, MauiNs + "Button", "PipButton");
+        Assert.Equal("Auto,*", (string?)rootGrid.Attribute("RowDefinitions"));
+
+        // Titelleiste als reguläre Zeile 0 — kein Overlay mehr über dem
+        // Video: kein VerticalOptions-/InputTransparent-Overlay-Handling
+        // und kein Margin-Versatz.
+        var title = Named(rootGrid, MauiNs + "VerticalStackLayout", "TitleChrome");
+        Assert.NotNull(title);
+        Assert.Equal("0", (string?)title.Attribute("Grid.Row"));
+        Assert.Null(title.Attribute("VerticalOptions"));
+        Assert.Null(title.Attribute("InputTransparent"));
+        Assert.Null(title.Attribute("Margin"));
+
+        var band = title.Element(MauiNs + "Border");
+        Assert.NotNull(band);
+        Assert.Null(band.Attribute("InputTransparent"));
+
+        // Videofläche als eigene Zeile 1 — das MediaElement und die
+        // schwebenden Elemente (Playlist-Navigation, Mini-Player-Schalter,
+        // Fehlerhinweis) liegen in ihr.
+        var surface = Named(rootGrid, MauiNs + "Grid", "VideoSurface");
+        Assert.NotNull(surface);
+        Assert.Equal("1", (string?)surface.Attribute("Grid.Row"));
+        Assert.Contains(surface.Descendants(), e => e.Name.LocalName == "MediaElement");
+
+        var pipButton = Named(surface, MauiNs + "Button", "PipButton");
         Assert.NotNull(pipButton);
         Assert.Equal("OnPipClicked", (string?)pipButton.Attribute("Clicked"));
+
+        // Das MediaElement liegt nicht mehr direkt in PlayerRoot.
+        Assert.DoesNotContain(rootGrid.Elements(), e => e.Name.LocalName == "MediaElement");
     }
 
     /// <summary>
-    /// Prüft PlayerPage: Kopfband und Playlist-Navigation bleiben der
-    /// nativen iOS-Transportleiste nicht im Weg — unter iOS schiebt ein
-    /// <c>#if IOS</c>-Block im Konstruktor beide um den benannten Versatz
+    /// Prüft PlayerPage: die Playlist-Navigation bleibt der nativen
+    /// iOS-Transportleiste nicht im Weg — unter iOS schiebt ein
+    /// <c>#if IOS</c>-Block im Konstruktor sie um den benannten Versatz
     /// <c>IosNativeControlsClearance</c> unter die eingeblendete Top-Leiste
-    /// mit den Vollbild-/PiP-Buttons (das eingabedurchlässige Band überdeckt
-    /// sie damit auch visuell nicht). Die Bar ist ein direktes
-    /// <c>PlayerRoot</c>-Kind außerhalb des eingabedurchlässigen Kopfbands
-    /// und trägt selbst kein <c>InputTransparent</c> — sie bleibt damit
-    /// garantiert bedienbar (Issue #45).
+    /// mit den Vollbild-/PiP-Buttons. Die Titelleiste liegt seit Issue #75
+    /// in einer eigenen Zeile oberhalb der Videofläche und benötigt keinen
+    /// Versatz mehr. Die Bar bleibt ein Element der Videofläche außerhalb
+    /// der Titelleiste und trägt selbst kein <c>InputTransparent</c> —
+    /// sie bleibt damit garantiert bedienbar (Issue #45).
     /// </summary>
     [Fact]
     public void PlayerPage_PlaylistNavigationBarClearsNativeControlsOnIos()
@@ -178,35 +181,38 @@ public class PlayerContractTests
         var code = PlayerPageCode();
         var document = PlayerPageXaml();
 
-        // Unter iOS werden Kopfband und Bar unter die native Top-Leiste
-        // des AVPlayerViewController geschoben — der Versatz ist benannt
+        // Unter iOS wird die Bar unter die native Top-Leiste des
+        // AVPlayerViewController geschoben — der Versatz ist benannt
         // (keine Magic Number) und der XAML-Wert bleibt der
-        // Standard-/Windows-Pfad.
+        // Standard-/Windows-Pfad. Die Titelleiste erhält keinen Versatz
+        // mehr — sie liegt oberhalb der Videofläche (Issue #75).
         var ctor = MethodBody(code, "public PlayerPage(");
         Assert.Contains("#if IOS", ctor, StringComparison.Ordinal);
         Assert.Contains("IosNativeControlsClearance", ctor, StringComparison.Ordinal);
-        Assert.Contains("OverlayChrome.Margin", ctor, StringComparison.Ordinal);
         Assert.Contains("PlaylistNavigationBar.Margin", ctor, StringComparison.Ordinal);
+        Assert.DoesNotContain("TitleChrome.Margin", ctor, StringComparison.Ordinal);
+        Assert.DoesNotContain("OverlayChrome.Margin", ctor, StringComparison.Ordinal);
         Assert.Contains("private const double IosNativeControlsClearance",
             code, StringComparison.Ordinal);
         Assert.DoesNotContain("new Thickness(0, 96, 16, 0)", code, StringComparison.Ordinal);
 
-        // Die Bar bleibt interaktiv: sie liegt als eigenes PlayerRoot-Kind
-        // außerhalb des eingabedurchlässigen Kopfbands und ist selbst nicht
-        // eingabedurchlässig.
+        // Die Bar bleibt interaktiv: sie liegt als Element der Videofläche
+        // außerhalb der Titelleiste und ist selbst nicht eingabedurchlässig.
         var rootGrid = Named(document, MauiNs + "Grid", "PlayerRoot");
         Assert.NotNull(rootGrid);
-        var navBar = Named(rootGrid, MauiNs + "HorizontalStackLayout", "PlaylistNavigationBar");
+        var surface = Named(rootGrid, MauiNs + "Grid", "VideoSurface");
+        Assert.NotNull(surface);
+        var navBar = Named(surface, MauiNs + "HorizontalStackLayout", "PlaylistNavigationBar");
         Assert.NotNull(navBar);
         Assert.Equal("0,64,16,0", (string?)navBar.Attribute("Margin"));
         Assert.Null(navBar.Attribute("InputTransparent"));
 
-        // Das Kopfband trägt im XAML keinen Margin — der iOS-Versatz gilt
-        // nur im Code-Behind, der Windows-/Standardpfad bleibt unverändert.
-        var overlay = Named(document, MauiNs + "VerticalStackLayout", "OverlayChrome");
-        Assert.NotNull(overlay);
-        Assert.Null(overlay.Attribute("Margin"));
-        Assert.DoesNotContain(overlay.Descendants(MauiNs + "HorizontalStackLayout"),
+        // Die Titelleiste trägt im XAML keinen Margin — sie belegt die
+        // volle Breite ihrer Zeile am oberen Fensterrand.
+        var title = Named(rootGrid, MauiNs + "VerticalStackLayout", "TitleChrome");
+        Assert.NotNull(title);
+        Assert.Null(title.Attribute("Margin"));
+        Assert.DoesNotContain(title.Descendants(MauiNs + "HorizontalStackLayout"),
             e => (string?)e.Attribute(XNs + "Name") == "PlaylistNavigationBar");
     }
 
