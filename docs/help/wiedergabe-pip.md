@@ -26,16 +26,13 @@ läuft vollständig über den MVU-Kreislauf.
 Die nativen Transportsteuerungen des `MediaElement`
 (`ShouldShowPlaybackControls` — Play/Pause, Positionsregler/Seek und
 die übrigen Transportfunktionen) sind in der normalen Vollansicht
-direkt bedienbar. Das App-Kopfband `OverlayChrome` (Titel,
-„Angesehen"-Hinweis) liegt nur am oberen Rand
-(`VerticalOptions="Start"`) und ist eingabedurchlässig — das
-`InputTransparent` steht dabei am Elternlayout selbst, nicht nur am
-inneren `Border`: Unter iOS hit-testet ein Layout auch bei
-eingabedurchlässigem Inhalt in den eigenen Bounds weiter und hätte
-sonst die Eingaben der nativen Transportleiste abgefangen. Der
-Mini-Player-Schalter liegt als eigenes Element über dem Kopfband,
-da `InputTransparent` unter Windows den gesamten Teilbaum vom
-Hit-Test ausnimmt — ein eingebetteter Button wäre sonst unbedienbar.
+direkt bedienbar. Die Titelleiste `TitleChrome` (Titel,
+Playlist-Kontext, „Angesehen"-Hinweis) liegt seit Issue #75 nicht
+mehr als Overlay auf dem Video, sondern in einer eigenen Zeile am
+oberen Fensterrand — die Videofläche `VideoSurface` füllt die zweite
+Zeile des `PlayerRoot`-Grids (`Auto,*`) und grenzt mit ihrem oberen
+Rand an den unteren Rand der Leiste. Der Mini-Player-Schalter liegt
+als eigenes Element über der Videofläche oben rechts.
 
 **Windows-Besonderheit:** Das `MediaPlayerElement` blendet die
 Steuerung nach dem Timeout zwar zuverlässig aus, aber in dieser
@@ -45,30 +42,31 @@ Ausblenden übernimmt weiterhin der Auto-Timer. Auf iOS/Android
 regelt der Plattform-Player das Einblenden nativ bei Berührung.
 
 **iOS — native Vollbild-/PiP-Schaltflächen frei erreichbar
-(Issue #45):** iOS blendet die native Top-Leiste des
+(Issues #45/#75):** iOS blendet die native Top-Leiste des
 `AVPlayerViewController` mit den Vollbild- und PiP-Schaltflächen im
-oberen Randbereich ein — genau dort lagen die App-Überlagerungen,
-die auf dem iPad deren Bedienung blockierten. Neben der
-Eingabedurchlässigkeit des Kopfband-Elternlayouts (s. o.) verschiebt
-die Seite unter iOS (`#if IOS` im Konstruktor) `OverlayChrome` und
-`PlaylistNavigationBar` um den benannten Versatz
-`IosNativeControlsClearance` (96 pt) unter die native Leiste: Das
-eingabedurchlässige Kopfband würde die nativen Schaltflächen sonst
-weiterhin visuell überdecken (Scrim-Abdunklung, „Angesehen"-Badge
-oben rechts), und die interaktive Playlist-Navigation darf nicht
-eingabedurchlässig sein — sie muss physisch darunter liegen und
-hält ihren XAML-Abstand zum mitverschobenen Kopfband. Die XAML-Werte
-bleiben der Windows-/Standardpfad; das Windows-Verhalten ist
-unverändert.
+oberen Randbereich der Videofläche ein — genau dort lagen die
+App-Überlagerungen, die auf dem iPad deren Bedienung blockierten.
+Die Titelleiste liegt seit ihrer Umstellung auf eine eigene Zeile
+(Issue #75) oberhalb der Videofläche und steht der nativen Leiste
+nicht mehr im Weg — ihr früherer iOS-Versatz per `Margin` ist
+entfallen, ebenso das einst nötige `InputTransparent`-Overlay-
+Handling. Einzig die interaktive `PlaylistNavigationBar` überlappt
+die Videofläche weiterhin: die Seite verschiebt sie unter iOS
+(`#if IOS` im Konstruktor) um den benannten Versatz
+`IosNativeControlsClearance` (96 pt) unter die native Leiste —
+eingabedurchlässig darf sie nicht sein, sie muss daher physisch
+darunter liegen. Die XAML-Werte bleiben der Windows-/Standardpfad;
+das Windows-Verhalten ist unverändert.
 
 **iOS-Verifikationsgrenze:** Der Fehler war iOS-/iPad-spezifisch;
 eine iOS-UI-Automatisierung existiert im Repository nicht, und die
 Windows-E2E-Suite erreicht die native `AVPlayerViewController`-
 Ebene grundsätzlich nicht. Der Nachweis stützt sich auf die
 quelltextbasierten Contract-Tests (`PlayerContractTests` pinnen
-`InputTransparent` am Elternlayout, den `#if IOS`-Versatzblock und
-die Lage der Playlist-Navigation außerhalb des eingabedurchlässigen
-Bands) sowie den dokumentierten manuellen TestFlight-Prüfschritt
+die Zeilenstruktur `Auto,*` mit der Titelleiste über der
+Videofläche, den `#if IOS`-Versatzblock der Playlist-Navigation
+und deren Lage außerhalb der Titelleiste) sowie den dokumentierten
+manuellen TestFlight-Prüfschritt
 auf dem iPad (Vollbild antippen, PiP starten, Playlist-Navigation
 bedienen). Der Versatz von 96 pt ist eine konservative Schätzung
 der Leistenhöhe inklusive Safe-Area — zeigt die Geräteprüfung eine
@@ -214,9 +212,9 @@ Bei Playlist-Wiedergabe zeigt der Player die Schaltflächen **„Zurück"**
 und **„Weiter"** (serverseitige `previous`-/`next`-Endpunkte) sowie
 unter dem Titel eine Kontextzeile „„Playlist-Name" · Eintrag n/m".
 Die Schaltflächen erscheinen nur im Playlist-Kontext und werden am
-Listenrand deaktiviert; im Mini-Player sind sie wie das Kopfband
-ausgeblendet. Unter iOS liegt die Zeile etwas tiefer — sie wird mit
-dem Kopfband unter die eingeblendete native Top-Leiste gerückt,
+Listenrand deaktiviert; im Mini-Player sind sie wie die Titelleiste
+ausgeblendet. Unter iOS liegt die Zeile etwas tiefer — sie wird
+unter die eingeblendete native Top-Leiste der Videofläche gerückt,
 bleibt aber voll bedienbar (siehe „Bedienung in der Vollansicht").
 
 ## Fehlerfall
@@ -256,9 +254,9 @@ setzbare Quelle sowie das `MediaFailed`-Ereignis des Players.
   dafür nötige Hintergrund-Audio-Modus ist in der `Info.plist`
   deklariert — ein eigener Schalter ist nicht nötig und erscheint
   unter iOS nicht. Die Vollbild- und PiP-Schaltflächen der
-  eingeblendeten nativen Leiste sind seit der Overlay-Korrektur
-  auf dem iPad wieder frei erreichbar (siehe „Bedienung in der
-  Vollansicht").
+  eingeblendeten nativen Leiste stehen am oberen Rand der
+  Videofläche frei — die Titelleiste liegt oberhalb davon
+  (siehe „Bedienung in der Vollansicht").
 
 ## Stabilität bei wiederholter Wiedergabe
 
