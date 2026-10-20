@@ -14,11 +14,23 @@ jobs:
     outputs:
       tag: ${{ steps.get-tag.outputs.tag }}
       version: ${{ steps.get-tag.outputs.version }}
+      released: ${{ steps.get-tag.outputs.released }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+
+      # Bestehenden Tag merken: semantic-release erzeugt fuer
+      # ci/docs/chore-Pushes kein neues Release - der Unterschied
+      # entscheidet spaeter, ob package-ios ueberhaupt etwas
+      # hochladen darf (sonst CFBundleVersion-Kollision in TestFlight).
+      - name: Tag vor dem Release-Lauf merken
+        id: before-tag
+        run: |
+          git fetch --tags
+          tag=$(git describe --tags --match 'v*' --abbrev=0 2>/dev/null || true)
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -47,6 +59,8 @@ jobs:
           tag=$(git describe --tags --match 'v*' --abbrev=0)
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
           echo "version=${tag#v}" >> "$GITHUB_OUTPUT"
+          [ "$tag" = '${{ steps.before-tag.outputs.tag }}' ] && released=false || released=true
+          echo "released=$released" >> "$GITHUB_OUTPUT"
 
   build-ios:
     needs: release
@@ -112,7 +126,10 @@ jobs:
   # zusaetzlich ans GitHub-Prerelease.
   package-ios:
     needs: release
-    if: vars.IOS_SIGNING_ENABLED == 'true'
+    # Ohne neuen Release-Tag gibt es nichts hochzuladen: der bisherige
+    # Tag wuerde mit identischer CFBundleVersion erneut gebaut und
+    # TestFlight lehnt den doppelten Upload ab ('already complete').
+    if: vars.IOS_SIGNING_ENABLED == 'true' && needs.release.outputs.released == 'true'
     runs-on: macos-latest
     timeout-minutes: 45
     steps:

@@ -14,11 +14,22 @@ jobs:
     outputs:
       tag: ${{ steps.get-tag.outputs.tag }}
       version: ${{ steps.get-tag.outputs.version }}
+      released: ${{ steps.get-tag.outputs.released }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+
+      # Bestehenden Tag merken (Konvention staging-merge.yml): ohne
+      # neuen Release-Tag wuerde package-ios denselben Tag erneut
+      # bauen - identische CFBundleVersion -> TestFlight-Abbruch.
+      - name: Tag vor dem Release-Lauf merken
+        id: before-tag
+        run: |
+          git fetch --tags
+          tag=$(git describe --tags --match 'v*' --abbrev=0 2>/dev/null || true)
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -47,6 +58,8 @@ jobs:
           tag=$(git describe --tags --match 'v*' --abbrev=0)
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
           echo "version=${tag#v}" >> "$GITHUB_OUTPUT"
+          [ "$tag" = '${{ steps.before-tag.outputs.tag }}' ] && released=false || released=true
+          echo "released=$released" >> "$GITHUB_OUTPUT"
 
   build-ios:
     needs: release
@@ -72,12 +85,13 @@ jobs:
 
       # iOS-Manifest pinnen: 'workload install' laedt sonst das neueste
       # Manifest (derzeit verweist 10.0.402.1 auf ein noch nicht
-      # publiziertes iOS-Manifest). Die Baseline ohne Manifest-Update
-      # installiert dagegen net10.0_26.0-Packs, die Xcode 26 verlangen -
-      # der Runner hat Xcode 27. 27.0.10722 liefert den Xcode-27-Pack.
+      # publiziertes iOS-Manifest). Hier laeuft macos-latest mit
+      # Release-Xcode 26.6 - das Manifest darf hoechstens Xcode 26.x
+      # verlangen (27.x braeche den Build; Store-Builds muessen ohnehin
+      # auf Release-Xcode laufen). 26.5.10318 liefert den Xcode-26-Pack.
       - name: Install .NET MAUI workload
         run: |
-          printf '{"microsoft.net.sdk.ios": "27.0.10722"}' > "$RUNNER_TEMP/workload-rollback.json"
+          printf '{"microsoft.net.sdk.ios": "26.5.10318"}' > "$RUNNER_TEMP/workload-rollback.json"
           dotnet workload update --from-rollback-file "$RUNNER_TEMP/workload-rollback.json"
           dotnet workload install maui --skip-manifest-update
 
@@ -105,7 +119,9 @@ jobs:
   # Commit-Anzahl und damit gegenueber den staging-Prereleases monoton.
   package-ios:
     needs: release
-    if: vars.IOS_SIGNING_ENABLED == 'true'
+    # Konvention staging-merge.yml: ohne neuen Release-Tag waere der
+    # TestFlight-Upload ein Duplikat (gleiche CFBundleVersion).
+    if: vars.IOS_SIGNING_ENABLED == 'true' && needs.release.outputs.released == 'true'
     runs-on: macos-latest
     timeout-minutes: 45
     steps:
