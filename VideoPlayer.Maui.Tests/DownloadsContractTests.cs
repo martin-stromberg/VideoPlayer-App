@@ -240,6 +240,55 @@ public class DownloadsContractTests
         Assert.Contains("nicht mehr vorhanden", item.ErrorText, StringComparison.Ordinal);
     }
 
+    /// <summary>Prüft DownloadsPage: Vorschaubild je Eintrag über das lokale Bild-Cache (Still/Poster).</summary>
+    [Fact]
+    public void DownloadsPage_ShowsPreviewImage_FromPictureCache()
+    {
+        var xaml = Read("VideoPlayer.Maui", "Pages", "DownloadsPage.xaml");
+
+        // Gerundeter Rahmen mit gecachtem Bild (Konvention der
+        // Episoden-Liste): Bild-Id und medientypabhängige Breite.
+        Assert.Contains("CachedPosterImage", xaml, StringComparison.Ordinal);
+        Assert.Contains("PictureId=\"{Binding PictureId}\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("{Binding PreviewWidth}", xaml, StringComparison.Ordinal);
+        Assert.Contains("RoundRectangle 8", xaml, StringComparison.Ordinal);
+    }
+
+    /// <summary>Prüft DownloadListItem: ein Bild gilt nur bei positiver Bild-Id als vorhanden.</summary>
+    [Fact]
+    public void DownloadListItem_HasPicture_OnlyWithPositivePictureId()
+    {
+        static DownloadListItem Entry(long? pictureId) => new()
+        {
+            EntryId = 1,
+            MediaType = "movie",
+            MediaId = 42,
+            Title = "Film",
+            State = DownloadState.Completed,
+            PictureId = pictureId
+        };
+
+        Assert.True(Entry(9007).HasPicture);
+        Assert.False(Entry(null).HasPicture);
+        Assert.False(Entry(0).HasPicture);
+    }
+
+    /// <summary>Prüft DownloadListItem: Still-Rahmen der Episode ist breiter als der Poster-Rahmen.</summary>
+    [Fact]
+    public void DownloadListItem_PreviewWidth_EpisodeWiderThanMovie()
+    {
+        static DownloadListItem Entry(string mediaType) => new()
+        {
+            EntryId = 1,
+            MediaType = mediaType,
+            MediaId = 42,
+            Title = "Titel",
+            State = DownloadState.Completed
+        };
+
+        Assert.True(Entry("tvshowepisode").PreviewWidth > Entry("movie").PreviewWidth);
+    }
+
     /// <summary>Prüft OrphanedText: ohne Restdaten ist die Zeile ausgeblendet (null).</summary>
     [Fact]
     public void DownloadsPageState_OrphanedText_WhenZero_Null()

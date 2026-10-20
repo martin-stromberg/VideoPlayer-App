@@ -299,6 +299,50 @@ public class LocalDatabaseTests : IDisposable
         await db.InitializeAsync();
     }
 
+    /// <summary>Prüft CacheDatabase: migriert die Vorschaubild-Spalte auf einer vorhandenen Manifest-Tabelle.</summary>
+    [Fact]
+    public async Task CacheDatabase_MigratesPictureIdOntoExistingManifest()
+    {
+        // Bestehende Installation ohne die PictureId-Spalte anlegen und
+        // eine Zeile befüllen.
+        var layout = CreateLayout();
+        SqliteBootstrap.EnsureInitialized();
+        var legacy = new SQLite.SQLiteAsyncConnection(layout.CacheDatabasePath);
+        await legacy.ExecuteAsync(
+            "CREATE TABLE download_manifest (" +
+            "Id integer primary key autoincrement, " +
+            "VideoId integer not null, " +
+            "VideoType varchar not null, " +
+            "FilePath varchar not null, " +
+            "SizeBytes bigint not null, " +
+            "Title varchar not null, " +
+            "DownloadedBytes bigint not null, " +
+            "TotalBytes bigint not null, " +
+            "Error varchar null, " +
+            "State varchar not null, " +
+            "UpdatedAtUtc datetime not null)");
+        await legacy.ExecuteAsync(
+            "INSERT INTO download_manifest (VideoId, VideoType, FilePath, SizeBytes, Title, " +
+            "DownloadedBytes, TotalBytes, State, UpdatedAtUtc) " +
+            "VALUES (31, 'movie', 'videos/31.mp4', 100, 'Film', 100, 100, 'completed', '2026-01-01 00:00:00')");
+        SQLite.SQLiteAsyncConnection.ResetPool();
+
+        var db = new CacheDatabase(layout);
+        await db.InitializeAsync();
+
+        var entry = Assert.Single(await db.Connection.Table<DownloadManifestEntry>().ToListAsync());
+        Assert.Equal(31, entry.VideoId);
+        Assert.Null(entry.PictureId);
+        // Neue Spalte vorhanden und beschreibbar.
+        entry.PictureId = 9007;
+        await db.Connection.UpdateAsync(entry);
+        var reloaded = await db.Connection.Table<DownloadManifestEntry>().FirstAsync();
+        Assert.Equal(9007, reloaded.PictureId);
+
+        // Idempotent: ein zweites Initialize läuft fehlerfrei.
+        await db.InitializeAsync();
+    }
+
     /// <summary>Prüft BackupDatabase: eine beschädigte Datei wird beiseitegelegt und neu initialisiert.</summary>
     [Fact]
     public async Task BackupDatabase_RecoversCorruptFile()

@@ -488,8 +488,18 @@ public partial class MediaDetailsPage : ContentPage
                 ShowId = details.ShowId,
                 ShowTitle = details.Title,
                 SeasonNumber = seasonNumber,
-                EpisodeNumber = episodeNumber
+                EpisodeNumber = episodeNumber,
+                // Still der gewählten Episode (Episoden-Liste), sonst die
+                // aufgelöste Kopfbereichs-Quelle (Eigenständig-Ansicht:
+                // Banner = generierter Still → Banner → Poster).
+                PictureId = details.SelectedEpisode?.PosterPictureId
+                    ?? details.BannerPictureId
+                    ?? details.PosterPictureId
             };
+        }
+        else
+        {
+            message = message with { PictureId = details.PosterPictureId };
         }
 
         _ = mvuHost.DispatchAsync(message);
@@ -515,7 +525,8 @@ public partial class MediaDetailsPage : ContentPage
             ShowId = details?.ShowId,
             ShowTitle = details?.Title,
             SeasonNumber = details?.SelectedSeason?.Number,
-            EpisodeNumber = episode.Number
+            EpisodeNumber = episode.Number,
+            PictureId = episode.PosterPictureId
         });
     }
 

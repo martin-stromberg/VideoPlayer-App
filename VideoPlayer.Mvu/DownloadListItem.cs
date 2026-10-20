@@ -20,6 +20,13 @@ public sealed record DownloadListItem
     /// <summary>Anzeigetitel des Downloads.</summary>
     public required string Title { get; init; }
 
+    /// <summary>
+    /// Bild-Id des Vorschaubilds (<c>api/pictures/{id}</c>): Episoden-Still
+    /// bzw. Film-Poster aus dem Manifest; <c>null</c> = kein Bild bekannt
+    /// (der Eintrag zeigt den getönten Platzhalter-Rahmen).
+    /// </summary>
+    public long? PictureId { get; init; }
+
     /// <summary>Aktueller Zustand des Downloads.</summary>
     public required DownloadState State { get; init; }
 
@@ -52,6 +59,15 @@ public sealed record DownloadListItem
 
     /// <summary>Ein Fehlerhinweis wird angezeigt.</summary>
     public bool HasError => ErrorText is not null;
+
+    /// <summary>Ein Vorschaubild kann geladen werden.</summary>
+    public bool HasPicture => PictureId is > 0;
+
+    /// <summary>
+    /// Breite des Vorschaubild-Rahmens in dp — Episode: 16:9-Still
+    /// (128), sonst 2:3-Poster (48); die Rahmenhöhe beträgt einheitlich 72.
+    /// </summary>
+    public double PreviewWidth => MediaTypeNames.Normalize(MediaType) == "tvshowepisode" ? 128 : 48;
 
     /// <summary>Fortschritt im Bereich 0–1 (bei unbekannter Gesamtgröße 0).</summary>
     public double Progress =>

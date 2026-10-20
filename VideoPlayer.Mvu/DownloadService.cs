@@ -239,6 +239,7 @@ public sealed class DownloadService
     /// <param name="settings">Aktuelle App-Einstellungen (Kontingent, WLAN-Bedingung).</param>
     /// <param name="seriesContext">Optionaler Serienkontext eines Episoden-Downloads (Grundlage des Offline-„Weiterschauen").</param>
     /// <param name="playlistContext">Optionaler Playlist-Bezug des Downloads (Herkunft und Reihenfolge playlist-gebundener Einplanungen).</param>
+    /// <param name="pictureId">Bild-Id des Vorschaubilds (<c>api/pictures/{id}</c> — Episoden-Still bzw. Film-Poster); <c>null</c> = kein Bild bekannt.</param>
     /// <param name="cancellationToken">Bricht die Manifest-Operation ab (nicht den Transfer).</param>
     /// <returns>Das Einreihe-Ergebnis mit Snapshot und Hinweistext.</returns>
     public async Task<DownloadEnqueueResult> EnqueueAsync(
@@ -248,6 +249,7 @@ public sealed class DownloadService
         AppSettings settings,
         DownloadSeriesContext? seriesContext = null,
         DownloadPlaylistContext? playlistContext = null,
+        long? pictureId = null,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(settings);
@@ -337,6 +339,7 @@ public sealed class DownloadService
                 }
                 ApplySeriesContext(existing, seriesContext);
                 ApplyPlaylistContext(existing, playlistContext);
+                existing.PictureId ??= pictureId;
                 existing.UpdatedAtUtc = DateTime.UtcNow;
                 await cache.Connection.UpdateAsync(existing);
                 entry = existing;
@@ -354,6 +357,7 @@ public sealed class DownloadService
                 };
                 ApplySeriesContext(entry, seriesContext);
                 ApplyPlaylistContext(entry, playlistContext);
+                entry.PictureId ??= pictureId;
                 await cache.Connection.InsertAsync(entry);
             }
         }
@@ -1287,6 +1291,7 @@ public sealed class DownloadService
             EntryId = entry.Id,
             MediaType = type,
             MediaId = entry.VideoId,
+            PictureId = entry.PictureId,
             Title = string.IsNullOrWhiteSpace(entry.Title)
                 ? $"Medium {entry.VideoId}"
                 : entry.Title,

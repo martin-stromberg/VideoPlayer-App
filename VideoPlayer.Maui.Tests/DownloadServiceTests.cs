@@ -260,6 +260,39 @@ public class DownloadServiceTests : IDisposable
         Assert.Equal(1, entry.EpisodeNumber);
     }
 
+    /// <summary>Prüft Enqueue: die Bild-Id des Vorschaubilds landet im Manifest und im Snapshot.</summary>
+    [Fact]
+    public async Task Enqueue_WithPictureId_PersistsPictureIdInManifest()
+    {
+        await LoginAsync();
+        EnqueueStream(32);
+        var service = CreateService();
+
+        var result = await service.EnqueueAsync("movie", 42, "Ein Film", Settings(), pictureId: 9007);
+
+        Assert.Equal(9007, result.Item!.PictureId);
+        var entry = await WaitForStateAsync(() => ReadEntryAsync("movie", 42), "completed");
+        Assert.Equal(9007, entry.PictureId);
+    }
+
+    /// <summary>Prüft Re-Enqueue: eine gespeicherte Bild-Id bleibt ohne neue Angabe erhalten.</summary>
+    [Fact]
+    public async Task Enqueue_ReenqueueWithoutPictureId_KeepsStoredPictureId()
+    {
+        await LoginAsync();
+        var service = CreateService(quotaBytesOverride: 0);
+        await service.EnqueueAsync("movie", 42, "Ein Film", Settings(), pictureId: 9007);
+        var failed = await WaitForStateAsync(() => ReadEntryAsync("movie", 42), "failed");
+        Assert.Equal(9007, failed.PictureId);
+
+        EnqueueStream(32);
+        var result = await CreateService().EnqueueAsync("movie", 42, "Ein Film", Settings());
+
+        Assert.Equal(9007, result.Item!.PictureId);
+        var entry = await WaitForStateAsync(() => ReadEntryAsync("movie", 42), "completed");
+        Assert.Equal(9007, entry.PictureId);
+    }
+
     /// <summary>Prüft Enqueue: abgeschlossener Download mit Datei wird dedupliziert.</summary>
     [Fact]
     public async Task Enqueue_CompletedExisting_ReturnsAlreadyPresent()

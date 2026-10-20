@@ -83,6 +83,13 @@ public sealed class DownloadManifestEntry
     /// </summary>
     public long? PlaylistSortOrder { get; set; }
 
+    /// <summary>
+    /// Bild-Id des Vorschaubilds der Downloads-Liste
+    /// (<c>api/pictures/{id}</c>): Episoden-Still bzw. Film-Poster, beim
+    /// Einreihen mitgegeben; <c>null</c> = kein Bild bekannt (Platzhalter).
+    /// </summary>
+    public long? PictureId { get; set; }
+
     /// <summary>Zeitpunkt der letzten Aktualisierung (UTC).</summary>
     public DateTime UpdatedAtUtc { get; set; }
 }

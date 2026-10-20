@@ -348,6 +348,18 @@ public class AppUpdateTests_Downloads
         Assert.Empty(transition.Effects);
     }
 
+    /// <summary>Prüft Requested: die Bild-Id des Vorschaubilds geht in den Einreihe-Effekt.</summary>
+    [Fact]
+    public void DownloadRequested_WithPictureId_ForwardsToEffect()
+    {
+        var transition = AppUpdate.Update(
+            ConnectedModel(),
+            new DownloadRequestedMessage("movie", 42, "Film") { PictureId = 9007 });
+
+        var enqueue = Assert.IsType<EnqueueDownloadEffect>(Assert.Single(transition.Effects));
+        Assert.Equal(9007, enqueue.PictureId);
+    }
+
     /// <summary>Prüft Retry: fehlgeschlagener Download → erneutes Einreihen.</summary>
     [Fact]
     public void DownloadRetryRequested_Failed_EnqueuesAgain()
@@ -358,6 +370,19 @@ public class AppUpdateTests_Downloads
 
         var effect = Assert.IsType<EnqueueDownloadEffect>(Assert.Single(transition.Effects));
         Assert.Equal(42, effect.MediaId);
+    }
+
+    /// <summary>Prüft Retry: die gespeicherte Bild-Id geht mit ins erneute Einreihen.</summary>
+    [Fact]
+    public void DownloadRetryRequested_Failed_ForwardsPictureId()
+    {
+        var transition = AppUpdate.Update(
+            ConnectedModel(),
+            new DownloadRetryRequestedMessage(
+                Item(42, state: DownloadState.Failed) with { PictureId = 9007 }));
+
+        var effect = Assert.IsType<EnqueueDownloadEffect>(Assert.Single(transition.Effects));
+        Assert.Equal(9007, effect.PictureId);
     }
 
     /// <summary>Prüft Retry: laufender Download → kein Effekt.</summary>

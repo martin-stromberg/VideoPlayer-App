@@ -700,6 +700,9 @@ public sealed record EnqueueDownloadEffect(
 
     /// <summary>Episodennummer innerhalb der Staffel (Episoden-Downloads); <c>null</c> = unbekannt.</summary>
     public int? EpisodeNumber { get; init; }
+
+    /// <summary>Bild-Id des Vorschaubilds (<c>api/pictures/{id}</c> — Episoden-Still bzw. Film-Poster); <c>null</c> = kein Bild bekannt.</summary>
+    public long? PictureId { get; init; }
 }
 
 /// <summary>
