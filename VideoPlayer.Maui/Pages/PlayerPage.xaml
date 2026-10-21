@@ -18,7 +18,9 @@
     <Grid x:Name="PlayerRoot" BackgroundColor="{StaticResource VpBgDeep}"
           RowDefinitions="Auto,*">
 
-        <!-- Titelleiste: Titel, Playlist-Kontext und „angesehen"-Hinweis.
+        <!-- Titelleiste: Titel, Playlist-Kontext, „angesehen"-Hinweis und
+             rechtsbündig die Playlist-Navigation als Symbol-Schaltflächen
+             (Issue #78 — zuvor lag sie als Overlay auf der Videofläche).
              Im Mini-Player blendet UpdateUi die Leiste aus — die
              Auto-Zeile kollabiert dann und die Videofläche füllt die
              gesamte Seite. -->
@@ -34,7 +36,7 @@
                         <GradientStop Color="{StaticResource VpScrimEnd}" Offset="1.0" />
                     </LinearGradientBrush>
                 </Border.Background>
-                <Grid ColumnDefinitions="*,Auto"
+                <Grid ColumnDefinitions="*,Auto,Auto"
                       ColumnSpacing="8">
                     <VerticalStackLayout Grid.Column="0"
                                        Spacing="2">
@@ -58,6 +60,36 @@
                            TextColor="{StaticResource VpSecondary}"
                            VerticalOptions="Center"
                            IsVisible="False" />
+                    <!-- Playlist-Navigation (nur bei Playlist-Wiedergabe
+                         sichtbar): rechte Spalte der Titelleiste. Als
+                         Element der eigenen Leistenzeile überlappt sie die
+                         Videofläche nicht mehr — der frühere iOS-Versatz
+                         unter die native Top-Leiste des
+                         AVPlayerViewController entfällt damit. -->
+                    <HorizontalStackLayout x:Name="PlaylistNavigationBar"
+                                           Grid.Column="2"
+                                           Spacing="10"
+                                           VerticalOptions="Center"
+                                           IsVisible="False">
+                        <Button x:Name="PreviousButton"
+                                AutomationId="PlayerPreviousButton"
+                                Text="&#xe045;"
+                                Style="{StaticResource IconButton}"
+                                FontFamily="MaterialIcons"
+                                FontSize="18"
+                                WidthRequest="44"
+                                HeightRequest="44"
+                                Clicked="OnPreviousClicked" />
+                        <Button x:Name="NextButton"
+                                AutomationId="PlayerNextButton"
+                                Text="&#xe044;"
+                                Style="{StaticResource IconButton}"
+                                FontFamily="MaterialIcons"
+                                FontSize="18"
+                                WidthRequest="44"
+                                HeightRequest="44"
+                                Clicked="OnNextClicked" />
+                    </HorizontalStackLayout>
                 </Grid>
             </Border>
         </VerticalStackLayout>
@@ -83,34 +115,6 @@
                                Color="{StaticResource VpPrimary}"
                                HeightRequest="48"
                                WidthRequest="48" />
-
-            <!-- Playlist-Navigation (nur bei Playlist-Wiedergabe sichtbar):
-                 liegt als eigenes Element über der Videofläche und nicht in
-                 der Titelleiste — sie bleibt so auch dort bedienbar, wo die
-                 Leiste ausgeblendet ist. Unter iOS versetzt das Code-Behind
-                 den Top-Margin unter die native Top-Leiste, die der
-                 AVPlayerViewController oben in der Videofläche einblendet. -->
-            <HorizontalStackLayout x:Name="PlaylistNavigationBar"
-                                   Spacing="10"
-                                   Margin="0,64,16,0"
-                                   HorizontalOptions="End"
-                                   VerticalOptions="Start"
-                                   IsVisible="False">
-                <Button x:Name="PreviousButton"
-                        AutomationId="PlayerPreviousButton"
-                        Text="Zurück"
-                        Style="{StaticResource SecondaryButton}"
-                        FontSize="12"
-                        HeightRequest="38"
-                        Clicked="OnPreviousClicked" />
-                <Button x:Name="NextButton"
-                        AutomationId="PlayerNextButton"
-                        Text="Weiter"
-                        Style="{StaticResource SecondaryButton}"
-                        FontSize="12"
-                        HeightRequest="38"
-                        Clicked="OnNextClicked" />
-            </HorizontalStackLayout>
 
             <!-- Mini-Player-Schalter liegt als eigenes Element über der
                  Videofläche oben rechts. -->
