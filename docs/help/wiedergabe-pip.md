@@ -50,13 +50,12 @@ Die Titelleiste liegt seit ihrer Umstellung auf eine eigene Zeile
 (Issue #75) oberhalb der Videofläche und steht der nativen Leiste
 nicht mehr im Weg — ihr früherer iOS-Versatz per `Margin` ist
 entfallen, ebenso das einst nötige `InputTransparent`-Overlay-
-Handling. Einzig die interaktive `PlaylistNavigationBar` überlappt
-die Videofläche weiterhin: die Seite verschiebt sie unter iOS
-(`#if IOS` im Konstruktor) um den benannten Versatz
-`IosNativeControlsClearance` (96 pt) unter die native Leiste —
-eingabedurchlässig darf sie nicht sein, sie muss daher physisch
-darunter liegen. Die XAML-Werte bleiben der Windows-/Standardpfad;
-das Windows-Verhalten ist unverändert.
+Handling. Mit Issue #78 ist auch die `PlaylistNavigationBar` in die
+Titelleiste gewandert (rechtsbündige Symbol-Schaltflächen): kein
+interaktives App-Element überlappt die Videofläche mehr — der
+frühere iOS-Versatz der Bar unter die native Leiste
+(`IosNativeControlsClearance`, 96 pt) ist damit vollständig
+entfallen. Das Windows-Verhalten ist unverändert.
 
 **iOS-Verifikationsgrenze:** Der Fehler war iOS-/iPad-spezifisch;
 eine iOS-UI-Automatisierung existiert im Repository nicht, und die
@@ -64,15 +63,11 @@ Windows-E2E-Suite erreicht die native `AVPlayerViewController`-
 Ebene grundsätzlich nicht. Der Nachweis stützt sich auf die
 quelltextbasierten Contract-Tests (`PlayerContractTests` pinnen
 die Zeilenstruktur `Auto,*` mit der Titelleiste über der
-Videofläche, den `#if IOS`-Versatzblock der Playlist-Navigation
-und deren Lage außerhalb der Titelleiste) sowie den dokumentierten
+Videofläche sowie die Lage der Playlist-Navigation innerhalb der
+Titelleiste) sowie den dokumentierten
 manuellen TestFlight-Prüfschritt
 auf dem iPad (Vollbild antippen, PiP starten, Playlist-Navigation
-bedienen). Der Versatz von 96 pt ist eine konservative Schätzung
-der Leistenhöhe inklusive Safe-Area — zeigt die Geräteprüfung eine
-Restüberdeckung, ist er feinzujustieren; als letzter
-Eskalationspfad wäre ein eigener iOS-Mapper am
-`AVPlayerViewController` des Toolkit-`MediaElement` denkbar.
+bedienen).
 
 ## Quellen
 
@@ -208,14 +203,15 @@ reiner Event-Übersetzer.
 
 ## Playlist-Navigation
 
-Bei Playlist-Wiedergabe zeigt der Player die Schaltflächen **„Zurück"**
-und **„Weiter"** (serverseitige `previous`-/`next`-Endpunkte) sowie
-unter dem Titel eine Kontextzeile „„Playlist-Name" · Eintrag n/m".
+Bei Playlist-Wiedergabe zeigt der Player rechtsbündig in der
+Titelleiste zwei Symbol-Schaltflächen für das vorherige bzw. nächste
+Video (serverseitige `previous`-/`next`-Endpunkte; Issue #78 —
+zuvor lagen die Text-Schaltflächen „Zurück"/„Weiter" als Overlay
+auf der Videofläche) sowie unter dem Titel eine Kontextzeile
+„„Playlist-Name" · Eintrag n/m".
 Die Schaltflächen erscheinen nur im Playlist-Kontext und werden am
 Listenrand deaktiviert; im Mini-Player sind sie wie die Titelleiste
-ausgeblendet. Unter iOS liegt die Zeile etwas tiefer — sie wird
-unter die eingeblendete native Top-Leiste der Videofläche gerückt,
-bleibt aber voll bedienbar (siehe „Bedienung in der Vollansicht").
+ausgeblendet.
 
 ## Fehlerfall
 

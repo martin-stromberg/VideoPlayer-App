@@ -149,8 +149,9 @@ public class PlayerContractTests
         Assert.Null(band.Attribute("InputTransparent"));
 
         // Videofläche als eigene Zeile 1 — das MediaElement und die
-        // schwebenden Elemente (Playlist-Navigation, Mini-Player-Schalter,
-        // Fehlerhinweis) liegen in ihr.
+        // schwebenden Elemente (Mini-Player-Schalter, Fehlerhinweis)
+        // liegen in ihr; die Playlist-Navigation sitzt seit Issue #78 in
+        // der Titelleiste.
         var surface = Named(rootGrid, MauiNs + "Grid", "VideoSurface");
         Assert.NotNull(surface);
         Assert.Equal("1", (string?)surface.Attribute("Grid.Row"));
@@ -165,55 +166,69 @@ public class PlayerContractTests
     }
 
     /// <summary>
-    /// Prüft PlayerPage: die Playlist-Navigation bleibt der nativen
-    /// iOS-Transportleiste nicht im Weg — unter iOS schiebt ein
-    /// <c>#if IOS</c>-Block im Konstruktor sie um den benannten Versatz
-    /// <c>IosNativeControlsClearance</c> unter die eingeblendete Top-Leiste
-    /// mit den Vollbild-/PiP-Buttons. Die Titelleiste liegt seit Issue #75
-    /// in einer eigenen Zeile oberhalb der Videofläche und benötigt keinen
-    /// Versatz mehr. Die Bar bleibt ein Element der Videofläche außerhalb
-    /// der Titelleiste und trägt selbst kein <c>InputTransparent</c> —
-    /// sie bleibt damit garantiert bedienbar (Issue #45).
+    /// Prüft PlayerPage: die Playlist-Navigation liegt rechtsbündig in der
+    /// Titelleiste (Issue #78) — die Bar ist ein Element der
+    /// <c>TitleChrome</c>-Zeile in der letzten Spalte des Kopf-Grids und
+    /// überlappt die Videofläche nicht mehr; der frühere iOS-Versatz unter
+    /// die native Top-Leiste des AVPlayerViewController
+    /// (<c>IosNativeControlsClearance</c>) ist damit entfallen. Die
+    /// Schaltflächen sind Symbol-Schaltflächen im <c>IconButton</c>-Stil
+    /// mit Material-Icons-Glyphen (skip_previous/skip_next); Namen,
+    /// AutomationIds und Click-Handler bleiben für die MVU-Verdrahtung
+    /// und die E2E-Ansteuerung unverändert.
     /// </summary>
     [Fact]
-    public void PlayerPage_PlaylistNavigationBarClearsNativeControlsOnIos()
+    public void PlayerPage_PlaylistNavigationSitsRightAlignedInTitleBar()
     {
         var code = PlayerPageCode();
         var document = PlayerPageXaml();
 
-        // Unter iOS wird die Bar unter die native Top-Leiste des
-        // AVPlayerViewController geschoben — der Versatz ist benannt
-        // (keine Magic Number) und der XAML-Wert bleibt der
-        // Standard-/Windows-Pfad. Die Titelleiste erhält keinen Versatz
-        // mehr — sie liegt oberhalb der Videofläche (Issue #75).
-        var ctor = MethodBody(code, "public PlayerPage(");
-        Assert.Contains("#if IOS", ctor, StringComparison.Ordinal);
-        Assert.Contains("IosNativeControlsClearance", ctor, StringComparison.Ordinal);
-        Assert.Contains("PlaylistNavigationBar.Margin", ctor, StringComparison.Ordinal);
-        Assert.DoesNotContain("TitleChrome.Margin", ctor, StringComparison.Ordinal);
-        Assert.DoesNotContain("OverlayChrome.Margin", ctor, StringComparison.Ordinal);
-        Assert.Contains("private const double IosNativeControlsClearance",
-            code, StringComparison.Ordinal);
-        Assert.DoesNotContain("new Thickness(0, 96, 16, 0)", code, StringComparison.Ordinal);
-
-        // Die Bar bleibt interaktiv: sie liegt als Element der Videofläche
-        // außerhalb der Titelleiste und ist selbst nicht eingabedurchlässig.
         var rootGrid = Named(document, MauiNs + "Grid", "PlayerRoot");
         Assert.NotNull(rootGrid);
-        var surface = Named(rootGrid, MauiNs + "Grid", "VideoSurface");
-        Assert.NotNull(surface);
-        var navBar = Named(surface, MauiNs + "HorizontalStackLayout", "PlaylistNavigationBar");
-        Assert.NotNull(navBar);
-        Assert.Equal("0,64,16,0", (string?)navBar.Attribute("Margin"));
-        Assert.Null(navBar.Attribute("InputTransparent"));
-
-        // Die Titelleiste trägt im XAML keinen Margin — sie belegt die
-        // volle Breite ihrer Zeile am oberen Fensterrand.
         var title = Named(rootGrid, MauiNs + "VerticalStackLayout", "TitleChrome");
         Assert.NotNull(title);
-        Assert.Null(title.Attribute("Margin"));
-        Assert.DoesNotContain(title.Descendants(MauiNs + "HorizontalStackLayout"),
+        var surface = Named(rootGrid, MauiNs + "Grid", "VideoSurface");
+        Assert.NotNull(surface);
+
+        // Rechtsbündig in der Titelleiste: letzte (Auto-)Spalte des
+        // Kopf-Grids, kein Overlay der Videofläche mehr.
+        var navBar = Named(title, MauiNs + "HorizontalStackLayout", "PlaylistNavigationBar");
+        Assert.NotNull(navBar);
+        Assert.Equal("2", (string?)navBar.Attribute("Grid.Column"));
+        Assert.Null(navBar.Attribute("Margin"));
+        Assert.Null(navBar.Attribute("InputTransparent"));
+        Assert.DoesNotContain(surface.Descendants(),
             e => (string?)e.Attribute(XNs + "Name") == "PlaylistNavigationBar");
+
+        // Symbol-Schaltflächen statt Text: IconButton-Stil,
+        // Material-Icons-Glyphen (skip_previous U+E045, skip_next U+E044).
+        var previous = Named(navBar, MauiNs + "Button", "PreviousButton");
+        var next = Named(navBar, MauiNs + "Button", "NextButton");
+        Assert.NotNull(previous);
+        Assert.NotNull(next);
+        Assert.Equal("{StaticResource IconButton}", (string?)previous.Attribute("Style"));
+        Assert.Equal("{StaticResource IconButton}", (string?)next.Attribute("Style"));
+        Assert.Equal("MaterialIcons", (string?)previous.Attribute("FontFamily"));
+        Assert.Equal("MaterialIcons", (string?)next.Attribute("FontFamily"));
+        Assert.Equal("\uE045", (string?)previous.Attribute("Text"));
+        Assert.Equal("\uE044", (string?)next.Attribute("Text"));
+
+        // Verdrahtung unverändert: AutomationIds (E2E/DevApi) und
+        // Click-Handler auf die Playlist-Navigations-Messages.
+        Assert.Equal("PlayerPreviousButton", (string?)previous.Attribute("AutomationId"));
+        Assert.Equal("PlayerNextButton", (string?)next.Attribute("AutomationId"));
+        Assert.Equal("OnPreviousClicked", (string?)previous.Attribute("Clicked"));
+        Assert.Equal("OnNextClicked", (string?)next.Attribute("Clicked"));
+        Assert.Contains("PlaylistPreviousRequestedMessage", code, StringComparison.Ordinal);
+        Assert.Contains("PlaylistNextRequestedMessage", code, StringComparison.Ordinal);
+
+        // Die Bar steht der nativen iOS-Top-Leiste nicht mehr im Weg —
+        // der Versatzblock und seine Konstante sind entfernt.
+        var ctor = MethodBody(code, "public PlayerPage(");
+        Assert.DoesNotContain("#if IOS", ctor, StringComparison.Ordinal);
+        Assert.DoesNotContain("PlaylistNavigationBar.Margin", ctor, StringComparison.Ordinal);
+        Assert.DoesNotContain("IosNativeControlsClearance", code, StringComparison.Ordinal);
+        Assert.DoesNotContain("new Thickness(0, 96, 16, 0)", code, StringComparison.Ordinal);
     }
 
     /// <summary>

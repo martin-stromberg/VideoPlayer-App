@@ -24,13 +24,6 @@ public partial class PlayerPage : ContentPage
 {
     private static readonly TimeSpan ProgressTickInterval = TimeSpan.FromSeconds(5);
     private static readonly TimeSpan ResumeSeekTimeout = TimeSpan.FromSeconds(10);
-    // Geschätzte Höhe der nativen iOS-Top-Leiste des
-    // AVPlayerViewController (Vollbild-/PiP-Buttons) inklusive Safe-Area
-    // und Sicherheitsabstand — Versatz der Playlist-Navigation unter die
-    // eingeblendete Leiste. Der Wert ist ohne Gerät nicht verifizierbar
-    // und in der TestFlight-Geräteprüfung zu bestätigen bzw.
-    // feinzujustieren.
-    private const double IosNativeControlsClearance = 96;
 
     private readonly MvuHost mvuHost;
     private readonly IPictureInPictureService pictureInPicture;
@@ -68,24 +61,6 @@ public partial class PlayerPage : ContentPage
         this.logger = logger;
         BindingContext = mvuHost;
         PipButton.IsVisible = pictureInPicture.IsToggleSupported;
-#if IOS
-        // iOS blendet die native Top-Leiste des AVPlayerViewController mit
-        // den Vollbild-/PiP-Buttons im oberen Randbereich der Videofläche
-        // ein. Die Titelleiste liegt seit ihrer Umstellung auf eine eigene
-        // Zeile oberhalb der Videofläche (Issue #75) und steht der nativen
-        // Leiste nicht mehr im Weg — ein Versatz ist für sie nicht mehr
-        // nötig. Nur die PlaylistNavigationBar überlappt die Videofläche
-        // weiterhin: die interaktive Bar darf nicht eingabedurchlässig
-        // sein und wird daher physisch unter die native Leiste geschoben.
-        // Die XAML-Werte bleiben der Standardpfad für Windows und andere
-        // Plattformen.
-        var barMargin = PlaylistNavigationBar.Margin;
-        PlaylistNavigationBar.Margin = new Thickness(
-            barMargin.Left,
-            barMargin.Top + IosNativeControlsClearance,
-            barMargin.Right,
-            barMargin.Bottom);
-#endif
 #if WINDOWS
         // Unter Windows blenden die Transportsteuerungen des MediaElements
         // sich nach dem Timeout nicht mehr über eigene Pointer-Ereignisse ein
