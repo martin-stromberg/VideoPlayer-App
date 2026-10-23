@@ -427,3 +427,10 @@ FodyWeavers.xsd
 *.msix
 *.msm
 *.msp
+
+# AI workflow files
+.agents/*
+issue.md
+
+# Lokale iOS-Deployment-Konfiguration (Signatur/Provision, benutzerspezifisch)
+.ios-deploy.user.json

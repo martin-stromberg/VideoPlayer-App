@@ -1,0 +1,195 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:controls="clr-namespace:VideoPlayer.Maui.Controls"
+             xmlns:mvu="clr-namespace:VideoPlayer.Mvu;assembly=VideoPlayer.Mvu"
+             x:Class="VideoPlayer.Maui.Pages.DownloadsPage"
+             x:Name="RootPage"
+             Title="Downloads"
+             x:DataType="mvu:MvuHost">
+
+    <Grid Padding="24"
+          RowDefinitions="Auto,Auto,Auto,*"
+          RowSpacing="14">
+
+        <!-- Kontingent-Belegung des Speicherplatzes für Downloads. -->
+        <Label x:Name="QuotaLabel"
+               Grid.Row="0"
+               Style="{StaticResource Caption}" />
+
+        <!-- Erkannte Restdaten ohne Manifest-Eintrag (nur sichtbar,
+             wenn vorhanden) — sie zählen in der Belegung mit. -->
+        <HorizontalStackLayout Grid.Row="0" Spacing="10">
+            <Label x:Name="OrphanedLabel"
+                   Style="{StaticResource Caption}"
+                   VerticalOptions="Center"
+                   IsVisible="False" />
+            <Button x:Name="PurgeOrphansButton"
+                    Text="Speicher bereinigen"
+                    Style="{StaticResource SecondaryButton}"
+                    FontSize="12"
+                    Padding="10,4"
+                    Clicked="OnPurgeOrphansClicked"
+                    IsVisible="False" />
+        </HorizontalStackLayout>
+
+        <!-- Gesamtaktionen (jeweils mit Rückfrage): fehlerhafte bzw.
+             alle Downloads löschen — Sichtbarkeit zustandsabhängig im
+             Code-Behind. -->
+        <HorizontalStackLayout Grid.Row="0"
+                               HorizontalOptions="End"
+                               Spacing="8">
+            <Button x:Name="DeleteFailedButton"
+                    AutomationId="DeleteFailedButton"
+                    Text="Alle Fehler löschen"
+                    Style="{StaticResource GhostButton}"
+                    TextColor="{StaticResource VpDanger}"
+                    FontSize="12"
+                    Padding="10,4"
+                    Clicked="OnDeleteFailedClicked"
+                    IsVisible="False" />
+            <Button x:Name="DeleteAllButton"
+                    AutomationId="DeleteAllButton"
+                    Text="Alle löschen"
+                    Style="{StaticResource GhostButton}"
+                    TextColor="{StaticResource VpDanger}"
+                    FontSize="12"
+                    Padding="10,4"
+                    Clicked="OnDeleteAllClicked"
+                    IsVisible="False" />
+        </HorizontalStackLayout>
+
+        <!-- Hinweis im Offline-Zustand: die Liste liegt lokal vor;
+             wartende Downloads starten mit der Verbindung. -->
+        <Border x:Name="OfflineBanner"
+                Grid.Row="1"
+                Style="{StaticResource Banner}"
+                IsVisible="False">
+            <Label Text="Offline – Downloads werden fortgesetzt, sobald eine Verbindung besteht."
+                   TextColor="{StaticResource VpText}"
+                   FontFamily="InterMedium" />
+        </Border>
+
+        <ActivityIndicator x:Name="LoadingIndicator"
+                           Grid.Row="2"
+                           IsRunning="{Binding Model.Downloads.IsLoading}"
+                           IsVisible="{Binding Model.Downloads.IsLoading}"
+                           Color="{StaticResource VpPrimary}" />
+
+        <VerticalStackLayout x:Name="ErrorPanel"
+                             Grid.Row="2"
+                             Spacing="10"
+                             IsVisible="False">
+            <Label x:Name="ErrorLabel" Style="{StaticResource ErrorText}" />
+            <Button x:Name="RetryButton"
+                    Text="Erneut laden"
+                    Style="{StaticResource SecondaryButton}"
+                    Clicked="OnRetryClicked"
+                    HorizontalOptions="Start" />
+        </VerticalStackLayout>
+
+        <Label x:Name="EmptyLabel"
+               AutomationId="EmptyLabel"
+               Grid.Row="2"
+               Text="Keine Downloads vorhanden. Medien lassen sich auf der Detailseite herunterladen."
+               Style="{StaticResource Caption}"
+               FontSize="14"
+               IsVisible="False" />
+
+        <!-- Download-Liste: Titel, Zustands-Chip, Fortschritt und die
+             Aktionen Abbrechen/Erneut versuchen/Löschen je Eintrag. Die
+             ItemsSource wird einmalig im Code-Behind auf eine stabile
+             ObservableCollection gesetzt — Fortschritts-Ticks
+             aktualisieren nur den betroffenen Eintrag in-place, ohne
+             dass die Liste neu aufgebaut wird (Flackern). -->
+        <CollectionView x:Name="DownloadsCollection"
+                        AutomationId="DownloadsCollection"
+                        Grid.Row="3">
+            <CollectionView.ItemTemplate>
+                <DataTemplate x:DataType="mvu:DownloadItemViewModel">
+                    <Border Style="{StaticResource Card}"
+                            Padding="16"
+                            Margin="0,0,0,12">
+                        <Grid ColumnDefinitions="Auto,*"
+                              ColumnSpacing="14">
+                            <!-- Vorschaubild links: Episoden-Still (16:9)
+                                 bzw. Film-Poster (2:3) aus der lokalen
+                                 Vorschaubild-Ablage — ohne Bild-Id bleibt
+                                 die getönte Fläche als Platzhalter
+                                 (Muster: Episoden-Liste der Detailseite). -->
+                            <Border Grid.Column="0"
+                                    Padding="0"
+                                    StrokeThickness="0"
+                                    WidthRequest="{Binding PreviewWidth}"
+                                    HeightRequest="72"
+                                    BackgroundColor="{StaticResource VpSurfaceLow}"
+                                    StrokeShape="RoundRectangle 8"
+                                    VerticalOptions="Start">
+                                <controls:CachedPosterImage PictureId="{Binding PictureId}"
+                                                            Aspect="AspectFill" />
+                            </Border>
+                            <VerticalStackLayout Grid.Column="1" Spacing="10">
+                                <Grid ColumnDefinitions="*,Auto"
+                                      ColumnSpacing="12">
+                                    <Label Text="{Binding Title}"
+                                           Grid.Column="0"
+                                           FontSize="16"
+                                           FontFamily="InterSemiBold"
+                                           TextColor="{StaticResource VpText}"
+                                           MaxLines="2"
+                                           LineBreakMode="TailTruncation"
+                                           VerticalOptions="Center" />
+                                    <!-- Zustand als Pill-Chip: getönte
+                                         Primärfläche mit weicher Schrift. -->
+                                    <Border Grid.Column="1"
+                                            StrokeShape="RoundRectangle 999"
+                                            Stroke="Transparent"
+                                            BackgroundColor="{StaticResource VpPrimaryTint}"
+                                            Padding="10,4"
+                                            VerticalOptions="Center">
+                                        <Label Text="{Binding StateText}"
+                                               FontSize="11"
+                                               FontFamily="InterSemiBold"
+                                               TextColor="{StaticResource VpPrimarySoft}" />
+                                    </Border>
+                                </Grid>
+                                <HorizontalStackLayout Spacing="10">
+                                    <Label Text="{Binding MediaTypeText}"
+                                           Style="{StaticResource Caption}" />
+                                    <Label Text="{Binding SizeText}"
+                                           Style="{StaticResource Caption}"
+                                           IsVisible="{Binding HasSizeText}" />
+                                    <Label Text="{Binding ProgressPercentText}"
+                                           Style="{StaticResource Caption}"
+                                           IsVisible="{Binding ShowProgress}" />
+                                </HorizontalStackLayout>
+                                <ProgressBar Progress="{Binding Progress}"
+                                             ProgressColor="{StaticResource VpPrimary}"
+                                             BackgroundColor="{StaticResource VpSurfaceHigh}"
+                                             IsVisible="{Binding ShowProgress}" />
+                                <Label Text="{Binding ErrorText}"
+                                       Style="{StaticResource ErrorText}"
+                                       IsVisible="{Binding HasError}" />
+                                <HorizontalStackLayout Spacing="8">
+                                    <Button Text="Abbrechen"
+                                            Style="{StaticResource SecondaryButton}"
+                                            Clicked="OnCancelClicked"
+                                            IsVisible="{Binding CanCancel}" />
+                                    <Button Text="Erneut versuchen"
+                                            Style="{StaticResource SecondaryButton}"
+                                            Clicked="OnRetryDownloadClicked"
+                                            IsVisible="{Binding CanRetry}" />
+                                    <Button Text="Löschen"
+                                            Style="{StaticResource GhostButton}"
+                                            TextColor="{StaticResource VpDanger}"
+                                            Clicked="OnDeleteClicked" />
+                                </HorizontalStackLayout>
+                            </VerticalStackLayout>
+                        </Grid>
+                    </Border>
+                </DataTemplate>
+            </CollectionView.ItemTemplate>
+        </CollectionView>
+    </Grid>
+
+</ContentPage>

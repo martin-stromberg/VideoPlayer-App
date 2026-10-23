@@ -1,0 +1,348 @@
+using System.Globalization;
+using VideoPlayer.Maui.Tests.Stubs;
+using VideoPlayer.Mvu;
+
+namespace VideoPlayer.Maui.Tests;
+
+/// <summary>
+/// Contract-Tests der Download-Verwaltung (Schritt 11): die MAUI-Schicht
+/// kann im Testprojekt nicht instanziiert werden — verdrahtete Struktur
+/// und Zusammenspiel werden daher über die Quelldateien geprüft
+/// (Muster: <see cref="FavoritesProfileContractTests"/>).
+/// </summary>
+public class DownloadsContractTests
+{
+    private static readonly string Root = RepositoryRoot.Find();
+
+    private static string Read(params string[] parts) =>
+        File.ReadAllText(Path.Combine(new[] { Root }.Concat(parts).ToArray()));
+
+    /// <summary>Prüft DownloadsPage: Liste mit Titel, Typ, Status, Fehler und Fortschrittsbalken.</summary>
+    [Fact]
+    public void DownloadsPage_ShowsItems_WithStatusAndProgress()
+    {
+        var xaml = Read("VideoPlayer.Maui", "Pages", "DownloadsPage.xaml");
+
+        // Stabile ItemsSource (Code-Behind): kein Listen-Binding, das bei
+        // jedem Fortschritts-Tick eine neue Instanz setzt (Flackern).
+        Assert.Contains("x:Name=\"DownloadsCollection\"", xaml, StringComparison.Ordinal);
+        Assert.DoesNotContain("ItemsSource=\"{Binding", xaml, StringComparison.Ordinal);
+        Assert.Contains("x:DataType=\"mvu:DownloadItemViewModel\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("{Binding Title}", xaml, StringComparison.Ordinal);
+        Assert.Contains("{Binding MediaTypeText}", xaml, StringComparison.Ordinal);
+        Assert.Contains("{Binding StateText}", xaml, StringComparison.Ordinal);
+        Assert.Contains("{Binding ErrorText}", xaml, StringComparison.Ordinal);
+        Assert.Contains("{Binding Progress}", xaml, StringComparison.Ordinal);
+        Assert.Contains("{Binding ProgressPercentText}", xaml, StringComparison.Ordinal);
+        // Quota-Anzeige, Offline-Banner, Lade-/Fehler-/Leerzustand.
+        Assert.Contains("QuotaLabel", xaml, StringComparison.Ordinal);
+        Assert.Contains("OfflineBanner", xaml, StringComparison.Ordinal);
+        Assert.Contains("LoadingIndicator", xaml, StringComparison.Ordinal);
+        Assert.Contains("RetryButton", xaml, StringComparison.Ordinal);
+        Assert.Contains("EmptyLabel", xaml, StringComparison.Ordinal);
+    }
+
+    /// <summary>Prüft DownloadsPage: Aktionen Abbrechen, Wiederholen und Löschen je Eintrag.</summary>
+    [Fact]
+    public void DownloadsPage_HasCancelRetryDeleteActions()
+    {
+        var xaml = Read("VideoPlayer.Maui", "Pages", "DownloadsPage.xaml");
+
+        Assert.Contains("OnCancelClicked", xaml, StringComparison.Ordinal);
+        Assert.Contains("OnRetryDownloadClicked", xaml, StringComparison.Ordinal);
+        Assert.Contains("OnDeleteClicked", xaml, StringComparison.Ordinal);
+        // Aktions-Sichtbarkeit je Eintragszustand.
+        Assert.Contains("{Binding CanCancel}", xaml, StringComparison.Ordinal);
+        Assert.Contains("{Binding CanRetry}", xaml, StringComparison.Ordinal);
+    }
+
+    /// <summary>Prüft DownloadsPage: dispatcht Öffnen-, Abbrechen-, Wiederholen- und Löschen-Nachrichten.</summary>
+    [Fact]
+    public void DownloadsPage_DispatchesMessages()
+    {
+        var code = Read("VideoPlayer.Maui", "Pages", "DownloadsPage.xaml.cs");
+
+        Assert.Contains("DownloadsPageOpenedMessage", code, StringComparison.Ordinal);
+        Assert.Contains("DownloadCancelRequestedMessage", code, StringComparison.Ordinal);
+        Assert.Contains("DownloadRetryRequestedMessage", code, StringComparison.Ordinal);
+        Assert.Contains("DownloadDeleteRequestedMessage", code, StringComparison.Ordinal);
+        Assert.Contains("DispatchAsync", code, StringComparison.Ordinal);
+        // Quota- und Offline-Anzeige werden aus dem Modell aktualisiert.
+        Assert.Contains("model.Downloads.QuotaText", code, StringComparison.Ordinal);
+        Assert.Contains("model.IsOffline", code, StringComparison.Ordinal);
+    }
+
+    /// <summary>Prüft DownloadsPage: granulare Listen-Aktualisierung ohne CollectionView-Reset (Anti-Flackern).</summary>
+    [Fact]
+    public void DownloadsPage_SyncsItems_WithoutItemsSourceReset()
+    {
+        var code = Read("VideoPlayer.Maui", "Pages", "DownloadsPage.xaml.cs");
+
+        // Stabile ObservableCollection, einmalig als ItemsSource gesetzt.
+        Assert.Contains("ObservableCollection<DownloadItemViewModel>", code, StringComparison.Ordinal);
+        Assert.Contains("ItemsSource = downloadItems", code, StringComparison.Ordinal);
+        // Granularer Abgleich pro Modelländerung (in-place statt Reset).
+        Assert.Contains("DownloadListSync.Sync(downloadItems, model.Downloads.Items)", code, StringComparison.Ordinal);
+        // Eintrags-Kontext ist das ViewModel; die Messages erhalten den Record.
+        Assert.Contains("is DownloadItemViewModel viewItem", code, StringComparison.Ordinal);
+    }
+
+    /// <summary>Prüft MediaDetailsPage: Download-Schalter für Film und je Episode.</summary>
+    [Fact]
+    public void MediaDetailsPage_HasDownloadButtons()
+    {
+        var xaml = Read("VideoPlayer.Maui", "Pages", "MediaDetailsPage.xaml");
+        var code = Read("VideoPlayer.Maui", "Pages", "MediaDetailsPage.xaml.cs");
+
+        Assert.Contains("DownloadButton", xaml, StringComparison.Ordinal);
+        Assert.Contains("OnDownloadClicked", xaml, StringComparison.Ordinal);
+        Assert.Contains("OnEpisodeDownloadClicked", xaml, StringComparison.Ordinal);
+        Assert.Contains("DownloadNoticeLabel", xaml, StringComparison.Ordinal);
+        Assert.Contains("DownloadRequestedMessage", code, StringComparison.Ordinal);
+        Assert.Contains("DownloadNotice", code, StringComparison.Ordinal);
+    }
+
+    /// <summary>Prüft MauiProgram: Download- und Auto-Download-Dienst werden registriert.</summary>
+    [Fact]
+    public void MauiProgram_RegistersDownloadServices()
+    {
+        var code = Read("VideoPlayer.Maui", "MauiProgram.cs");
+
+        Assert.Contains("AddSingleton<DownloadService>", code, StringComparison.Ordinal);
+        Assert.Contains("AddSingleton<AutoDownloadService>", code, StringComparison.Ordinal);
+    }
+
+    /// <summary>Prüft ShellAppEffectHandler: alle Download-Effekte sind verdrahtet, Ereignisse abonniert.</summary>
+    [Fact]
+    public void ShellAppEffectHandler_WiresDownloadEffects()
+    {
+        var code = Read("VideoPlayer.Maui", "Services", "ShellAppEffectHandler.cs");
+
+        foreach (var effect in new[]
+        {
+            "LoadDownloadsEffect",
+            "EnqueueDownloadEffect",
+            "CancelDownloadEffect",
+            "DeleteDownloadEffect",
+            "ResumeDownloadsEffect",
+            "RunAutoDownloadsEffect",
+            "DeleteWatchedDownloadEffect"
+        })
+        {
+            Assert.Contains(effect, code, StringComparison.Ordinal);
+        }
+
+        Assert.Contains("downloads.ItemChanged", code, StringComparison.Ordinal);
+        Assert.Contains("downloads.ItemRemoved", code, StringComparison.Ordinal);
+        Assert.Contains("DownloadItemChangedMessage", code, StringComparison.Ordinal);
+        Assert.Contains("DownloadDeletedMessage", code, StringComparison.Ordinal);
+        Assert.Contains("DownloadsLoadedMessage", code, StringComparison.Ordinal);
+    }
+
+    /// <summary>Prüft ConnectivityMonitor: WLAN-Profil wird erkannt (Wi-Fi-only-Downloads).</summary>
+    [Fact]
+    public void ConnectivityMonitor_ReportsWifi()
+    {
+        var code = Read("VideoPlayer.Maui", "Services", "ConnectivityNetworkStatusMonitor.cs");
+
+        Assert.Contains("ConnectionProfile.WiFi", code, StringComparison.Ordinal);
+        Assert.Contains("IsWifi", code, StringComparison.Ordinal);
+    }
+
+    /// <summary>Prüft Manifest-Ablage: no-backup-Dateien (aus System-Backup ausgeschlossen).</summary>
+    [Fact]
+    public void StorageLayout_DownloadsUnderNoBackup()
+    {
+        var code = Read("VideoPlayer.Storage", "AppStorageLayout.cs");
+
+        Assert.Contains("NoBackupDirectory", code, StringComparison.Ordinal);
+        Assert.Contains("videos", code, StringComparison.Ordinal);
+    }
+
+    /// <summary>Prüft DownloadService: Abgleich Ablageort ↔ Manifest ist implementiert und verdrahtet.</summary>
+    [Fact]
+    public void DownloadService_Reconcile_WiredInHandler()
+    {
+        var service = Read("VideoPlayer.Mvu", "DownloadService.cs");
+        var handler = Read("VideoPlayer.Maui", "Services", "ShellAppEffectHandler.cs");
+
+        Assert.Contains("ReconcileAsync", service, StringComparison.Ordinal);
+        Assert.Contains("ErrorMissingFile", service, StringComparison.Ordinal);
+        Assert.Contains("downloads.ReconcileAsync", handler, StringComparison.Ordinal);
+    }
+
+    /// <summary>Prüft DownloadsPage: Aktion „Alle Fehler löschen" ist verdrahtet (Schalter, Rückfrage, Message, Sichtbarkeit, Effekt-Handler).</summary>
+    [Fact]
+    public void DownloadsPage_WiresDeleteFailed()
+    {
+        var xaml = Read("VideoPlayer.Maui", "Pages", "DownloadsPage.xaml");
+        var code = Read("VideoPlayer.Maui", "Pages", "DownloadsPage.xaml.cs");
+        var handler = Read("VideoPlayer.Maui", "Services", "ShellAppEffectHandler.cs");
+
+        Assert.Contains("DeleteFailedButton", xaml, StringComparison.Ordinal);
+        Assert.Contains("OnDeleteFailedClicked", xaml, StringComparison.Ordinal);
+        Assert.Contains("DownloadsDeleteFailedRequestedMessage", code, StringComparison.Ordinal);
+        Assert.Contains("DisplayAlertAsync", code, StringComparison.Ordinal);
+        Assert.Contains("DeleteFailedButton.IsVisible", code, StringComparison.Ordinal);
+        Assert.Contains("HasFailedItems", code, StringComparison.Ordinal);
+        Assert.Contains("DeleteFailedDownloadsEffect", handler, StringComparison.Ordinal);
+        Assert.Contains("DeleteFailedAsync", handler, StringComparison.Ordinal);
+    }
+
+    /// <summary>Prüft HasFailedItems: nur fehlgeschlagene/abgebrochene Einträge aktivieren die Sammelaktion.</summary>
+    [Fact]
+    public void DownloadsPageState_HasFailedItems_OnlyFailedOrCancelled()
+    {
+        static DownloadListItem Entry(DownloadState state) => new()
+        {
+            EntryId = 1,
+            MediaType = "movie",
+            MediaId = 42,
+            Title = "Film",
+            State = state
+        };
+
+        Assert.True(new DownloadsPageState { Items = [Entry(DownloadState.Failed)] }.HasFailedItems);
+        Assert.True(new DownloadsPageState { Items = [Entry(DownloadState.Cancelled)] }.HasFailedItems);
+        Assert.False(DownloadsPageState.Initial.HasFailedItems);
+        Assert.False(new DownloadsPageState
+        {
+            Items = [Entry(DownloadState.Queued), Entry(DownloadState.Completed)]
+        }.HasFailedItems);
+    }
+
+    /// <summary>Prüft DownloadsPage: Hinweiszeile für nicht zugeordnete Restdaten vorhanden.</summary>
+    [Fact]
+    public void DownloadsPage_ShowsOrphanedHint()
+    {
+        var xaml = Read("VideoPlayer.Maui", "Pages", "DownloadsPage.xaml");
+        var code = Read("VideoPlayer.Maui", "Pages", "DownloadsPage.xaml.cs");
+
+        Assert.Contains("OrphanedLabel", xaml, StringComparison.Ordinal);
+        Assert.Contains("model.Downloads.OrphanedText", code, StringComparison.Ordinal);
+    }
+
+    /// <summary>Prüft ErrorText: „missing_file" wird als verständlicher Hinweis übersetzt.</summary>
+    [Fact]
+    public void DownloadListItem_MissingFile_ErrorText()
+    {
+        var item = new DownloadListItem
+        {
+            EntryId = 1,
+            MediaType = "movie",
+            MediaId = 42,
+            Title = "Film",
+            State = DownloadState.Failed,
+            Error = DownloadService.ErrorMissingFile
+        };
+
+        Assert.NotNull(item.ErrorText);
+        Assert.Contains("nicht mehr vorhanden", item.ErrorText, StringComparison.Ordinal);
+    }
+
+    /// <summary>Prüft DownloadsPage: Vorschaubild je Eintrag über das lokale Bild-Cache (Still/Poster).</summary>
+    [Fact]
+    public void DownloadsPage_ShowsPreviewImage_FromPictureCache()
+    {
+        var xaml = Read("VideoPlayer.Maui", "Pages", "DownloadsPage.xaml");
+
+        // Gerundeter Rahmen mit gecachtem Bild (Konvention der
+        // Episoden-Liste): Bild-Id und medientypabhängige Breite.
+        Assert.Contains("CachedPosterImage", xaml, StringComparison.Ordinal);
+        Assert.Contains("PictureId=\"{Binding PictureId}\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("{Binding PreviewWidth}", xaml, StringComparison.Ordinal);
+        Assert.Contains("RoundRectangle 8", xaml, StringComparison.Ordinal);
+    }
+
+    /// <summary>Prüft DownloadListItem: ein Bild gilt nur bei positiver Bild-Id als vorhanden.</summary>
+    [Fact]
+    public void DownloadListItem_HasPicture_OnlyWithPositivePictureId()
+    {
+        static DownloadListItem Entry(long? pictureId) => new()
+        {
+            EntryId = 1,
+            MediaType = "movie",
+            MediaId = 42,
+            Title = "Film",
+            State = DownloadState.Completed,
+            PictureId = pictureId
+        };
+
+        Assert.True(Entry(9007).HasPicture);
+        Assert.False(Entry(null).HasPicture);
+        Assert.False(Entry(0).HasPicture);
+    }
+
+    /// <summary>Prüft DownloadListItem: Still-Rahmen der Episode ist breiter als der Poster-Rahmen.</summary>
+    [Fact]
+    public void DownloadListItem_PreviewWidth_EpisodeWiderThanMovie()
+    {
+        static DownloadListItem Entry(string mediaType) => new()
+        {
+            EntryId = 1,
+            MediaType = mediaType,
+            MediaId = 42,
+            Title = "Titel",
+            State = DownloadState.Completed
+        };
+
+        Assert.True(Entry("tvshowepisode").PreviewWidth > Entry("movie").PreviewWidth);
+    }
+
+    /// <summary>Prüft OrphanedText: ohne Restdaten ist die Zeile ausgeblendet (null).</summary>
+    [Fact]
+    public void DownloadsPageState_OrphanedText_WhenZero_Null()
+    {
+        Assert.Null(DownloadsPageState.Initial.OrphanedText);
+        Assert.Null(new DownloadsPageState { OrphanedBytes = 0 }.OrphanedText);
+    }
+
+    /// <summary>Prüft OrphanedText: mit Restdaten wird die nicht zugeordnete Größe genannt.</summary>
+    [Fact]
+    public void DownloadsPageState_OrphanedText_WhenSet_NamesBytes()
+    {
+        // Die Größenformatierung folgt der UI-Kultur; die App-Texte sind deutsch,
+        // daher wird die Erwartung unter fester deutscher Kultur geprüft.
+        var previousCulture = CultureInfo.CurrentCulture;
+        try
+        {
+            CultureInfo.CurrentCulture = CultureInfo.GetCultureInfo("de-DE");
+
+            var state = new DownloadsPageState { OrphanedBytes = 2_147_483_648L };
+
+            Assert.NotNull(state.OrphanedText);
+            Assert.Contains("nicht zugeordnet", state.OrphanedText, StringComparison.Ordinal);
+            Assert.Contains("2,0 GB", state.OrphanedText, StringComparison.Ordinal);
+        }
+        finally
+        {
+            CultureInfo.CurrentCulture = previousCulture;
+        }
+    }
+
+    /// <summary>Prüft iOS-Backend: Hintergrund-URL-Session und App-Delegate-Verdrahtung vorhanden.</summary>
+    [Fact]
+    public void IosBackgroundDownloadBackend_Wired()
+    {
+        var backend = Read("VideoPlayer.Maui", "Platforms", "iOS", "IosBackgroundDownloadBackend.cs");
+        var appDelegate = Read("VideoPlayer.Maui", "Platforms", "iOS", "AppDelegate.cs");
+        var maui = Read("VideoPlayer.Maui", "MauiProgram.cs");
+
+        Assert.Contains("CreateBackgroundSessionConfiguration", backend, StringComparison.Ordinal);
+        Assert.Contains("AllowsCellularAccess", backend, StringComparison.Ordinal);
+        Assert.Contains("CompletionSink", backend, StringComparison.Ordinal);
+        Assert.Contains("handleEventsForBackgroundURLSession", appDelegate, StringComparison.Ordinal);
+        Assert.Contains("IosBackgroundDownloadBackend", maui, StringComparison.Ordinal);
+        Assert.Contains("IDownloadBackend", maui, StringComparison.Ordinal);
+    }
+
+    /// <summary>Prüft DownloadService: Backend-Abstraktion und externe Transfer-Vervollständigung.</summary>
+    [Fact]
+    public void DownloadService_UsesBackend_AndCompletesExternal()
+    {
+        var code = Read("VideoPlayer.Mvu", "DownloadService.cs");
+
+        Assert.Contains("IDownloadBackend", code, StringComparison.Ordinal);
+        Assert.Contains("CompleteExternalTransferAsync", code, StringComparison.Ordinal);
+    }
+}
