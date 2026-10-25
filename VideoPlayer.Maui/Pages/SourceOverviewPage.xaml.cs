@@ -118,16 +118,11 @@ public partial class SourceOverviewPage : ContentPage
         }
     }
 
-    private void OnGenreSelected(object? sender, SelectionChangedEventArgs e)
+    private void OnGenreTapped(object? sender, TappedEventArgs e)
     {
-        if (e.CurrentSelection.FirstOrDefault() is SourceGenreItem genre)
+        if (sender is BindableObject element && element.BindingContext is SourceGenreItem genre)
         {
             _ = mvuHost.DispatchAsync(new SourceGenreSelectedMessage(genre.Id));
-        }
-
-        if (sender is CollectionView collectionView)
-        {
-            collectionView.SelectedItem = null;
         }
     }
 

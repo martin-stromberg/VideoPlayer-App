@@ -108,6 +108,44 @@ public sealed class SourceBrowsingTests : E2ETestBase
             "Bei leerer Server-Genreliste darf keine „Alle“-nur-Zeile erscheinen.");
     }
 
+    /// <summary>
+    /// Regressionstest (TestFlight-Feedback, iPad): Die Genre-Leiste darf
+    /// nur eine schmale Zeile belegen — das Medien-Raster muss darunter
+    /// sichtbar sein und die Titel müssen erreichbar bleiben. Unter iOS
+    /// dehnte die CollectionView die Leiste auf die volle Resthöhe aus
+    /// und verdeckte alle Einträge.
+    /// </summary>
+    [Fact]
+    public async Task GenreBar_HeightBounded_ItemsGridVisible()
+    {
+        using var server = NewServer(withGenres: true);
+        using var app = await StartAppAsync();
+        await LoginToSourceAsync(app, server);
+
+        await app.DevApi.WaitForModelAsync(
+            m => m.SourceBrowserSourceId == SourceId
+                && m.SourceBrowserShowGenreFilter
+                && m.SourceBrowserItemTitles != null
+                && m.SourceBrowserItemTitles.Count == 2,
+            TimeSpan.FromSeconds(30),
+            "Genre-Leiste und Einträge geladen", Ct);
+
+        var tree = await WaitForLayoutAsync(app);
+        var bar = tree.FindByAutomationId("GenresCollection");
+        var grid = tree.FindByAutomationId("ItemsCollection");
+        Assert.NotNull(bar);
+        Assert.NotNull(grid);
+        Assert.NotNull(bar!.Bounds);
+        Assert.NotNull(grid!.Bounds);
+        Assert.True(
+            bar.Bounds!.Height is > 0 and <= 120,
+            $"Die Genre-Leiste darf nur eine Zeile belegen (Ist: {bar.Bounds.Height}).");
+        Assert.True(grid.IsVisible, "Das Medien-Raster muss unter der Genre-Leiste sichtbar sein.");
+        Assert.True(
+            grid.Bounds!.Height >= 200,
+            $"Das Medien-Raster muss nennenswerte Höhe belegen (Ist: {grid.Bounds.Height}).");
+    }
+
     /// <summary>Mock-Server mit einer Quelle und zwei Einträgen; Genres nur bei <paramref name="withGenres"/>.</summary>
     /// <param name="withGenres"><c>true</c> = die Quelle liefert „Komödie"/„Drama"; <c>false</c> = leere Genre-Liste.</param>
     /// <returns>Der konfigurierte Mock-Server.</returns>
@@ -187,5 +225,32 @@ public sealed class SourceBrowsingTests : E2ETestBase
         }
 
         return false;
+    }
+
+    /// <summary>
+    /// Pollt den Elementbaum, bis <c>GenresCollection</c> und
+    /// <c>ItemsCollection</c> gemessene Bounds melden (Layout nach dem
+    /// Laden abgewartet).
+    /// </summary>
+    /// <param name="app">Die laufende App-Instanz.</param>
+    /// <returns>Der letzte gelesene Elementbaum.</returns>
+    private static async Task<DevApiTreeNode> WaitForLayoutAsync(AppInstance app)
+    {
+        var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(15);
+        DevApiTreeNode? tree = null;
+        while (DateTime.UtcNow < deadline)
+        {
+            tree = await app.DevApi.GetTreeAsync(Ct);
+            var bar = tree.FindByAutomationId("GenresCollection");
+            var grid = tree.FindByAutomationId("ItemsCollection");
+            if (bar?.Bounds is { Height: > 0 } && grid?.Bounds is { Height: > 0 })
+            {
+                return tree;
+            }
+
+            await Task.Delay(250, Ct);
+        }
+
+        return tree!;
     }
 }

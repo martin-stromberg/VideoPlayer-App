@@ -34,10 +34,16 @@ Die Auswahl einer Quelle schließt das Seitenmenü und öffnet die
 Übersichtsseite (Shell-Route `sourceoverview`, auf den
 Navigationsstack geschoben):
 
-- **Genre-Leiste:** horizontal, mit vorangestelltem Eintrag **„Alle"**
-  (kein Filter); das gewählte Genre ist hervorgehoben. Ein Wechsel
-  lädt die Liste ab der ersten Seite neu (`genreId`-Parameter von
-  `api/items`).
+- **Genre-Leiste:** eine einzeilige, horizontal scrollende Chip-Leiste
+  unter dem Suchfeld, mit vorangestelltem Eintrag **„Alle"**
+  (kein Filter); das gewählte Genre ist hervorgehoben. Die Leiste
+  belegt nur ihre Inhaltshöhe und verdrängt das Medien-Raster nicht —
+  technisch ist sie als `ScrollView` + `BindableLayout` umgesetzt
+  (Muster `MediaCarousel`), weil eine `CollectionView` in der
+  `Auto`-Grid-Zeile sich unter iOS auf die volle Resthöhe ausdehnte
+  und sämtliche Einträge verdeckte (TestFlight-Feedback, iPad). Ein
+  Wechsel lädt die Liste ab der ersten Seite neu (`genreId`-Parameter
+  von `api/items`).
 - **Sichtbarkeit der Genre-Leiste:** Die Leiste erscheint nur, wenn
   der Server für die Quelle tatsächlich Genres liefert
   (`api/SourceGenres/{id}`). Liefert der Endpunkt eine leere Liste —
