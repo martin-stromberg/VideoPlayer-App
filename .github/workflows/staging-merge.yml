@@ -64,9 +64,10 @@ jobs:
 
   build-ios:
     needs: release
-    # Das aktuelle MAUI-Workload-Paket Microsoft.iOS.Sdk.net10.0_27.0
-    # verlangt Xcode 27 — macos-latest liefert hoechstens 26.x. Das
-    # xcode-27-Image (Preview) traegt Xcode 27 als Default.
+    # Das aktuelle MAUI-Workload-Paket Microsoft.iOS.Sdk.net10.0_27.1
+    # verlangt Xcode 27.1 — macos-latest liefert hoechstens 26.x. Das
+    # xcode-27-Image (Preview) traegt inzwischen Xcode 27.1 als Default
+    # (zuvor 27.0; das SDK-Paket verlangt die exakt passende Version).
     # Kann auf macos-latest zurueck, sobald dort Xcode 27 GA ist.
     runs-on: xcode-27
     steps:
@@ -92,10 +93,10 @@ jobs:
       # Manifest (derzeit verweist 10.0.402.1 auf ein noch nicht
       # publiziertes iOS-Manifest). Die Baseline ohne Manifest-Update
       # installiert dagegen net10.0_26.0-Packs, die Xcode 26 verlangen -
-      # der Runner hat Xcode 27. 27.0.10722 liefert den Xcode-27-Pack.
+      # der Runner hat Xcode 27.1. 27.1.10018 liefert den Xcode-27.1-Pack.
       - name: Install .NET MAUI workload
         run: |
-          printf '{"microsoft.net.sdk.ios": "27.0.10722"}' > "$RUNNER_TEMP/workload-rollback.json"
+          printf '{"microsoft.net.sdk.ios": "27.1.10018"}' > "$RUNNER_TEMP/workload-rollback.json"
           dotnet workload update --from-rollback-file "$RUNNER_TEMP/workload-rollback.json"
           dotnet workload install maui --skip-manifest-update
 
