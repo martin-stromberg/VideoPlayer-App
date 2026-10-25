@@ -19,6 +19,9 @@ public sealed record HomeLists
     /// <summary>„Neu im Programm" (Cache-Schlüssel <c>recent</c>).</summary>
     public IReadOnlyList<HomeMediaItem> Recent { get; init; } = [];
 
+    /// <summary>Noch nicht abgelaufene, nicht leere saisonale Genre-Sektionen.</summary>
+    public IReadOnlyList<HomeSeasonalSection> SeasonalGenres { get; init; } = [];
+
     /// <summary>
     /// Schlüssel der Cache-Bereiche, deren Einträge beim Lesen als
     /// beschädigt erkannt und verworfen wurden — bei bestehender

@@ -24,14 +24,17 @@ public sealed class HomeListService
     };
 
     private readonly CacheDatabase cache;
+    private readonly TimeProvider timeProvider;
     private readonly ILogger<HomeListService> logger;
 
     /// <summary>Erstellt den Dienst.</summary>
     /// <param name="cache">Lokale Cache-Ablage mit den synchronisierten Listen.</param>
     /// <param name="logger">Optionaler Logger für das Programmprotokoll.</param>
-    public HomeListService(CacheDatabase cache, ILogger<HomeListService>? logger = null)
+    /// <param name="timeProvider">Uhr für die Auswertung serverseitiger Ablaufgrenzen.</param>
+    public HomeListService(CacheDatabase cache, ILogger<HomeListService>? logger = null, TimeProvider? timeProvider = null)
     {
         this.cache = cache ?? throw new ArgumentNullException(nameof(cache));
+        this.timeProvider = timeProvider ?? TimeProvider.System;
         this.logger = logger ?? NullLogger<HomeListService>.Instance;
     }
 
@@ -70,6 +73,7 @@ public sealed class HomeListService
             ContinueWatching = MapAll(continueWatching.Items, MapContinueWatching),
             Favorites = MapAll(favorites.Items, f => MapEntry(f.Entry)),
             Recent = MapAll(recent.Items, r => MapEntry(r.Entry)),
+            SeasonalGenres = await LoadSeasonalGenresAsync(cancellationToken),
             DiscardedCaches = discarded
         };
     }
@@ -126,6 +130,26 @@ public sealed class HomeListService
         }
 
         return items;
+    }
+
+    /// <summary>Liest gültige saisonale Sektionen ohne eigene Saisonberechnung.</summary>
+    /// <param name="cancellationToken">Abbruchtoken.</param>
+    /// <returns>Nicht leere Sektionen vor ihrer exklusiven Server-Ablaufgrenze.</returns>
+    public async Task<IReadOnlyList<HomeSeasonalSection>> LoadSeasonalGenresAsync(CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        var cached = await ReadListAsync<SeasonalGenre>(ServerSyncService.SeasonalGenresCacheKey);
+        var now = timeProvider.GetUtcNow();
+        var sections = new List<HomeSeasonalSection>();
+        foreach (var genre in cached.Items)
+        {
+            if (genre is null || genre.GenreId <= 0 || string.IsNullOrWhiteSpace(genre.Name) || genre.ExpiresAt <= now)
+                continue;
+            var items = MapAll(genre.Entries ?? [], media => media is Movie or MovieCollection or TvShow ? MapEntry(media) : null);
+            if (items.Count > 0)
+                sections.Add(new HomeSeasonalSection { GenreId = genre.GenreId, Name = genre.Name, ExpiresAt = genre.ExpiresAt, Items = items });
+        }
+        return sections;
     }
 
     /// <summary>Cache-Bereichsname der Favoriten-Kopie (für <see cref="HomeLists.DiscardedCaches"/>).</summary>

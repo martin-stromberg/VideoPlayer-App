@@ -106,6 +106,14 @@ namespace VideoPlayer.Maui
             // Vorschaubilder (api/pictures/{id}) mit lokaler Ablage im
             // nicht backup-pflichtigen Previews-Verzeichnis.
             builder.Services.AddSingleton<HomeListService>();
+            builder.Services.AddSingleton<TimeProvider>(_ =>
+            {
+#if DEBUG
+                return Services.SeasonalTestTimeProvider.Create();
+#else
+                return TimeProvider.System;
+#endif
+            });
             builder.Services.AddSingleton<OfflineContinueWatchingService>();
             builder.Services.AddSingleton<PosterImageService>();
 

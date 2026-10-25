@@ -25,9 +25,9 @@ public sealed class LoginTests : E2ETestBase
         await ConnectToPairingRequiredAsync(app, server);
         await PairAsync(app, server);
 
-        app.Ui.EnterText("LoginUsernameEntry", server.Username);
-        app.Ui.EnterText("LoginPasswordEntry", "falsches-passwort");
-        app.Ui.ClickButton("LoginButton");
+        await app.DevApi.SetTextAsync("LoginUsernameEntry", server.Username, Ct);
+        await app.DevApi.SetTextAsync("LoginPasswordEntry", "falsches-passwort", Ct);
+        await app.DevApi.InvokeAsync("LoginButton", cancellationToken: Ct);
 
         var model = await app.DevApi.WaitForModelAsync(
             m => m.LoginError is not null && !m.IsLoginRunning,

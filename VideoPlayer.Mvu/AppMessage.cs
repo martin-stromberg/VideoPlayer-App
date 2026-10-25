@@ -211,6 +211,12 @@ public sealed record SynchronizationCompletedMessage(SyncResult Result) : AppMes
 /// <returns>Nachricht mit den geladenen Listen.</returns>
 public sealed record HomeListsLoadedMessage(HomeLists Lists) : AppMessage;
 
+/// <summary>Startseite wird sichtbar oder serverseitige Ablaufgrenze ist erreicht.</summary>
+public sealed record HomeListsReloadRequestedMessage : AppMessage;
+
+/// <summary>Benutzer fordert eine erneute Synchronisation der Startseite an.</summary>
+public sealed record HomeRefreshRequestedMessage : AppMessage;
+
 /// <summary>
 /// Der Abruf des servergenerierten Hero-Hintergrundbilds
 /// (<c>api/pictures/hero-background</c>) ist abgeschlossen (Antwort auf

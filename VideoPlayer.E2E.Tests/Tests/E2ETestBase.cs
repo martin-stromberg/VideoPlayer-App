@@ -89,9 +89,12 @@ public abstract class E2ETestBase
     /// <param name="server">Der Mock-Server.</param>
     protected static async Task LoginAsync(AppInstance app, MockVideoServer server)
     {
-        app.Ui.EnterText("LoginUsernameEntry", server.Username);
-        app.Ui.EnterText("LoginPasswordEntry", server.Password);
-        app.Ui.ClickButton("LoginButton");
+        // Windows PasswordBox bietet keinen UIA ValuePattern. Die bestehende
+        // Developer-API setzt die echten MAUI-Felder und löst dieselbe
+        // Clicked-Ereigniskette aus, ohne vom globalen Tastaturfokus abzuhängen.
+        await app.DevApi.SetTextAsync("LoginUsernameEntry", server.Username, Ct);
+        await app.DevApi.SetTextAsync("LoginPasswordEntry", server.Password, Ct);
+        await app.DevApi.InvokeAsync("LoginButton", cancellationToken: Ct);
         DevApiModel model;
         try
         {

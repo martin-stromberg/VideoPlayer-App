@@ -90,6 +90,25 @@ public class OfflineContinueWatchingServiceTests : IDisposable
         });
     }
 
+    /// <summary>Offline bleiben gültige Saisonsektionen sichtbar, abgelaufene entfallen.</summary>
+    [Fact]
+    public async Task HomeLists_OfflineIncludesOnlyUnexpiredSeasonalGenres()
+    {
+        await cache.Connection.InsertOrReplaceAsync(new CachedListEntry
+        {
+            Key = ServerSyncService.SeasonalGenresCacheKey,
+            Json = JsonSerializer.Serialize(new[]
+            {
+                new SeasonalGenre { GenreId = 7, Name = "Aktiv", ExpiresAt = DateTimeOffset.UtcNow.AddDays(1), Entries = [new Movie { Id = 71, Name = "Film" }] },
+                new SeasonalGenre { GenreId = 8, Name = "Abgelaufen", ExpiresAt = DateTimeOffset.UtcNow.AddDays(-1), Entries = [new Movie { Id = 81, Name = "Alter Film" }] }
+            }),
+            UpdatedAtUtc = DateTime.UtcNow
+        });
+        var section = Assert.Single((await service.LoadHomeListsAsync()).SeasonalGenres);
+        Assert.Equal(7, section.GenreId);
+        Assert.Equal(71, Assert.Single(section.Items).Id);
+    }
+
     /// <summary>Prüft Weiterschauen: ein abgeschlossener Film-Download mit vorhandener Datei erscheint in der Liste.</summary>
     [Fact]
     public async Task ContinueWatching_CompletedMovieWithFile_Appears()

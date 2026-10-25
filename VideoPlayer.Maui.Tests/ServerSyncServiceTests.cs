@@ -75,6 +75,7 @@ public class ServerSyncServiceTests : IDisposable
             new MediaSource { Id = 1, Name = "Filme" }
         });
         handler.EnqueueJson(HttpStatusCode.OK, Array.Empty<RecentEntry>());
+        handler.EnqueueJson(HttpStatusCode.OK, Array.Empty<SeasonalGenre>());
         handler.EnqueueJson(HttpStatusCode.OK, new[]
         {
             new ContinueWatchingEntry
@@ -92,6 +93,24 @@ public class ServerSyncServiceTests : IDisposable
     }
 
     private ServerSyncService CreateService() => new(authSession, queue, cache);
+
+    /// <summary>Fehler bewahren saisonalen Cache; ein erfolgreiches [] ersetzt ihn.</summary>
+    [Fact]
+    public async Task SyncSeasonalGenres_ErrorPreservesCache_EmptyClearsIt()
+    {
+        await LoginAsync();
+        var genre = new SeasonalGenre { GenreId = 7, Name = "Halloween", ExpiresAt = DateTimeOffset.UtcNow.AddDays(1), Entries = [new Movie { Id = 1, Name = "Film" }] };
+        handler.EnqueueJson(HttpStatusCode.OK, new[] { genre });
+        var service = CreateService();
+        Assert.True(await service.SyncSeasonalGenresAsync());
+        Assert.Single((await new HomeListService(cache).LoadHomeListsAsync()).SeasonalGenres);
+        for (var i = 0; i < 4; i++) handler.Enqueue(HttpStatusCode.InternalServerError);
+        Assert.False(await service.SyncSeasonalGenresAsync());
+        Assert.Single((await new HomeListService(cache).LoadHomeListsAsync()).SeasonalGenres);
+        handler.EnqueueJson(HttpStatusCode.OK, Array.Empty<SeasonalGenre>());
+        Assert.True(await service.SyncSeasonalGenresAsync());
+        Assert.Empty((await new HomeListService(cache).LoadHomeListsAsync()).SeasonalGenres);
+    }
 
     /// <summary>Prüft SynchronizeAsync: sendet Ausstehendes und aktualisiert dann die Caches.</summary>
     [Fact]
@@ -119,8 +138,9 @@ public class ServerSyncServiceTests : IDisposable
         Assert.EndsWith("/api/continue-watching/progress", paths[2]);
         Assert.EndsWith("/api/Sources", paths[3]);
         Assert.EndsWith("/api/items/recent", paths[4]);
-        Assert.EndsWith("/api/continue-watching", paths[5]);
-        Assert.EndsWith("/api/favorites", paths[6]);
+        Assert.EndsWith("/api/home/seasonal-genres", paths[5]);
+        Assert.EndsWith("/api/continue-watching", paths[6]);
+        Assert.EndsWith("/api/favorites", paths[7]);
 
         // Fortschritts-Payload enthält Position und Dauer in Sekunden.
         using var body = JsonDocument.Parse(handler.Requests[1].Body!);
@@ -265,6 +285,7 @@ public class ServerSyncServiceTests : IDisposable
         await LoginAsync();
         handler.EnqueueJson(HttpStatusCode.OK, Array.Empty<MediaSource>());
         handler.EnqueueJson(HttpStatusCode.OK, Array.Empty<RecentEntry>());
+        handler.EnqueueJson(HttpStatusCode.OK, Array.Empty<SeasonalGenre>());
         handler.EnqueueJson(HttpStatusCode.OK, Array.Empty<ContinueWatchingEntry>());
         // Favoriten: 500 wird dreimal wiederholt → 4 Antworten.
         for (var i = 0; i < 4; i++)

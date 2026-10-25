@@ -138,7 +138,10 @@ public sealed record AppModel
     public bool HasRecentEntries => RecentEntries.Count > 0;
 
     /// <summary>Mindestens eine Startseiten-Liste enthält Einträge.</summary>
-    public bool HasHomeContent => HasContinueWatching || HasFavorites || HasRecentEntries;
+    public bool HasHomeContent => HasContinueWatching || HasFavorites || HasRecentEntries || SeasonalGenres.Count > 0;
+
+    /// <summary>Aktuelle saisonale Genre-Sektionen aus dem lokalen Cache.</summary>
+    public IReadOnlyList<HomeSeasonalSection> SeasonalGenres { get; init; } = [];
 
     /// <summary>
     /// Zustand des Hero-Kopfbereichs der Startseite (Ladezustand und

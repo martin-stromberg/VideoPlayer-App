@@ -14,14 +14,19 @@ public partial class HomePage : ContentPage
     private readonly MvuHost mvuHost;
     private byte[]? appliedHeroBytes;
     private bool subscribed;
+    private readonly TimeProvider timeProvider;
+    private ITimer? expiryTimer;
 
     /// <summary>Initialisiert eine neue Instanz der <see cref="HomePage"/>-Klasse.</summary>
     /// <param name="mvuHost">MVU-Host; dient als <see cref="BindableObject.BindingContext"/> und Dispatch-Ziel der Auswahl-Nachrichten.</param>
-    public HomePage(MvuHost mvuHost)
+    /// <param name="timeProvider">Uhr für serverseitige Ablaufgrenzen.</param>
+    public HomePage(MvuHost mvuHost, TimeProvider timeProvider)
     {
         InitializeComponent();
         this.mvuHost = mvuHost;
+        this.timeProvider = timeProvider;
         BindingContext = mvuHost;
+        HomeRefresh.Command = new Command(() => _ = mvuHost.DispatchAsync(new HomeRefreshRequestedMessage()));
         SizeChanged += OnSizeChanged;
         UpdateBanners(mvuHost.Model);
         UpdateHero(mvuHost.Model);
@@ -39,12 +44,16 @@ public partial class HomePage : ContentPage
         mvuHost.ModelChanged += OnModelChanged;
         UpdateBanners(mvuHost.Model);
         UpdateHero(mvuHost.Model);
+        ScheduleExpiry(mvuHost.Model);
+        _ = mvuHost.DispatchAsync(new HomeListsReloadRequestedMessage());
     }
 
     /// <inheritdoc/>
     protected override void OnDisappearing()
     {
         subscribed = false;
+        expiryTimer?.Dispose();
+        expiryTimer = null;
         mvuHost.ModelChanged -= OnModelChanged;
         base.OnDisappearing();
     }
@@ -60,6 +69,7 @@ public partial class HomePage : ContentPage
             {
                 UpdateBanners(model);
                 UpdateHero(model);
+                ScheduleExpiry(model);
             }
         });
     }
@@ -68,6 +78,27 @@ public partial class HomePage : ContentPage
     {
         OfflineBanner.IsVisible = model.IsOffline;
         StorageNoticeBanner.IsVisible = model.StorageNotice is not null;
+    }
+
+    private void ScheduleExpiry(AppModel model)
+    {
+        expiryTimer?.Dispose();
+        expiryTimer = null;
+        if (!subscribed || model.SeasonalGenres.Count == 0)
+            return;
+
+        var delay = model.SeasonalGenres.Min(g => g.ExpiresAt) - timeProvider.GetUtcNow();
+        // Revalidate bounded long timers after wall-clock corrections as well.
+        delay = delay <= TimeSpan.Zero ? TimeSpan.FromMilliseconds(1) : TimeSpan.FromTicks(Math.Min(delay.Ticks, TimeSpan.FromMinutes(1).Ticks));
+        expiryTimer = timeProvider.CreateTimer(_ => MainThread.BeginInvokeOnMainThread(() =>
+        {
+            if (!subscribed)
+                return;
+            if (mvuHost.Model.SeasonalGenres.Any(g => g.ExpiresAt <= timeProvider.GetUtcNow()))
+                _ = mvuHost.DispatchAsync(new HomeListsReloadRequestedMessage());
+            else
+                ScheduleExpiry(mvuHost.Model);
+        }), null, delay, Timeout.InfiniteTimeSpan);
     }
 
     private void OnSizeChanged(object? sender, EventArgs e)

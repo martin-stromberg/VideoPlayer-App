@@ -210,6 +210,10 @@ public static class AppUpdate
             SynchronizationCompletedMessage => UpdateSynchronizationCompleted(model),
             CachedListsChangedMessage => UpdateCachedListsChanged(model),
             HomeListsLoadedMessage loaded => UpdateHomeListsLoaded(model, loaded),
+            HomeListsReloadRequestedMessage => new AppTransition(model, [new LoadHomeListsEffect()]),
+            HomeRefreshRequestedMessage => model.ConnectionState == ConnectionState.Connected && !model.IsSyncRunning
+                ? new AppTransition(model with { IsSyncRunning = true }, [new RunFullSyncEffect()])
+                : new AppTransition(model, [new LoadHomeListsEffect()]),
             HeroBackgroundLoadedMessage loaded => UpdateHeroBackgroundLoaded(model, loaded),
             StorageRecoveredMessage recovered => UpdateStorageRecovered(model, recovered),
             MediaItemSelectedMessage selected => UpdateMediaItemSelected(model, selected),
@@ -1334,7 +1338,8 @@ public static class AppUpdate
         {
             ContinueWatching = message.Lists.ContinueWatching,
             Favorites = message.Lists.Favorites,
-            RecentEntries = message.Lists.Recent
+            RecentEntries = message.Lists.Recent,
+            SeasonalGenres = message.Lists.SeasonalGenres
         };
 
         // Verworfene (beschädigte) Caches werden bei bestehender
@@ -3569,6 +3574,7 @@ public static class AppUpdate
             ContinueWatching = [],
             Favorites = [],
             RecentEntries = [],
+            SeasonalGenres = [],
             SourcesOverview = SourcesOverviewState.Initial,
             SourceBrowser = SourceBrowserState.Empty,
             MediaDetails = MediaDetailsState.Empty,

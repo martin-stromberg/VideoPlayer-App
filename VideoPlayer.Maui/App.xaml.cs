@@ -41,6 +41,7 @@ namespace VideoPlayer.Maui
             {
                 Title = "VideoPlayer"
             };
+            window.Resumed += (_, _) => _ = mvuHost.DispatchAsync(new HomeListsReloadRequestedMessage());
 
 #if DEBUG || DEV_API
             // Developer-API (nur Debug oder explizites Opt-in via DEV_API-Define):

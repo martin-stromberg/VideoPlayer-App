@@ -158,3 +158,8 @@ bleibt davon unberührt.
 Im Offline-Modus zeigt die Startseite das bekannte gelbe Banner; die
 gecachten Listen bleiben vollständig sichtbar und bedienbar. Fehlende
 Vorschaubilder werden durch den Titel-Fallback ersetzt.
+
+Saisonale Genre-Listen haben einen eigenen Ablaufzeitpunkt vom Server. Sie
+bleiben offline nur bis zu diesem Zeitpunkt sichtbar und verschwinden auch,
+wenn die Startseite währenddessen geöffnet bleibt. Details dazu stehen in der
+[Hilfe zu saisonalen Startseitenlisten](saisonale-startseitenlisten.md).

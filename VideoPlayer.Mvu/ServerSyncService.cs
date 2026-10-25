@@ -37,6 +37,9 @@ public sealed class ServerSyncService
     /// <summary>Cache-Schlüssel der zuletzt hinzugefügten Inhalte.</summary>
     public const string RecentCacheKey = "recent";
 
+    /// <summary>Cache-Schlüssel der saisonalen Genre-Sektionen.</summary>
+    public const string SeasonalGenresCacheKey = "seasonal_genres";
+
     /// <summary>Cache-Schlüssel der Weiterschauen-Liste.</summary>
     public const string ContinueWatchingCacheKey = "continue_watching";
 
@@ -167,7 +170,7 @@ public sealed class ServerSyncService
     /// <returns><c>true</c> bei Erfolg; <c>false</c> ohne Client oder bei Fehler.</returns>
     public async Task<bool> SyncMetadataAsync(CancellationToken cancellationToken = default)
     {
-        return await TrySyncAsync(async client =>
+        var metadata = await TrySyncAsync(async client =>
         {
             var sources = await client.GetSourcesAsync(cancellationToken);
             await WriteCachedListAsync(SourcesCacheKey, sources);
@@ -175,7 +178,21 @@ public sealed class ServerSyncService
             var recent = await client.GetRecentEntriesAsync(cancellationToken);
             await WriteCachedListAsync(RecentCacheKey, recent);
         });
+        // Ein älterer Server ohne diesen Endpunkt darf die übrigen Listen
+        // weiter synchronisieren; Saisonfehler bewahren nur deren Cache.
+        await SyncSeasonalGenresAsync(cancellationToken);
+        return metadata;
     }
+
+    /// <summary>Ersetzt den saisonalen Cache nur nach einem erfolgreichen Abruf.</summary>
+    /// <param name="cancellationToken">Abbruchtoken.</param>
+    /// <returns>Ob die Serverantwort erfolgreich gespeichert wurde.</returns>
+    public Task<bool> SyncSeasonalGenresAsync(CancellationToken cancellationToken = default) =>
+        TrySyncAsync(async client =>
+        {
+            var genres = await client.GetSeasonalGenresAsync(cancellationToken);
+            await WriteCachedListAsync(SeasonalGenresCacheKey, genres);
+        });
 
     /// <summary>Aktualisiert die gecachte Weiterschauen-Liste.</summary>
     /// <param name="cancellationToken">Bricht die Aktualisierung ab.</param>
