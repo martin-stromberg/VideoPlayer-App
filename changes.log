@@ -1,5 +1,12 @@
 # Änderungsprotokoll
 
+## 2026-10-25 — Genre-Leiste der Quellenansicht belegt nur noch eine Zeile (TestFlight-Feedback)
+
+- **Anforderung:** Auf dem iPad dehnte die Genre-Leiste der Quellen-Übersicht die Chips über die gesamte Resthöhe — sie ragten über den unteren Bildschirmrand hinaus, die Titelliste war verdeckt, Filme und Serien nicht erreichbar.
+- **Umbau `SourceOverviewPage.xaml`:** Die `CollectionView` `GenresCollection` wurde durch `ScrollView Orientation="Horizontal"` + `HorizontalStackLayout` mit `BindableLayout.ItemsSource` ersetzt (Muster `MediaCarousel`) — die Leiste misst ihre Höhe wieder aus dem Chip-Inhalt statt die `Auto`-Zeile auf die Resthöhe aufzublähen; die Auswahl läuft per `TapGestureRecognizer` → `OnGenreTapped` → `SourceGenreSelectedMessage` (Fachverhalten, `Chip`-Optik und `ShowGenreFilter`-Sichtbarkeit unverändert). Die Developer-API steuert die BindableLayout-Leiste über den vorhandenen Tap-Auslöser weiter an (`TrySelectBindableLayoutItem`).
+- **Tests:** Neuer Contract-Test `SourceOverviewPage_GenreBar_UsesBoundedHorizontalLayout` pinnt das höhenbegrenzte Layout; das E2E-Baum-DTO erhielt das `bounds`-Feld, und der neue E2E-Test `GenreBar_HeightBounded_ItemsGridVisible` weist die begrenzte Leistenhöhe bei sichtbarem Medien-Raster in der echten App nach. Gesamt: 1355/1355 Unit-Tests grün, 66/66 E2E-Tests grün.
+- **Doku:** `docs/help/quellen-browsing-details.md` (Abschnitt „Browsing einer Quelle"), `docs/RELEASE_NOTES.md`.
+
 ## 2026-10-20 — Titelleiste der Wiedergabeseite als eigene Zeile über der Videofläche (Issue #75)
 
 - **Anforderung:** Die Titelleiste der Wiedergabeseite lag als Overlay über dem Video und war unter iOS zusätzlich per Margin nach unten versetzt (Issue #45: sie überdeckte die eingeblendete native Top-Leiste des `AVPlayerViewController`). Die schwebende Platzierung wirkte störend und unfertig — die Leiste soll wieder am oberen Fensterrand sitzen, diesmal ohne das Video zu überlagern: der obere Rand der Videoplayer-Komponente grenzt an den unteren Rand der Leiste.

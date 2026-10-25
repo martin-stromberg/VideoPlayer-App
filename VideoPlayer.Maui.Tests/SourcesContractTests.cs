@@ -1,3 +1,4 @@
+using System.Xml.Linq;
 using VideoPlayer.Maui.Tests.Stubs;
 
 namespace VideoPlayer.Maui.Tests;
@@ -155,6 +156,42 @@ public class SourcesContractTests
         var code = Read("VideoPlayer.Maui", "Pages", "SourceOverviewPage.xaml.cs");
         Assert.Contains("ItemsCollection.ItemsSource", code, StringComparison.Ordinal);
         Assert.Contains("SourceItemListSync.Sync", code, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// Prüft SourceOverviewPage: die Genre-Leiste ist eine höhenbegrenzte
+    /// Zeile im Karussell-Muster (<c>ScrollView</c> + <c>BindableLayout</c>,
+    /// vgl. <c>MediaCarousel</c>) — eine <c>CollectionView</c> dehnt sich
+    /// unter iOS auf die Resthöhe aus und verdeckt das Medien-Raster
+    /// (TestFlight-Feedback: Chips als bildschirmhohe Pillen).
+    /// </summary>
+    [Fact]
+    public void SourceOverviewPage_GenreBar_UsesBoundedHorizontalLayout()
+    {
+        var mauiNs = (XNamespace)"http://schemas.microsoft.com/dotnet/2021/maui";
+        var xaml = Read("VideoPlayer.Maui", "Pages", "SourceOverviewPage.xaml");
+
+        Assert.Contains("Orientation=\"Horizontal\"", xaml, StringComparison.Ordinal);
+        Assert.Contains(
+            "BindableLayout.ItemsSource=\"{Binding Model.SourceBrowser.Genres}\"",
+            xaml,
+            StringComparison.Ordinal);
+        Assert.Contains("{StaticResource Chip}", xaml, StringComparison.Ordinal);
+        Assert.Contains("TapGestureRecognizer", xaml, StringComparison.Ordinal);
+
+        // Keine CollectionView als Genre-Leiste — ihr vertikales Füllen
+        // in der Auto-Zeile war der Defekt.
+        var document = XDocument.Parse(xaml);
+        Assert.DoesNotContain(
+            document.Descendants(mauiNs + "CollectionView"),
+            e => (string?)e.Attribute("AutomationId") == "GenresCollection");
+
+        // Auswahl dispatcht weiterhin die Filter-Nachricht — über den
+        // Tap-Handler der Chips statt des CollectionView-Selections.
+        var code = Read("VideoPlayer.Maui", "Pages", "SourceOverviewPage.xaml.cs");
+        Assert.Contains("OnGenreTapped", code, StringComparison.Ordinal);
+        Assert.Contains("SourceGenreSelectedMessage", code, StringComparison.Ordinal);
+        Assert.DoesNotContain("OnGenreSelected", code, StringComparison.Ordinal);
     }
 
     /// <summary>Prüft SourceOverviewPage: dispatcht Browsernachrichten.</summary>

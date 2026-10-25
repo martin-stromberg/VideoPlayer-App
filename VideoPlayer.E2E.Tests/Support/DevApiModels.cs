@@ -300,6 +300,9 @@ public sealed class DevApiTreeNode
     /// <summary>Platzhaltertext des Elements.</summary>
     [JsonPropertyName("placeholder")] public string? Placeholder { get; set; }
 
+    /// <summary>Layout-Position und -Größe des Elements.</summary>
+    [JsonPropertyName("bounds")] public DevApiBounds? Bounds { get; set; }
+
     /// <summary>Kindknoten.</summary>
     [JsonPropertyName("children")] public List<DevApiTreeNode> Children { get; set; } = [];
 
@@ -327,6 +330,22 @@ public sealed class DevApiTreeNode
 
         return null;
     }
+}
+
+/// <summary>DTO der Layout-Bounds eines Elements im <c>GET /tree</c>-Elementbaum.</summary>
+public sealed class DevApiBounds
+{
+    /// <summary>X-Position.</summary>
+    [JsonPropertyName("x")] public double X { get; set; }
+
+    /// <summary>Y-Position.</summary>
+    [JsonPropertyName("y")] public double Y { get; set; }
+
+    /// <summary>Breite.</summary>
+    [JsonPropertyName("width")] public double Width { get; set; }
+
+    /// <summary>Höhe.</summary>
+    [JsonPropertyName("height")] public double Height { get; set; }
 }
 
 /// <summary>DTO eines abgeleiteten CollectionView-Eintrags.</summary>
