@@ -1,6 +1,6 @@
 # Abschlussprüfungen – Saisonabhängige Genre-Listen
 
-**Status: Fehler vorhanden**
+**Aktueller Status (2026-10-26): Beide Such-E2E bei gezielter Wiederholung bestanden; vollständige Windows-E2E-Nachprüfung weiterhin offen.**
 
 ## Mobile UnitSuite und Windows-Build
 
@@ -21,3 +21,15 @@ Eine weitere Wiederholung erfolgte in diesem Abschlussbericht-Schritt nicht: Es 
 ## Servernachweise
 
 Keine Server-Suites erneut ausgeführt. Der dauerhafte [Server-Testbericht](../../../integration/seasonal-genres/server-test-results.md) und die [unabhängige Abnahme](../../../integration/seasonal-genres/acceptance-schritt-1.md) dokumentieren Debug-/Release-Build, die vollständige Suite (**2358 bestanden, 2 bestehende Skips**) sowie unabhängige gezielte Saisonprüfungen (**12/12**, darunter vier reale Web-E2E-Flüsse und Mutationstests).
+
+## Gezielte Nachprüfung am 2026-10-26
+
+Unveränderter Produkt- und Teststand, gefilterter Lauf der beiden zuvor fehlgeschlagenen Suchtests:
+
+- `SourceSearchTests.SubmittedText_RemainsVisibleAfterReturn`: bestanden (32 s).
+- `SourceSearchTests.SubmitViaEnter_FiltersFromFirstPage`: bestanden (4 s).
+- Gesamt: **2 bestanden, 0 Fehler, 0 Skips**, 39,1 s, Exitcode 0. Keine WinRT-Finalizerfehlermeldung in diesem Lauf.
+
+Befehl: `dotnet test VideoPlayer.E2E.Tests/VideoPlayer.E2E.Tests.csproj --no-restore --filter "FullyQualifiedName~SourceSearchTests.SubmitViaEnter_FiltersFromFirstPage|FullyQualifiedName~SourceSearchTests.SubmittedText_RemainsVisibleAfterReturn"` mit TRX-Logger. Lokales Ergebnis: `.work/test-results/search-recheck-20261026/search-recheck.trx`.
+
+Vor dem Lauf lief kein PickerHost-Prozess; die anschließende Fensterliste zeigte keinen entsprechenden Dialog. Eine Firewallabfrage ist nicht nachgewiesen. Die ältere Fokusbeobachtung wird als historische Diagnose erhalten, nicht als abschließend bewiesene Ursache. Die vollständige 72er-Suite wurde auf diesen gezielten Nutzerauftrag hin nicht wiederholt; aus den zwei bestandenen Wiederholungen wird kein neuer vollständiger 72/72-Lauf abgeleitet.
