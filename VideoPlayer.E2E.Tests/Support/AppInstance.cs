@@ -250,9 +250,16 @@ public sealed class AppInstance : IDisposable
         var forcedKill = killAttempted && killRequestSucceeded && exitCode == -1;
         File.WriteAllText(Path.Combine(directory, "process.json"), JsonSerializer.Serialize(new
         {
-            pid = process.Id, profile, exitCode, killAttempted, killRequestSucceeded,
-            killError, forcedKill, exitedBeforeShutdown,
-            shutdownStartedAtUtc, outputDrained = drained,
+            pid = process.Id,
+            profile,
+            exitCode,
+            killAttempted,
+            killRequestSucceeded,
+            killError,
+            forcedKill,
+            exitedBeforeShutdown,
+            shutdownStartedAtUtc,
+            outputDrained = drained,
             recordedAtUtc = DateTime.UtcNow
         }));
         Console.WriteLine($"[E2E app {process.Id}, {profile}] Exit={exitCode}, "
