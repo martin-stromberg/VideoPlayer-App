@@ -1,7 +1,7 @@
 # Serverlieferung: Saisonale Genre-Listen
 ## Aktueller Übernahmestand (2026-10-26)
 
-Die Serveränderung ist auf aktuellem `staging` integriert, unabhängig abgenommen und als [PR #287](https://github.com/martin-stromberg/VideoPlayer/pull/287) zur Code-Owner-Prüfung freigegeben. Alle erforderlichen GitHub-CI-Checks sind grün. Details, neuer Integrationsbranch und separates Bundle stehen im [Integrationsbericht](server-integration.md); der [unabhängige Review](server-integration-review.md) ist erfüllt. Der Branch ist auch im ursprünglichen lokalen Serverrepository importiert, ohne dessen aktiven Checkout zu ändern. Ein Merge und eine Laufzeitinstallation sind noch nicht erfolgt: Code-Owner-Freigabe und konkretes Installationsziel stehen aus.
+Die Serveränderung ist auf aktuellem `staging` integriert, unabhängig abgenommen und als [PR #287](https://github.com/martin-stromberg/VideoPlayer/pull/287) vom Anwender nach `staging` gemergt. Alle erforderlichen GitHub-CI-Checks sind grün. Details, neuer Integrationsbranch und separates Bundle stehen im [Integrationsbericht](server-integration.md); der [unabhängige Review](server-integration-review.md) ist erfüllt. Der Branch ist auch im ursprünglichen lokalen Serverrepository importiert, ohne dessen aktiven Checkout zu ändern. Mergecommit ist `0df39e661348a4bd9b6f8d55313310dbc23c4a7b`; der nachfolgende Server-Prerelease läuft. Eine Laufzeitinstallation ist noch nicht erfolgt, das konkrete Installationsziel steht aus.
 
 Der mobile Gesamtlauf bleibt offen; die [aktuellen Testergebnisse](mobile-test-results.md) dokumentieren den nachgewiesenen MAUI-Shutdown-Crash. Die folgenden Angaben beschreiben die ursprüngliche isolierte Serverlieferung vor der aktuellen Übernahme.
 

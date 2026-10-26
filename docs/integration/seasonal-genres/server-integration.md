@@ -1,11 +1,11 @@
 # Serverintegration der saisonalen Startseitenlisten
 
-Stand: 2026-10-26. Übernahme auf aktuellem Server-`staging` unabhängig abgenommen; PR bereit zur externen Freigabe, finale CI grün. Noch kein Merge und keine Laufzeitbereitstellung.
+Stand: 2026-10-26. Übernahme auf aktuellem Server-`staging` unabhängig abgenommen und vom Anwender gemergt; PR-CI grün. Der anschließende Server-Prerelease läuft, eine Laufzeitinstallation ist noch nicht nachgewiesen.
 
 ## Konkreter Übernahmestand
 
 - Serverrepository: `https://github.com/martin-stromberg/VideoPlayer`.
-- Zur Prüfung freigegebener PR gegen `staging`: [PR #287](https://github.com/martin-stromberg/VideoPlayer/pull/287).
+- Gemergter PR gegen `staging`: [PR #287](https://github.com/martin-stromberg/VideoPlayer/pull/287).
 - Integrationsbasis: `6a89228edf77a756563abbc7c211b8abe634533f` (aktueller `origin/staging` beim Start).
 - Branch: `task/saisonlisten-schritt-2-server-integration`.
 - Produktcommit: `e7e5e56aa175083e7f3d72e523fa87f62d55895c`.
@@ -44,11 +44,11 @@ Ausführliche lokale Logs und TRX: `.work/server-integration-results/`. Im Serve
 Letzte gelesene CI-Momentaufnahme: [PR CI for Staging, Run 40283574471](https://github.com/martin-stromberg/VideoPlayer/actions/runs/40283574471).
 
 - Neuer Lauf für HEAD `b4f33de517136930434bd699f787b933cd8a6a89`: `pending` bei der letzten Lesung.
-- PR ist konfliktfrei (`MERGEABLE`) und seit 2026-10-26 „ready for review“.
+- PR wurde am 2026-10-26 um 12:01:12 UTC vom Anwender nach `staging` gemergt; Mergecommit `0df39e661348a4bd9b6f8d55313310dbc23c4a7b`.
 
 Die unabhängige Abnahme des Integrationsstands `194f0e64eceb0fb403f9ee1eb03ed1977b2b9baa` ist **Erfüllt**; siehe [dauerhafte unabhängige Abnahme](server-integration-review.md). Der zusätzliche Commit `b4f33de517136930434bd699f787b933cd8a6a89` ändert ausschließlich den übernommenen Abnahmebericht, Handover und Schrittstatus; Produktdateien und Tests sind unverändert. Deshalb wurden keine Tests wiederholt. Vor einem Merge ist grüne CI auf dem aktuellen Dokumentations-HEAD erforderlich. Der bestehende Promotion-PR #256 (`staging` nach `main`) wurde nicht verändert oder gemergt: `staging` lag bei der Prüfung 276 Commits vor `main`; diese fremden Änderungen werden nicht nebenbei freigegeben.
 
-Die konkrete laufende Serverinstanz bzw. ihr Installationsweg ist noch nicht benannt. Es erfolgten weder Main-Promotion noch Laufzeitinstallation noch mobile Veröffentlichung. Der mobile Lifecycle bleibt wegen des gesondert protokollierten WinRT-Shutdownfehlers offen; diese erfolgreiche Serverprüfung bescheinigt keinen vollständig grünen mobilen Gesamtlauf.
+Die konkrete laufende Serverinstanz bzw. ihr Installationsweg ist noch nicht benannt. Die Übernahme nach `staging` ist erfolgt. Es erfolgten weder Main-Promotion noch Laufzeitinstallation noch mobile Veröffentlichung. Der mobile Lifecycle bleibt wegen des gesondert protokollierten WinRT-Shutdownfehlers offen; diese erfolgreiche Serverprüfung bescheinigt keinen vollständig grünen mobilen Gesamtlauf.
 
 ## Abnahmeübernahme am 2026-10-26
 
