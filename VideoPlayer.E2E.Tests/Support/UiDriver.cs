@@ -490,6 +490,33 @@ public sealed class UiDriver : IDisposable
         }
     }
 
+    /// <summary>Wartet, bis eine Aktionsmenü-Schaltfläche nach der Auswahl geschlossen ist.</summary>
+    /// <param name="name">Anzeigename der ausgewählten Aktionsmenü-Schaltfläche.</param>
+    /// <param name="timeout">Maximale Wartezeit; standardmäßig 15 Sekunden.</param>
+    public void WaitForNameAbsent(string name, TimeSpan? timeout = null)
+    {
+        var deadline = DateTime.UtcNow + (timeout ?? TimeSpan.FromSeconds(15));
+        var processId = window.Properties.ProcessId.ValueOrDefault;
+        while (true)
+        {
+            var element = window.FindFirstDescendant(Conditions.ByName(name))
+                ?? automation.GetDesktop()
+                    .FindAllDescendants(Conditions.ByName(name))
+                    .FirstOrDefault(e => e.Properties.ProcessId.ValueOrDefault == processId);
+            if (element is null)
+            {
+                return;
+            }
+
+            if (DateTime.UtcNow >= deadline)
+            {
+                throw new TimeoutException($"Aktionsmenü '{name}' wurde nicht geschlossen.");
+            }
+
+            Thread.Sleep(100);
+        }
+    }
+
     /// <summary>
     /// Scrollt den Container mit der angegebenen AutomationId ans
     /// vertikale Ende — löst bei Listen mit

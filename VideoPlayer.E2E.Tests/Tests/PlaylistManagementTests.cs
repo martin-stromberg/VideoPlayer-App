@@ -78,6 +78,9 @@ public sealed class PlaylistManagementTests : E2ETestBase
     {
         await app.DevApi.InvokeAsync($"EntryMenu_{entryId}", cancellationToken: Ct);
         app.Ui.ClickByName(action, TimeSpan.FromSeconds(15));
+        // Die nächste Menüöffnung darf erst nach dem Schließen des vorherigen
+        // ActionSheets erfolgen; der Modell-Reload kann davor fertig sein.
+        app.Ui.WaitForNameAbsent(action, TimeSpan.FromSeconds(15));
     }
 
     /// <summary>

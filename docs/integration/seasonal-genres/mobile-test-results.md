@@ -3,6 +3,20 @@
 Stand: 2026-10-26. Frühere Mobile-Unit-, Build- und Servernachweise stehen im
 Feature-Testbericht und im Server-Testbericht.
 
+## Aktueller Nachweis nach Playlist-Testfix
+
+Der letzte vollständige Windows-E2E-Lauf bestand mit **70/72, 0 Skips, Exitcode 1**; alle sechs saisonalen Flüsse waren grün. Der zuvor reproduzierbare Playlist-Verschiebefall bestand nach einer überprüften ActionSheet-Synchronisierung. Der Playlist-Löschfall scheiterte im Gesamtlauf an einem UIA-Timeout und bestand isoliert. Im LogProtocol-Fluss beendete sich die MAUI-App mit `0xC0000005` (PID 57880); isoliert bestand auch dieser Fall. Der volle Lauf bleibt rot. Artefakte: `.work/test-results/final-post-playlist-20261026/`. Dumpanalyse und unerledigte Diagnose stehen im erhaltenen Feature-Verzeichnis.
+## Vorheriger guarded Windows-E2E-Vollrun am 2026-10-26
+
+Die vollständige Suite lief mit PID-genauer ProcDump-Überwachung aller eigenen App-Prozesse: **70 bestanden, 2 fehlgeschlagen, 0 übersprungen, 72 gesamt**, laut TRX `Failed` (9:20). Alle sechs saisonalen E2E-Flüsse bestanden. 77 Workspace-App-PIDs wurden überwacht.
+
+- `PlaylistManagementTests.MoveEntries_ReordersOnServer`: Timeout; einmal isoliert wiederholt und erneut fehlgeschlagen (Exit 1).
+- `ContinueWatchingContextMenuTests.LongPressMovie_ChooseSkip_CallsSkipEndpoint_EntryDisappears`: `Assert.NotNull()`; einmal isoliert wiederholt und bestanden (Exit 0).
+
+Die Wiederholungen ändern den Vollsuite-Stand nicht. Keine Produkt-/Teständerung, Abschwächung oder Skips; kein weiterer Vollrun.
+
+ProcDump erstellte für PID 27688 einen vollständigen Dump (789 MB) nach `Unhandled: C000027B`; die Prozessdaten notieren später einen erzwungenen App-Shutdown. In diesem Lauf trat kein `0xC0000005` auf. Der Dump und sämtliche Logs bleiben lokal unter `.work/test-results/full-final-20261026/`; es wurde nichts hochgeladen. Der dotnet-Prozess-Exitcode aus dem Monitor war 0, obwohl TRX/Console den Testlauf als fehlgeschlagen ausweisen; Ergebnisstatus 70/2.
+
 ## Guarded Windows-E2E-Suite
 
 Befehl:

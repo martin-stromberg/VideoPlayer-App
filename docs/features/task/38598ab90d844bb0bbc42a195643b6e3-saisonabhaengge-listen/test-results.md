@@ -1,6 +1,29 @@
 # Abschlussprüfungen – Saisonabhängige Genre-Listen
 
-**Aktueller Status (2026-10-26): Guarded Windows-E2E-Suite lief 69/72; App-Crash wurde per PID belegt. Drei Fehler danach einzeln geprüft.**
+**Aktueller Status (2026-10-26): letzter vollständiger Windows-E2E-Lauf 70/72, 0 Skips, Exitcode 1; alle sechs saisonalen Flüsse bestanden. Zwei bestehende Fehlerfälle bestanden jeweils isoliert, der native App-Abbruch trat erneut auf.**
+
+## Neuester vollständiger Windows-E2E-Lauf nach Playlist-Synchronisierung
+
+Nach dem unabhängig geprüften `WaitForNameAbsent`-Testhelper wurde die gesamte 72er-Suite einmal mit dem bestehenden App-Exit-Guard ausgeführt: **70 bestanden, 2 fehlgeschlagen, 0 übersprungen, Exitcode 1**, Dauer 12m43s. Alle sechs `SeasonalGenresTests` bestanden. Der zuvor reproduzierbar fehlgeschlagene Verschiebetest bestand nach der Korrektur zwei isolierte Läufe und im Gesamtlauf; drei benachbarte Entfernen-Szenarien bestanden ebenfalls.
+
+- `PlaylistManagementTests.EditAndDeletePlaylist_ViaManageMenu_UpdatesServerAndNavigatesBack`: UIA-Timeout beim Menüpunkt „Löschen“ im Gesamtlauf; eine isolierte Wiederholung bestand 1/1 mit App-Exit 0.
+- `LogProtocolTests.LoggingEnabled_LogoutAndPipSubFlows_WriteDiagnosticEntries`: MAUI-App PID 57880 beendete sich mit `0xC0000005`; stderr enthält „The specified network name is no longer available.“ Eine isolierte Wiederholung bestand 1/1 mit App-Exit 0. Die native Ursache bleibt ungeklärt.
+
+Console/TRX und beide isolierten TRX-Dateien liegen ignoriert unter `.work/test-results/final-post-playlist-20261026/`; Prozessdaten unter `.work/e2e-process-logs/20261026-140654595-57880/`. Ein älterer 789-MB-Dump zu `C000027B` zeigte eine WinRT-Stowed-Exception mit `E_UNEXPECTED` im UI-Messaging-Pfad nach Beginn des Fixture-Shutdowns; der Zusammenhang mit `0xC0000005` ist nicht belegt. Zwölf PID-genau überwachte Suchtest-Wiederholungen plus ein gemeinsamer Lauf (6/6) reproduzierten `0xC0000005` nicht. Details in `native-dump-investigation.md` und `native-dump-analysis.md`. Aus den bestandenen Einzelwiederholungen folgt kein grüner 72er-Gesamtlauf.
+## Vorheriger guarded Windows-E2E-Vollrun am 2026-10-26
+
+Die angeforderte vollständige 72er-Suite lief mit PID-genauer ProcDump-Überwachung aller eigenen `VideoPlayer.Maui.exe`-Prozesse. Ergebnis laut Console und TRX: **70 bestanden, 2 fehlgeschlagen, 0 übersprungen, 72 gesamt**, Laufzeit 9:20, TRX-Outcome `Failed`. Alle sechs `SeasonalGenresTests` bestanden. Der Monitor erkannte 77 Workspace-App-PIDs und erstellte einen vollständigen Dump.
+
+Fehler und je eine isolierte Wiederholung:
+
+- `PlaylistManagementTests.MoveEntries_ReordersOnServer`: Timeout beim Verschieben von Film A; isolierte Wiederholung **1/1 fehlgeschlagen**, Exitcode 1.
+- `ContinueWatchingContextMenuTests.LongPressMovie_ChooseSkip_CallsSkipEndpoint_EntryDisappears`: `Assert.NotNull()` für den Continue-Watching-Eintrag; isolierte Wiederholung **1/1 bestanden**, Exitcode 0.
+
+Die Wiederholungen ändern das Vollsuite-Ergebnis nicht. Keine Tests wurden übersprungen oder abgeschwächt, kein Produkt-/Testcode wurde geändert. Es gab keine weitere Vollsuite-Wiederholung.
+
+ProcDump schrieb für Workspace-App-PID 27688 (`e2e-selectentrystartspla-df49504e6dbc451eac155d6df5479f4e`) einen vollständigen 789-MB-Dump. Sein Protokoll meldet `Unhandled: C000027B`; die E2E-Prozessdaten verzeichnen anschließend einen versuchten und erzwungenen App-Shutdown. Ein `0xC0000005` trat in diesem Vollrun nicht auf. Der Dump klärt die Ursache nicht; die native Auswertung bleibt offen. Das vom `Start-Process`-Monitor gemeldete dotnet-Prozess-Exitcodefeld war 0, obwohl Console und TRX den Lauf als fehlgeschlagen ausweisen; maßgeblich für den Teststatus sind die 70/2-Resultate im TRX.
+
+Artefakte liegen lokal und ignoriert unter `.work/test-results/full-final-20261026/`: `console.log`, `full-final-20261026.trx`, `exit-code.txt`, `monitor-status.txt`, je-PID-Protokolle und `dumps-27688/`. Die beiden isolierten Wiederholungen liegen in `recheck/`. Es wurden keine Dumps hochgeladen.
 
 ## Guarded Windows-E2E-Lauf am 2026-10-26
 

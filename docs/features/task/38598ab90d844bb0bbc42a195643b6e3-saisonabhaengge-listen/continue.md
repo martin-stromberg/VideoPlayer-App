@@ -24,8 +24,8 @@ Keine.
 
 ## Noch offene Abschlusskriterien (2026-10-26)
 
-- [ ] Vollständige Windows-E2E-Suite mit 72/72, Exitcode 0 und ohne unerwarteten App-Abbruch erfolgreich ausführen. Letzter bewachter Gesamtlauf: 69/72; drei Einzelfall-Wiederholungen bestanden, der Suchfall zweimal. Dies ersetzt keinen grünen Gesamtlauf.
-- [ ] Nativen Shutdown-Abbruch der MAUI-App (PID 45732, `0xC0000005`, ca. 375 ms nach Beginn von `CloseMainWindow`) anhand eines nativen Crashdumps eingrenzen und einen belegbaren Fix prüfen. Managed Stack und offizielle ähnliche Issues belegen kein konkretes fehlerhaftes Objekt. Details in `diagnosis-winrt-shutdown.md`.
+- [ ] Vollständige Windows-E2E-Suite mit 72/72, Exitcode 0 und ohne unerwarteten App-Abbruch erfolgreich ausführen. Letzter bewachter Gesamtlauf am 2026-10-26: 70/72, 0 übersprungen; Playlist-Löschen und LogProtocol bestanden anschließend jeweils isoliert. Dies ersetzt keinen grünen Gesamtlauf.
+- [ ] Nativen Shutdown-Abbruch der MAUI-App (`0xC0000005`, zuletzt PID 57880) anhand eines passenden nativen Crashdumps eingrenzen und einen belegbaren Fix prüfen. Der vorhandene Dump eines anderen Laufs zeigt `C000027B`; sein Zusammenhang mit dem Access Violation-Abbruch ist nicht belegt. Details in `native-dump-investigation.md` und `native-dump-analysis.md`.
 ## Hinweise zur Fortsetzung
 
 Produktcode und Testtreiber wurden in Iteration 3 nicht verändert; erfolglose Fokusversuche wurden vollständig zurückgenommen. Bestehende Nachweise: 1396 mobile Unit-Tests bestanden, Windows-Build erfolgreich; Server Debug/Release und vollständige Suite 2358 bestanden/2 bestehende Skips, vier echte Web-E2E bestanden und unabhängige Mutationstests erfolgreich. Details in `test-results.md` und `implementation-followup-3.md`.
@@ -42,3 +42,12 @@ Die Fortsetzung wird vor weiteren Reviews/Tests gemäß Implementierungsabbruchr
 Auf Nutzerauftrag wurden die beiden zuvor fehlgeschlagenen Such-E2E ohne Code- oder Teständerung erneut ausgeführt: **2 bestanden, 0 Fehler, 0 Skips**, Gesamtdauer 39,1 Sekunden, Prozess-Exitcode 0. Der zuvor gemeldete WinRT-Finalizerfehler trat in diesem Lauf nicht auf; eine vollständige Suite wurde nicht wiederholt. Kein PickerHost-Prozess war vor dem Lauf vorhanden. Die anschließende Computer-Use-Fensterliste zeigte keinen PickerHost-/Firewalldialog; eine Firewallabfrage ist weiterhin nicht nachgewiesen. Die historische Fokusbeobachtung allein beweist die damalige Fehlerursache nicht.
 
 Maschinenlesbares Ergebnis lokal unter `.work/test-results/search-recheck-20261026/search-recheck.trx`; dauerhafte Zusammenfassung in `test-results.md`. Die beiden konkreten Suchfehler sind damit erfolgreich nachgeprüft. Die vollständige Suite sowie die frühere WinRT-Prozessmeldung bleiben als gesonderte Nacharbeit erhalten.
+
+## Letzter Abschlusslauf (2026-10-26)
+- [x] Einen letzten vollständigen guarded Windows-E2E-Lauf mit PID-genauem ProcDump für Workspace-App-PIDs ausgeführt und Console/TRX/Dump lokal gespeichert. Ergebnis **70/72**, 0 Skips; beide Fehler je einmal isoliert wiederholt (einer erneut fehlgeschlagen, einer bestanden). Die Bedingung 72/72 bleibt offen; nativer Dump PID 27688 meldet `C000027B`, nicht `0xC0000005`. Details in `test-results.md`.
+## Offene Punkte nach der letzten Fortsetzung
+
+- [ ] Vollständige Windows-E2E-Suite mit 72/72 und Exitcode 0 nachweisen. Der letzte Lauf nach dem geprüften Playlist-Testfix endete mit 70/72; Playlist-Löschen und LogProtocol bestanden nur in isolierten Wiederholungen. Alle sechs saisonalen E2E-Flüsse sind weiterhin grün.
+- [ ] Sporadischen MAUI-Abbruch `0xC0000005` beim Fixture-Shutdown eingrenzen und belegt beheben. Er trat zuletzt im LogProtocol-Fluss (App-PID 57880) auf. Der lokal gesicherte Dump eines anderen Laufs zeigt `C000027B`/`E_UNEXPECTED`; ein Zusammenhang ist nicht belegt. Kein Runtime-Fix ohne konkreten nativen Nachweis.
+
+Diese Punkte wurden in der maximalen Lifecycle-Prüfschleife nicht abgeschlossen. Der Featureordner bleibt erhalten und Schritt 13 in `todo.md` offen. Die übrigen Anforderungs- und saisonalen E2E-Prüfungen sind dokumentiert.

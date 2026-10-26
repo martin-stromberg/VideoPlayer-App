@@ -1,6 +1,6 @@
 # Serverintegration der saisonalen Startseitenlisten
 
-Stand: 2026-10-26. Übernahme auf aktuellem Server-`staging` unabhängig abgenommen und vom Anwender gemergt; PR-CI grün. Der anschließende Server-Prerelease läuft, eine Laufzeitinstallation ist noch nicht nachgewiesen.
+Stand: 2026-10-26. Übernahme auf aktuellem Server-`staging` unabhängig abgenommen und vom Anwender gemergt; PR-CI grün. Der anschließende Server-Prerelease ist erfolgreich abgeschlossen; das Self-Update der laufenden Instanzen wurde vom Anwender bestätigt und am lokalen Health-Endpunkt geprüft.
 
 ## Konkreter Übernahmestand
 
@@ -48,8 +48,11 @@ Letzte gelesene CI-Momentaufnahme: [PR CI for Staging, Run 40283574471](https://
 
 Die unabhängige Abnahme des Integrationsstands `194f0e64eceb0fb403f9ee1eb03ed1977b2b9baa` ist **Erfüllt**; siehe [dauerhafte unabhängige Abnahme](server-integration-review.md). Der zusätzliche Commit `b4f33de517136930434bd699f787b933cd8a6a89` ändert ausschließlich den übernommenen Abnahmebericht, Handover und Schrittstatus; Produktdateien und Tests sind unverändert. Deshalb wurden keine Tests wiederholt. Vor einem Merge ist grüne CI auf dem aktuellen Dokumentations-HEAD erforderlich. Der bestehende Promotion-PR #256 (`staging` nach `main`) wurde nicht verändert oder gemergt: `staging` lag bei der Prüfung 276 Commits vor `main`; diese fremden Änderungen werden nicht nebenbei freigegeben.
 
-Die konkrete laufende Serverinstanz bzw. ihr Installationsweg ist noch nicht benannt. Die Übernahme nach `staging` ist erfolgt. Es erfolgten weder Main-Promotion noch Laufzeitinstallation noch mobile Veröffentlichung. Der mobile Lifecycle bleibt wegen des gesondert protokollierten WinRT-Shutdownfehlers offen; diese erfolgreiche Serverprüfung bescheinigt keinen vollständig grünen mobilen Gesamtlauf.
+Zum Zeitpunkt der PR-Übergabe war die Laufzeitinstanz noch nicht benannt. Inzwischen hat der Anwender das Self-Update bestätigt; siehe den aktuellen Abschnitt unten. Eine Main-Promotion und mobile Veröffentlichung wurden nicht durchgeführt. Der mobile Lifecycle bleibt wegen der dokumentierten Windows-E2E-Fehler offen; die erfolgreiche Serverprüfung bescheinigt keinen vollständig grünen mobilen Gesamtlauf.
 
 ## Abnahmeübernahme am 2026-10-26
 
 Der Dokumentationscommit `b4f33de517136930434bd699f787b933cd8a6a89` wurde auf den bestehenden PR #287 gepusht. Das verifizierte Bundle und der neue lokale Featurebranch im ursprünglichen Serverrepository zeigen ebenfalls auf diesen HEAD. Aktiver ursprünglicher Branch, aktiver HEAD und Arbeitsdateien blieben unverändert. Der PR bleibt Draft; es erfolgte weder Ready-Markierung noch Merge oder Deployment. Der neue CI-Lauf [40283574471](https://github.com/martin-stromberg/VideoPlayer/actions/runs/40283574471) für genau diesen HEAD war bei der letzten Lesung `pending`; auf sein Ende wurde hier nicht gewartet.
+## Laufende Serverinstanz nach Self-Update
+
+Der Anwender bestätigte am 2026-10-26, dass die neue Serverversion durch Self-Update verteilt ist, unter anderem unter `http://localhost:83/`. Lokaler Smokecheck: `GET /` und `GET /api/health` antworteten mit HTTP 200 (`OK`); der saisonale Endpunkt `GET /api/home/seasonal-genres` antwortete ohne Bearer-Token erwartungsgemäß mit HTTP 401. Der [Server-Prerelease-Lauf für den Mergecommit](https://github.com/martin-stromberg/VideoPlayer/actions/runs/40319353867) ist erfolgreich abgeschlossen. Ohne Anmeldung wurde weder die Saison-Payload noch die konkrete Versionsnummer der lokalen Instanz geprüft. Der Server-Übernahme- und Bereitstellungsschritt ist nach Bestätigung des Anwenders erledigt; der separate mobile Testabschluss bleibt offen.
