@@ -1,4 +1,9 @@
 # Serverlieferung: Saisonale Genre-Listen
+## Aktueller Übernahmestand (2026-10-26)
+
+Die Serveränderung ist auf aktuellem `staging` integriert, unabhängig abgenommen und als [PR #287](https://github.com/martin-stromberg/VideoPlayer/pull/287) zur Code-Owner-Prüfung freigegeben. Alle erforderlichen GitHub-CI-Checks sind grün. Details, neuer Integrationsbranch und separates Bundle stehen im [Integrationsbericht](server-integration.md); der [unabhängige Review](server-integration-review.md) ist erfüllt. Der Branch ist auch im ursprünglichen lokalen Serverrepository importiert, ohne dessen aktiven Checkout zu ändern. Ein Merge und eine Laufzeitinstallation sind noch nicht erfolgt: Code-Owner-Freigabe und konkretes Installationsziel stehen aus.
+
+Der mobile Gesamtlauf bleibt offen; die [aktuellen Testergebnisse](mobile-test-results.md) dokumentieren den nachgewiesenen MAUI-Shutdown-Crash. Die folgenden Angaben beschreiben die ursprüngliche isolierte Serverlieferung vor der aktuellen Übernahme.
 
 Für die Bedienung siehe [Hilfe zu saisonalen Startseitenlisten](../../help/saisonale-startseitenlisten.md);
 der technische Endpunkt und seine UTC-Ablaufsemantik stehen im
