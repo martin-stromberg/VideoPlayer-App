@@ -27,13 +27,20 @@ public sealed class AppInstance : IDisposable
     private readonly UIA3Automation automation = new();
     private readonly Process process;
     private readonly string exeDirectory;
+    private readonly Task<string> standardOutput;
+    private readonly Task<string> standardError;
+    private readonly Action<Exception> reportShutdownFailure;
     private bool disposed;
 
-    private AppInstance(Process process, string exeDirectory, string profile, int devApiPort)
+    private AppInstance(Process process, string exeDirectory, string profile, int devApiPort,
+        Task<string> standardOutput, Task<string> standardError, Action<Exception> reportShutdownFailure)
     {
         this.process = process;
         this.exeDirectory = exeDirectory;
         Profile = profile;
+        this.standardOutput = standardOutput;
+        this.standardError = standardError;
+        this.reportShutdownFailure = reportShutdownFailure;
         DevApi = new DevApiClient(devApiPort);
         Ui = new UiDriver(automation, WaitForMainWindow(automation, process));
     }
@@ -61,11 +68,14 @@ public sealed class AppInstance : IDisposable
     /// <param name="profile">Expliziter Profilname (z. B. für einen
     /// Neustart-Test mit dem Profil einer früheren Instanz);
     /// <c>null</c> = frisches, eindeutiges Testprofil.</param>
+    /// <param name="reportShutdownFailure">Meldet native Prozessfehler an die
+    /// getrennte xUnit-Aufräumphase, damit ein ursprünglicher Testfehler erhalten bleibt.</param>
     /// <returns>Die laufende Instanz.</returns>
     public static async Task<AppInstance> StartAsync(
         string exePath, string testName, TimeSpan? startupTimeout = null,
         CancellationToken cancellationToken = default,
-        string? profile = null)
+        string? profile = null,
+        Action<Exception>? reportShutdownFailure = null)
     {
         var timeout = startupTimeout ?? TimeSpan.FromSeconds(45);
         var exeDirectory = Path.GetDirectoryName(exePath)!;
@@ -77,7 +87,9 @@ public sealed class AppInstance : IDisposable
         var startInfo = new ProcessStartInfo(exePath)
         {
             WorkingDirectory = exeDirectory,
-            UseShellExecute = false
+            UseShellExecute = false,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true
         };
         startInfo.Environment[ProfileEnvironmentVariable] = resolvedProfile;
         // Der statische Gate-Schlüssel darf nicht geerbt werden — sonst
@@ -86,11 +98,14 @@ public sealed class AppInstance : IDisposable
 
         var process = Process.Start(startInfo)
             ?? throw new InvalidOperationException("Der App-Prozess konnte nicht gestartet werden.");
+        var standardOutput = process.StandardOutput.ReadToEndAsync();
+        var standardError = process.StandardError.ReadToEndAsync();
 
         try
         {
             var port = await WaitForDevApiPortAsync(metadataPath, process, timeout, cancellationToken);
-            var instance = new AppInstance(process, exeDirectory, resolvedProfile, port);
+            var instance = new AppInstance(process, exeDirectory, resolvedProfile, port,
+                standardOutput, standardError, reportShutdownFailure ?? (error => throw error));
 
             // Die API meldet sich, sobald das Fenster steht — bis der
             // erste Modell-Snapshot lesbar ist, kann noch etwas Zeit
@@ -101,7 +116,10 @@ public sealed class AppInstance : IDisposable
         }
         catch
         {
-            try { process.Kill(entireProcessTree: true); } catch { /* best effort */ }
+            var (killRequestSucceeded, killError) = TryKillAndWait(process);
+            WriteProcessDiagnostics(process, resolvedProfile, standardOutput, standardError,
+                killAttempted: true, killRequestSucceeded, killError);
+            process.Dispose();
             throw;
         }
     }
@@ -128,6 +146,12 @@ public sealed class AppInstance : IDisposable
         }
 
         disposed = true;
+        var killAttempted = false;
+        var killRequestSucceeded = false;
+        string? killError = null;
+        var exitedBeforeShutdown = process.HasExited;
+        var shutdownStartedAtUtc = DateTime.UtcNow;
+        Exception? shutdownFailure = null;
         try { Ui.Dispose(); } catch { /* best effort */ }
         try { DevApi.Dispose(); } catch { /* best effort */ }
 
@@ -138,24 +162,116 @@ public sealed class AppInstance : IDisposable
                 try { process.CloseMainWindow(); } catch { /* best effort */ }
                 if (!process.WaitForExit(10_000))
                 {
-                    process.Kill(entireProcessTree: true);
+                    killAttempted = true;
+                    (killRequestSucceeded, killError) = TryKillAndWait(process);
                 }
             }
         }
         catch (Exception)
         {
-            try { process.Kill(entireProcessTree: true); } catch { /* best effort */ }
+            killAttempted = true;
+            (killRequestSucceeded, killError) = TryKillAndWait(process);
         }
         finally
         {
+            shutdownFailure = WriteProcessDiagnostics(process, Profile, standardOutput, standardError,
+                killAttempted, killRequestSucceeded, killError, exitedBeforeShutdown, shutdownStartedAtUtc);
             process.Dispose();
             TryDelete(Path.Combine(exeDirectory, "devapi.json"));
             if (deleteProfile)
             {
                 DeleteProfileDirectory();
             }
-            automation.Dispose();
+            try { automation.Dispose(); }
+            catch (Exception error)
+            {
+                shutdownFailure = shutdownFailure is null
+                    ? error : new AggregateException(shutdownFailure, error);
+            }
         }
+        if (shutdownFailure is not null) reportShutdownFailure(shutdownFailure);
+    }
+
+    private static (bool RequestSucceeded, string? Error) TryKillAndWait(Process process)
+    {
+        var requestSucceeded = false;
+        try
+        {
+            process.Kill(entireProcessTree: true);
+            requestSucceeded = true;
+            process.WaitForExit(5_000);
+            return (requestSucceeded, null);
+        }
+        catch (Exception error)
+        {
+            return (requestSucceeded, error.ToString());
+        }
+    }
+
+    private static Exception? WriteProcessDiagnostics(Process process, string profile,
+        Task<string> standardOutput, Task<string> standardError, bool killAttempted,
+        bool killRequestSucceeded, string? killError,
+        bool? exitedBeforeShutdown = null, DateTime? shutdownStartedAtUtc = null)
+    {
+        try
+        {
+            return WriteProcessDiagnosticsCore(process, profile, standardOutput, standardError,
+                killAttempted, killRequestSucceeded, killError, exitedBeforeShutdown, shutdownStartedAtUtc);
+        }
+        catch (Exception error)
+        {
+            // Auch ein Protokollfehler gehört in die getrennte Aufräumphase
+            // und darf weder den ursprünglichen Testfehler noch Cleanup verdrängen.
+            return new InvalidOperationException(
+                $"Prozessdiagnose für App {process.Id} ({profile}) fehlgeschlagen.", error);
+        }
+    }
+
+    private static Exception? WriteProcessDiagnosticsCore(Process process, string profile,
+        Task<string> standardOutput, Task<string> standardError, bool killAttempted,
+        bool killRequestSucceeded, string? killError,
+        bool? exitedBeforeShutdown, DateTime? shutdownStartedAtUtc)
+    {
+        // Jeder App-Prozess erbt sonst stderr des Testhosts. Native Fehler
+        // sind dann im Sammellog keinem Test oder Prozess zuzuordnen.
+        var directory = Path.Combine(RepositoryRoot.Find(), ".work", "e2e-process-logs",
+            $"{DateTime.UtcNow:yyyyMMdd-HHmmssfff}-{process.Id}");
+        Directory.CreateDirectory(directory);
+        var drained = Task.WaitAll([standardOutput, standardError], TimeSpan.FromSeconds(5));
+        var stdout = standardOutput.IsCompletedSuccessfully ? standardOutput.Result : "";
+        var stderr = standardError.IsCompletedSuccessfully ? standardError.Result : "";
+        File.WriteAllText(Path.Combine(directory, "stdout.log"), stdout);
+        File.WriteAllText(Path.Combine(directory, "stderr.log"), stderr);
+        var exitCode = process.HasExited ? process.ExitCode : (int?)null;
+        // Windows Process.Kill verwendet TerminateProcess(..., -1). Nur
+        // akzeptierter Killaufruf UND dessen tatsächlicher Exitcode belegen
+        // einen Fixture-Kill. Ein nativer Crash kann auch zwischen Timeout
+        // und Killaufruf eintreten und darf niemals durch ein Flag verschwinden.
+        var forcedKill = killAttempted && killRequestSucceeded && exitCode == -1;
+        File.WriteAllText(Path.Combine(directory, "process.json"), JsonSerializer.Serialize(new
+        {
+            pid = process.Id,
+            profile,
+            exitCode,
+            killAttempted,
+            killRequestSucceeded,
+            killError,
+            forcedKill,
+            exitedBeforeShutdown,
+            shutdownStartedAtUtc,
+            outputDrained = drained,
+            recordedAtUtc = DateTime.UtcNow
+        }));
+        Console.WriteLine($"[E2E app {process.Id}, {profile}] Exit={exitCode}, "
+            + $"KillAttempted={killAttempted}, KillRequestSucceeded={killRequestSucceeded}, "
+            + $"ForcedKill={forcedKill}; Logs: {directory}");
+        if (!string.IsNullOrEmpty(stdout)) Console.Write(stdout);
+        if (!string.IsNullOrEmpty(stderr)) Console.Error.Write(stderr);
+        return exitCode is null || (!forcedKill && exitCode != 0)
+            ? new InvalidOperationException(
+                $"App-Prozess {process.Id} ({profile}) ist unerwartet beendet: "
+                + $"Exit {exitCode} (0x{unchecked((uint)(exitCode ?? -1)):X8}); Logs: {directory}")
+            : null;
     }
 
     /// <summary>

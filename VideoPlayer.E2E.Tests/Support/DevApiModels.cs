@@ -101,6 +101,15 @@ public sealed class DevApiModel
     /// <summary>Anzahl der zuletzt gesehenen Einträge.</summary>
     [JsonPropertyName("recentEntriesCount")] public int RecentEntriesCount { get; set; }
 
+    /// <summary>Anzahl aktuell sichtbarer saisonaler Genre-Sektionen.</summary>
+    [JsonPropertyName("seasonalGenresCount")] public int SeasonalGenresCount { get; set; }
+
+    /// <summary>Id des geladenen Detailmediums.</summary>
+    [JsonPropertyName("mediaDetailsId")] public long MediaDetailsId { get; set; }
+
+    /// <summary>Titel des geladenen Detailmediums.</summary>
+    [JsonPropertyName("mediaDetailsTitle")] public string? MediaDetailsTitle { get; set; }
+
     /// <summary>Eine Wiedergabe ist angefordert (Player-Seite belegt).</summary>
     [JsonPropertyName("playerIsActive")] public bool PlayerIsActive { get; set; }
 

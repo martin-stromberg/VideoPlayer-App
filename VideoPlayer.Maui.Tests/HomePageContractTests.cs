@@ -187,7 +187,9 @@ public class HomePageContractTests
         var recentIndex = xaml.IndexOf("{Binding Model.RecentEntries}", StringComparison.Ordinal);
         Assert.True(favoritesIndex > continueWatchingIndex);
         Assert.True(recentIndex > continueWatchingIndex);
-        Assert.Equal(2, xaml.Split("OnMediaItemTapped").Length - 1);
+        // Auch dynamische Saisonlisten verwenden dieselbe Detailnavigation.
+        Assert.Equal(3, xaml.Split("OnMediaItemTapped").Length - 1);
+        Assert.Contains("BindableLayout.ItemsSource=\"{Binding Model.SeasonalGenres}\"", xaml, StringComparison.Ordinal);
 
         Assert.Contains("OnContinueWatchingItemTapped", code, StringComparison.Ordinal);
         Assert.Contains("ContinueWatchingItemSelectedMessage", code, StringComparison.Ordinal);

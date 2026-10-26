@@ -139,6 +139,18 @@ public sealed class MockVideoServer : IDisposable
     /// </summary>
     public long? PlaybackMovieId { get; set; }
 
+    /// <summary>Konfigurierbare saisonale Antwort im realen Server-Wireformat.</summary>
+    public string SeasonalGenresJson { get; set; } = "[]";
+
+    /// <summary>HTTP-Status der saisonalen Antwort (z. B. 503 für Cachetests).</summary>
+    public int SeasonalGenresStatus { get; set; } = 200;
+
+    /// <summary>Health-Status für einen reproduzierbaren Offline-Neustart.</summary>
+    public int HealthStatus { get; set; } = 200;
+
+    /// <summary>Optionale Sammlung für saisonale Detailnavigation.</summary>
+    public long? SeasonalCollectionId { get; set; }
+
     /// <summary>Anzeigetitel des Opt-in-Wiedergabefluss-Films.</summary>
     public string PlaybackMovieTitle { get; set; } = "E2E-Testfilm";
 
@@ -461,7 +473,19 @@ public sealed class MockVideoServer : IDisposable
 
         if (method == "GET" && path.Equals("/api/health", StringComparison.OrdinalIgnoreCase))
         {
-            return (200, "text/plain", Encoding.UTF8.GetBytes("OK"));
+            return (HealthStatus, "text/plain", Encoding.UTF8.GetBytes("OK"));
+        }
+
+        if (method == "GET" && path.Equals("/api/home/seasonal-genres", StringComparison.OrdinalIgnoreCase))
+        {
+            if (!IsGateValid(request) || !request.Headers.ContainsKey("Authorization"))
+                return (401, "application/json", JsonBody(new { error = "unauthorized" }));
+            return (SeasonalGenresStatus, "application/json", Encoding.UTF8.GetBytes(SeasonalGenresJson));
+        }
+
+        if (method == "GET" && SeasonalCollectionId is { } collectionId && path.Equals($"/api/items/moviecollection/{collectionId}", StringComparison.OrdinalIgnoreCase))
+        {
+            return (200, "application/json", Encoding.UTF8.GetBytes($"{{\"id\":{collectionId},\"name\":\"Saison-Sammlung\",\"movies\":[]}}"));
         }
 
         if (method == "POST" && path.Equals("/api/pairing/exchange", StringComparison.OrdinalIgnoreCase))

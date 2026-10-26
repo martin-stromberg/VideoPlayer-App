@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using FlaUI.Core.AutomationElements;
 using FlaUI.Core.Conditions;
 using FlaUI.Core.Definitions;
@@ -455,17 +456,21 @@ public sealed class UiDriver : IDisposable
     /// </summary>
     /// <param name="name">Der Anzeigename des Elements.</param>
     /// <param name="timeout">Maximale Wartezeit (Standard 15 s).</param>
+    /// <param name="initialWait">Wartezeit vor der Elementsuche (Standard 0 s).</param>
     /// <returns>Das gefundene und ausgelöste Element.</returns>
-    public AutomationElement ClickByName(string name, TimeSpan? timeout = null)
+    public AutomationElement ClickByName(string name, TimeSpan? timeout = null, TimeSpan? initialWait = null)
     {
+        if (initialWait.HasValue)
+        {
+            Thread.Sleep(initialWait.Value);
+        }
+
         var deadline = DateTime.UtcNow + (timeout ?? TimeSpan.FromSeconds(15));
         var processId = window.Properties.ProcessId.ValueOrDefault;
         while (true)
         {
             var element = window.FindFirstDescendant(Conditions.ByName(name))
-                ?? automation.GetDesktop()
-                    .FindAllDescendants(Conditions.ByName(name))
-                    .FirstOrDefault(e => e.Properties.ProcessId.ValueOrDefault == processId);
+                ?? FindInAppDesktopChildren(name, processId);
             if (element is not null)
             {
                 if (element.Patterns.Invoke.IsSupported)
@@ -486,8 +491,63 @@ public sealed class UiDriver : IDisposable
                     $"Kein Element mit dem Namen '{name}' im Fenster oder als Popup des Prozesses gefunden.");
             }
 
+            Debug.WriteLine($"E2E: ClickByName({name}) - Element not found, retrying...");
             Thread.Sleep(200);
         }
+    }
+
+    /// <summary>Wartet, bis eine Aktionsmenü-Schaltfläche nach der Auswahl geschlossen ist.</summary>
+    /// <param name="name">Anzeigename der ausgewählten Aktionsmenü-Schaltfläche.</param>
+    /// <param name="timeout">Maximale Wartezeit; standardmäßig 15 Sekunden.</param>
+    public void WaitForNameAbsent(string name, TimeSpan? timeout = null)
+    {
+        var deadline = DateTime.UtcNow + (timeout ?? TimeSpan.FromSeconds(15));
+        var processId = window.Properties.ProcessId.ValueOrDefault;
+        while (true)
+        {
+            var element = window.FindFirstDescendant(Conditions.ByName(name))
+                ?? FindInAppDesktopChildren(name, processId);
+            if (element is null)
+            {
+                return;
+            }
+
+            if (DateTime.UtcNow >= deadline)
+            {
+                throw new TimeoutException($"Aktionsmenü '{name}' wurde nicht geschlossen.");
+            }
+
+            Thread.Sleep(100);
+        }
+    }
+
+    /// <summary>
+    /// Sucht in direkten Desktop-Kindern des App-Prozesses und deren Teilbäumen,
+    /// damit fremde Fensterbäume nicht von UIA durchlaufen werden.
+    /// </summary>
+    /// <param name="name">Anzeigename des gesuchten Elements.</param>
+    /// <param name="processId">Prozess-ID der App.</param>
+    /// <returns>Das gefundene Element oder <c>null</c>.</returns>
+    private AutomationElement? FindInAppDesktopChildren(string name, int processId)
+    {
+        var condition = Conditions.ByName(name);
+        var desktopChildren = automation.GetDesktop()
+            .FindAllChildren(Conditions.ByProcessId(processId));
+        foreach (var child in desktopChildren)
+        {
+            if (child.Name == name)
+            {
+                return child;
+            }
+
+            var descendant = child.FindFirstDescendant(condition);
+            if (descendant is not null)
+            {
+                return descendant;
+            }
+        }
+
+        return null;
     }
 
     /// <summary>

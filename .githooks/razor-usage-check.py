@@ -25,7 +25,7 @@ from pathlib import Path
 sys.stdout.reconfigure(encoding='utf-8', errors='replace')
 sys.stderr.reconfigure(encoding='utf-8', errors='replace')
 
-EXCLUDED_DIRS = {'.git', 'bin', 'obj', 'TestResults', 'node_modules', '.vs', 'packages'}
+EXCLUDED_DIRS = {'.git', '.work', 'bin', 'obj', 'TestResults', 'node_modules', '.vs', 'packages'}
 SKIP_NAMES = {"App", "Routes"}
 
 TAG_TEMPLATE = r"<{}[\s/>@]"

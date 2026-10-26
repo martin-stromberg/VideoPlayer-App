@@ -101,6 +101,15 @@ public sealed record DevApiModelSnapshot
     /// <summary>Anzahl der Neu-im-Programm-Einträge.</summary>
     public int RecentEntriesCount { get; init; }
 
+    /// <summary>Anzahl aktuell sichtbarer saisonaler Genre-Sektionen.</summary>
+    public int SeasonalGenresCount { get; init; }
+
+    /// <summary>Id des geladenen Detailmediums (0 ohne geladene Details).</summary>
+    public long MediaDetailsId { get; init; }
+
+    /// <summary>Titel des geladenen Detailmediums.</summary>
+    public string? MediaDetailsTitle { get; init; }
+
     /// <summary>Eine Wiedergabe ist angefordert (Player-Zustand belegt).</summary>
     public bool PlayerIsActive { get; init; }
 
@@ -289,6 +298,9 @@ public sealed record DevApiModelSnapshot
             LogSendError = model.LogSendError,
             HeroTitle = model.HeroTitle,
             ContinueWatchingCount = model.ContinueWatching.Count,
+            SeasonalGenresCount = model.SeasonalGenres.Count,
+            MediaDetailsId = model.MediaDetails.Details?.MediaId ?? 0,
+            MediaDetailsTitle = model.MediaDetails.Details?.Title,
             FavoritesCount = model.Favorites.Count,
             RecentEntriesCount = model.RecentEntries.Count,
             PlayerIsActive = model.Player.IsActive,

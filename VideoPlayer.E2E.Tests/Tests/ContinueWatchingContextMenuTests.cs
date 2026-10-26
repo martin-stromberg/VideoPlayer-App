@@ -101,8 +101,7 @@ public sealed class ContinueWatchingContextMenuTests : E2ETestBase
         var index = await ContinueWatchingIndexAsync(app, MovieTitle);
         await app.DevApi.LongPressAsync("ContinueWatchingCarousel", index, Ct);
 
-        WaitForName(app.Ui, "Ausblenden");
-        app.Ui.ClickByName("Abbrechen");
+        app.Ui.ClickByName("Abbrechen", initialWait: TimeSpan.FromMilliseconds(300));
 
         // Stabilitätsfenster: mögliche Nachlauf-Requests abwarten.
         await Task.Delay(2000, Ct);

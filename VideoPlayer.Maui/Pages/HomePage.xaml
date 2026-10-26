@@ -6,6 +6,8 @@
              x:Class="VideoPlayer.Maui.Pages.HomePage"
              Title="Startseite"
              x:DataType="mvu:MvuHost">
+    <RefreshView x:Name="HomeRefresh" IsRefreshing="{Binding Model.IsSyncRunning, Mode=OneWay}"
+                 AutomationId="HomeRefresh">
     <ScrollView>
         <VerticalStackLayout Padding="0,10,0,20" Spacing="24">
             <!-- Hero-Kopfbereich (Web-Vorbild .home-hero): servergeneriertes
@@ -163,10 +165,24 @@
                                     Items="{Binding Model.RecentEntries}"
                                     ItemTapped="OnMediaItemTapped" />
 
+            <VerticalStackLayout AutomationId="SeasonalGenres"
+                                 Spacing="24"
+                                 BindableLayout.ItemsSource="{Binding Model.SeasonalGenres}">
+                <BindableLayout.ItemTemplate>
+                    <DataTemplate x:DataType="mvu:HomeSeasonalSection">
+                        <controls:MediaCarousel Title="{Binding Name}"
+                                                AutomationId="{Binding AutomationId}"
+                                                Items="{Binding Items}"
+                                                ItemTapped="OnMediaItemTapped" />
+                    </DataTemplate>
+                </BindableLayout.ItemTemplate>
+            </VerticalStackLayout>
+
             <Label x:Name="ServerStatusLabel"
                    Text="{Binding Model.ServerHealthText}"
                    Style="{StaticResource Caption}"
                    Padding="24,0" />
         </VerticalStackLayout>
     </ScrollView>
+    </RefreshView>
 </ContentPage>

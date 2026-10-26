@@ -34,7 +34,7 @@ public sealed class AppFixture
     {
         var root = RepositoryRoot.Find();
         var projectPath = Path.Combine(root, "VideoPlayer.Maui", "VideoPlayer.Maui.csproj");
-        var arguments = $"build \"{projectPath}\" -f {WindowsTfm} -c Debug --nologo -v q";
+        var arguments = $"build \"{projectPath}\" -f {WindowsTfm} -c Debug --nologo -v q --disable-build-servers";
 
         using var process = new Process
         {
@@ -49,10 +49,20 @@ public sealed class AppFixture
         };
 
         process.Start();
-        var stdout = await process.StandardOutput.ReadToEndAsync();
-        var stderr = await process.StandardError.ReadToEndAsync();
         using var cts = new CancellationTokenSource(TimeSpan.FromMinutes(10));
-        await process.WaitForExitAsync(cts.Token);
+        var stdoutTask = process.StandardOutput.ReadToEndAsync(cts.Token);
+        var stderrTask = process.StandardError.ReadToEndAsync(cts.Token);
+        try
+        {
+            await Task.WhenAll(stdoutTask, stderrTask, process.WaitForExitAsync(cts.Token)).WaitAsync(cts.Token);
+        }
+        catch
+        {
+            if (!process.HasExited) process.Kill(entireProcessTree: true);
+            throw;
+        }
+        var stdout = await stdoutTask;
+        var stderr = await stderrTask;
         if (process.ExitCode != 0)
         {
             throw new InvalidOperationException(

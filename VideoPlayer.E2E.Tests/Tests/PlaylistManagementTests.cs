@@ -67,7 +67,7 @@ public sealed class PlaylistManagementTests : E2ETestBase
     private static async Task ChooseManageActionAsync(AppInstance app, string action)
     {
         await app.DevApi.InvokeAsync("PlaylistManageButton", cancellationToken: Ct);
-        app.Ui.ClickByName(action, TimeSpan.FromSeconds(15));
+        app.Ui.ClickByName(action, TimeSpan.FromSeconds(15), initialWait: TimeSpan.FromMilliseconds(300));
     }
 
     /// <summary>Wählt eine Aktion des Eintrags-Kontextmenüs.</summary>
@@ -78,6 +78,9 @@ public sealed class PlaylistManagementTests : E2ETestBase
     {
         await app.DevApi.InvokeAsync($"EntryMenu_{entryId}", cancellationToken: Ct);
         app.Ui.ClickByName(action, TimeSpan.FromSeconds(15));
+        // Die nächste Menüöffnung darf erst nach dem Schließen des vorherigen
+        // ActionSheets erfolgen; der Modell-Reload kann davor fertig sein.
+        app.Ui.WaitForNameAbsent(action, TimeSpan.FromSeconds(15));
     }
 
     /// <summary>

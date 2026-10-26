@@ -31,7 +31,7 @@ from pathlib import Path
 sys.stdout.reconfigure(encoding='utf-8', errors='replace')
 sys.stderr.reconfigure(encoding='utf-8', errors='replace')
 
-EXCLUDED_DIRS = {'.git', 'bin', 'obj', 'TestResults', 'node_modules', '.vs', '.idea', 'packages'}
+EXCLUDED_DIRS = {'.git', '.work', 'bin', 'obj', 'TestResults', 'node_modules', '.vs', '.idea', 'packages'}
 
 ENUM_RE = re.compile(
     r'\b(?:public|internal)(?:\s+\w+)*\s+enum\s+(\w+)\s*(?::\s*[\w.]+)?\s*\{([^}]*)\}',

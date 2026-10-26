@@ -91,7 +91,8 @@ public sealed class OfflineContinueWatchingService
         {
             ContinueWatching = continueWatching,
             Favorites = favorites,
-            Recent = recent
+            Recent = recent,
+            SeasonalGenres = await homeLists.LoadSeasonalGenresAsync(cancellationToken)
         };
     }
 

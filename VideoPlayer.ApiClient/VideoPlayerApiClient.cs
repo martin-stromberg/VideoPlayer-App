@@ -248,6 +248,14 @@ public class VideoPlayerApiClient
         return await GetJsonAsync<RecentEntry[]>("api/items/recent", cancellationToken) ?? [];
     }
 
+    /// <summary>Lädt die aktuell sichtbaren saisonalen Genre-Sektionen.</summary>
+    /// <param name="cancellationToken">Abbruchtoken.</param>
+    /// <returns>Geordnete Sektionen inklusive serverseitiger Ablaufgrenze.</returns>
+    public async Task<IReadOnlyList<SeasonalGenre>> GetSeasonalGenresAsync(CancellationToken cancellationToken = default)
+    {
+        return await GetJsonAsync<SeasonalGenre[]>("api/home/seasonal-genres", cancellationToken) ?? [];
+    }
+
     #endregion
 
     #region Continue Watching
