@@ -1,6 +1,44 @@
 # Abschlussprüfungen – Saisonabhängige Genre-Listen
 
-**Aktueller Status (2026-10-26): Beide Such-E2E bei gezielter Wiederholung bestanden; vollständige Windows-E2E-Nachprüfung weiterhin offen.**
+**Aktueller Status (2026-10-26): Guarded Windows-E2E-Suite lief 69/72; App-Crash wurde per PID belegt. Drei Fehler danach einzeln geprüft.**
+
+## Guarded Windows-E2E-Lauf am 2026-10-26
+
+Nach unabhängiger Prüfung der E2E-Crash-/Cleanup-Änderungen wurde die volle 72er-Suite erneut mit `--no-restore`, normaler Console-Ausgabe und TRX-Logger ausgeführt:
+
+```text
+dotnet test VideoPlayer.E2E.Tests/VideoPlayer.E2E.Tests.csproj --no-restore --logger "console;verbosity=normal" --logger "trx;LogFileName=final-guarded-20261026.trx" --results-directory .work/test-results/final-guarded-20261026
+```
+
+Ergebnis: **69 bestanden, 3 fehlgeschlagen, 0 übersprungen, 72 gesamt**, 8:03, Prozess-Exitcode **1**. Alle sechs `SeasonalGenresTests` bestanden. `PlaylistManagementTests.SetAndResetGenres_UpdatesServer`, das im vorigen Lauf fehlgeschlagen war, bestand diesmal.
+
+Fehler und gezielte Wiederholungen:
+
+- `ContinueWatchingContextMenuTests.LongPressMovie_ChooseSkip_CallsSkipEndpoint_EntryDisappears`: `FlaUI.Core.Exceptions.NoClickablePointException` bei `UiDriver.ClickByName` (Testzeile 74). Isolierte Wiederholung: **1/1 bestanden**, Exit 0.
+- `PlaylistProgressReportTests.Playback_ProgressReport_WithoutPlaylist_HasNullPlaylistId`: `Assert.NotNull()` fehlgeschlagen (Zeile 159). Isolierte Wiederholung: **1/1 bestanden**, Exit 0.
+- `SourceSearchTests.SubmittedText_RemainsVisibleAfterReturn`: guarded Test meldete unerwarteten MAUI-App-Prozess **PID 45732**, Exit `-1073741819` (`0xC0000005`), Profil `e2e-submittedtextremains-df9b7ff6bfda49d2a9c98c9c28086e99`. Prozessdaten: `killAttempted=false`, `forcedKill=false`, `exitedBeforeShutdown=false`, Shutdown begann `2026-10-26T06:28:50.708399Z`, Ausgabe vollständig gelesen. `stderr.log` enthält `Fatal error. 0xC0000005` im Stack `Marshal.Release` → `WinRT.IObjectReference.DisposeTrackerSource` → `Dispose` → `Finalize` → `GC.RunFinalizers`; `stdout.log` ist leer. Das ist ein bestätigter App-Prozessabsturz während des Testablaufs, keine erfolgreiche Testbereinigung. Zwei anschließende isolierte Wiederholungen bestanden jeweils (**1/1**, Exit 0) und zeigten keinen erneuten Crash. Die Ursache ist damit nicht behoben oder erklärt.
+
+Die drei Einzelfall-Wiederholungen bestehen nur zur Reproduzierbarkeit; sie ändern das Vollsuite-Ergebnis **69/72** nicht. Kein Produktfix, keine Abschwächung und kein Skip. Die Crashursache bleibt ungeklärt.
+
+Artefakte: `.work/test-results/final-guarded-20261026/` enthält vollständige Console/TRX/Exitcodes und die gefilterten Wiederholungen. PID-bezogene Daten des Absturzes: `.work/e2e-process-logs/20261026-062851082-45732/{process.json,stderr.log,stdout.log}`. Eine cleanup-feste Zusammenfassung liegt in `docs/integration/seasonal-genres/mobile-test-results.md`.
+
+## Vollständige Windows-E2E-Nachprüfung am 2026-10-26
+
+Ausgeführt wurde die angeforderte vollständige Suite mit `--no-restore`, normaler Console-Ausgabe und TRX-Logger:
+
+```text
+dotnet test VideoPlayer.E2E.Tests/VideoPlayer.E2E.Tests.csproj --no-restore --logger "console;verbosity=normal" --logger "trx;LogFileName=final-20261026.trx" --results-directory .work/test-results/final-20261026
+```
+
+Ergebnis: **71 bestanden, 1 fehlgeschlagen, 0 übersprungen, 72 gesamt**, Laufzeit 9:09, Prozess-Exitcode **1**. Die sechs `SeasonalGenresTests` und beide zuvor fehlgeschlagenen `SourceSearchTests` bestanden.
+
+Einziger Testfehler: `PlaylistManagementTests.SetAndResetGenres_UpdatesServer` nach Timeout beim erneuten Öffnen des Genre-Editors. Letzter Modellzustand: Seite `Playlists`, Playlist-Genretext `Komödie, Drama`, Änderungsmitteilung „Die Genres wurden aktualisiert.“, `playlistGenreEditorOpen=false`, Optionen leer. Stack: `DevApiClient.WaitForModelAsync` Zeile 138, Test Zeile 493.
+
+Der fehlgeschlagene Playlistfall wurde einmal isoliert wiederholt: **1 bestanden, 0 fehlgeschlagen, 0 übersprungen**, 13,5 s, Exitcode 0. Damit ist der Suite-Fehler nicht reproduziert; die ursprüngliche Abweichung bleibt dokumentiert, es wurde kein Fix vorgenommen.
+
+Der native WinRT-Finalizerfehler `0xC0000005` trat im Vollsuite-Log erneut auf (`Marshal.Release` → `WinRT.IObjectReference.DisposeTrackerSource` → `Dispose` → `Finalize` / `GC.RunFinalizers`). Die Ausgabe enthält keine Prozess-ID und erlaubt keine belastbare Zuordnung zu Testhost oder MAUI-App. Der Testhost setzte die Suite fort und schloss sie mit den oben genannten Testergebnissen ab.
+
+Artefakte: `.work/test-results/final-20261026/console.log`, `final-20261026.trx`, `exit-code.txt`; isolierte Wiederholung unter `.work/test-results/final-20261026/recheck/`. Eine kompakte, cleanup-feste Zusammenfassung liegt in `docs/integration/seasonal-genres/mobile-test-results.md`.
 
 ## Mobile UnitSuite und Windows-Build
 

@@ -19,9 +19,13 @@ Keine.
 
 - [x] `SourceSearchTests.SubmitViaEnter_FiltersFromFirstPage` am 2026-10-26 unverändert erneut ausgeführt: bestanden.
 - [x] `SourceSearchTests.SubmittedText_RemainsVisibleAfterReturn` am 2026-10-26 unverändert erneut ausgeführt: bestanden.
-- [ ] Vollständige Windows-E2E-Suite nach der erfolgreichen gezielten Nachprüfung erneut abschließen. Historischer vollständiger Lauf: 70/72; die beiden damaligen Fehlerfälle sind jetzt separat bestanden.
-- [ ] Im letzten gezielten Lauf zusätzlich gemeldeten WinRT-Finalizer-Prozessfehler `0xC0000005` in freier interaktiver Session prüfen; Ergebnis war 7/9 (einschließlich sechs bestandener saisonaler Tests). Keine Produktursache belegt; keine Testabschächung oder spekulative Korrektur vornehmen.
+- [x] Vollständige guarded Windows-E2E-Suite nach der Testinfrastrukturänderung ausgeführt: 69/72, 0 übersprungen; alle sechs saisonalen Tests bestanden. Drei Fehlerfälle wurden gezielt wiederholt: zwei bestanden isoliert, der Suchtest bestand nach einem erfassten App-Crash auch in zwei Wiederholungen. Der Vollsuite-Fehlerstand bleibt 69/72. Details in `test-results.md`.
+- [x] Native WinRT-Absturzüberwachung in der guarded Suite geprüft: `SourceSearchTests.SubmittedText_RemainsVisibleAfterReturn` erfasste App-PID 45732 mit Exit `0xC0000005`; PID-Prozessdaten und stderr bewahren den Finalizerstack. Zwei isolierte Wiederholungen bestanden, die Ursache ist aber nicht erklärt oder behoben. Keine Testabschwächung oder Produktkorrektur. Details in `test-results.md`.
 
+## Noch offene Abschlusskriterien (2026-10-26)
+
+- [ ] Vollständige Windows-E2E-Suite mit 72/72, Exitcode 0 und ohne unerwarteten App-Abbruch erfolgreich ausführen. Letzter bewachter Gesamtlauf: 69/72; drei Einzelfall-Wiederholungen bestanden, der Suchfall zweimal. Dies ersetzt keinen grünen Gesamtlauf.
+- [ ] Nativen Shutdown-Abbruch der MAUI-App (PID 45732, `0xC0000005`, ca. 375 ms nach Beginn von `CloseMainWindow`) anhand eines nativen Crashdumps eingrenzen und einen belegbaren Fix prüfen. Managed Stack und offizielle ähnliche Issues belegen kein konkretes fehlerhaftes Objekt. Details in `diagnosis-winrt-shutdown.md`.
 ## Hinweise zur Fortsetzung
 
 Produktcode und Testtreiber wurden in Iteration 3 nicht verändert; erfolglose Fokusversuche wurden vollständig zurückgenommen. Bestehende Nachweise: 1396 mobile Unit-Tests bestanden, Windows-Build erfolgreich; Server Debug/Release und vollständige Suite 2358 bestanden/2 bestehende Skips, vier echte Web-E2E bestanden und unabhängige Mutationstests erfolgreich. Details in `test-results.md` und `implementation-followup-3.md`.

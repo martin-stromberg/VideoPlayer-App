@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Runtime.CompilerServices;
 using VideoPlayer.E2E.Tests.Support;
 
@@ -10,9 +11,10 @@ namespace VideoPlayer.E2E.Tests.Tests;
 /// sequentiellen <c>E2E</c>-Collection.
 /// </summary>
 [Collection("E2E")]
-public abstract class E2ETestBase
+public abstract class E2ETestBase : IAsyncLifetime
 {
     private readonly AppFixture fixture;
+    private readonly ConcurrentQueue<Exception> appShutdownFailures = new();
 
     /// <summary>Initialisiert die Basisklasse.</summary>
     /// <param name="fixture">Geteilte Build-Fixture der Collection.</param>
@@ -23,6 +25,21 @@ public abstract class E2ETestBase
 
     /// <summary>Abbruchtoken des laufenden Tests (xUnit-Kontext).</summary>
     protected static CancellationToken Ct => TestContext.Current.CancellationToken;
+
+    /// <inheritdoc/>
+    public ValueTask InitializeAsync() => ValueTask.CompletedTask;
+
+    /// <inheritdoc/>
+    public ValueTask DisposeAsync()
+    {
+        // Ein Fehler aus einem using-Dispose würde eine vorherige Assertion
+        // überschreiben. xUnit aggregiert die getrennte Aufräumphase hingegen
+        // mit dem Ergebnis des eigentlichen Tests.
+        return appShutdownFailures.IsEmpty
+            ? ValueTask.CompletedTask
+            : ValueTask.FromException(new AggregateException(
+                "Mindestens ein App-Prozess wurde unerwartet beendet.", appShutdownFailures));
+    }
 
     /// <summary>
     /// Baut die App (einmalig) und startet sie mit einem eigenen Profil.
@@ -36,7 +53,8 @@ public abstract class E2ETestBase
     {
         var exePath = await fixture.EnsureBuiltAsync();
         return await AppInstance.StartAsync(
-            exePath, testName, cancellationToken: Ct, profile: profile);
+            exePath, testName, cancellationToken: Ct, profile: profile,
+            reportShutdownFailure: appShutdownFailures.Enqueue);
     }
 
     /// <summary>
