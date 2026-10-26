@@ -67,7 +67,7 @@ public sealed class PlaylistManagementTests : E2ETestBase
     private static async Task ChooseManageActionAsync(AppInstance app, string action)
     {
         await app.DevApi.InvokeAsync("PlaylistManageButton", cancellationToken: Ct);
-        app.Ui.ClickByName(action, TimeSpan.FromSeconds(15));
+        app.Ui.ClickByName(action, TimeSpan.FromSeconds(15), initialWait: TimeSpan.FromMilliseconds(300));
     }
 
     /// <summary>Wählt eine Aktion des Eintrags-Kontextmenüs.</summary>

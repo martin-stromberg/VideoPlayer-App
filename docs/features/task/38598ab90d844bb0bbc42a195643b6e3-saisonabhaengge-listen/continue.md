@@ -24,8 +24,8 @@ Keine.
 
 ## Noch offene Abschlusskriterien (2026-10-26)
 
-- [ ] Vollständige Windows-E2E-Suite mit 72/72, Exitcode 0 und ohne unerwarteten App-Abbruch erfolgreich ausführen. Letzter bewachter Gesamtlauf am 2026-10-26: 70/72, 0 übersprungen; Playlist-Löschen und LogProtocol bestanden anschließend jeweils isoliert. Dies ersetzt keinen grünen Gesamtlauf.
-- [ ] Nativen Shutdown-Abbruch der MAUI-App (`0xC0000005`, zuletzt PID 57880) anhand eines passenden nativen Crashdumps eingrenzen und einen belegbaren Fix prüfen. Der vorhandene Dump eines anderen Laufs zeigt `C000027B`; sein Zusammenhang mit dem Access Violation-Abbruch ist nicht belegt. Details in `native-dump-investigation.md` und `native-dump-analysis.md`.
+- [ ] Vollständige Windows-E2E-Suite mit 72/72, Exitcode 0 und ohne unerwarteten App-Abbruch erfolgreich ausführen. Letzter Gesamtlauf am 2026-10-26: 70/72, 0 übersprungen; die zwei Fehler waren native Shutdown-Abbrüche in SourceBrowsing und ContinueWatchingPlayback. Alle sechs saisonalen Flüsse bestanden.
+- [ ] Nativen Shutdown-Abbruch der MAUI-App (`0xC0000005`, zuletzt PIDs 44260 und 49276) anhand eines passenden nativen Crashdumps eingrenzen und einen belegbaren Fix prüfen. Der vorhandene Dump eines anderen Laufs zeigt `C000027B`; sein Zusammenhang mit dem Access Violation-Abbruch ist nicht belegt. Details in `native-dump-investigation.md` und `native-dump-analysis.md`.
 ## Hinweise zur Fortsetzung
 
 Produktcode und Testtreiber wurden in Iteration 3 nicht verändert; erfolglose Fokusversuche wurden vollständig zurückgenommen. Bestehende Nachweise: 1396 mobile Unit-Tests bestanden, Windows-Build erfolgreich; Server Debug/Release und vollständige Suite 2358 bestanden/2 bestehende Skips, vier echte Web-E2E bestanden und unabhängige Mutationstests erfolgreich. Details in `test-results.md` und `implementation-followup-3.md`.
@@ -51,3 +51,12 @@ Maschinenlesbares Ergebnis lokal unter `.work/test-results/search-recheck-202610
 - [ ] Sporadischen MAUI-Abbruch `0xC0000005` beim Fixture-Shutdown eingrenzen und belegt beheben. Er trat zuletzt im LogProtocol-Fluss (App-PID 57880) auf. Der lokal gesicherte Dump eines anderen Laufs zeigt `C000027B`/`E_UNEXPECTED`; ein Zusammenhang ist nicht belegt. Kein Runtime-Fix ohne konkreten nativen Nachweis.
 
 Diese Punkte wurden in der maximalen Lifecycle-Prüfschleife nicht abgeschlossen. Der Featureordner bleibt erhalten und Schritt 13 in `todo.md` offen. Die übrigen Anforderungs- und saisonalen E2E-Prüfungen sind dokumentiert.
+
+## Fortsetzung nach Nutzerhinweis zur UIA-Desktopsuche (2026-10-26)
+
+- [x] `initialWait` beim Playlist-Verwaltungsmenü und beim Continue-Watching-Cancel-Test eingesetzt; fehlenden `System.Diagnostics`-Import ergänzt. Der betroffene Genre-Test bestand gezielt.
+- [x] Desktop-Fallback in `ClickByName` und `WaitForNameAbsent` auf direkte Desktop-Kinder der App-PID und deren Teilbäume begrenzt. Fremde Fensterbäume werden nicht mehr tief durchsucht. Die zwei gezielten E2E-Tests bestanden 2/2, der unabhängige Review meldete keine blockierenden Befunde.
+- [x] Vollständige Windows-E2E-Suite nach dem Umbau ausgeführt: **70/72**, 0 Skips, Exitcode 1. Alle Playlist-Verwaltungs-, Continue-Watching-Kontextmenü- und saisonalen Tests bestanden. Zwei MAUI-Prozesse beendeten sich beim Fixture-Shutdown mit `0xC0000005` im WinRT-Finalizer.
+- [ ] Native Shutdown-Ursache mit passendem Crashdump und belegtem Fix klären; danach die vollständige Suite mit 72/72 nachweisen. Ein `C000027B`-Abbruch des StreamFailure-Tests trat in einem vorherigen Lauf und dessen Zweiertest auf, ein weiterer isolierter Lauf bestand. Die zwei `0xC0000005`-Abbrüche traten nach der UIA-Änderung in anderen Tests auf. Keine Verbindung der nativen Fehler zur UIA-Änderung belegt.
+
+Einzelne UIA-Aufrufe besitzen weiterhin keine eigene harte Timeout-Grenze. Der `initialWait` und die App-PID-Begrenzung verringern die beobachtete Konkurrenz mit fremden Fensterbäumen, belegen aber keine generelle Hängefreiheit. Detailergebnisse und Artefaktpfade in `test-results.md`.

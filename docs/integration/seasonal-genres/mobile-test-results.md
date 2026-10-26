@@ -3,6 +3,10 @@
 Stand: 2026-10-26. Frühere Mobile-Unit-, Build- und Servernachweise stehen im
 Feature-Testbericht und im Server-Testbericht.
 
+## Letzter Windows-E2E-Lauf nach Eingrenzung der UIA-Desktopsuche
+
+**70/72 bestanden, 0 Skips, Exitcode 1.** Alle sechs saisonalen Tests, alle Playlist-Management-Tests und alle drei Continue-Watching-Kontextmenütests bestanden. Zwei MAUI-App-Prozesse stürzten beim Fixture-Shutdown mit `0xC0000005` im WinRT-Finalizer ab (`SourceBrowsingTests.GenreBar_Hidden_WhenServerHasNoGenres` und `ContinueWatchingPlaybackTests.TapContinueWatchingEpisode_OpensDetailsAndStartsPlaybackAndAdvancesToNextEpisode`). Die vollständige Suite bleibt rot; ein nativer Fix ist nicht belegt. TRX: `.work/test-results/full-bounded-desktop-20261026/full-bounded-desktop-20261026.trx`. Die gezielten Tests für Genre-Verwaltungsmenü und Continue-Watching-Cancel bestanden nach der UIA-Änderung 2/2. Weitere Details im Feature-Testbericht.
+
 ## Aktueller Nachweis nach Playlist-Testfix
 
 Der letzte vollständige Windows-E2E-Lauf bestand mit **70/72, 0 Skips, Exitcode 1**; alle sechs saisonalen Flüsse waren grün. Der zuvor reproduzierbare Playlist-Verschiebefall bestand nach einer überprüften ActionSheet-Synchronisierung. Der Playlist-Löschfall scheiterte im Gesamtlauf an einem UIA-Timeout und bestand isoliert. Im LogProtocol-Fluss beendete sich die MAUI-App mit `0xC0000005` (PID 57880); isoliert bestand auch dieser Fall. Der volle Lauf bleibt rot. Artefakte: `.work/test-results/final-post-playlist-20261026/`. Dumpanalyse und unerledigte Diagnose stehen im erhaltenen Feature-Verzeichnis.

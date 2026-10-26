@@ -1,6 +1,14 @@
 # Abschlussprüfungen – Saisonabhängige Genre-Listen
 
-**Aktueller Status (2026-10-26): letzter vollständiger Windows-E2E-Lauf 70/72, 0 Skips, Exitcode 1; alle sechs saisonalen Flüsse bestanden. Zwei bestehende Fehlerfälle bestanden jeweils isoliert, der native App-Abbruch trat erneut auf.**
+**Aktueller Status (2026-10-26): letzter vollständiger Windows-E2E-Lauf 70/72, 0 Skips, Exitcode 1; alle sechs saisonalen Flüsse und die betroffenen Kontextmenütests bestanden. Zwei MAUI-Prozesse stürzten beim Fixture-Shutdown mit `0xC0000005` ab.**
+
+## Nachprüfung der initialen Wartezeit und der App-begrenzten Desktopsuche
+
+Die vom Nutzer begonnene `initialWait`-Erweiterung wurde beim Playlist-Verwaltungsmenü und beim Continue-Watching-Cancel-Test angewandt. Die Desktop-Fallbacksuche des UI-Treibers durchläuft nur noch direkte Desktop-Kinder der App-PID und deren Teilbäume. Der Cancel-Test nutzt die Popup-fähige Klicksuche anstelle einer Vorabprüfung ausschließlich im Hauptfenster. Unabhängiger Review: keine blockierenden Befunde. Die zwei betroffenen Tests bestanden gezielt **2/2**; der Genre-Test bestand außerdem zuvor einzeln. Artefakte: `.work/test-results/bounded-desktop-targeted-20261026/` und `.work/test-results/genre-initial-wait-20261026/`.
+
+Der erste vollständige Lauf mit `initialWait`, vor Begrenzung der Desktopsuche, endete **70/72**: Continue-Watching-Cancel fand „Ausblenden“ nicht (isoliert bestanden), und `StreamFailure_AdvancesToNextPlaylistEntry` verzeichnete beim App-Shutdown `0xC000027B` (im Zweiertest wiederholt, in einem weiteren isolierten Lauf bestanden). Die Assertions des Streamtests waren zuvor erfüllt. Artefakte: `.work/test-results/full-initial-wait-20261026/`; Diagnose in `diagnosis-continue-menu.md` und `diagnosis-stream-failure-exit.md`.
+
+Der anschließende vollständige Lauf nach der begrenzten Desktopsuche endete mit **70 bestanden, 2 fehlgeschlagen, 0 übersprungen, Exitcode 1** in 11:25. Alle Playlist-Management-Tests einschließlich `SetAndResetGenres_UpdatesServer`, alle drei Continue-Watching-Kontextmenütests und alle sechs saisonalen Tests bestanden. Die beiden Fehlschläge waren native App-Abbrüche `0xC0000005` beim Fixture-Shutdown in `SourceBrowsingTests.GenreBar_Hidden_WhenServerHasNoGenres` (PID 44260) und `ContinueWatchingPlaybackTests.TapContinueWatchingEpisode_OpensDetailsAndStartsPlaybackAndAdvancesToNextEpisode` (PID 49276). Der gemeldete Finalizerstack enthält `WinRT.IObjectReference.Finalize` und bei PID 44260 `Marshal.Release`. Artefakte: `.work/test-results/full-bounded-desktop-20261026/full-bounded-desktop-20261026.trx` und lokale Prozesslogs unter `.work/e2e-process-logs/`. Ein grüner Gesamtlauf und ein belegter nativer Fix fehlen weiterhin.
 
 ## Neuester vollständiger Windows-E2E-Lauf nach Playlist-Synchronisierung
 
