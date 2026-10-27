@@ -42,6 +42,31 @@ public sealed record DownloadListItem
     /// <summary>Maschinenlesbarer Fehlercode des letzten Fehlschlags; <c>null</c> = kein Fehler.</summary>
     public string? Error { get; init; }
 
+    /// <summary>Herkunft des Downloads (Altbestand gilt als <see cref="DownloadOrigin.Manual"/>).</summary>
+    public DownloadOrigin Origin { get; init; } = DownloadOrigin.Manual;
+
+    /// <summary>Ablaufdatum des abgeschlossenen Downloads (UTC); <c>null</c> = nicht gesetzt.</summary>
+    public DateTime? ExpiresAtUtc { get; init; }
+
+    /// <summary>Herkunfts-Kennzeichnung des Eintrags („Cache" bei automatischen Downloads); <c>null</c> = keine Anzeige.</summary>
+    public string? OriginText => Origin == DownloadOrigin.Auto ? "Cache" : null;
+
+    /// <summary>Eine Herkunfts-Kennzeichnung wird angezeigt.</summary>
+    public bool HasOriginText => OriginText is not null;
+
+    /// <summary>
+    /// Ablaufdatum-Anzeige des Eintrags („Läuft ab am …", lokales Datum,
+    /// kurzes Format) — nur bei abgeschlossenen Downloads mit gesetztem
+    /// Ablaufdatum; sonst <c>null</c>.
+    /// </summary>
+    public string? ExpiresText =>
+        State == DownloadState.Completed && ExpiresAtUtc is { } expiresAtUtc
+            ? $"Läuft ab am {expiresAtUtc.ToLocalTime():dd.MM.yyyy HH:mm}"
+            : null;
+
+    /// <summary>Eine Ablaufdatum-Anzeige wird gezeigt.</summary>
+    public bool HasExpiresText => ExpiresText is not null;
+
     /// <summary>Der Download wartet oder läuft gerade.</summary>
     public bool IsActive => State is DownloadState.Queued or DownloadState.Downloading;
 
@@ -67,7 +92,8 @@ public sealed record DownloadListItem
     /// Breite des Vorschaubild-Rahmens in dp — Episode: 16:9-Still
     /// (128), sonst 2:3-Poster (48); die Rahmenhöhe beträgt einheitlich 72.
     /// </summary>
-    public double PreviewWidth => MediaTypeNames.Normalize(MediaType) == "tvshowepisode" ? 128 : 48;
+    public double PreviewWidth =>
+        MediaTypeNames.Normalize(MediaType) == "tvshowepisode" ? 128 : 48;
 
     /// <summary>Fortschritt im Bereich 0–1 (bei unbekannter Gesamtgröße 0).</summary>
     public double Progress =>

@@ -628,7 +628,7 @@ public class AppUpdateTests_Player
             Settings = new AppSettings
             {
                 AutoResumeEnabled = true,
-                AutoDeleteWatchedEpisodes = true
+                AutoDeletePlayedDownloads = true
             }
         };
 
@@ -1012,6 +1012,88 @@ public class AppUpdateTests_Player
 
         Assert.Same(PlayerState.Empty, transition.Model.Player);
         Assert.Empty(transition.Effects);
+    }
+
+    // --- Wiedergabe-Schutz des Download-Ablaufdatums ---
+
+    /// <summary>Hilfsmethode: laufende Wiedergabe einer lokalen Datei (Download).</summary>
+    /// <returns>Der Player-Zustand mit lokaler Quelle.</returns>
+    private static PlayerState LocalFilePlayingState() =>
+        PlayingState() with
+        {
+            Source = new PlaybackSource
+            {
+                Kind = PlaybackSourceKind.LocalFile,
+                Location = "/tmp/movie_31.mp4"
+            }
+        };
+
+    /// <summary>Prüft den Wiedergabe-Schutz: der erste Takt mit bekannter Dauer einer lokalen Datei emittiert den Schutz-Effekt mit der Restdauer.</summary>
+    [Fact]
+    public void PlaybackProgress_LocalFileFirstTick_EmitsProtectEffect()
+    {
+        var duration = TimeSpan.FromMinutes(45);
+        var position = TimeSpan.FromMinutes(10);
+        var model = WithPlayer(LocalFilePlayingState());
+
+        var transition = AppUpdate.Update(
+            model,
+            new PlaybackProgressMessage(position, duration, true, false, 31));
+
+        Assert.True(transition.Model.Player.DownloadExpiryProtected);
+        var effect = Assert.Single(transition.Effects, e => e is ProtectDownloadExpiryEffect);
+        var protect = (ProtectDownloadExpiryEffect)effect;
+        Assert.Equal("tvshowepisode", protect.MediaType);
+        Assert.Equal(31, protect.MediaId);
+        Assert.Equal(duration - position, protect.RemainingDuration);
+    }
+
+    /// <summary>Prüft den Wiedergabe-Schutz: der Effekt greift einmalig je Medium — der zweite Takt wiederholt ihn nicht.</summary>
+    [Fact]
+    public void PlaybackProgress_LocalFileSecondTick_NoRepeat()
+    {
+        var duration = TimeSpan.FromMinutes(45);
+        var model = WithPlayer(LocalFilePlayingState());
+        var first = AppUpdate.Update(
+            model,
+            new PlaybackProgressMessage(TimeSpan.FromMinutes(10), duration, true, false, 31));
+
+        var second = AppUpdate.Update(
+            first.Model,
+            new PlaybackProgressMessage(TimeSpan.FromMinutes(11), duration, true, false, 31));
+
+        Assert.True(second.Model.Player.DownloadExpiryProtected);
+        Assert.DoesNotContain(second.Effects, e => e is ProtectDownloadExpiryEffect);
+    }
+
+    /// <summary>Prüft den Wiedergabe-Schutz: eine Stream-Quelle löst keinen Schutz-Effekt aus und setzt das Flag nicht.</summary>
+    [Fact]
+    public void PlaybackProgress_StreamSource_NoEffect()
+    {
+        var model = WithPlayer(PlayingState());
+
+        var transition = AppUpdate.Update(
+            model,
+            new PlaybackProgressMessage(
+                TimeSpan.FromMinutes(10), TimeSpan.FromMinutes(45), true, false, 31));
+
+        Assert.False(transition.Model.Player.DownloadExpiryProtected);
+        Assert.DoesNotContain(transition.Effects, e => e is ProtectDownloadExpiryEffect);
+    }
+
+    /// <summary>Prüft den Wiedergabe-Schutz: ohne bekannte Dauer entfällt die Hochsetzung.</summary>
+    [Fact]
+    public void PlaybackProgress_UnknownDuration_NoEffect()
+    {
+        var model = WithPlayer(LocalFilePlayingState() with { Duration = TimeSpan.Zero });
+
+        var transition = AppUpdate.Update(
+            model,
+            new PlaybackProgressMessage(
+                TimeSpan.FromMinutes(10), TimeSpan.Zero, true, false, 31));
+
+        Assert.False(transition.Model.Player.DownloadExpiryProtected);
+        Assert.DoesNotContain(transition.Effects, e => e is ProtectDownloadExpiryEffect);
     }
 
     // --- Picture-in-Picture ---

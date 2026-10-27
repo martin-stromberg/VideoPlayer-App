@@ -92,4 +92,17 @@ public sealed class DownloadManifestEntry
 
     /// <summary>Zeitpunkt der letzten Aktualisierung (UTC).</summary>
     public DateTime UpdatedAtUtc { get; set; }
+
+    /// <summary>
+    /// Ablaufdatum des abgeschlossenen Downloads (UTC): Fertigstellung
+    /// plus konfigurierter Aufbewahrungszeit; <c>null</c> = nicht gesetzt
+    /// bzw. Altbestand (gilt im Bereinigungslauf als abgelaufen).
+    /// </summary>
+    public DateTime? ExpiresAtUtc { get; set; }
+
+    /// <summary>
+    /// Persistierte Herkunft des Downloads (<c>manual</c>/<c>auto</c>);
+    /// <c>null</c> = Altbestand = <c>manual</c>.
+    /// </summary>
+    public string? Origin { get; set; }
 }

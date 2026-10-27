@@ -28,4 +28,12 @@ public sealed record DownloadReconcileResult
     /// <summary>Anzahl korrigierter Manifest-Einträge („fertig" ohne Datei → fehlgeschlagen).</summary>
     /// <value>Die Anzahl der korrigierten Einträge.</value>
     public int CorrectedCompletedCount { get; init; }
+
+    /// <summary>Anzahl abgelaufener Downloads, die vollständig entfernt wurden (Datei + Manifest-Zeile).</summary>
+    /// <value>Die Anzahl der entfernten Einträge.</value>
+    public int RemovedExpiredCount { get; init; }
+
+    /// <summary>Anzahl abgelaufener Einträge, die als Auto-Download-Kandidat verlängert wurden.</summary>
+    /// <value>Die Anzahl der verlängerten Einträge.</value>
+    public int ExtendedExpiryCount { get; init; }
 }

@@ -98,6 +98,13 @@ public sealed class DownloadService
     /// <summary>Fehlertext bei ungültiger Download-Anforderung.</summary>
     public const string NoticeInvalidMedia = "Dieses Medium kann nicht heruntergeladen werden.";
 
+    /// <summary>
+    /// Faktor des Wiedergabe-Schutzes: das Ablaufdatum eines lokal
+    /// wiedergegebenen Downloads wird auf <c>jetzt + Faktor × Restdauer</c>
+    /// hochgesetzt (<see cref="ExtendExpiryAsync"/>).
+    /// </summary>
+    public const int PlaybackProtectionFactor = 2;
+
     private const long BytesPerGigabyte = 1_073_741_824L;
     private const int CopyBufferSize = 81920;
 
@@ -118,6 +125,7 @@ public sealed class DownloadService
     private readonly long? quotaBytesOverride;
     private readonly IDownloadBackend? backend;
     private readonly ILogger<DownloadService> logger;
+    private readonly Func<DateTime> utcNow;
 
     private readonly SemaphoreSlim manifestGate = new(1, 1);
     private readonly SemaphoreSlim pumpGate = new(1, 1);
@@ -140,7 +148,7 @@ public sealed class DownloadService
         INetworkStatusMonitor networkMonitor,
         ILogger<DownloadService>? logger = null,
         IDownloadBackend? backend = null)
-        : this(authSession, secrets, cache, layout, networkMonitor, null, null, null, logger, backend)
+        : this(authSession, secrets, cache, layout, networkMonitor, null, null, null, logger, backend, null)
     {
     }
 
@@ -155,6 +163,7 @@ public sealed class DownloadService
     /// <param name="quotaBytesOverride">Ersetzt das GB-Kontingent der Einstellungen (für Tests); <c>null</c> = <c>DownloadQuotaGb</c>.</param>
     /// <param name="logger">Optionaler Logger für das Programmprotokoll.</param>
     /// <param name="backend">Plattform-Transfer-Backend (iOS: Hintergrund-Session); <c>null</c> = prozessinterner HTTP-Stream.</param>
+    /// <param name="utcNow">Zeitquelle der Ablauflogik (für Tests); <c>null</c> = <see cref="DateTime.UtcNow"/>.</param>
     internal DownloadService(
         AuthSessionService authSession,
         AppSecretsService secrets,
@@ -165,7 +174,8 @@ public sealed class DownloadService
         Func<string, bool>? fileExists,
         long? quotaBytesOverride,
         ILogger<DownloadService>? logger = null,
-        IDownloadBackend? backend = null)
+        IDownloadBackend? backend = null,
+        Func<DateTime>? utcNow = null)
     {
         this.authSession = authSession ?? throw new ArgumentNullException(nameof(authSession));
         this.secrets = secrets ?? throw new ArgumentNullException(nameof(secrets));
@@ -179,6 +189,7 @@ public sealed class DownloadService
         // Backend delegiert den Transfer (iOS: systemseitige Hintergrund-
         // Session). Ohne Angabe bleibt der prozessinterne HTTP-Stream.
         this.backend = backend;
+        this.utcNow = utcNow ?? (() => DateTime.UtcNow);
     }
 
     /// <summary>Wird ausgelöst, wenn ein Download-Eintrag geändert wurde (Zustand oder Fortschritt).</summary>
@@ -240,6 +251,7 @@ public sealed class DownloadService
     /// <param name="seriesContext">Optionaler Serienkontext eines Episoden-Downloads (Grundlage des Offline-„Weiterschauen").</param>
     /// <param name="playlistContext">Optionaler Playlist-Bezug des Downloads (Herkunft und Reihenfolge playlist-gebundener Einplanungen).</param>
     /// <param name="pictureId">Bild-Id des Vorschaubilds (<c>api/pictures/{id}</c> — Episoden-Still bzw. Film-Poster); <c>null</c> = kein Bild bekannt.</param>
+    /// <param name="origin">Herkunft des Downloads (<see cref="DownloadOrigin.Manual"/> über die Oberfläche, <see cref="DownloadOrigin.Auto"/> aus dem Auto-Download-Vorlauf).</param>
     /// <param name="cancellationToken">Bricht die Manifest-Operation ab (nicht den Transfer).</param>
     /// <returns>Das Einreihe-Ergebnis mit Snapshot und Hinweistext.</returns>
     public async Task<DownloadEnqueueResult> EnqueueAsync(
@@ -250,55 +262,15 @@ public sealed class DownloadService
         DownloadSeriesContext? seriesContext = null,
         DownloadPlaylistContext? playlistContext = null,
         long? pictureId = null,
+        DownloadOrigin origin = DownloadOrigin.Manual,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(settings);
         var type = MediaTypeNames.Normalize(mediaType);
 
-        DownloadEnqueueResult Logged(DownloadEnqueueResult enqueueResult)
-        {
-            // Fehler-Notices (ungültiges Medium, Kontingent erschöpft)
-            // sind überholbare Einzelfehler → Warning; nur die
-            // tatsächliche Einplanung ist ein Verlaufsereignis
-            // (Information). Dedup-Hinweise ohne Zustandsänderung
-            // (AlreadyRunning/AlreadyQueued/AlreadyPresent) bleiben
-            // Debug — Auto-Download-Läufe prüfen pro Kandidat und
-            // würden sonst pro Eintrag der Liste einen Eintrag ohne
-            // Vorgang erzeugen.
-            if (enqueueResult.IsError)
-            {
-                logger.LogWarning(
-                    "Download-Auftrag {MediaType}/{MediaId} ({Title}): {Notice}",
-                    type,
-                    mediaId,
-                    title,
-                    enqueueResult.Notice);
-            }
-            else if (enqueueResult.Notice == NoticeEnqueued)
-            {
-                logger.LogInformation(
-                    "Download-Auftrag {MediaType}/{MediaId} ({Title}): {Notice}",
-                    type,
-                    mediaId,
-                    title,
-                    enqueueResult.Notice);
-            }
-            else
-            {
-                logger.LogDebug(
-                    "Download-Auftrag {MediaType}/{MediaId} ({Title}): {Notice}",
-                    type,
-                    mediaId,
-                    title,
-                    enqueueResult.Notice);
-            }
-
-            return enqueueResult;
-        }
-
         if (mediaId <= 0 || type is not ("movie" or "tvshowepisode"))
         {
-            return Logged(new DownloadEnqueueResult
+            return LogEnqueueResult(type, mediaId, title, new DownloadEnqueueResult
             {
                 Item = null,
                 Notice = NoticeInvalidMedia,
@@ -306,58 +278,22 @@ public sealed class DownloadService
             });
         }
 
-        DownloadManifestEntry entry;
+        var request = new EnqueueRequest(
+            type, mediaId, title, seriesContext, playlistContext, pictureId, origin);
+        DownloadManifestEntry? entry = null;
+        DownloadEnqueueResult? dedup = null;
+        DownloadListItem? changedItem = null;
         await manifestGate.WaitAsync(cancellationToken);
         try
         {
             var existing = await FindEntryAsync(type, mediaId);
             if (existing is not null)
             {
-                var state = DownloadStateNames.FromPersisted(existing.State);
-                if (state == DownloadState.Downloading && runningTransfers.ContainsKey(Key(type, mediaId)))
-                {
-                    return Logged(new DownloadEnqueueResult { Item = ToItem(existing), Notice = NoticeAlreadyRunning });
-                }
-                if (state == DownloadState.Queued)
-                {
-                    return Logged(new DownloadEnqueueResult { Item = ToItem(existing), Notice = NoticeAlreadyQueued });
-                }
-                if (state == DownloadState.Completed && fileExists(DownloadManifestPaths.Resolve(layout, existing)))
-                {
-                    return Logged(new DownloadEnqueueResult { Item = ToItem(existing), Notice = NoticeAlreadyPresent });
-                }
-
-                // Fehlgeschlagen/abgebrochen/verwaist (completed ohne Datei,
-                // downloading ohne laufenden Transfer) → erneut einreihen.
-                existing.State = DownloadStateNames.ToPersisted(DownloadState.Queued);
-                existing.Error = null;
-                existing.DownloadedBytes = 0;
-                existing.TotalBytes = 0;
-                if (!string.IsNullOrWhiteSpace(title))
-                {
-                    existing.Title = title;
-                }
-                ApplySeriesContext(existing, seriesContext);
-                ApplyPlaylistContext(existing, playlistContext);
-                existing.PictureId ??= pictureId;
-                existing.UpdatedAtUtc = DateTime.UtcNow;
-                await cache.Connection.UpdateAsync(existing);
-                entry = existing;
+                (dedup, entry, changedItem) = await ResolveExistingEntryAsync(existing, request, settings);
             }
             else
             {
-                entry = new DownloadManifestEntry
-                {
-                    VideoId = (int)mediaId,
-                    VideoType = type,
-                    Title = title ?? string.Empty,
-                    FilePath = FilePathFor(type, mediaId),
-                    State = DownloadStateNames.ToPersisted(DownloadState.Queued),
-                    UpdatedAtUtc = DateTime.UtcNow
-                };
-                ApplySeriesContext(entry, seriesContext);
-                ApplyPlaylistContext(entry, playlistContext);
-                entry.PictureId ??= pictureId;
+                entry = CreateManifestEntry(request);
                 await cache.Connection.InsertAsync(entry);
             }
         }
@@ -366,26 +302,228 @@ public sealed class DownloadService
             manifestGate.Release();
         }
 
+        // Das ItemChanged-Ereignis einer Dedup-Verlängerung wird erst
+        // nach dem Gate-Release ausgelöst — der kritische Abschnitt
+        // bleibt kurz und Handler laufen nicht in das noch gehaltene
+        // Gate (Muster UpdateManifestEntryAsync).
+        if (changedItem is not null)
+        {
+            RaiseItemChanged(changedItem);
+        }
+
+        if (dedup is not null)
+        {
+            return LogEnqueueResult(type, mediaId, title, dedup);
+        }
+
         // Vorab-Quota-Prüfung: ist das Kontingent bereits belegt, wird der
         // Auftrag sofort als fehlgeschlagen geführt statt zu warten.
-        if (GetUsedBytes() >= QuotaBytesFor(settings))
+        var queued = entry!;
+        if (await FailIfQuotaExceededAsync(queued, settings))
         {
-            // Der Zustandswechsel-Eintrag von SetStateAsync (Failed mit
-            // quota_exceeded) trägt das Ereignis bereits als Warnung —
-            // kein zweiter Warn-Eintrag mit dem Hinweistext für
-            // denselben Vorgang.
-            await SetStateAsync(entry, DownloadState.Failed, ErrorQuotaExceeded);
             return new DownloadEnqueueResult
             {
-                Item = ToItem(entry),
+                Item = ToItem(queued),
                 Notice = NoticeQuotaExceeded,
                 IsError = true
             };
         }
 
-        RaiseItemChanged(ToItem(entry));
+        RaiseItemChanged(ToItem(queued));
         PumpQueue(settings);
-        return Logged(new DownloadEnqueueResult { Item = ToItem(entry), Notice = NoticeEnqueued });
+        return LogEnqueueResult(type, mediaId, title, new DownloadEnqueueResult { Item = ToItem(queued), Notice = NoticeEnqueued });
+    }
+
+    /// <summary>
+    /// Protokolliert das Einreihe-Ergebnis und liefert es zurück:
+    /// Fehler-Notices (ungültiges Medium, Kontingent erschöpft) sind
+    /// überholbare Einzelfehler → Warning; nur die tatsächliche
+    /// Einplanung ist ein Verlaufsereignis (Information). Dedup-Hinweise
+    /// ohne Zustandsänderung (AlreadyRunning/AlreadyQueued/
+    /// AlreadyPresent) bleiben Debug — Auto-Download-Läufe prüfen pro
+    /// Kandidat und würden sonst pro Eintrag der Liste einen Eintrag
+    /// ohne Vorgang erzeugen.
+    /// </summary>
+    /// <param name="type">Der normalisierte Medientyp.</param>
+    /// <param name="mediaId">Die Medien-Id.</param>
+    /// <param name="title">Der Anzeigetitel des Downloads.</param>
+    /// <param name="result">Das zu protokollierende Ergebnis.</param>
+    /// <returns>Das übergebene Ergebnis.</returns>
+    private DownloadEnqueueResult LogEnqueueResult(
+        string type, long mediaId, string? title, DownloadEnqueueResult result)
+    {
+        if (result.IsError)
+        {
+            logger.LogWarning(
+                "Download-Auftrag {MediaType}/{MediaId} ({Title}): {Notice}",
+                type,
+                mediaId,
+                title,
+                result.Notice);
+        }
+        else if (result.Notice == NoticeEnqueued)
+        {
+            logger.LogInformation(
+                "Download-Auftrag {MediaType}/{MediaId} ({Title}): {Notice}",
+                type,
+                mediaId,
+                title,
+                result.Notice);
+        }
+        else
+        {
+            logger.LogDebug(
+                "Download-Auftrag {MediaType}/{MediaId} ({Title}): {Notice}",
+                type,
+                mediaId,
+                title,
+                result.Notice);
+        }
+
+        return result;
+    }
+
+    /// <summary>
+    /// Gebündelte Daten einer Einreihe-Anforderung — die fachlich
+    /// zusammengehörige Datengruppe von <see cref="EnqueueAsync"/>,
+    /// die Dedup/Requeue und Neuanlage gemeinsam beschreibt.
+    /// </summary>
+    /// <param name="Type">Der normalisierte Medientyp.</param>
+    /// <param name="MediaId">Die Medien-Id.</param>
+    /// <param name="Title">Der Anzeigetitel des Downloads; <c>null</c> = Fallback.</param>
+    /// <param name="SeriesContext">Optionaler Serienkontext eines Episoden-Downloads.</param>
+    /// <param name="PlaylistContext">Optionaler Playlist-Bezug des Downloads.</param>
+    /// <param name="PictureId">Optionale Bild-Id des Vorschaubilds.</param>
+    /// <param name="Origin">Herkunft des Einreihe-Auftrags.</param>
+    /// <returns>Anforderungs-Datensatz der Einreihe-Operation.</returns>
+    private sealed record EnqueueRequest(
+        string Type,
+        long MediaId,
+        string? Title,
+        DownloadSeriesContext? SeriesContext,
+        DownloadPlaylistContext? PlaylistContext,
+        long? PictureId,
+        DownloadOrigin Origin);
+
+    /// <summary>
+    /// Dedup- und Requeue-Behandlung eines vorhandenen Manifest-Eintrags
+    /// (läuft unter dem <see cref="manifestGate"/> des Aufrufers):
+    /// laufende, wartende und abgeschlossene Aufträge liefern ihr
+    /// Dedup-Ergebnis — im Auto-Download-Vorlauf wird ein bereits
+    /// vorhandener Kandidat verlängert statt erneut geladen
+    /// (Ablaufdatum + Herkunft „auto"). Fehlgeschlagene, abgebrochene
+    /// und verwaiste Einträge (completed ohne Datei, downloading ohne
+    /// laufenden Transfer) werden als wartend erneut eingeplant
+    /// (<c>Requeued</c> des Ergebnistupels); Herkunft und Kontext
+    /// bleiben erhalten, das bisherige Ablaufdatum wird zurückgesetzt.
+    /// </summary>
+    /// <param name="existing">Der vorhandene Manifest-Eintrag.</param>
+    /// <param name="request">Die Einreihe-Anforderung (Titel, Kontexte, Bild-Id, Herkunft).</param>
+    /// <param name="settings">Aktuelle App-Einstellungen (Aufbewahrungszeit der Dedup-Verlängerung).</param>
+    /// <returns>
+    /// Das Dedup-Ergebnis bzw. der erneut eingeplante Eintrag (genau
+    /// eines von beiden) sowie der Änderungs-Snapshot einer
+    /// Dedup-Verlängerung — das <see cref="ItemChanged"/>-Ereignis
+    /// löst der Aufrufer erst nach dem Gate-Release aus.
+    /// </returns>
+    private async Task<(DownloadEnqueueResult? Result, DownloadManifestEntry? Requeued, DownloadListItem? Changed)>
+        ResolveExistingEntryAsync(
+            DownloadManifestEntry existing,
+            EnqueueRequest request,
+            AppSettings settings)
+    {
+        var state = DownloadStateNames.FromPersisted(existing.State);
+        if (state == DownloadState.Downloading
+            && runningTransfers.ContainsKey(ManifestKey(existing.VideoType, existing.VideoId)))
+        {
+            return (new DownloadEnqueueResult { Item = ToItem(existing), Notice = NoticeAlreadyRunning }, null, null);
+        }
+        if (state == DownloadState.Queued)
+        {
+            return (new DownloadEnqueueResult { Item = ToItem(existing), Notice = NoticeAlreadyQueued }, null, null);
+        }
+        if (state == DownloadState.Completed && fileExists(DownloadManifestPaths.Resolve(layout, existing)))
+        {
+            // Dedup im Auto-Download-Vorlauf: ein bereits vorhandener
+            // Kandidat wird verlängert statt erneut geladen — Ablauf-
+            // datum auf jetzt + Aufbewahrungszeit hochsetzen und die
+            // Herkunft auf „auto" stellen (auch ein manueller Download
+            // wird damit zum automatischen; UI-Bezeichnung „Cache").
+            DownloadListItem? changed = null;
+            if (request.Origin == DownloadOrigin.Auto)
+            {
+                existing.ExpiresAtUtc = utcNow() + TimeSpan.FromDays(settings.DownloadRetentionDays);
+                existing.Origin = DownloadOriginNames.ToPersisted(DownloadOrigin.Auto);
+                existing.UpdatedAtUtc = utcNow();
+                await cache.Connection.UpdateAsync(existing);
+                changed = ToItem(existing);
+            }
+
+            return (new DownloadEnqueueResult { Item = ToItem(existing), Notice = NoticeAlreadyPresent }, null, changed);
+        }
+
+        existing.State = DownloadStateNames.ToPersisted(DownloadState.Queued);
+        existing.Error = null;
+        existing.DownloadedBytes = 0;
+        existing.TotalBytes = 0;
+        existing.ExpiresAtUtc = null;
+        if (!string.IsNullOrWhiteSpace(request.Title))
+        {
+            existing.Title = request.Title;
+        }
+        ApplySeriesContext(existing, request.SeriesContext);
+        ApplyPlaylistContext(existing, request.PlaylistContext);
+        existing.PictureId ??= request.PictureId;
+        existing.UpdatedAtUtc = utcNow();
+        await cache.Connection.UpdateAsync(existing);
+        return (null, existing, null);
+    }
+
+    /// <summary>
+    /// Erstellt den Manifest-Eintrag einer neuen Einreihe-Anforderung
+    /// (Zustand wartend, Herkunft des Auftrags, Kontextangaben) — noch
+    /// nicht persistiert.
+    /// </summary>
+    /// <param name="request">Die Einreihe-Anforderung (Typ, Id, Titel, Kontexte, Bild-Id, Herkunft).</param>
+    /// <returns>Der neue Manifest-Eintrag.</returns>
+    private DownloadManifestEntry CreateManifestEntry(EnqueueRequest request)
+    {
+        var entry = new DownloadManifestEntry
+        {
+            VideoId = (int)request.MediaId,
+            VideoType = request.Type,
+            Title = request.Title ?? string.Empty,
+            FilePath = FilePathFor(request.Type, request.MediaId),
+            State = DownloadStateNames.ToPersisted(DownloadState.Queued),
+            Origin = DownloadOriginNames.ToPersisted(request.Origin),
+            UpdatedAtUtc = utcNow()
+        };
+        ApplySeriesContext(entry, request.SeriesContext);
+        ApplyPlaylistContext(entry, request.PlaylistContext);
+        entry.PictureId ??= request.PictureId;
+        return entry;
+    }
+
+    /// <summary>
+    /// Führt den Auftrag als fehlgeschlagen (<see cref="ErrorQuotaExceeded"/>),
+    /// wenn das Speicherplatzkontingent bereits belegt ist.
+    /// </summary>
+    /// <param name="entry">Der eingeplante Manifest-Eintrag.</param>
+    /// <param name="settings">Aktuelle App-Einstellungen (Kontingent).</param>
+    /// <returns><c>true</c>, wenn das Kontingent erschöpft ist und der Eintrag als fehlgeschlagen geführt wurde.</returns>
+    private async Task<bool> FailIfQuotaExceededAsync(DownloadManifestEntry entry, AppSettings settings)
+    {
+        if (GetUsedBytes() < QuotaBytesFor(settings))
+        {
+            return false;
+        }
+
+        // Der Zustandswechsel-Eintrag von SetStateAsync (Failed mit
+        // quota_exceeded) trägt das Ereignis bereits als Warnung —
+        // kein zweiter Warn-Eintrag mit dem Hinweistext für
+        // denselben Vorgang.
+        await SetStateAsync(entry, DownloadState.Failed, ErrorQuotaExceeded);
+        return true;
     }
 
     /// <summary>
@@ -442,7 +580,7 @@ public sealed class DownloadService
     public async Task CancelAsync(string mediaType, long mediaId, CancellationToken cancellationToken = default)
     {
         var type = MediaTypeNames.Normalize(mediaType);
-        if (runningTransfers.TryGetValue(Key(type, mediaId), out var cts))
+        if (runningTransfers.TryGetValue(ManifestKey(type, mediaId), out var cts))
         {
             // Der Transfer meldet den Abbruch selbst als „cancelled"
             // (SetStateAsync-Eintrag) — kein zusätzlicher Zwischeneintrag.
@@ -469,7 +607,7 @@ public sealed class DownloadService
     public async Task<bool> DeleteAsync(string mediaType, long mediaId, CancellationToken cancellationToken = default)
     {
         var type = MediaTypeNames.Normalize(mediaType);
-        var key = Key(type, mediaId);
+        var key = ManifestKey(type, mediaId);
         if (runningTransfers.TryGetValue(key, out var cts))
         {
             cts.Cancel();
@@ -482,17 +620,7 @@ public sealed class DownloadService
             return false;
         }
 
-        await manifestGate.WaitAsync(cancellationToken);
-        try
-        {
-            await cache.Connection.DeleteAsync(entry);
-        }
-        finally
-        {
-            manifestGate.Release();
-        }
-
-        RaiseItemRemoved(type, mediaId);
+        await DeleteManifestEntryAsync(entry, cancellationToken);
         logger.LogInformation(
             "Download {MediaType}/{MediaId} ({Title}) entfernt.",
             type,
@@ -502,25 +630,107 @@ public sealed class DownloadService
     }
 
     /// <summary>
-    /// Löscht den Download eines Mediums nur, wenn er abgeschlossen ist
-    /// (automatisches Entfernen gesehener Episoden) — laufende oder
-    /// wartende Aufträge bleiben unberührt.
+    /// Verkürzt das Ablaufdatum eines abgeschlossenen Downloads auf
+    /// <c>jetzt + <paramref name="delay"/></c> — Träger der Option
+    /// „Downloads nach dem Abspielen automatisch löschen"; die eigentliche
+    /// Entfernung übernimmt der nächste Bereinigungslauf. Nicht
+    /// abgeschlossene/fehlende Einträge bleiben unberührt.
     /// </summary>
     /// <param name="mediaType">Medientyp des Mediums.</param>
     /// <param name="mediaId">Id des Mediums.</param>
+    /// <param name="delay">Löschverzögerung ab Jetzt.</param>
     /// <param name="cancellationToken">Bricht die Operation ab.</param>
-    /// <returns><c>true</c>, wenn ein abgeschlossener Download entfernt wurde.</returns>
-    public async Task<bool> DeleteIfCompletedAsync(string mediaType, long mediaId, CancellationToken cancellationToken = default)
+    /// <returns><c>true</c>, wenn das Ablaufdatum eines <c>completed</c>-Eintrags gesetzt wurde.</returns>
+    public Task<bool> ExpireAfterAsync(
+        string mediaType, long mediaId, TimeSpan delay, CancellationToken cancellationToken = default) =>
+        UpdateCompletedExpiryAsync(
+            mediaType, mediaId, _ => utcNow() + delay, cancellationToken);
+
+    /// <summary>
+    /// Gerüst der Ablaufdatum-Änderungen (<see cref="ExpireAfterAsync"/>,
+    /// <see cref="ExtendExpiryAsync"/>): Eintrag suchen und die
+    /// <c>completed</c>-Vorbedingung prüfen, das Ziel über
+    /// <paramref name="computeTargetUtc"/> berechnen (<c>null</c> =
+    /// keine Änderung), schreiben und die Änderung nach dem
+    /// Gate-Release über <see cref="ItemChanged"/> melden.
+    /// </summary>
+    /// <param name="mediaType">Medientyp des Mediums (wird normalisiert).</param>
+    /// <param name="mediaId">Id des Mediums.</param>
+    /// <param name="computeTargetUtc">Zielberechnung aus dem gefundenen Eintrag; <c>null</c> = Eintrag bleibt unberührt.</param>
+    /// <param name="cancellationToken">Bricht die Operation ab.</param>
+    /// <returns><c>true</c>, wenn das Ablaufdatum eines <c>completed</c>-Eintrags geändert wurde.</returns>
+    private async Task<bool> UpdateCompletedExpiryAsync(
+        string mediaType,
+        long mediaId,
+        Func<DownloadManifestEntry, DateTime?> computeTargetUtc,
+        CancellationToken cancellationToken)
     {
         var type = MediaTypeNames.Normalize(mediaType);
-        var entry = await FindEntryAsync(type, mediaId);
-        if (entry is null || DownloadStateNames.FromPersisted(entry.State) != DownloadState.Completed)
+        DownloadListItem? changedItem = null;
+        // Lesen, Vorbedingung und Schreiben unter dem Gate — ein
+        // paralleler Schreiber darf nicht zwischen Prüfung und
+        // Schreiben dazwischenfunken (Muster EnqueueAsync).
+        await manifestGate.WaitAsync(cancellationToken);
+        try
         {
-            return false;
+            var entry = await FindEntryAsync(type, mediaId);
+            if (entry is null || DownloadStateNames.FromPersisted(entry.State) != DownloadState.Completed)
+            {
+                return false;
+            }
+
+            var untilUtc = computeTargetUtc(entry);
+            if (untilUtc is null)
+            {
+                return false;
+            }
+
+            entry.ExpiresAtUtc = untilUtc;
+            entry.UpdatedAtUtc = utcNow();
+            await cache.Connection.UpdateAsync(entry);
+            changedItem = ToItem(entry);
+        }
+        finally
+        {
+            manifestGate.Release();
         }
 
-        return await DeleteAsync(type, mediaId, cancellationToken);
+        // Das Ereignis wird erst nach dem Gate-Release ausgelöst —
+        // der kritische Abschnitt bleibt kurz und Handler, die
+        // synchron auf den Dienst zugreifen, laufen nicht in das
+        // noch gehaltene Gate (Muster UpdateManifestEntryAsync).
+        RaiseItemChanged(changedItem!);
+        return true;
     }
+
+    /// <summary>
+    /// Setzt das Ablaufdatum eines abgeschlossenen Downloads auf
+    /// <c>jetzt + <see cref="PlaybackProtectionFactor"/> ×
+    /// <paramref name="remaining"/></c> hoch — Wiedergabe-Schutz:
+    /// während des Abspielens einer lokalen Datei darf der
+    /// Bereinigungslauf den Download nicht entfernen. Bestehende
+    /// spätere Ablaufdaten bleiben bestehen (nur Hochsetzung); nicht
+    /// abgeschlossene/fehlende Einträge bleiben unberührt.
+    /// </summary>
+    /// <param name="mediaType">Medientyp des Mediums.</param>
+    /// <param name="mediaId">Id des Mediums.</param>
+    /// <param name="remaining">Verbleibende Wiedergabedauer — Basis der Hochsetzung (über die Zeitquelle).</param>
+    /// <param name="cancellationToken">Bricht die Operation ab.</param>
+    /// <returns><c>true</c>, wenn das Ablaufdatum eines <c>completed</c>-Eintrags hochgesetzt wurde.</returns>
+    public Task<bool> ExtendExpiryAsync(
+        string mediaType, long mediaId, TimeSpan remaining, CancellationToken cancellationToken = default) =>
+        UpdateCompletedExpiryAsync(
+            mediaType, mediaId,
+            // Nur Hochsetzung: ein bestehendes späteres Ablaufdatum
+            // bleibt bestehen (Selektor liefert null = keine Änderung).
+            entry =>
+            {
+                var untilUtc = utcNow() + PlaybackProtectionFactor * remaining;
+                return entry.ExpiresAtUtc is not null && entry.ExpiresAtUtc >= untilUtc
+                    ? null
+                    : untilUtc;
+            },
+            cancellationToken);
 
     /// <summary>
     /// Nimmt unterbrochene Downloads wieder auf: wartende und (z. B. nach
@@ -562,18 +772,7 @@ public sealed class DownloadService
             {
                 entry.State = DownloadStateNames.ToPersisted(DownloadState.Queued);
                 entry.Error = null;
-                entry.UpdatedAtUtc = DateTime.UtcNow;
-                await manifestGate.WaitAsync(cancellationToken);
-                try
-                {
-                    await cache.Connection.UpdateAsync(entry);
-                }
-                finally
-                {
-                    manifestGate.Release();
-                }
-
-                RaiseItemChanged(ToItem(entry));
+                await UpdateManifestEntryAsync(entry, cancellationToken);
             }
         }
 
@@ -597,11 +796,14 @@ public sealed class DownloadService
     /// <param name="mediaKey">Der Medien-Key aus dem Dateinamen-Muster.</param>
     /// <param name="errorCode">Fehlercode des Transfers; <c>null</c> = Erfolg.</param>
     /// <param name="tempPath">Pfad der fertig geladenen Temp-Datei; <c>null</c> bei Fehler.</param>
+    /// <param name="settings">Aktuelle App-Einstellungen (Aufbewahrungszeit für das Ablaufdatum der Fertigstellung).</param>
     /// <param name="cancellationToken">Bricht die Manifest-Operation ab.</param>
     /// <returns>Eine abgeschlossene Aufgabe nach der Korrektur.</returns>
     public async Task CompleteExternalTransferAsync(
-        string mediaKey, string? errorCode, string? tempPath, CancellationToken cancellationToken = default)
+        string mediaKey, string? errorCode, string? tempPath, AppSettings settings, CancellationToken cancellationToken = default)
     {
+        ArgumentNullException.ThrowIfNull(settings);
+
         var parts = mediaKey.Split('|')[0].Split('_');
         if (parts.Length != 2 || !long.TryParse(parts[1], out var mediaId))
         {
@@ -621,6 +823,7 @@ public sealed class DownloadService
                 entry.FilePath = DownloadManifestPaths.Resolve(layout, entry);
                 File.Copy(tempPath, entry.FilePath, overwrite: true);
                 entry.SizeBytes = new FileInfo(entry.FilePath).Length;
+                entry.ExpiresAtUtc = utcNow() + TimeSpan.FromDays(settings.DownloadRetentionDays);
                 await SetStateAsync(entry, DownloadState.Completed, null);
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
@@ -802,16 +1005,33 @@ public sealed class DownloadService
     /// einplanbar. Dateien von Einträgen im Zustand
     /// <see cref="DownloadState.Completed"/> und von gerade laufenden
     /// Transfers werden nie angefasst.
+    /// <para>
+    /// Mit übergebenen <paramref name="settings"/> läuft zusätzlich die
+    /// Ablauf-Prüfung: abgeschlossene Einträge mit erreichtem (oder im
+    /// Altbestand nicht gesetztem) Ablaufdatum werden entfernt — Datei,
+    /// Manifest-Zeile, <see cref="ItemRemoved"/>; Einträge, deren Medium
+    /// weiterhin Auto-Download-Kandidat ist (Schlüssel in
+    /// <paramref name="autoDownloadCandidateKeys"/>), werden stattdessen
+    /// auf <c>jetzt + Aufbewahrungszeit</c> verlängert und auf die
+    /// Herkunft <c>auto</c> umgestellt.
+    /// </para>
     /// </summary>
+    /// <param name="settings">Aktuelle App-Einstellungen (Aufbewahrungszeit der Verlängerung); <c>null</c> = kein Ablauf-Pass.</param>
+    /// <param name="autoDownloadCandidateKeys">Kandidatenmenge des Auto-Download-Vorlaufs im <see cref="ManifestKey"/>-Format; <c>null</c> = keine Kandidaten.</param>
     /// <param name="cancellationToken">Bricht die Manifest-Operationen ab.</param>
     /// <returns>Das Abgleichsergebnis mit den erkannten und entfernten Datenmengen.</returns>
-    public async Task<DownloadReconcileResult> ReconcileAsync(CancellationToken cancellationToken = default)
+    public async Task<DownloadReconcileResult> ReconcileAsync(
+        AppSettings? settings = null,
+        IReadOnlySet<string>? autoDownloadCandidateKeys = null,
+        CancellationToken cancellationToken = default)
     {
         var removedPartialBytes = 0L;
         var removedPartialCount = 0;
         var orphanedBytes = 0L;
         var orphanedFileCount = 0;
         var correctedCompleted = 0;
+        var removedExpiredCount = 0;
+        var extendedExpiryCount = 0;
 
         List<DownloadManifestEntry> entries;
         try
@@ -873,21 +1093,12 @@ public sealed class DownloadService
             if (!string.Equals(entry.FilePath, path, StringComparison.OrdinalIgnoreCase))
             {
                 entry.FilePath = path;
-                entry.UpdatedAtUtc = DateTime.UtcNow;
-                await manifestGate.WaitAsync(cancellationToken);
-                try
-                {
-                    await cache.Connection.UpdateAsync(entry);
-                }
-                finally
-                {
-                    manifestGate.Release();
-                }
+                await UpdateManifestEntryAsync(entry, cancellationToken);
             }
 
             var state = DownloadStateNames.FromPersisted(entry.State);
             var isRunning = state == DownloadState.Downloading
-                && runningTransfers.ContainsKey(Key(entry.VideoType, entry.VideoId));
+                && runningTransfers.ContainsKey(ManifestKey(entry.VideoType, entry.VideoId));
 
             // Überholte Teildatei: Eintrag wartet, ist fehlgeschlagen/
             // abgebrochen oder „läuft" ohne tatsächlichen Transfer — die
@@ -911,17 +1122,57 @@ public sealed class DownloadService
             }
         }
 
-        if (removedPartialCount > 0 || orphanedFileCount > 0 || correctedCompleted > 0)
+        // Ablauf-Pass: abgeschlossene Einträge mit erreichtem Ablaufdatum
+        // (Altbestand ohne ExpiresAtUtc gilt als abgelaufen) werden
+        // entfernt — es sei denn, das Medium ist weiterhin Auto-Download-
+        // Kandidat, dann wird verlängert und die Herkunft auf „auto"
+        // gestellt. Nur „completed" wird geprüft — laufende Transfers,
+        // wartende und fehlerhafte Einträge bleiben unberührt.
+        if (settings is not null)
+        {
+            var now = utcNow();
+            var retention = TimeSpan.FromDays(settings.DownloadRetentionDays);
+            foreach (var entry in entries)
+            {
+                if (DownloadStateNames.FromPersisted(entry.State) != DownloadState.Completed
+                    || runningTransfers.ContainsKey(ManifestKey(entry.VideoType, entry.VideoId))
+                    || (entry.ExpiresAtUtc is not null && entry.ExpiresAtUtc > now))
+                {
+                    continue;
+                }
+
+                if (autoDownloadCandidateKeys is not null
+                    && autoDownloadCandidateKeys.Contains(ManifestKey(entry.VideoType, entry.VideoId)))
+                {
+                    entry.ExpiresAtUtc = now + retention;
+                    entry.Origin = DownloadOriginNames.ToPersisted(DownloadOrigin.Auto);
+                    await UpdateManifestEntryAsync(entry, cancellationToken);
+                    extendedExpiryCount++;
+                    continue;
+                }
+
+                TryDeleteFile(DownloadManifestPaths.Resolve(layout, entry));
+                await DeleteManifestEntryAsync(entry, cancellationToken);
+                removedExpiredCount++;
+            }
+        }
+
+        if (removedPartialCount > 0 || orphanedFileCount > 0 || correctedCompleted > 0
+            || removedExpiredCount > 0 || extendedExpiryCount > 0)
         {
             logger.LogInformation(
                 "Download-Abgleich: {RemovedCount} überholte Teildateien entfernt ({RemovedBytes} Bytes), "
                 + "{OrphanedCount} Restdateien ohne Manifest-Eintrag erkannt ({OrphanedBytes} Bytes), "
-                + "{CorrectedCount} fertige Einträge ohne Datei korrigiert.",
+                + "{CorrectedCount} fertige Einträge ohne Datei korrigiert, "
+                + "{ExpiredCount} abgelaufene Downloads entfernt, "
+                + "{ExtendedCount} Auto-Download-Kandidaten verlängert.",
                 removedPartialCount,
                 removedPartialBytes,
                 orphanedFileCount,
                 orphanedBytes,
-                correctedCompleted);
+                correctedCompleted,
+                removedExpiredCount,
+                extendedExpiryCount);
         }
 
         return new DownloadReconcileResult
@@ -930,7 +1181,9 @@ public sealed class DownloadService
             RemovedPartialCount = removedPartialCount,
             OrphanedBytes = orphanedBytes,
             OrphanedFileCount = orphanedFileCount,
-            CorrectedCompletedCount = correctedCompleted
+            CorrectedCompletedCount = correctedCompleted,
+            RemovedExpiredCount = removedExpiredCount,
+            ExtendedExpiryCount = extendedExpiryCount
         };
     }
 
@@ -963,7 +1216,7 @@ public sealed class DownloadService
                     break;
                 }
 
-                var key = Key(entry.VideoType, entry.VideoId);
+                var key = ManifestKey(entry.VideoType, entry.VideoId);
                 var cts = new CancellationTokenSource();
                 if (!runningTransfers.TryAdd(key, cts))
                 {
@@ -1000,7 +1253,7 @@ public sealed class DownloadService
         var entries = await cache.Connection.Table<DownloadManifestEntry>().ToListAsync();
         return entries
             .Where(e => DownloadStateNames.FromPersisted(e.State) == DownloadState.Queued
-                && !runningTransfers.ContainsKey(Key(e.VideoType, e.VideoId)))
+                && !runningTransfers.ContainsKey(ManifestKey(e.VideoType, e.VideoId)))
             .OrderBy(e => e.Id)
             .FirstOrDefault();
     }
@@ -1011,7 +1264,7 @@ public sealed class DownloadService
         CancellationTokenSource cts,
         long usedAtStart)
     {
-        var key = Key(entry.VideoType, entry.VideoId);
+        var key = ManifestKey(entry.VideoType, entry.VideoId);
         var quotaBytes = QuotaBytesFor(settings);
         try
         {
@@ -1024,16 +1277,7 @@ public sealed class DownloadService
 
             entry.TotalBytes = 0;
             entry.DownloadedBytes = 0;
-            await manifestGate.WaitAsync(cts.Token);
-            try
-            {
-                await cache.Connection.UpdateAsync(entry);
-            }
-            finally
-            {
-                manifestGate.Release();
-            }
-            RaiseItemChanged(ToItem(entry));
+            await UpdateManifestEntryAsync(entry, cts.Token);
 
             Directory.CreateDirectory(layout.VideosDirectory);
             // Wieder eingeplante Einträge können einen veralteten
@@ -1106,6 +1350,9 @@ public sealed class DownloadService
                 entry.TotalBytes = result.TotalBytes;
             }
 
+            // Ablaufdatum der Fertigstellung: die Aufbewahrungsfrist
+            // beginnt erst mit „completed".
+            entry.ExpiresAtUtc = utcNow() + TimeSpan.FromDays(settings.DownloadRetentionDays);
             await SetStateIfPresentAsync(entry, DownloadState.Completed, null);
         }
         catch (OperationCanceledException) when (cts.IsCancellationRequested)
@@ -1158,7 +1405,22 @@ public sealed class DownloadService
         }
 
         lastProgressEmit[key] = now;
-        await manifestGate.WaitAsync();
+        await UpdateManifestEntryAsync(entry, CancellationToken.None);
+    }
+
+    /// <summary>
+    /// Persistiert einen geänderten Manifest-Eintrag unter dem
+    /// <see cref="manifestGate"/> (Zeitstempel über die Zeitquelle) und
+    /// meldet die Änderung über <see cref="ItemChanged"/>.
+    /// </summary>
+    /// <param name="entry">Der geänderte Manifest-Eintrag.</param>
+    /// <param name="cancellationToken">Bricht die Manifest-Operation ab.</param>
+    /// <returns>Eine abgeschlossene Aufgabe nach dem Schreiben.</returns>
+    private async Task UpdateManifestEntryAsync(
+        DownloadManifestEntry entry, CancellationToken cancellationToken)
+    {
+        entry.UpdatedAtUtc = utcNow();
+        await manifestGate.WaitAsync(cancellationToken);
         try
         {
             await cache.Connection.UpdateAsync(entry);
@@ -1171,11 +1433,34 @@ public sealed class DownloadService
         RaiseItemChanged(ToItem(entry));
     }
 
+    /// <summary>
+    /// Entfernt einen Manifest-Eintrag unter dem <see cref="manifestGate"/>
+    /// und meldet das Entfernen über <see cref="ItemRemoved"/>.
+    /// </summary>
+    /// <param name="entry">Der zu entfernende Manifest-Eintrag.</param>
+    /// <param name="cancellationToken">Bricht die Manifest-Operation ab.</param>
+    /// <returns>Eine abgeschlossene Aufgabe nach dem Schreiben.</returns>
+    private async Task DeleteManifestEntryAsync(
+        DownloadManifestEntry entry, CancellationToken cancellationToken)
+    {
+        await manifestGate.WaitAsync(cancellationToken);
+        try
+        {
+            await cache.Connection.DeleteAsync(entry);
+        }
+        finally
+        {
+            manifestGate.Release();
+        }
+
+        RaiseItemRemoved(entry.VideoType, entry.VideoId);
+    }
+
     private async Task SetStateAsync(DownloadManifestEntry entry, DownloadState state, string? error, Exception? exception = null)
     {
         entry.State = DownloadStateNames.ToPersisted(state);
         entry.Error = error;
-        entry.UpdatedAtUtc = DateTime.UtcNow;
+        entry.UpdatedAtUtc = utcNow();
         await manifestGate.WaitAsync();
         try
         {
@@ -1264,7 +1549,16 @@ public sealed class DownloadService
     private string FilePathFor(string type, long mediaId) =>
         Path.Combine(layout.VideosDirectory, $"{type}_{mediaId}.mp4");
 
-    private static string Key(string type, long mediaId) => $"{type}:{mediaId}";
+    /// <summary>
+    /// Manifest-Key eines Mediums (<c>{typ}:{mediaId}</c>, normalisierter
+    /// Medientyp) — gemeinsame Konvention der Transfer-Verwaltung und der
+    /// Auto-Download-Kandidatenmenge des Bereinigungslaufs.
+    /// </summary>
+    /// <param name="mediaType">Der Medientyp (wird normalisiert).</param>
+    /// <param name="mediaId">Die Medien-Id.</param>
+    /// <returns>Der Manifest-Key.</returns>
+    internal static string ManifestKey(string mediaType, long mediaId) =>
+        $"{MediaTypeNames.Normalize(mediaType)}:{mediaId}";
 
     private void TryDeleteFile(string? path)
     {
@@ -1296,6 +1590,8 @@ public sealed class DownloadService
                 ? $"Medium {entry.VideoId}"
                 : entry.Title,
             State = DownloadStateNames.FromPersisted(entry.State),
+            Origin = DownloadOriginNames.FromPersisted(entry.Origin),
+            ExpiresAtUtc = entry.ExpiresAtUtc,
             DownloadedBytes = entry.DownloadedBytes,
             TotalBytes = entry.TotalBytes,
             SizeBytes = entry.SizeBytes,

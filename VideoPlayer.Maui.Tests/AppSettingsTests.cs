@@ -18,7 +18,11 @@ public class AppSettingsTests
         Assert.Equal(300, settings.WatchedEndWindowSeconds);
         Assert.Equal(5, settings.DownloadQuotaGb);
         Assert.Equal(AppSettings.DefaultDownloadQuotaGb, settings.DownloadQuotaGb);
-        Assert.False(settings.AutoDeleteWatchedEpisodes);
+        Assert.Equal(7, settings.DownloadRetentionDays);
+        Assert.Equal(AppSettings.DefaultDownloadRetentionDays, settings.DownloadRetentionDays);
+        Assert.False(settings.AutoDeletePlayedDownloads);
+        Assert.Equal(15, settings.DeleteAfterPlaybackDelayMinutes);
+        Assert.Equal(AppSettings.DefaultDeleteAfterPlaybackDelayMinutes, settings.DeleteAfterPlaybackDelayMinutes);
         // Positiv formulierte Einstellung: der Hero-Kopfbereich ist
         // standardmäßig aktiviert.
         Assert.True(settings.HomeHeroEnabled);
@@ -64,6 +68,32 @@ public class AppSettingsTests
         Assert.Equal(expected, new AppSettings { DownloadQuotaGb = input }.Normalize().DownloadQuotaGb);
     }
 
+    /// <summary>Prüft Normalize: begrenzt die Aufbewahrungszeit in Tagen.</summary>
+    /// <param name="input">Die Eingabe.</param>
+    /// <param name="expected">Der erwartete Wert.</param>
+    [Theory]
+    [InlineData(0, 1)]
+    [InlineData(-2, 1)]
+    [InlineData(366, 365)]
+    [InlineData(14, 14)]
+    public void Normalize_ClampsDownloadRetentionDays(int input, int expected)
+    {
+        Assert.Equal(expected, new AppSettings { DownloadRetentionDays = input }.Normalize().DownloadRetentionDays);
+    }
+
+    /// <summary>Prüft Normalize: begrenzt die Löschverzögerung in Minuten (0 = sofort erlaubt).</summary>
+    /// <param name="input">Die Eingabe.</param>
+    /// <param name="expected">Der erwartete Wert.</param>
+    [Theory]
+    [InlineData(-1, 0)]
+    [InlineData(0, 0)]
+    [InlineData(1441, 1440)]
+    [InlineData(30, 30)]
+    public void Normalize_ClampsDeleteAfterPlaybackDelayMinutes(int input, int expected)
+    {
+        Assert.Equal(expected, new AppSettings { DeleteAfterPlaybackDelayMinutes = input }.Normalize().DeleteAfterPlaybackDelayMinutes);
+    }
+
     /// <summary>Prüft Normalize: lässt boolesche Werte unverändert.</summary>
     [Fact]
     public void Normalize_LeavesBooleansUntouched()
@@ -73,7 +103,7 @@ public class AppSettingsTests
             AutoDownloadEnabled = true,
             AutoResumeEnabled = false,
             WifiOnlyDownloads = false,
-            AutoDeleteWatchedEpisodes = true
+            AutoDeletePlayedDownloads = true
         };
 
         var normalized = settings.Normalize();
@@ -81,6 +111,6 @@ public class AppSettingsTests
         Assert.True(normalized.AutoDownloadEnabled);
         Assert.False(normalized.AutoResumeEnabled);
         Assert.False(normalized.WifiOnlyDownloads);
-        Assert.True(normalized.AutoDeleteWatchedEpisodes);
+        Assert.True(normalized.AutoDeletePlayedDownloads);
     }
 }

@@ -774,14 +774,28 @@ public sealed record ResumeDownloadsEffect(AppSettings Settings) : AppEffect;
 public sealed record RunAutoDownloadsEffect(AppSettings Settings, bool Force) : AppEffect;
 
 /// <summary>
-/// Den abgeschlossenen Download eines als gesehen markierten Mediums
-/// entfernen (Einstellung „Gesehene Episoden automatisch löschen" —
-/// Ergebnis bei Treffer: <c>DownloadDeletedMessage</c>).
+/// Das Ablaufdatum des Downloads eines als gesehen markierten Mediums
+/// auf <c>jetzt + Löschverzögerung</c> verkürzen (Einstellung
+/// „Downloads nach dem Abspielen automatisch löschen"); die eigentliche
+/// Entfernung übernimmt der nächste Bereinigungslauf.
 /// </summary>
 /// <param name="MediaType">Medientyp des gesehenen Mediums (normalisiert).</param>
 /// <param name="MediaId">Id des Mediums.</param>
-/// <returns>Effekt-Datensatz für das automatische Entfernen.</returns>
-public sealed record DeleteWatchedDownloadEffect(string MediaType, long MediaId) : AppEffect;
+/// <param name="Delay">Löschverzögerung (<see cref="TimeSpan.Zero"/> = Ablauf sofort).</param>
+/// <returns>Effekt-Datensatz für die Ablauf-Verkürzung.</returns>
+public sealed record ExpireWatchedDownloadEffect(string MediaType, long MediaId, TimeSpan Delay) : AppEffect;
+
+/// <summary>
+/// Wiedergabe-Schutz: das Ablaufdatum des Downloads des gerade lokal
+/// wiedergegebenen Mediums auf <c>jetzt + 2 × Restdauer</c> hochsetzen,
+/// sodass der Bereinigungslauf die Datei während der Wiedergabe nicht
+/// entfernt.
+/// </summary>
+/// <param name="MediaType">Medientyp des wiedergegebenen Mediums (normalisiert).</param>
+/// <param name="MediaId">Id des Mediums.</param>
+/// <param name="RemainingDuration">Verbleibende Wiedergabedauer (Gesamtdauer − Position).</param>
+/// <returns>Effekt-Datensatz für den Wiedergabe-Schutz.</returns>
+public sealed record ProtectDownloadExpiryEffect(string MediaType, long MediaId, TimeSpan RemainingDuration) : AppEffect;
 
 /// <summary>
 /// Protokollversand ausführen: das Programmprotokoll als Anhang eines

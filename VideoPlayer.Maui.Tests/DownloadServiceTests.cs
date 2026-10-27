@@ -71,16 +71,17 @@ public class DownloadServiceTests : IDisposable
         }
     }
 
-    private DownloadService CreateService(long? quotaBytesOverride = null) => new(
+    private DownloadService CreateService(long? quotaBytesOverride = null, Func<DateTime>? utcNow = null) => new(
         authSession, secrets, cache, layout, networkMonitor,
         () => new HttpClient(handler, disposeHandler: false) { Timeout = Timeout.InfiniteTimeSpan },
         File.Exists,
-        quotaBytesOverride);
+        quotaBytesOverride,
+        utcNow: utcNow);
 
     private static AppSettings Settings(bool wifiOnly = false, bool autoDelete = false) => new()
     {
         WifiOnlyDownloads = wifiOnly,
-        AutoDeleteWatchedEpisodes = autoDelete
+        AutoDeletePlayedDownloads = autoDelete
     };
 
     private async Task LoginAsync()
@@ -104,6 +105,27 @@ public class DownloadServiceTests : IDisposable
             .Where(e => e.VideoId == (int)mediaId)
             .ToListAsync();
         return rows.FirstOrDefault(e => e.VideoType == type);
+    }
+
+    private async Task<DownloadManifestEntry> InsertCompletedAsync(
+        long mediaId, DateTime? expiresAtUtc = null, string? origin = null)
+    {
+        var path = Path.Combine(layout.VideosDirectory, $"movie_{mediaId}.mp4");
+        await File.WriteAllBytesAsync(path, new byte[64]);
+        var entry = new DownloadManifestEntry
+        {
+            VideoId = (int)mediaId,
+            VideoType = "movie",
+            Title = "Ein Film",
+            FilePath = path,
+            State = "completed",
+            SizeBytes = 64,
+            Origin = origin,
+            ExpiresAtUtc = expiresAtUtc,
+            UpdatedAtUtc = DateTime.UtcNow
+        };
+        await cache.Connection.InsertAsync(entry);
+        return entry;
     }
 
     private static async Task<DownloadManifestEntry> WaitForStateAsync(
@@ -612,19 +634,207 @@ public class DownloadServiceTests : IDisposable
         Assert.Null(await ReadEntryAsync("movie", 42));
     }
 
-    /// <summary>Prüft DeleteIfCompleted: nur abgeschlossene Downloads werden entfernt.</summary>
+    /// <summary>Prüft Herkunft: der manuelle Einreihe-Pfad persistiert „manual" im Manifest.</summary>
     [Fact]
-    public async Task DeleteIfCompleted_QueuedEntry_StaysUntouched()
+    public async Task Enqueue_Manual_PersistsOriginManual()
+    {
+        await LoginAsync();
+        EnqueueStream(32);
+        var service = CreateService();
+
+        await service.EnqueueAsync("movie", 42, "Ein Film", Settings());
+
+        var entry = await WaitForStateAsync(() => ReadEntryAsync("movie", 42), "completed");
+        Assert.Equal("manual", entry.Origin);
+    }
+
+    /// <summary>Prüft Re-Enqueue: die gespeicherte Herkunft bleibt erhalten; das Ablaufdatum wird zurückgesetzt.</summary>
+    [Fact]
+    public async Task Enqueue_Reenqueue_KeepsOrigin()
+    {
+        await LoginAsync();
+        var service = CreateService(quotaBytesOverride: 0);
+        await service.EnqueueAsync("movie", 42, "Ein Film", Settings(), origin: DownloadOrigin.Auto);
+        var failed = await WaitForStateAsync(() => ReadEntryAsync("movie", 42), "failed");
+        Assert.Equal("auto", failed.Origin);
+
+        EnqueueStream(32);
+        var result = await CreateService().EnqueueAsync("movie", 42, "Ein Film", Settings());
+
+        Assert.Equal(DownloadService.NoticeEnqueued, result.Notice);
+        var entry = await WaitForStateAsync(() => ReadEntryAsync("movie", 42), "completed");
+        Assert.Equal("auto", entry.Origin);
+        Assert.NotNull(entry.ExpiresAtUtc);
+    }
+
+    /// <summary>Prüft Fertigstellung: das Ablaufdatum wird auf Fertigstellung + Aufbewahrungszeit gesetzt.</summary>
+    [Fact]
+    public async Task Transfer_Completed_SetsExpiresAtUtc()
+    {
+        var now = new DateTime(2030, 6, 1, 12, 0, 0, DateTimeKind.Utc);
+        await LoginAsync();
+        EnqueueStream(64);
+        var service = CreateService(utcNow: () => now);
+        var settings = new AppSettings { DownloadRetentionDays = 7 };
+
+        await service.EnqueueAsync("movie", 42, "Ein Film", settings);
+
+        var entry = await WaitForStateAsync(() => ReadEntryAsync("movie", 42), "completed");
+        Assert.Equal(now + TimeSpan.FromDays(7), entry.ExpiresAtUtc);
+    }
+
+    /// <summary>Prüft den iOS-Abschlusspfad: der systemseitig beendete Transfer setzt das Ablaufdatum ebenfalls.</summary>
+    [Fact]
+    public async Task CompleteExternal_Completed_SetsExpiresAtUtc()
+    {
+        var now = new DateTime(2030, 6, 1, 12, 0, 0, DateTimeKind.Utc);
+        var targetPath = Path.Combine(layout.VideosDirectory, "movie_42.mp4");
+        var tempPath = Path.Combine(root, "temp-download.bin");
+        await File.WriteAllBytesAsync(tempPath, new byte[96]);
+        await cache.Connection.InsertAsync(new DownloadManifestEntry
+        {
+            VideoId = 42,
+            VideoType = "movie",
+            Title = "Ein Film",
+            FilePath = targetPath,
+            State = "downloading",
+            UpdatedAtUtc = DateTime.UtcNow
+        });
+        var service = CreateService(utcNow: () => now);
+        var settings = new AppSettings { DownloadRetentionDays = 7 };
+
+        await service.CompleteExternalTransferAsync("movie_42", null, tempPath, settings);
+
+        var entry = await ReadEntryAsync("movie", 42);
+        Assert.Equal("completed", entry!.State);
+        Assert.Equal(now + TimeSpan.FromDays(7), entry.ExpiresAtUtc);
+        Assert.True(File.Exists(targetPath));
+    }
+
+    /// <summary>Prüft die Parameterprüfung: fehlende Einstellungen werden wie in EnqueueAsync/ResumeInterruptedAsync sofort abgewiesen.</summary>
+    [Fact]
+    public async Task CompleteExternalTransfer_NullSettings_Throws()
+    {
+        var service = CreateService();
+
+        await Assert.ThrowsAsync<ArgumentNullException>(
+            () => service.CompleteExternalTransferAsync("movie_42", null, "temp.bin", null!));
+    }
+
+    /// <summary>Prüft die Verkürzung: das Ablaufdatum eines fertigen Downloads wird auf jetzt + Verzögerung gesetzt.</summary>
+    [Fact]
+    public async Task ExpireAfter_CompletedEntry_SetsExpiry()
+    {
+        var now = new DateTime(2030, 6, 1, 12, 0, 0, DateTimeKind.Utc);
+        await InsertCompletedAsync(42, expiresAtUtc: now.AddDays(7));
+        var service = CreateService(utcNow: () => now);
+
+        var shortened = await service.ExpireAfterAsync("movie", 42, TimeSpan.FromMinutes(15));
+
+        Assert.True(shortened);
+        var entry = await ReadEntryAsync("movie", 42);
+        Assert.Equal(now + TimeSpan.FromMinutes(15), entry!.ExpiresAtUtc);
+    }
+
+    /// <summary>Prüft die Verkürzung: nicht abgeschlossene Einträge bleiben unberührt.</summary>
+    [Fact]
+    public async Task ExpireAfter_NonCompleted_NoOp()
     {
         await LoginAsync();
         networkMonitor.IsWifi = false;
         var service = CreateService();
         await service.EnqueueAsync("tvshowepisode", 33, "Folge", Settings(wifiOnly: true));
 
-        var deleted = await service.DeleteIfCompletedAsync("tvshowepisode", 33);
+        var shortened = await service.ExpireAfterAsync("tvshowepisode", 33, TimeSpan.FromMinutes(15));
 
-        Assert.False(deleted);
-        Assert.NotNull(await ReadEntryAsync("tvshowepisode", 33));
+        Assert.False(shortened);
+        var entry = await ReadEntryAsync("tvshowepisode", 33);
+        Assert.Null(entry!.ExpiresAtUtc);
+    }
+
+    /// <summary>Prüft den Wiedergabe-Schutz: ein fehlendes oder früheres Ablaufdatum wird auf jetzt + Faktor × Restdauer hochgesetzt.</summary>
+    [Fact]
+    public async Task ExtendExpiry_RaisesEarlierOrNull()
+    {
+        var now = new DateTime(2030, 6, 1, 12, 0, 0, DateTimeKind.Utc);
+        await InsertCompletedAsync(42);
+        var service = CreateService(utcNow: () => now);
+
+        var raised = await service.ExtendExpiryAsync("movie", 42, TimeSpan.FromHours(4));
+
+        Assert.True(raised);
+        var entry = await ReadEntryAsync("movie", 42);
+        Assert.Equal(
+            now + DownloadService.PlaybackProtectionFactor * TimeSpan.FromHours(4),
+            entry!.ExpiresAtUtc);
+    }
+
+    /// <summary>Prüft den Wiedergabe-Schutz: ein späteres Ablaufdatum bleibt bestehen (nur Hochsetzung).</summary>
+    [Fact]
+    public async Task ExtendExpiry_LaterExpiry_Kept()
+    {
+        var now = new DateTime(2030, 6, 1, 12, 0, 0, DateTimeKind.Utc);
+        var existing = now.AddDays(7);
+        await InsertCompletedAsync(42, expiresAtUtc: existing);
+        var service = CreateService(utcNow: () => now);
+
+        var raised = await service.ExtendExpiryAsync("movie", 42, TimeSpan.FromHours(1));
+
+        Assert.False(raised);
+        var entry = await ReadEntryAsync("movie", 42);
+        Assert.Equal(existing, entry!.ExpiresAtUtc);
+    }
+
+    /// <summary>Prüft den Wiedergabe-Schutz: nicht abgeschlossene Einträge bleiben unberührt.</summary>
+    [Fact]
+    public async Task ExtendExpiry_NonCompleted_NoOp()
+    {
+        await LoginAsync();
+        networkMonitor.IsWifi = false;
+        var service = CreateService();
+        await service.EnqueueAsync("movie", 42, "Ein Film", Settings(wifiOnly: true));
+
+        var raised = await service.ExtendExpiryAsync("movie", 42, TimeSpan.FromHours(4));
+
+        Assert.False(raised);
+        var entry = await ReadEntryAsync("movie", 42);
+        Assert.Null(entry!.ExpiresAtUtc);
+    }
+
+    /// <summary>Prüft die Dedup-Verlängerung: AlreadyPresent mit Herkunft „auto" verlängert das Ablaufdatum und stellt die Herkunft um.</summary>
+    [Fact]
+    public async Task Enqueue_AutoAlreadyPresent_ExtendsExpiryAndSwitchesOrigin()
+    {
+        var now = new DateTime(2030, 6, 1, 12, 0, 0, DateTimeKind.Utc);
+        await InsertCompletedAsync(42, expiresAtUtc: now.AddDays(1), origin: "manual");
+        var service = CreateService(utcNow: () => now);
+        var changed = new List<DownloadListItem>();
+        service.ItemChanged += (_, e) => changed.Add(e.Item);
+
+        var result = await service.EnqueueAsync(
+            "movie", 42, "Ein Film", Settings(), origin: DownloadOrigin.Auto);
+
+        Assert.Equal(DownloadService.NoticeAlreadyPresent, result.Notice);
+        var entry = await ReadEntryAsync("movie", 42);
+        Assert.Equal("auto", entry!.Origin);
+        Assert.Equal(now + TimeSpan.FromDays(7), entry.ExpiresAtUtc);
+        Assert.Contains(changed, i => i.MediaId == 42 && i.Origin == DownloadOrigin.Auto);
+    }
+
+    /// <summary>Prüft die Dedup-Verlängerung: AlreadyPresent mit Herkunft „manual" ändert weder Ablaufdatum noch Herkunft.</summary>
+    [Fact]
+    public async Task Enqueue_ManualAlreadyPresent_KeepsExpiryAndOrigin()
+    {
+        var expires = DateTime.UtcNow.AddDays(1);
+        await InsertCompletedAsync(42, expiresAtUtc: expires, origin: "auto");
+        var service = CreateService();
+
+        var result = await service.EnqueueAsync("movie", 42, "Ein Film", Settings());
+
+        Assert.Equal(DownloadService.NoticeAlreadyPresent, result.Notice);
+        var entry = await ReadEntryAsync("movie", 42);
+        Assert.Equal("auto", entry!.Origin);
+        Assert.Equal(expires, entry.ExpiresAtUtc);
     }
 
     /// <summary>Prüft Fehler-Löschung: failed- und cancelled-Einträge werden samt Datei entfernt, andere bleiben.</summary>
@@ -837,19 +1047,6 @@ public class DownloadServiceTests : IDisposable
         {
             length = data.Length;
             return true;
-        }
-    }
-
-    private sealed class FakeNetworkMonitor : INetworkStatusMonitor
-    {
-        public bool IsOnline { get; set; } = true;
-        public bool IsWifi { get; set; } = true;
-        public event EventHandler<bool>? AvailabilityChanged;
-        public void Start() { }
-        public void SetOnline(bool online)
-        {
-            IsOnline = online;
-            AvailabilityChanged?.Invoke(this, online);
         }
     }
 }

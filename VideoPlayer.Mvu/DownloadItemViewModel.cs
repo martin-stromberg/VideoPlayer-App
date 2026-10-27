@@ -64,6 +64,18 @@ public sealed class DownloadItemViewModel : INotifyPropertyChanged
     /// <summary>Eine Größenangabe wird angezeigt.</summary>
     public bool HasSizeText => item.HasSizeText;
 
+    /// <summary>Herkunfts-Kennzeichnung des Eintrags („Cache" bei automatischen Downloads); <c>null</c> = keine Anzeige.</summary>
+    public string? OriginText => item.OriginText;
+
+    /// <summary>Eine Herkunfts-Kennzeichnung wird angezeigt.</summary>
+    public bool HasOriginText => item.HasOriginText;
+
+    /// <summary>Ablaufdatum-Anzeige des Eintrags („Läuft ab am …"); <c>null</c> = keine Anzeige.</summary>
+    public string? ExpiresText => item.ExpiresText;
+
+    /// <summary>Eine Ablaufdatum-Anzeige wird gezeigt.</summary>
+    public bool HasExpiresText => item.HasExpiresText;
+
     /// <summary>Dem Anwender anzeigbarer Fehlertext; <c>null</c>, wenn kein Fehler vorliegt.</summary>
     public string? ErrorText => item.ErrorText;
 
@@ -111,6 +123,10 @@ public sealed class DownloadItemViewModel : INotifyPropertyChanged
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(ErrorText)));
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(SizeText)));
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(HasSizeText)));
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(OriginText)));
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(HasOriginText)));
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(ExpiresText)));
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(HasExpiresText)));
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(CanCancel)));
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(CanRetry)));
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(CanDelete)));

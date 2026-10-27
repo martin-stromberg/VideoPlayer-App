@@ -154,7 +154,9 @@ namespace VideoPlayer.Maui
                 Services.IosBackgroundDownloadBackend.Shared = backend;
                 backend.CompletionSink = (key, error, tempPath) =>
                     sp.GetRequiredService<DownloadService>()
-                        .CompleteExternalTransferAsync(key, error, tempPath);
+                        .CompleteExternalTransferAsync(
+                            key, error, tempPath,
+                            sp.GetRequiredService<AppSettingsService>().Load());
                 return backend;
             });
             builder.Services.AddSingleton<IDownloadBackend>(sp =>

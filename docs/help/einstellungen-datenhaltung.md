@@ -26,8 +26,20 @@ sofort übernommen und bleiben nach dem Neustart der App erhalten.
   (Standard: ein).
 - **Speicherplatzkontingent für Downloads (GB)** — Obergrenze des
   Speicherplatzes für Downloads in Gigabyte (1–500, Standard 5).
-- **Gesehene Episoden automatisch löschen** — entfernt lokal gespeicherte
-  Episoden, nachdem sie angesehen wurden (Standard: aus).
+- **Aufbewahrungszeit für Downloads (Tage)** — wie lange ein fertiger
+  Download aufbewahrt wird, bevor der Bereinigungslauf ihn entfernt
+  bzw. als Auto-Download-Kandidat verlängert (1–365, Standard 7).
+  Wirkt nur auf neu gesetzte Ablaufdaten — bestehende Fristen werden
+  nicht nachträglich neu berechnet.
+- **Downloads nach dem Abspielen automatisch löschen** — setzt das
+  Ablaufdatum angesehener Downloads (Filme und Episoden) auf „jetzt
+  + Löschverzögerung" (Standard: aus; Nachfolger der früheren
+  Option „Gesehene Episoden automatisch löschen", deren
+  Schaltzustand übernommen wird).
+- **Löschverzögerung nach dem Abspielen (Minuten)** — Frist bis zum
+  Ablauf nach dem Ansehen (0–1440, Standard 15; 0 = Entfernung beim
+  nächsten Bereinigungslauf). Wirkt nur auf neu gesetzte
+  Ablaufdaten.
 
 ### Wiedergabe
 

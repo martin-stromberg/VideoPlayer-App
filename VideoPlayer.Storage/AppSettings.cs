@@ -11,6 +11,12 @@ public sealed record AppSettings
     /// <summary>Standardwert des Speicherplatzkontingents in Gigabyte.</summary>
     public const int DefaultDownloadQuotaGb = 5;
 
+    /// <summary>Standardwert der Aufbewahrungszeit abgeschlossener Downloads in Tagen.</summary>
+    public const int DefaultDownloadRetentionDays = 7;
+
+    /// <summary>Standardwert der Löschverzögerung nach dem Abspielen in Minuten.</summary>
+    public const int DefaultDeleteAfterPlaybackDelayMinutes = 15;
+
     /// <summary>Automatische Downloads an/aus.</summary>
     public bool AutoDownloadEnabled { get; init; }
 
@@ -32,8 +38,28 @@ public sealed record AppSettings
     /// <summary>Speicherplatzkontingent für Downloads in Gigabyte (1–500, Standard 5).</summary>
     public int DownloadQuotaGb { get; init; } = DefaultDownloadQuotaGb;
 
-    /// <summary>Gesehene Episoden automatisch löschen an/aus.</summary>
-    public bool AutoDeleteWatchedEpisodes { get; init; }
+    /// <summary>
+    /// Aufbewahrungszeit abgeschlossener Downloads in Tagen (1–365,
+    /// Standard <see cref="DefaultDownloadRetentionDays"/>): Grundlage des
+    /// Ablaufdatums (<c>ExpiresAtUtc</c>) bei Fertigstellung bzw.
+    /// Verlängerung; wirkt nur auf neu gesetzte Ablaufdaten.
+    /// </summary>
+    public int DownloadRetentionDays { get; init; } = DefaultDownloadRetentionDays;
+
+    /// <summary>
+    /// „Downloads nach dem Abspielen automatisch löschen" an/aus: bei
+    /// Erreichen der „angesehen"-Schwelle wird das Ablaufdatum auf
+    /// <c>jetzt + <see cref="DeleteAfterPlaybackDelayMinutes"/></c>
+    /// verkürzt (Standard: aus).
+    /// </summary>
+    public bool AutoDeletePlayedDownloads { get; init; }
+
+    /// <summary>
+    /// Löschverzögerung nach dem Abspielen in Minuten (0–1440, Standard
+    /// <see cref="DefaultDeleteAfterPlaybackDelayMinutes"/>); 0 = Ablauf
+    /// sofort → Entfernung beim nächsten Bereinigungslauf.
+    /// </summary>
+    public int DeleteAfterPlaybackDelayMinutes { get; init; } = DefaultDeleteAfterPlaybackDelayMinutes;
 
     /// <summary>
     /// Hero-Kopfbereich der Startseite anzeigen (positiv formuliert —
@@ -56,6 +82,8 @@ public sealed record AppSettings
     {
         PreloadEpisodeCount = Math.Clamp(PreloadEpisodeCount, 1, 10),
         WatchedEndWindowSeconds = Math.Clamp(WatchedEndWindowSeconds, 30, 3600),
-        DownloadQuotaGb = Math.Clamp(DownloadQuotaGb, 1, 500)
+        DownloadQuotaGb = Math.Clamp(DownloadQuotaGb, 1, 500),
+        DownloadRetentionDays = Math.Clamp(DownloadRetentionDays, 1, 365),
+        DeleteAfterPlaybackDelayMinutes = Math.Clamp(DeleteAfterPlaybackDelayMinutes, 0, 1440)
     };
 }

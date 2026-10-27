@@ -864,6 +864,208 @@ public class AutoDownloadServiceTests : IDisposable
         Assert.DoesNotContain(handler.Requests, r => r.PathAndQuery.Contains("api/items/tvshow/"));
     }
 
+    /// <summary>Prüft Herkunft: der Auto-Download-Pfad persistiert „auto" im Manifest.</summary>
+    [Fact]
+    public async Task Enqueue_Auto_PersistsOriginAuto()
+    {
+        await LoginAsync();
+        await CacheContinueWatchingAsync(
+            new ContinueWatchingEntry
+            {
+                MediaType = "movie",
+                PositionSeconds = 60,
+                Entry = new Movie { Id = 7, Name = "Film Sieben" }
+            });
+        handler.Enqueue(_ => new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new ByteArrayContent([1, 2, 3])
+        });
+
+        await service.RunAsync(settings);
+        await WaitForAsync(async () =>
+            (await EntriesAsync()).SingleOrDefault()?.State == "completed");
+
+        var entry = Assert.Single(await EntriesAsync());
+        Assert.Equal("auto", entry.Origin);
+    }
+
+    /// <summary>Hilfsmethode: legt eine Serienstruktur im <c>ShowDetailsCache</c> ab.</summary>
+    /// <param name="show">Der zu cachende Serien-Graph.</param>
+    /// <returns>Eine abgeschlossene Aufgabe nach dem Schreiben.</returns>
+    private async Task CacheShowAsync(TvShow show) =>
+        await ShowDetailsCache.WriteAsync(cache, show);
+
+    /// <summary>Hilfsmethode: legt Playlist-Einträge im <c>PlaylistEntriesCache</c> ab.</summary>
+    /// <param name="playlistId">Id der Playlist.</param>
+    /// <param name="entries">Die zu cachenden Einträge (Server-Reihenfolge).</param>
+    /// <returns>Eine abgeschlossene Aufgabe nach dem Schreiben.</returns>
+    private async Task CachePlaylistAsync(long playlistId, params PlaylistEntry[] entries) =>
+        await PlaylistEntriesCache.WriteAsync(cache, playlistId, entries);
+
+    /// <summary>Hilfsmethode: baut einen <see cref="PlaylistEntry"/>-DTO für den Cache.</summary>
+    /// <param name="id">Id des Playlist-Eintrags.</param>
+    /// <param name="mediaType">Medientyp der Referenz.</param>
+    /// <param name="mediaId">Id des referenzierten Mediums.</param>
+    /// <param name="isAccessible"><c>false</c> = kein Zugriffsrecht.</param>
+    /// <param name="sortOrder">Sortierposition; <c>null</c> = nicht zugewiesen.</param>
+    /// <returns>Der Playlist-Eintrag.</returns>
+    private static PlaylistEntry PlaylistEntryDto(
+        long id, string mediaType, long mediaId,
+        bool isAccessible = true, long? sortOrder = null) => new()
+        {
+            Id = id,
+            PlaylistId = 5,
+            MediaType = mediaType,
+            MediaId = mediaId,
+            MediaTitle = $"Eintrag {id}",
+            IsAccessible = isAccessible,
+            SortOrder = sortOrder
+        };
+
+    /// <summary>Prüft die Offline-Kandidatenmenge: Selbst-Keys plus Serien- und Playlist-Vorlauf bis <c>PreloadEpisodeCount</c>.</summary>
+    [Fact]
+    public async Task GetCandidateKeys_SelfAndSeriesAndPlaylist()
+    {
+        await CacheContinueWatchingAsync(
+            new ContinueWatchingEntry
+            {
+                MediaType = "movie",
+                PositionSeconds = 60,
+                Entry = new Movie { Id = 7, Name = "Film Sieben" }
+            },
+            new ContinueWatchingEntry
+            {
+                MediaType = "episode",
+                PositionSeconds = 60,
+                Entry = new TvShowEpisode
+                {
+                    Id = 40,
+                    Name = "Aktuell",
+                    Season = new TvShowSeason { Id = 21, Number = 1, Show = new TvShow { Id = 11 } }
+                }
+            },
+            new ContinueWatchingEntry
+            {
+                MediaType = "episode",
+                PositionSeconds = 60,
+                PlaylistId = 5,
+                PlaylistName = "Mix",
+                PlaylistEntryId = 101,
+                Entry = new TvShowEpisode
+                {
+                    Id = 32,
+                    Name = "Pilot",
+                    Season = new TvShowSeason { Id = 21, Show = new TvShow { Id = 12 } }
+                }
+            });
+        // Erst nach CacheContinueWatchingAsync schreiben — der Aufruf
+        // leert cached_lists zuvor vollständig.
+        await CacheShowAsync(ShowWithEpisodes(11, "Probe",
+            (1, 1, 40, "A"), (1, 2, 41, "B"), (1, 3, 42, "C")));
+        await CachePlaylistAsync(5,
+            PlaylistEntryDto(100, "TVShowEpisode", 30),
+            PlaylistEntryDto(101, "TVShowEpisode", 32),
+            PlaylistEntryDto(102, "TVShowEpisode", 33),
+            PlaylistEntryDto(103, "Movie", 99));
+
+        var keys = await service.GetAutoDownloadCandidateKeysAsync(settings);
+
+        Assert.Equal(
+            new HashSet<string>
+            {
+                "movie:7",
+                "tvshowepisode:40", "tvshowepisode:41", // PreloadEpisodeCount = 2
+                "tvshowepisode:32", "tvshowepisode:33"
+            },
+            keys);
+    }
+
+    /// <summary>Prüft die Kandidatenmenge: deaktivierte automatische Downloads liefern eine leere Menge.</summary>
+    [Fact]
+    public async Task GetCandidateKeys_AutoDisabled_Empty()
+    {
+        await CacheContinueWatchingAsync(
+            new ContinueWatchingEntry
+            {
+                MediaType = "movie",
+                PositionSeconds = 60,
+                Entry = new Movie { Id = 7, Name = "Film Sieben" }
+            });
+
+        var keys = await service.GetAutoDownloadCandidateKeysAsync(
+            settings with { AutoDownloadEnabled = false });
+
+        Assert.Empty(keys);
+    }
+
+    /// <summary>Prüft die Kandidatenmenge: ohne gecachte Strukturen bleibt nur der Selbst-Key je Weiterschauen-Eintrag.</summary>
+    [Fact]
+    public async Task GetCandidateKeys_MissingCaches_SelfOnly()
+    {
+        await CacheContinueWatchingAsync(
+            new ContinueWatchingEntry
+            {
+                MediaType = "episode",
+                PositionSeconds = 60,
+                Entry = new TvShowEpisode
+                {
+                    Id = 40,
+                    Name = "Aktuell",
+                    Season = new TvShowSeason { Id = 21, Number = 1, Show = new TvShow { Id = 11 } }
+                }
+            },
+            new ContinueWatchingEntry
+            {
+                MediaType = "episode",
+                PositionSeconds = 60,
+                PlaylistId = 5,
+                PlaylistName = "Mix",
+                PlaylistEntryId = 101,
+                Entry = new TvShowEpisode { Id = 32, Name = "Pilot" }
+            });
+
+        var keys = await service.GetAutoDownloadCandidateKeysAsync(settings);
+
+        Assert.Equal(
+            new HashSet<string> { "tvshowepisode:40", "tvshowepisode:32" },
+            keys);
+    }
+
+    /// <summary>Prüft den Playlist-Cache: Schreiben/Lesen liefert die geordnete Struktur.</summary>
+    [Fact]
+    public async Task PlaylistCache_WriteRead_RoundTrip()
+    {
+        await CachePlaylistAsync(5,
+            PlaylistEntryDto(101, "TVShowEpisode", 32, sortOrder: 1),
+            PlaylistEntryDto(102, "Movie", 99, isAccessible: false, sortOrder: 2));
+
+        var cached = await PlaylistEntriesCache.ReadAsync(cache, 5);
+
+        Assert.NotNull(cached);
+        Assert.Equal(5, cached!.PlaylistId);
+        Assert.Equal(2, cached.Entries.Count);
+        Assert.Equal(101, cached.Entries[0].EntryId);
+        Assert.Equal("TVShowEpisode", cached.Entries[0].MediaType);
+        Assert.Equal(32, cached.Entries[0].MediaId);
+        Assert.Equal(1, cached.Entries[0].SortOrder);
+        Assert.True(cached.Entries[0].IsAccessible);
+        Assert.False(cached.Entries[1].IsAccessible);
+    }
+
+    /// <summary>Prüft den Playlist-Cache: defektes JSON wird als fehlend gelesen (kein Absturz).</summary>
+    [Fact]
+    public async Task PlaylistCache_CorruptJson_ReturnsNull()
+    {
+        await cache.Connection.InsertAsync(new CachedListEntry
+        {
+            Key = PlaylistEntriesCache.KeyFor(7),
+            Json = "{defekt",
+            UpdatedAtUtc = DateTime.UtcNow
+        });
+
+        Assert.Null(await PlaylistEntriesCache.ReadAsync(cache, 7));
+    }
+
     /// <summary>Prüft die Protokolleinträge: Lauf-Ergebnis und Mindestabstand-Auslassung landen als Information.</summary>
     [Fact]
     public async Task RunAsync_LogsOutcome()
@@ -897,18 +1099,5 @@ public class AutoDownloadServiceTests : IDisposable
             e.Level == LogLevel.Information
             && e.Category.Contains(nameof(AutoDownloadService), StringComparison.Ordinal)
             && e.Message.Contains("Mindestabstand", StringComparison.Ordinal));
-    }
-
-    private sealed class FakeNetworkMonitor : INetworkStatusMonitor
-    {
-        public bool IsOnline { get; set; } = true;
-        public bool IsWifi { get; set; } = true;
-        public event EventHandler<bool>? AvailabilityChanged;
-        public void Start() { }
-        public void SetOnline(bool online)
-        {
-            IsOnline = online;
-            AvailabilityChanged?.Invoke(this, online);
-        }
     }
 }

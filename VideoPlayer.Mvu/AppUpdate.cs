@@ -2609,7 +2609,8 @@ public static class AppUpdate
                     Position = TimeSpan.Zero,
                     Duration = TimeSpan.Zero,
                     LastReportedPositionSeconds = -1,
-                    EndWindowStreak = 0
+                    EndWindowStreak = 0,
+                    DownloadExpiryProtected = false
                 }
             },
             [new ResolvePlaybackSourceEffect(mediaType, next.MediaId, next.StartPositionSeconds)]);
@@ -2637,7 +2638,8 @@ public static class AppUpdate
                     IsResolving = true,
                     IsPlaying = false,
                     IsBuffering = false,
-                    Error = error
+                    Error = error,
+                    DownloadExpiryProtected = false
                 }
             },
             [new AdvancePlaylistEntryEffect(player.PlaylistId!.Value, player.PlaylistEntryId)]);
@@ -3763,7 +3765,8 @@ public static class AppUpdate
                         IsResolving = false,
                         IsPlaying = false,
                         IsBuffering = false,
-                        Error = error ?? player.Error
+                        Error = error ?? player.Error,
+                        DownloadExpiryProtected = false
                     }
                 },
                 []);
@@ -3788,6 +3791,7 @@ public static class AppUpdate
                     Duration = TimeSpan.Zero,
                     LastReportedPositionSeconds = -1,
                     EndWindowStreak = 0,
+                    DownloadExpiryProtected = false,
                     UpcomingEpisodes = player.UpcomingEpisodes.Skip(1).ToList(),
                     Error = error
                 }
@@ -3854,6 +3858,25 @@ public static class AppUpdate
                 updated.ProgressReportPlaylistId));
         }
 
+        // Wiedergabe-Schutz: beim ersten Takt mit bekannter Dauer einer
+        // lokalen Datei (Download-Wiedergabe) das Ablaufdatum auf
+        // „jetzt + 2 × Restdauer" hochsetzen, damit der Bereinigungslauf
+        // die Datei während des Abspielens nicht entfernt. Einmalig je
+        // Medium (Flag-Reset bei jedem Medienwechsel); ohne bekannte
+        // Dauer entfällt die Hochsetzung.
+        if (!updated.DownloadExpiryProtected
+            && updated.Source?.Kind == PlaybackSourceKind.LocalFile
+            && message.Duration > TimeSpan.Zero)
+        {
+            updated = updated with { DownloadExpiryProtected = true };
+            var remainingDuration = message.Duration - message.Position;
+            if (remainingDuration > TimeSpan.Zero && updated.MediaType is { } mediaType)
+            {
+                effects.Add(new ProtectDownloadExpiryEffect(
+                    mediaType, updated.MediaId, remainingDuration));
+            }
+        }
+
         return EvaluateEndWindow(model, player, updated, message, effects);
     }
 
@@ -3911,11 +3934,16 @@ public static class AppUpdate
                 && updated.EndWindowStreak >= EndWindowRequiredTicks)
             {
                 updated = updated with { IsWatched = true };
-                // Optionales Aufräumen: einen abgeschlossenen Download
-                // der gesehenen Episode entfernen.
-                if (model.Settings.AutoDeleteWatchedEpisodes && updated.MediaType == "tvshowepisode")
+                // Optionales Aufräumen: das Ablaufdatum des Downloads
+                // des gesehenen Mediums auf „jetzt + Löschverzögerung"
+                // verkürzen (alle ladbaren Medientypen — die Entfernung
+                // übernimmt der nächste Bereinigungslauf).
+                if (model.Settings.AutoDeletePlayedDownloads
+                    && updated.MediaType is { } mediaType)
                 {
-                    effects.Add(new DeleteWatchedDownloadEffect(updated.MediaType, updated.MediaId));
+                    effects.Add(new ExpireWatchedDownloadEffect(
+                        mediaType, updated.MediaId,
+                        TimeSpan.FromMinutes(model.Settings.DeleteAfterPlaybackDelayMinutes)));
                 }
             }
         }
@@ -3976,12 +4004,17 @@ public static class AppUpdate
                 updated.ProgressReportPlaylistId)
         };
 
-        // Optionales Aufräumen: einen abgeschlossenen Download der
-        // gesehenen Episode entfernen (idempotent — wirkt auch, wenn die
-        // Schwelle bereits im Takt erreicht wurde).
-        if (model.Settings.AutoDeleteWatchedEpisodes && updated.MediaType == "tvshowepisode")
+        // Optionales Aufräumen: das Ablaufdatum des Downloads des
+        // gesehenen Mediums auf „jetzt + Löschverzögerung" verkürzen
+        // (alle ladbaren Medientypen; idempotent — wirkt auch, wenn die
+        // Schwelle bereits im Takt erreicht wurde; die Entfernung
+        // übernimmt der nächste Bereinigungslauf).
+        if (model.Settings.AutoDeletePlayedDownloads
+            && updated.MediaType is { } mediaType)
         {
-            effects.Add(new DeleteWatchedDownloadEffect(updated.MediaType, updated.MediaId));
+            effects.Add(new ExpireWatchedDownloadEffect(
+                mediaType, updated.MediaId,
+                TimeSpan.FromMinutes(model.Settings.DeleteAfterPlaybackDelayMinutes)));
         }
 
         // Am Ende liegt die Restlaufzeit bei 0 — hier wechselt die

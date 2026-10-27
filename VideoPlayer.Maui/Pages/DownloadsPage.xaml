@@ -156,12 +156,31 @@
                                 <HorizontalStackLayout Spacing="10">
                                     <Label Text="{Binding MediaTypeText}"
                                            Style="{StaticResource Caption}" />
+                                    <!-- Herkunfts-Kennzeichnung: „Cache"
+                                         bei automatischen Downloads —
+                                         Pill-Chip im Stil des
+                                         Zustands-Chips. -->
+                                    <Border StrokeShape="RoundRectangle 999"
+                                            Stroke="Transparent"
+                                            BackgroundColor="{StaticResource VpPrimaryTint}"
+                                            Padding="10,4"
+                                            IsVisible="{Binding HasOriginText}">
+                                        <Label Text="{Binding OriginText}"
+                                               AutomationId="OriginLabel"
+                                               FontSize="11"
+                                               FontFamily="InterSemiBold"
+                                               TextColor="{StaticResource VpPrimarySoft}" />
+                                    </Border>
                                     <Label Text="{Binding SizeText}"
                                            Style="{StaticResource Caption}"
                                            IsVisible="{Binding HasSizeText}" />
                                     <Label Text="{Binding ProgressPercentText}"
                                            Style="{StaticResource Caption}"
                                            IsVisible="{Binding ShowProgress}" />
+                                    <Label Text="{Binding ExpiresText}"
+                                           AutomationId="ExpiresLabel"
+                                           Style="{StaticResource Caption}"
+                                           IsVisible="{Binding HasExpiresText}" />
                                 </HorizontalStackLayout>
                                 <ProgressBar Progress="{Binding Progress}"
                                              ProgressColor="{StaticResource VpPrimary}"
