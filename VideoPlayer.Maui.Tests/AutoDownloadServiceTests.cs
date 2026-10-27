@@ -299,7 +299,7 @@ public class AutoDownloadServiceTests : IDisposable
         await LoginAsync();
         networkMonitor.IsWifi = false;
         // Vorhandener wartender Auftrag für Film 7 (WLAN-only blockiert den Start).
-        await downloadService.EnqueueAsync("movie", 7, "Film Sieben", settings);
+        await downloadService.EnqueueAsync(new DownloadEnqueueRequest("movie", 7, "Film Sieben"), settings);
         await CacheContinueWatchingAsync(
             new ContinueWatchingEntry
             {
@@ -707,7 +707,7 @@ public class AutoDownloadServiceTests : IDisposable
         {
             Content = new ByteArrayContent([1, 2, 3])
         });
-        await downloadService.EnqueueAsync("tvshowepisode", 32, "Probe – A", settings);
+        await downloadService.EnqueueAsync(new DownloadEnqueueRequest("tvshowepisode", 32, "Probe – A"), settings);
         await WaitForAsync(async () =>
             (await EntriesAsync()).SingleOrDefault()?.State == "completed");
         await CacheContinueWatchingAsync(

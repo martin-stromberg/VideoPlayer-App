@@ -99,33 +99,17 @@ public class DownloadServiceTests : IDisposable
         });
     }
 
-    private async Task<DownloadManifestEntry?> ReadEntryAsync(string type, long mediaId)
+    // Manifest-Lese-/-Anlege-Hilfen liegen gemeinsam in
+    // ManifestTestHelpers — die Wrapper reichen cache/layout durch.
+    private Task<DownloadManifestEntry?> ReadEntryAsync(string type, long mediaId)
     {
-        var rows = await cache.Connection.Table<DownloadManifestEntry>()
-            .Where(e => e.VideoId == (int)mediaId)
-            .ToListAsync();
-        return rows.FirstOrDefault(e => e.VideoType == type);
+        return ManifestTestHelpers.ReadEntryAsync(cache, type, mediaId);
     }
 
-    private async Task<DownloadManifestEntry> InsertCompletedAsync(
+    private Task<DownloadManifestEntry> InsertCompletedAsync(
         long mediaId, DateTime? expiresAtUtc = null, string? origin = null)
     {
-        var path = Path.Combine(layout.VideosDirectory, $"movie_{mediaId}.mp4");
-        await File.WriteAllBytesAsync(path, new byte[64]);
-        var entry = new DownloadManifestEntry
-        {
-            VideoId = (int)mediaId,
-            VideoType = "movie",
-            Title = "Ein Film",
-            FilePath = path,
-            State = "completed",
-            SizeBytes = 64,
-            Origin = origin,
-            ExpiresAtUtc = expiresAtUtc,
-            UpdatedAtUtc = DateTime.UtcNow
-        };
-        await cache.Connection.InsertAsync(entry);
-        return entry;
+        return ManifestTestHelpers.InsertCompletedAsync(cache, layout, mediaId, expiresAtUtc, origin);
     }
 
     private static async Task<DownloadManifestEntry> WaitForStateAsync(
@@ -155,7 +139,7 @@ public class DownloadServiceTests : IDisposable
         var changed = new List<DownloadListItem>();
         service.ItemChanged += (_, e) => changed.Add(e.Item);
 
-        var result = await service.EnqueueAsync("movie", 42, "Ein Film", Settings());
+        var result = await service.EnqueueAsync(new DownloadEnqueueRequest("movie", 42, "Ein Film"), Settings());
         Assert.Equal(DownloadService.NoticeEnqueued, result.Notice);
         Assert.Equal(DownloadState.Queued, result.Item!.State);
 
@@ -181,7 +165,7 @@ public class DownloadServiceTests : IDisposable
             File.Exists, null,
             logging.CreateLogger<DownloadService>());
 
-        var result = await service.EnqueueAsync("movie", 42, "Ein Film", Settings());
+        var result = await service.EnqueueAsync(new DownloadEnqueueRequest("movie", 42, "Ein Film"), Settings());
         Assert.Equal(DownloadService.NoticeEnqueued, result.Notice);
         await WaitForStateAsync(() => ReadEntryAsync("movie", 42), "completed");
 
@@ -220,9 +204,9 @@ public class DownloadServiceTests : IDisposable
             File.Exists, null,
             logging.CreateLogger<DownloadService>());
         var settings = Settings(wifiOnly: true);
-        await service.EnqueueAsync("movie", 42, "Ein Film", settings);
+        await service.EnqueueAsync(new DownloadEnqueueRequest("movie", 42, "Ein Film"), settings);
 
-        var result = await service.EnqueueAsync("movie", 42, "Ein Film", settings);
+        var result = await service.EnqueueAsync(new DownloadEnqueueRequest("movie", 42, "Ein Film"), settings);
 
         Assert.Equal(DownloadService.NoticeAlreadyQueued, result.Notice);
         Assert.DoesNotContain(logging.Entries, e =>
@@ -249,7 +233,7 @@ public class DownloadServiceTests : IDisposable
             File.Exists, 100,
             logging.CreateLogger<DownloadService>());
 
-        var result = await service.EnqueueAsync("movie", 42, "Ein Film", Settings());
+        var result = await service.EnqueueAsync(new DownloadEnqueueRequest("movie", 42, "Ein Film"), Settings());
 
         Assert.True(result.IsError);
         Assert.Equal(DownloadService.NoticeQuotaExceeded, result.Notice);
@@ -268,12 +252,11 @@ public class DownloadServiceTests : IDisposable
         var service = CreateService();
 
         await service.EnqueueAsync(
-            "tvshowepisode", 31, "Serie – Pilot", Settings(),
-            seriesContext: new DownloadSeriesContext(
-                ShowId: 11,
-                ShowTitle: "Serie",
-                SeasonNumber: 1,
-                EpisodeNumber: 1));
+            new DownloadEnqueueRequest(
+                "tvshowepisode", 31, "Serie – Pilot",
+                SeriesContext: new DownloadSeriesContext(
+                    ShowId: 11, ShowTitle: "Serie", SeasonNumber: 1, EpisodeNumber: 1)),
+            Settings());
 
         var entry = await WaitForStateAsync(() => ReadEntryAsync("tvshowepisode", 31), "completed");
         Assert.Equal(11, entry.ShowId);
@@ -290,7 +273,7 @@ public class DownloadServiceTests : IDisposable
         EnqueueStream(32);
         var service = CreateService();
 
-        var result = await service.EnqueueAsync("movie", 42, "Ein Film", Settings(), pictureId: 9007);
+        var result = await service.EnqueueAsync(new DownloadEnqueueRequest("movie", 42, "Ein Film", PictureId: 9007), Settings());
 
         Assert.Equal(9007, result.Item!.PictureId);
         var entry = await WaitForStateAsync(() => ReadEntryAsync("movie", 42), "completed");
@@ -303,12 +286,12 @@ public class DownloadServiceTests : IDisposable
     {
         await LoginAsync();
         var service = CreateService(quotaBytesOverride: 0);
-        await service.EnqueueAsync("movie", 42, "Ein Film", Settings(), pictureId: 9007);
+        await service.EnqueueAsync(new DownloadEnqueueRequest("movie", 42, "Ein Film", PictureId: 9007), Settings());
         var failed = await WaitForStateAsync(() => ReadEntryAsync("movie", 42), "failed");
         Assert.Equal(9007, failed.PictureId);
 
         EnqueueStream(32);
-        var result = await CreateService().EnqueueAsync("movie", 42, "Ein Film", Settings());
+        var result = await CreateService().EnqueueAsync(new DownloadEnqueueRequest("movie", 42, "Ein Film"), Settings());
 
         Assert.Equal(9007, result.Item!.PictureId);
         var entry = await WaitForStateAsync(() => ReadEntryAsync("movie", 42), "completed");
@@ -322,11 +305,11 @@ public class DownloadServiceTests : IDisposable
         await LoginAsync();
         EnqueueStream();
         var service = CreateService();
-        await service.EnqueueAsync("movie", 42, "Ein Film", Settings());
+        await service.EnqueueAsync(new DownloadEnqueueRequest("movie", 42, "Ein Film"), Settings());
         await WaitForStateAsync(() => ReadEntryAsync("movie", 42), "completed");
         handler.Requests.Clear();
 
-        var result = await service.EnqueueAsync("movie", 42, "Ein Film", Settings());
+        var result = await service.EnqueueAsync(new DownloadEnqueueRequest("movie", 42, "Ein Film"), Settings());
 
         Assert.Equal(DownloadService.NoticeAlreadyPresent, result.Notice);
         Assert.Empty(handler.Requests);
@@ -341,9 +324,9 @@ public class DownloadServiceTests : IDisposable
         networkMonitor.IsWifi = false;
         var service = CreateService();
         var settings = Settings(wifiOnly: true);
-        await service.EnqueueAsync("movie", 42, "Ein Film", settings);
+        await service.EnqueueAsync(new DownloadEnqueueRequest("movie", 42, "Ein Film"), settings);
 
-        var result = await service.EnqueueAsync("movie", 42, "Ein Film", settings);
+        var result = await service.EnqueueAsync(new DownloadEnqueueRequest("movie", 42, "Ein Film"), settings);
 
         Assert.Equal(DownloadService.NoticeAlreadyQueued, result.Notice);
         var items = await service.LoadItemsAsync();
@@ -367,8 +350,8 @@ public class DownloadServiceTests : IDisposable
         });
 
         var service = CreateService();
-        await service.EnqueueAsync("movie", 1, "Eins", Settings());
-        await service.EnqueueAsync("movie", 2, "Zwei", Settings());
+        await service.EnqueueAsync(new DownloadEnqueueRequest("movie", 1, "Eins"), Settings());
+        await service.EnqueueAsync(new DownloadEnqueueRequest("movie", 2, "Zwei"), Settings());
 
         // Beide Transfers müssen gleichzeitig gestartet sein — ein
         // serieller Ablauf liefe in das Zeitlimit.
@@ -387,7 +370,7 @@ public class DownloadServiceTests : IDisposable
         await File.WriteAllBytesAsync(occupying, new byte[200]);
         var service = CreateService(quotaBytesOverride: 100);
 
-        var result = await service.EnqueueAsync("movie", 42, "Ein Film", Settings());
+        var result = await service.EnqueueAsync(new DownloadEnqueueRequest("movie", 42, "Ein Film"), Settings());
 
         Assert.True(result.IsError);
         Assert.Equal(DownloadService.NoticeQuotaExceeded, result.Notice);
@@ -405,7 +388,7 @@ public class DownloadServiceTests : IDisposable
         EnqueueStream(200);
         var service = CreateService(quotaBytesOverride: 100);
 
-        await service.EnqueueAsync("movie", 42, "Ein Film", Settings());
+        await service.EnqueueAsync(new DownloadEnqueueRequest("movie", 42, "Ein Film"), Settings());
         var entry = await WaitForStateAsync(() => ReadEntryAsync("movie", 42), "failed");
 
         Assert.Equal(DownloadService.ErrorQuotaExceeded, entry.Error);
@@ -425,7 +408,7 @@ public class DownloadServiceTests : IDisposable
             return new HttpResponseMessage(HttpStatusCode.OK); // unerreichbar
         });
         var service = CreateService();
-        await service.EnqueueAsync("movie", 42, "Ein Film", Settings());
+        await service.EnqueueAsync(new DownloadEnqueueRequest("movie", 42, "Ein Film"), Settings());
         await WaitForStateAsync(() => ReadEntryAsync("movie", 42), "downloading");
 
         await service.CancelAsync("movie", 42);
@@ -441,7 +424,7 @@ public class DownloadServiceTests : IDisposable
         await LoginAsync();
         networkMonitor.IsWifi = false;
         var service = CreateService();
-        await service.EnqueueAsync("movie", 42, "Ein Film", Settings(wifiOnly: true));
+        await service.EnqueueAsync(new DownloadEnqueueRequest("movie", 42, "Ein Film"), Settings(wifiOnly: true));
 
         await service.CancelAsync("movie", 42);
 
@@ -457,7 +440,7 @@ public class DownloadServiceTests : IDisposable
         networkMonitor.IsWifi = false;
         var service = CreateService();
 
-        await service.EnqueueAsync("movie", 42, "Ein Film", Settings(wifiOnly: true));
+        await service.EnqueueAsync(new DownloadEnqueueRequest("movie", 42, "Ein Film"), Settings(wifiOnly: true));
         await Task.Delay(300);
 
         var entry = await ReadEntryAsync("movie", 42);
@@ -473,7 +456,7 @@ public class DownloadServiceTests : IDisposable
         networkMonitor.IsWifi = false;
         var service = CreateService();
         var settings = Settings(wifiOnly: true);
-        await service.EnqueueAsync("movie", 42, "Ein Film", settings);
+        await service.EnqueueAsync(new DownloadEnqueueRequest("movie", 42, "Ein Film"), settings);
         await Task.Delay(200);
 
         networkMonitor.IsWifi = true;
@@ -570,7 +553,7 @@ public class DownloadServiceTests : IDisposable
         handler.Enqueue(HttpStatusCode.InternalServerError);
         var service = CreateService();
 
-        await service.EnqueueAsync("movie", 42, "Ein Film", Settings());
+        await service.EnqueueAsync(new DownloadEnqueueRequest("movie", 42, "Ein Film"), Settings());
         var entry = await WaitForStateAsync(() => ReadEntryAsync("movie", 42), "failed");
 
         Assert.Equal("http_500", entry.Error);
@@ -585,7 +568,7 @@ public class DownloadServiceTests : IDisposable
         handler.EnqueueException(new HttpRequestException("verbindungsfehler"));
         var service = CreateService();
 
-        await service.EnqueueAsync("movie", 42, "Ein Film", Settings());
+        await service.EnqueueAsync(new DownloadEnqueueRequest("movie", 42, "Ein Film"), Settings());
         var entry = await WaitForStateAsync(() => ReadEntryAsync("movie", 42), "failed");
 
         Assert.Equal(DownloadService.ErrorNetwork, entry.Error);
@@ -600,7 +583,7 @@ public class DownloadServiceTests : IDisposable
         var service = CreateService();
         var removed = new List<DownloadRemovedEventArgs>();
         service.ItemRemoved += (_, e) => removed.Add(e);
-        await service.EnqueueAsync("movie", 42, "Ein Film", Settings());
+        await service.EnqueueAsync(new DownloadEnqueueRequest("movie", 42, "Ein Film"), Settings());
         var entry = await WaitForStateAsync(() => ReadEntryAsync("movie", 42), "completed");
 
         var deleted = await service.DeleteAsync("movie", 42);
@@ -624,7 +607,7 @@ public class DownloadServiceTests : IDisposable
             return new HttpResponseMessage(HttpStatusCode.OK); // unerreichbar
         });
         var service = CreateService();
-        await service.EnqueueAsync("movie", 42, "Ein Film", Settings());
+        await service.EnqueueAsync(new DownloadEnqueueRequest("movie", 42, "Ein Film"), Settings());
         await WaitForStateAsync(() => ReadEntryAsync("movie", 42), "downloading");
 
         var deleted = await service.DeleteAsync("movie", 42);
@@ -642,7 +625,7 @@ public class DownloadServiceTests : IDisposable
         EnqueueStream(32);
         var service = CreateService();
 
-        await service.EnqueueAsync("movie", 42, "Ein Film", Settings());
+        await service.EnqueueAsync(new DownloadEnqueueRequest("movie", 42, "Ein Film"), Settings());
 
         var entry = await WaitForStateAsync(() => ReadEntryAsync("movie", 42), "completed");
         Assert.Equal("manual", entry.Origin);
@@ -654,12 +637,12 @@ public class DownloadServiceTests : IDisposable
     {
         await LoginAsync();
         var service = CreateService(quotaBytesOverride: 0);
-        await service.EnqueueAsync("movie", 42, "Ein Film", Settings(), origin: DownloadOrigin.Auto);
+        await service.EnqueueAsync(new DownloadEnqueueRequest("movie", 42, "Ein Film", Origin: DownloadOrigin.Auto), Settings());
         var failed = await WaitForStateAsync(() => ReadEntryAsync("movie", 42), "failed");
         Assert.Equal("auto", failed.Origin);
 
         EnqueueStream(32);
-        var result = await CreateService().EnqueueAsync("movie", 42, "Ein Film", Settings());
+        var result = await CreateService().EnqueueAsync(new DownloadEnqueueRequest("movie", 42, "Ein Film"), Settings());
 
         Assert.Equal(DownloadService.NoticeEnqueued, result.Notice);
         var entry = await WaitForStateAsync(() => ReadEntryAsync("movie", 42), "completed");
@@ -677,7 +660,7 @@ public class DownloadServiceTests : IDisposable
         var service = CreateService(utcNow: () => now);
         var settings = new AppSettings { DownloadRetentionDays = 7 };
 
-        await service.EnqueueAsync("movie", 42, "Ein Film", settings);
+        await service.EnqueueAsync(new DownloadEnqueueRequest("movie", 42, "Ein Film"), settings);
 
         var entry = await WaitForStateAsync(() => ReadEntryAsync("movie", 42), "completed");
         Assert.Equal(now + TimeSpan.FromDays(7), entry.ExpiresAtUtc);
@@ -743,7 +726,7 @@ public class DownloadServiceTests : IDisposable
         await LoginAsync();
         networkMonitor.IsWifi = false;
         var service = CreateService();
-        await service.EnqueueAsync("tvshowepisode", 33, "Folge", Settings(wifiOnly: true));
+        await service.EnqueueAsync(new DownloadEnqueueRequest("tvshowepisode", 33, "Folge"), Settings(wifiOnly: true));
 
         var shortened = await service.ExpireAfterAsync("tvshowepisode", 33, TimeSpan.FromMinutes(15));
 
@@ -792,7 +775,7 @@ public class DownloadServiceTests : IDisposable
         await LoginAsync();
         networkMonitor.IsWifi = false;
         var service = CreateService();
-        await service.EnqueueAsync("movie", 42, "Ein Film", Settings(wifiOnly: true));
+        await service.EnqueueAsync(new DownloadEnqueueRequest("movie", 42, "Ein Film"), Settings(wifiOnly: true));
 
         var raised = await service.ExtendExpiryAsync("movie", 42, TimeSpan.FromHours(4));
 
@@ -811,8 +794,7 @@ public class DownloadServiceTests : IDisposable
         var changed = new List<DownloadListItem>();
         service.ItemChanged += (_, e) => changed.Add(e.Item);
 
-        var result = await service.EnqueueAsync(
-            "movie", 42, "Ein Film", Settings(), origin: DownloadOrigin.Auto);
+        var result = await service.EnqueueAsync(new DownloadEnqueueRequest("movie", 42, "Ein Film", Origin: DownloadOrigin.Auto), Settings());
 
         Assert.Equal(DownloadService.NoticeAlreadyPresent, result.Notice);
         var entry = await ReadEntryAsync("movie", 42);
@@ -829,7 +811,7 @@ public class DownloadServiceTests : IDisposable
         await InsertCompletedAsync(42, expiresAtUtc: expires, origin: "auto");
         var service = CreateService();
 
-        var result = await service.EnqueueAsync("movie", 42, "Ein Film", Settings());
+        var result = await service.EnqueueAsync(new DownloadEnqueueRequest("movie", 42, "Ein Film"), Settings());
 
         Assert.Equal(DownloadService.NoticeAlreadyPresent, result.Notice);
         var entry = await ReadEntryAsync("movie", 42);
@@ -935,11 +917,11 @@ public class DownloadServiceTests : IDisposable
         await LoginAsync();
         handler.Enqueue(HttpStatusCode.InternalServerError);
         var service = CreateService();
-        await service.EnqueueAsync("movie", 42, "Ein Film", Settings());
+        await service.EnqueueAsync(new DownloadEnqueueRequest("movie", 42, "Ein Film"), Settings());
         await WaitForStateAsync(() => ReadEntryAsync("movie", 42), "failed");
 
         EnqueueStream(64);
-        var result = await service.EnqueueAsync("movie", 42, "Ein Film", Settings());
+        var result = await service.EnqueueAsync(new DownloadEnqueueRequest("movie", 42, "Ein Film"), Settings());
 
         Assert.Equal(DownloadService.NoticeEnqueued, result.Notice);
         var entry = await WaitForStateAsync(() => ReadEntryAsync("movie", 42), "completed");
@@ -957,7 +939,7 @@ public class DownloadServiceTests : IDisposable
         var changed = new List<DownloadListItem>();
         service.ItemChanged += (_, e) => changed.Add(e.Item);
 
-        await service.EnqueueAsync("movie", 42, "Ein Film", Settings());
+        await service.EnqueueAsync(new DownloadEnqueueRequest("movie", 42, "Ein Film"), Settings());
         await WaitForStateAsync(() => ReadEntryAsync("movie", 42), "completed");
 
         var final = changed.Last();
@@ -974,7 +956,7 @@ public class DownloadServiceTests : IDisposable
         // Kein Login → keine Basisadresse/kein Token.
         var service = CreateService();
 
-        await service.EnqueueAsync("movie", 42, "Ein Film", Settings());
+        await service.EnqueueAsync(new DownloadEnqueueRequest("movie", 42, "Ein Film"), Settings());
         var entry = await WaitForStateAsync(() => ReadEntryAsync("movie", 42), "failed");
 
         Assert.Equal(DownloadService.ErrorNoConnection, entry.Error);
@@ -986,7 +968,7 @@ public class DownloadServiceTests : IDisposable
     {
         var service = CreateService();
 
-        var result = await service.EnqueueAsync("tvshow", 5, "Serie", Settings());
+        var result = await service.EnqueueAsync(new DownloadEnqueueRequest("tvshow", 5, "Serie"), Settings());
 
         Assert.True(result.IsError);
         Assert.Null(result.Item);
@@ -1001,8 +983,8 @@ public class DownloadServiceTests : IDisposable
         networkMonitor.IsWifi = false;
         var service = CreateService();
         var settings = Settings(wifiOnly: true);
-        await service.EnqueueAsync("movie", 1, "Eins", settings);
-        await service.EnqueueAsync("tvshowepisode", 2, "Zwei", settings);
+        await service.EnqueueAsync(new DownloadEnqueueRequest("movie", 1, "Eins"), settings);
+        await service.EnqueueAsync(new DownloadEnqueueRequest("tvshowepisode", 2, "Zwei"), settings);
 
         var items = await service.LoadItemsAsync();
 

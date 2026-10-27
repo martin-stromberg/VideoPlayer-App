@@ -1504,10 +1504,13 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
                 ? null
                 : new DownloadSeriesContext(enqueue.ShowId, enqueue.ShowTitle, enqueue.SeasonNumber, enqueue.EpisodeNumber);
             result = await downloads.EnqueueAsync(
-                enqueue.MediaType, enqueue.MediaId, enqueue.Title, enqueue.Settings, seriesContext,
-                pictureId: enqueue.PictureId,
-                origin: DownloadOrigin.Manual,
-                cancellationToken: cancellationToken);
+                new DownloadEnqueueRequest(
+                    enqueue.MediaType, enqueue.MediaId, enqueue.Title,
+                    SeriesContext: seriesContext,
+                    PictureId: enqueue.PictureId,
+                    Origin: DownloadOrigin.Manual),
+                enqueue.Settings,
+                cancellationToken);
         }
         catch (Exception ex)
         {

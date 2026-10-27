@@ -101,12 +101,11 @@ public class DownloadServiceReconcileTests : IDisposable
         return entry;
     }
 
-    private async Task<DownloadManifestEntry?> ReadEntryAsync(long mediaId = 42)
+    // Die Manifest-Lese-Hilfe liegt gemeinsam in ManifestTestHelpers —
+    // der Wrapper reicht die cache-Ablage durch.
+    private Task<DownloadManifestEntry?> ReadEntryAsync(long mediaId = 42)
     {
-        var rows = await cache.Connection.Table<DownloadManifestEntry>()
-            .Where(e => e.VideoId == (int)mediaId)
-            .ToListAsync();
-        return rows.FirstOrDefault(e => e.VideoType == "movie");
+        return ManifestTestHelpers.ReadEntryAsync(cache, "movie", mediaId);
     }
 
     private string WriteFile(string name, int size)
@@ -236,7 +235,7 @@ public class DownloadServiceReconcileTests : IDisposable
             return new HttpResponseMessage(HttpStatusCode.OK); // unerreichbar
         });
         var service = CreateService();
-        await service.EnqueueAsync("movie", 42, "Ein Film", new AppSettings());
+        await service.EnqueueAsync(new DownloadEnqueueRequest("movie", 42, "Ein Film"), new AppSettings());
 
         var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(15);
         DownloadManifestEntry? entry;
@@ -343,7 +342,7 @@ public class DownloadServiceReconcileTests : IDisposable
         await InsertEntryAsync("completed", stalePath);
         var service = CreateService();
 
-        var result = await service.EnqueueAsync("movie", 42, "Ein Film", new AppSettings());
+        var result = await service.EnqueueAsync(new DownloadEnqueueRequest("movie", 42, "Ein Film"), new AppSettings());
 
         Assert.Equal(DownloadService.NoticeAlreadyPresent, result.Notice);
         Assert.Equal("completed", (await ReadEntryAsync())!.State);

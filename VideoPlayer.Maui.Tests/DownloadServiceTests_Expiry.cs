@@ -76,32 +76,16 @@ public class DownloadServiceTests_Expiry : IDisposable
         null,
         utcNow: utcNow);
 
-    private async Task<DownloadManifestEntry?> ReadEntryAsync(string type, long mediaId)
+    // Manifest-Lese-/-Anlege-Hilfen liegen gemeinsam in
+    // ManifestTestHelpers — die Wrapper reichen cache/layout durch.
+    private Task<DownloadManifestEntry?> ReadEntryAsync(string type, long mediaId)
     {
-        var rows = await cache.Connection.Table<DownloadManifestEntry>()
-            .Where(e => e.VideoId == (int)mediaId)
-            .ToListAsync();
-        return rows.FirstOrDefault(e => e.VideoType == type);
+        return ManifestTestHelpers.ReadEntryAsync(cache, type, mediaId);
     }
 
-    private async Task<DownloadManifestEntry> InsertCompletedAsync(long mediaId, DateTime? expiresAtUtc)
+    private Task<DownloadManifestEntry> InsertCompletedAsync(long mediaId, DateTime? expiresAtUtc)
     {
-        var path = Path.Combine(layout.VideosDirectory, $"movie_{mediaId}.mp4");
-        await File.WriteAllBytesAsync(path, new byte[64]);
-        var entry = new DownloadManifestEntry
-        {
-            VideoId = (int)mediaId,
-            VideoType = "movie",
-            Title = "Ein Film",
-            FilePath = path,
-            State = "completed",
-            SizeBytes = 64,
-            Origin = "manual",
-            ExpiresAtUtc = expiresAtUtc,
-            UpdatedAtUtc = DateTime.UtcNow.AddDays(-1)
-        };
-        await cache.Connection.InsertAsync(entry);
-        return entry;
+        return ManifestTestHelpers.InsertCompletedAsync(cache, layout, mediaId, expiresAtUtc, origin: "manual");
     }
 
     /// <summary>Prüft den Wiedergabe-Schutz: Zielwert und Schreibstempel kommen aus der injizierten Zeitquelle.</summary>
@@ -154,8 +138,7 @@ public class DownloadServiceTests_Expiry : IDisposable
         var settings = new AppSettings { DownloadRetentionDays = 7 };
 
         // Act
-        var result = await service.EnqueueAsync(
-            "movie", 42, "Ein Film", settings, origin: DownloadOrigin.Auto);
+        var result = await service.EnqueueAsync(new DownloadEnqueueRequest("movie", 42, "Ein Film", Origin: DownloadOrigin.Auto), settings);
 
         // Assert
         Assert.Equal(DownloadService.NoticeAlreadyPresent, result.Notice);

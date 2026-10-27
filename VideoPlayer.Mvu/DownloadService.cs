@@ -244,29 +244,20 @@ public sealed class DownloadService
     /// Bei Erreichen des Speicherplatzkontingents wird der Eintrag als
     /// fehlgeschlagen (<see cref="ErrorQuotaExceeded"/>) geführt.
     /// </summary>
-    /// <param name="mediaType">Medientyp (wird normalisiert; nur <c>movie</c>/<c>tvshowepisode</c> sind ladbar).</param>
-    /// <param name="mediaId">Id des Mediums.</param>
-    /// <param name="title">Anzeigetitel des Downloads; <c>null</c> = Fallback.</param>
+    /// <param name="request">Die Einreihe-Anforderung (Medientyp wird normalisiert; nur <c>movie</c>/<c>tvshowepisode</c> sind ladbar).</param>
     /// <param name="settings">Aktuelle App-Einstellungen (Kontingent, WLAN-Bedingung).</param>
-    /// <param name="seriesContext">Optionaler Serienkontext eines Episoden-Downloads (Grundlage des Offline-„Weiterschauen").</param>
-    /// <param name="playlistContext">Optionaler Playlist-Bezug des Downloads (Herkunft und Reihenfolge playlist-gebundener Einplanungen).</param>
-    /// <param name="pictureId">Bild-Id des Vorschaubilds (<c>api/pictures/{id}</c> — Episoden-Still bzw. Film-Poster); <c>null</c> = kein Bild bekannt.</param>
-    /// <param name="origin">Herkunft des Downloads (<see cref="DownloadOrigin.Manual"/> über die Oberfläche, <see cref="DownloadOrigin.Auto"/> aus dem Auto-Download-Vorlauf).</param>
     /// <param name="cancellationToken">Bricht die Manifest-Operation ab (nicht den Transfer).</param>
     /// <returns>Das Einreihe-Ergebnis mit Snapshot und Hinweistext.</returns>
     public async Task<DownloadEnqueueResult> EnqueueAsync(
-        string mediaType,
-        long mediaId,
-        string? title,
+        DownloadEnqueueRequest request,
         AppSettings settings,
-        DownloadSeriesContext? seriesContext = null,
-        DownloadPlaylistContext? playlistContext = null,
-        long? pictureId = null,
-        DownloadOrigin origin = DownloadOrigin.Manual,
         CancellationToken cancellationToken = default)
     {
+        ArgumentNullException.ThrowIfNull(request);
         ArgumentNullException.ThrowIfNull(settings);
-        var type = MediaTypeNames.Normalize(mediaType);
+        var type = MediaTypeNames.Normalize(request.MediaType);
+        var mediaId = request.MediaId;
+        var title = request.Title;
 
         if (mediaId <= 0 || type is not ("movie" or "tvshowepisode"))
         {
@@ -278,8 +269,8 @@ public sealed class DownloadService
             });
         }
 
-        var request = new EnqueueRequest(
-            type, mediaId, title, seriesContext, playlistContext, pictureId, origin);
+        // Ab hier trägt die Anforderung den normalisierten Medientyp.
+        request = request with { MediaType = type };
         DownloadManifestEntry? entry = null;
         DownloadEnqueueResult? dedup = null;
         DownloadListItem? changedItem = null;
@@ -384,28 +375,6 @@ public sealed class DownloadService
     }
 
     /// <summary>
-    /// Gebündelte Daten einer Einreihe-Anforderung — die fachlich
-    /// zusammengehörige Datengruppe von <see cref="EnqueueAsync"/>,
-    /// die Dedup/Requeue und Neuanlage gemeinsam beschreibt.
-    /// </summary>
-    /// <param name="Type">Der normalisierte Medientyp.</param>
-    /// <param name="MediaId">Die Medien-Id.</param>
-    /// <param name="Title">Der Anzeigetitel des Downloads; <c>null</c> = Fallback.</param>
-    /// <param name="SeriesContext">Optionaler Serienkontext eines Episoden-Downloads.</param>
-    /// <param name="PlaylistContext">Optionaler Playlist-Bezug des Downloads.</param>
-    /// <param name="PictureId">Optionale Bild-Id des Vorschaubilds.</param>
-    /// <param name="Origin">Herkunft des Einreihe-Auftrags.</param>
-    /// <returns>Anforderungs-Datensatz der Einreihe-Operation.</returns>
-    private sealed record EnqueueRequest(
-        string Type,
-        long MediaId,
-        string? Title,
-        DownloadSeriesContext? SeriesContext,
-        DownloadPlaylistContext? PlaylistContext,
-        long? PictureId,
-        DownloadOrigin Origin);
-
-    /// <summary>
     /// Dedup- und Requeue-Behandlung eines vorhandenen Manifest-Eintrags
     /// (läuft unter dem <see cref="manifestGate"/> des Aufrufers):
     /// laufende, wartende und abgeschlossene Aufträge liefern ihr
@@ -429,7 +398,7 @@ public sealed class DownloadService
     private async Task<(DownloadEnqueueResult? Result, DownloadManifestEntry? Requeued, DownloadListItem? Changed)>
         ResolveExistingEntryAsync(
             DownloadManifestEntry existing,
-            EnqueueRequest request,
+            DownloadEnqueueRequest request,
             AppSettings settings)
     {
         var state = DownloadStateNames.FromPersisted(existing.State);
@@ -486,14 +455,14 @@ public sealed class DownloadService
     /// </summary>
     /// <param name="request">Die Einreihe-Anforderung (Typ, Id, Titel, Kontexte, Bild-Id, Herkunft).</param>
     /// <returns>Der neue Manifest-Eintrag.</returns>
-    private DownloadManifestEntry CreateManifestEntry(EnqueueRequest request)
+    private DownloadManifestEntry CreateManifestEntry(DownloadEnqueueRequest request)
     {
         var entry = new DownloadManifestEntry
         {
             VideoId = (int)request.MediaId,
-            VideoType = request.Type,
+            VideoType = request.MediaType,
             Title = request.Title ?? string.Empty,
-            FilePath = FilePathFor(request.Type, request.MediaId),
+            FilePath = FilePathFor(request.MediaType, request.MediaId),
             State = DownloadStateNames.ToPersisted(DownloadState.Queued),
             Origin = DownloadOriginNames.ToPersisted(request.Origin),
             UpdatedAtUtc = utcNow()
@@ -1025,22 +994,9 @@ public sealed class DownloadService
         IReadOnlySet<string>? autoDownloadCandidateKeys = null,
         CancellationToken cancellationToken = default)
     {
-        var removedPartialBytes = 0L;
-        var removedPartialCount = 0;
-        var orphanedBytes = 0L;
-        var orphanedFileCount = 0;
-        var correctedCompleted = 0;
-        var removedExpiredCount = 0;
-        var extendedExpiryCount = 0;
-
-        List<DownloadManifestEntry> entries;
-        try
+        var entries = await ReadManifestEntriesAsync();
+        if (entries is null)
         {
-            entries = await cache.Connection.Table<DownloadManifestEntry>().ToListAsync();
-        }
-        catch (Exception ex) when (ex is SQLite.SQLiteException or InvalidOperationException)
-        {
-            logger.LogWarning(ex, "Download-Manifest nicht lesbar — Abgleich übersprungen.");
             return new DownloadReconcileResult();
         }
 
@@ -1051,19 +1007,143 @@ public sealed class DownloadService
             .GroupBy(e => Path.GetFileName(e.FilePath), StringComparer.OrdinalIgnoreCase)
             .ToDictionary(g => g.Key, g => g.First(), StringComparer.OrdinalIgnoreCase);
 
-        string[] files;
+        var files = ReadVideoFileNames();
+        if (files is null)
+        {
+            return new DownloadReconcileResult();
+        }
+
+        // Datei-Scan-Pass: Teildatei-Bereinigung, Restdaten-Erkennung und
+        // Pfad-Heilung nach Container-Umzug.
+        var (removedPartialBytes, removedPartialCount, orphanedBytes, orphanedFileCount) =
+            await ScanFilesAsync(files, entryByFileName, cancellationToken);
+
+        // Korrektur-Pass: „completed"-Einträge ohne lokale Datei werden
+        // als fehlgeschlagen markiert (erneut einplanbar).
+        var correctedCompleted = await CorrectCompletedWithoutFileAsync(entries, cancellationToken);
+
+        // Ablauf-Pass: abgeschlossene Einträge mit erreichtem Ablaufdatum
+        // (Altbestand ohne ExpiresAtUtc gilt als abgelaufen) werden
+        // entfernt — es sei denn, das Medium ist weiterhin Auto-Download-
+        // Kandidat, dann wird verlängert und die Herkunft auf „auto"
+        // gestellt. Nur „completed" wird geprüft — laufende Transfers,
+        // wartende und fehlerhafte Einträge bleiben unberührt.
+        var removedExpiredCount = 0;
+        var extendedExpiryCount = 0;
+        if (settings is not null)
+        {
+            (removedExpiredCount, extendedExpiryCount) = await RunExpiryPassAsync(
+                entries, settings, autoDownloadCandidateKeys, cancellationToken);
+        }
+
+        var result = new DownloadReconcileResult
+        {
+            RemovedPartialBytes = removedPartialBytes,
+            RemovedPartialCount = removedPartialCount,
+            OrphanedBytes = orphanedBytes,
+            OrphanedFileCount = orphanedFileCount,
+            CorrectedCompletedCount = correctedCompleted,
+            RemovedExpiredCount = removedExpiredCount,
+            ExtendedExpiryCount = extendedExpiryCount
+        };
+        LogReconcileResult(result);
+        return result;
+    }
+
+    /// <summary>
+    /// Liest alle Einträge des Download-Manifests für den Abgleich
+    /// (<see cref="ReconcileAsync"/>); <c>null</c> bei nicht lesbarer
+    /// Ablage — der Abgleich wird dann übersprungen.
+    /// </summary>
+    /// <returns>Die Manifest-Einträge; <c>null</c>, wenn das Manifest nicht lesbar ist.</returns>
+    private async Task<List<DownloadManifestEntry>?> ReadManifestEntriesAsync()
+    {
         try
         {
-            files = Directory.Exists(layout.VideosDirectory)
+            return await cache.Connection.Table<DownloadManifestEntry>().ToListAsync();
+        }
+        catch (Exception ex) when (ex is SQLite.SQLiteException or InvalidOperationException)
+        {
+            logger.LogWarning(ex, "Download-Manifest nicht lesbar — Abgleich übersprungen.");
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Listet die Dateien des Video-Verzeichnisses für den Abgleich
+    /// (<see cref="ReconcileAsync"/>); <c>null</c> bei nicht lesbarem
+    /// Verzeichnis — der Abgleich wird dann übersprungen.
+    /// </summary>
+    /// <returns>Die Dateipfade; <c>null</c>, wenn das Verzeichnis nicht lesbar ist.</returns>
+    private string[]? ReadVideoFileNames()
+    {
+        try
+        {
+            return Directory.Exists(layout.VideosDirectory)
                 ? Directory.GetFiles(layout.VideosDirectory)
                 : [];
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
             logger.LogWarning(ex, "Video-Verzeichnis nicht lesbar — Abgleich übersprungen.");
-            return new DownloadReconcileResult();
+            return null;
         }
+    }
 
+    /// <summary>
+    /// Protokolliert das Abgleichsergebnis (<see cref="ReconcileAsync"/>)
+    /// — nur bei tatsächlich erkannten oder entfernten Datenmengen.
+    /// </summary>
+    /// <param name="result">Das Abgleichsergebnis.</param>
+    private void LogReconcileResult(DownloadReconcileResult result)
+    {
+        if (result.RemovedPartialCount > 0 || result.OrphanedFileCount > 0
+            || result.CorrectedCompletedCount > 0 || result.RemovedExpiredCount > 0
+            || result.ExtendedExpiryCount > 0)
+        {
+            logger.LogInformation(
+                "Download-Abgleich: {RemovedCount} überholte Teildateien entfernt ({RemovedBytes} Bytes), "
+                + "{OrphanedCount} Restdateien ohne Manifest-Eintrag erkannt ({OrphanedBytes} Bytes), "
+                + "{CorrectedCount} fertige Einträge ohne Datei korrigiert, "
+                + "{ExpiredCount} abgelaufene Downloads entfernt, "
+                + "{ExtendedCount} Auto-Download-Kandidaten verlängert.",
+                result.RemovedPartialCount,
+                result.RemovedPartialBytes,
+                result.OrphanedFileCount,
+                result.OrphanedBytes,
+                result.CorrectedCompletedCount,
+                result.RemovedExpiredCount,
+                result.ExtendedExpiryCount);
+        }
+    }
+
+    /// <summary>
+    /// Datei-Scan-Pass des Abgleichs (<see cref="ReconcileAsync"/>): jede
+    /// Datei des Video-Verzeichnisses wird über den Dateinamen dem
+    /// Manifest zugeordnet. Dateien ohne Manifest-Bezug sind verwaiste
+    /// Restdaten — sie werden gezählt, aber nicht entfernt (Bereinigung
+    /// ist eine Anwenderentscheidung). Einträge mit veraltetem
+    /// Verzeichnisanteil (Container-Umzug) werden auf den tatsächlichen
+    /// Ablageort geheilt. Überholte Teildateien — der Eintrag wartet,
+    /// ist fehlgeschlagen/abgebrochen oder „läuft" ohne tatsächlichen
+    /// Transfer — werden entfernt. Dateien von Einträgen im Zustand
+    /// <see cref="DownloadState.Completed"/> und von gerade laufenden
+    /// Transfers werden nie angefasst.
+    /// </summary>
+    /// <param name="files">Die Dateien des Video-Verzeichnisses.</param>
+    /// <param name="entryByFileName">Manifest-Einträge nach Dateinamen.</param>
+    /// <param name="cancellationToken">Bricht die Manifest-Operationen ab.</param>
+    /// <returns>Die Mengen der entfernten Teildateien und der erkannten Restdaten (Anzahl und Bytes).</returns>
+    private async Task<(long RemovedPartialBytes, int RemovedPartialCount, long OrphanedBytes, int OrphanedFileCount)>
+        ScanFilesAsync(
+            string[] files,
+            IReadOnlyDictionary<string, DownloadManifestEntry> entryByFileName,
+            CancellationToken cancellationToken)
+    {
+        var removedPartialBytes = 0L;
+        var removedPartialCount = 0;
+        var orphanedBytes = 0L;
+        var orphanedFileCount = 0;
         foreach (var path in files)
         {
             long size;
@@ -1112,6 +1192,24 @@ public sealed class DownloadService
             }
         }
 
+        return (removedPartialBytes, removedPartialCount, orphanedBytes, orphanedFileCount);
+    }
+
+    /// <summary>
+    /// Korrektur-Pass des Abgleichs (<see cref="ReconcileAsync"/>): als
+    /// „fertig" (<see cref="DownloadState.Completed"/>) geführte Einträge
+    /// ohne lokale Datei werden als fehlgeschlagen
+    /// (<see cref="ErrorMissingFile"/>) korrigiert und sind damit erneut
+    /// einplanbar.
+    /// </summary>
+    /// <param name="entries">Die Manifest-Einträge des Abgleichs.</param>
+    /// <param name="cancellationToken">Bricht die Manifest-Operationen ab.</param>
+    /// <returns>Die Anzahl der korrigierten Einträge.</returns>
+    private async Task<int> CorrectCompletedWithoutFileAsync(
+        List<DownloadManifestEntry> entries,
+        CancellationToken cancellationToken)
+    {
+        var correctedCompleted = 0;
         foreach (var entry in entries)
         {
             if (DownloadStateNames.FromPersisted(entry.State) == DownloadState.Completed
@@ -1122,69 +1220,61 @@ public sealed class DownloadService
             }
         }
 
-        // Ablauf-Pass: abgeschlossene Einträge mit erreichtem Ablaufdatum
-        // (Altbestand ohne ExpiresAtUtc gilt als abgelaufen) werden
-        // entfernt — es sei denn, das Medium ist weiterhin Auto-Download-
-        // Kandidat, dann wird verlängert und die Herkunft auf „auto"
-        // gestellt. Nur „completed" wird geprüft — laufende Transfers,
-        // wartende und fehlerhafte Einträge bleiben unberührt.
-        if (settings is not null)
+        return correctedCompleted;
+    }
+
+    /// <summary>
+    /// Ablauf-Pass des Abgleichs (<see cref="ReconcileAsync"/>):
+    /// abgeschlossene Einträge mit erreichtem (oder im Altbestand nicht
+    /// gesetztem) Ablaufdatum werden entfernt — Datei, Manifest-Zeile,
+    /// <see cref="ItemRemoved"/>; Einträge, deren Medium weiterhin
+    /// Auto-Download-Kandidat ist (Schlüssel in
+    /// <paramref name="autoDownloadCandidateKeys"/>), werden stattdessen
+    /// auf <c>jetzt + Aufbewahrungszeit</c> verlängert und auf die
+    /// Herkunft <c>auto</c> umgestellt. Nur „completed" wird geprüft —
+    /// laufende Transfers, wartende und fehlerhafte Einträge bleiben
+    /// unberührt.
+    /// </summary>
+    /// <param name="entries">Die Manifest-Einträge des Abgleichs.</param>
+    /// <param name="settings">Aktuelle App-Einstellungen (Aufbewahrungszeit der Verlängerung).</param>
+    /// <param name="autoDownloadCandidateKeys">Kandidatenmenge des Auto-Download-Vorlaufs im <see cref="ManifestKey"/>-Format; <c>null</c> = keine Kandidaten.</param>
+    /// <param name="cancellationToken">Bricht die Manifest-Operationen ab.</param>
+    /// <returns>Die Anzahl entfernter abgelaufener Einträge und die Anzahl verlängerter Auto-Download-Kandidaten.</returns>
+    private async Task<(int RemovedExpiredCount, int ExtendedExpiryCount)> RunExpiryPassAsync(
+        List<DownloadManifestEntry> entries,
+        AppSettings settings,
+        IReadOnlySet<string>? autoDownloadCandidateKeys,
+        CancellationToken cancellationToken)
+    {
+        var removedExpiredCount = 0;
+        var extendedExpiryCount = 0;
+        var now = utcNow();
+        var retention = TimeSpan.FromDays(settings.DownloadRetentionDays);
+        foreach (var entry in entries)
         {
-            var now = utcNow();
-            var retention = TimeSpan.FromDays(settings.DownloadRetentionDays);
-            foreach (var entry in entries)
+            if (DownloadStateNames.FromPersisted(entry.State) != DownloadState.Completed
+                || runningTransfers.ContainsKey(ManifestKey(entry.VideoType, entry.VideoId))
+                || (entry.ExpiresAtUtc is not null && entry.ExpiresAtUtc > now))
             {
-                if (DownloadStateNames.FromPersisted(entry.State) != DownloadState.Completed
-                    || runningTransfers.ContainsKey(ManifestKey(entry.VideoType, entry.VideoId))
-                    || (entry.ExpiresAtUtc is not null && entry.ExpiresAtUtc > now))
-                {
-                    continue;
-                }
-
-                if (autoDownloadCandidateKeys is not null
-                    && autoDownloadCandidateKeys.Contains(ManifestKey(entry.VideoType, entry.VideoId)))
-                {
-                    entry.ExpiresAtUtc = now + retention;
-                    entry.Origin = DownloadOriginNames.ToPersisted(DownloadOrigin.Auto);
-                    await UpdateManifestEntryAsync(entry, cancellationToken);
-                    extendedExpiryCount++;
-                    continue;
-                }
-
-                TryDeleteFile(DownloadManifestPaths.Resolve(layout, entry));
-                await DeleteManifestEntryAsync(entry, cancellationToken);
-                removedExpiredCount++;
+                continue;
             }
+
+            if (autoDownloadCandidateKeys is not null
+                && autoDownloadCandidateKeys.Contains(ManifestKey(entry.VideoType, entry.VideoId)))
+            {
+                entry.ExpiresAtUtc = now + retention;
+                entry.Origin = DownloadOriginNames.ToPersisted(DownloadOrigin.Auto);
+                await UpdateManifestEntryAsync(entry, cancellationToken);
+                extendedExpiryCount++;
+                continue;
+            }
+
+            TryDeleteFile(DownloadManifestPaths.Resolve(layout, entry));
+            await DeleteManifestEntryAsync(entry, cancellationToken);
+            removedExpiredCount++;
         }
 
-        if (removedPartialCount > 0 || orphanedFileCount > 0 || correctedCompleted > 0
-            || removedExpiredCount > 0 || extendedExpiryCount > 0)
-        {
-            logger.LogInformation(
-                "Download-Abgleich: {RemovedCount} überholte Teildateien entfernt ({RemovedBytes} Bytes), "
-                + "{OrphanedCount} Restdateien ohne Manifest-Eintrag erkannt ({OrphanedBytes} Bytes), "
-                + "{CorrectedCount} fertige Einträge ohne Datei korrigiert, "
-                + "{ExpiredCount} abgelaufene Downloads entfernt, "
-                + "{ExtendedCount} Auto-Download-Kandidaten verlängert.",
-                removedPartialCount,
-                removedPartialBytes,
-                orphanedFileCount,
-                orphanedBytes,
-                correctedCompleted,
-                removedExpiredCount,
-                extendedExpiryCount);
-        }
-
-        return new DownloadReconcileResult
-        {
-            RemovedPartialBytes = removedPartialBytes,
-            RemovedPartialCount = removedPartialCount,
-            OrphanedBytes = orphanedBytes,
-            OrphanedFileCount = orphanedFileCount,
-            CorrectedCompletedCount = correctedCompleted,
-            RemovedExpiredCount = removedExpiredCount,
-            ExtendedExpiryCount = extendedExpiryCount
-        };
+        return (removedExpiredCount, extendedExpiryCount);
     }
 
     private async Task PumpQueueAsync(AppSettings settings)

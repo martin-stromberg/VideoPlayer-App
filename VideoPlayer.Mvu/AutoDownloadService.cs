@@ -136,7 +136,7 @@ public sealed class AutoDownloadService
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 var type = MediaTypeNames.Normalize(item.MediaType);
-                var hasPlaylistBinding = item.PlaylistId is > 0 && item.PlaylistEntryId is > 0;
+                var hasPlaylistBinding = HasPlaylistBinding(item);
                 try
                 {
                     if (type == "movie")
@@ -232,7 +232,7 @@ public sealed class AutoDownloadService
             keys.Add(DownloadService.ManifestKey(type, item.Id));
 
             var playlistMatched = false;
-            if (item.PlaylistId is > 0 && item.PlaylistEntryId is > 0)
+            if (HasPlaylistBinding(item))
             {
                 playlistMatched = await AddPlaylistCandidateKeysAsync(item, settings, keys);
             }
@@ -379,11 +379,13 @@ public sealed class AutoDownloadService
                 ? $"{showName} – Episode {episode.Number}"
                 : $"{showName} – {episode.Name}";
             var enqueueResult = await downloads.EnqueueAsync(
-                "tvshowepisode", episode.Id, title, settings,
-                new DownloadSeriesContext(show.Id, showName, season.Number, episode.Number),
-                pictureId: episode.GeneratedBackgroundPictureId ?? episode.PosterPictureId,
-                origin: DownloadOrigin.Auto,
-                cancellationToken: cancellationToken);
+                new DownloadEnqueueRequest(
+                    "tvshowepisode", episode.Id, title,
+                    SeriesContext: new DownloadSeriesContext(show.Id, showName, season.Number, episode.Number),
+                    PictureId: episode.GeneratedBackgroundPictureId ?? episode.PosterPictureId,
+                    Origin: DownloadOrigin.Auto),
+                settings,
+                cancellationToken);
             if (enqueueResult.Notice == DownloadService.NoticeEnqueued)
             {
                 enqueued++;
@@ -428,13 +430,13 @@ public sealed class AutoDownloadService
         CancellationToken cancellationToken)
     {
         var client = authSession.Client;
-        if (client is null || item.PlaylistId is not > 0 || item.PlaylistEntryId is not > 0)
+        if (client is null || !HasPlaylistBinding(item))
         {
             return null;
         }
 
         var scan = await ScanPlaylistFromCurrentAsync(
-            client, item.PlaylistId.Value, item.PlaylistEntryId.Value,
+            client, item.PlaylistId!.Value, item.PlaylistEntryId!.Value,
             settings.PreloadEpisodeCount, cancellationToken);
         if (scan is null)
         {
@@ -581,11 +583,13 @@ public sealed class AutoDownloadService
         foreach (var entry in candidates)
         {
             var enqueueResult = await downloads.EnqueueAsync(
-                MediaTypeNames.Normalize(entry.MediaType), entry.MediaId, PlaylistEntryTitle(entry), settings,
-                SeriesContextOf(entry),
-                new DownloadPlaylistContext(item.PlaylistId, entry.Id, entry.SortOrder),
-                entry.ResolvedPictureId,
-                DownloadOrigin.Auto,
+                new DownloadEnqueueRequest(
+                    MediaTypeNames.Normalize(entry.MediaType), entry.MediaId, PlaylistEntryTitle(entry),
+                    SeriesContextOf(entry),
+                    new DownloadPlaylistContext(item.PlaylistId, entry.Id, entry.SortOrder),
+                    entry.ResolvedPictureId,
+                    DownloadOrigin.Auto),
+                settings,
                 cancellationToken);
             if (enqueueResult.Notice == DownloadService.NoticeEnqueued)
             {
@@ -656,16 +660,26 @@ public sealed class AutoDownloadService
         AppSettings settings,
         CancellationToken cancellationToken)
     {
-        var hasPlaylistBinding = item.PlaylistId is > 0 && item.PlaylistEntryId is > 0;
+        var hasPlaylistBinding = HasPlaylistBinding(item);
         var result = await downloads.EnqueueAsync(
-            mediaType, item.Id, item.Title, settings,
-            playlistContext: hasPlaylistBinding
-                ? new DownloadPlaylistContext(item.PlaylistId, item.PlaylistEntryId, null)
-                : null,
-            pictureId: item.PosterPictureId,
-            origin: DownloadOrigin.Auto,
-            cancellationToken: cancellationToken);
+            new DownloadEnqueueRequest(
+                mediaType, item.Id, item.Title,
+                PlaylistContext: hasPlaylistBinding
+                    ? new DownloadPlaylistContext(item.PlaylistId, item.PlaylistEntryId, null)
+                    : null,
+                PictureId: item.PosterPictureId,
+                Origin: DownloadOrigin.Auto),
+            settings,
+            cancellationToken);
         return result.Notice == DownloadService.NoticeEnqueued;
+    }
+
+    /// <summary>Prüft, ob der Weiterschauen-Eintrag einen Playlist-Bezug trägt (Playlist-Id und Eintrags-Id bekannt).</summary>
+    /// <param name="item">Der Weiterschauen-Eintrag.</param>
+    /// <returns><c>true</c>, wenn der Eintrag playlist-gebunden ist.</returns>
+    private static bool HasPlaylistBinding(HomeMediaItem item)
+    {
+        return item.PlaylistId is > 0 && item.PlaylistEntryId is > 0;
     }
 
     /// <summary>Index des ersten Elements, das das Prädikat erfüllt; -1 = nicht gefunden.</summary>
