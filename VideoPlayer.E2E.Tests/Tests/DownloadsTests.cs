@@ -155,8 +155,12 @@ public sealed class DownloadsTests : E2ETestBase
         server.PlaybackMovieTitle = "E2E-Verfalls-Film";
         server.PlaybackVideoPath = Path.Combine(AppContext.BaseDirectory, "Assets", "testvideo.mp4");
         // Beide Starts teilen sich das Profil — das Manifest übersteht
-        // den Neustart und der Start-Abgleich wirkt auf die Ablage.
-        var app = await StartAppAsync(profile: "downloads-expiry");
+        // den Neustart und der Start-Abgleich wirkt auf die Ablage. Der
+        // Name ist je Lauf eindeutig: ein persistiertes Profil mit
+        // gespeicherten Zugangsdaten würde das Pairing direkt zur
+        // Startseite führen statt zur Anmelde-Wahl.
+        var profile = $"downloads-expiry-{Guid.NewGuid():N}";
+        var app = await StartAppAsync(profile: profile);
         await ConnectToPairingRequiredAsync(app, server);
         await PairAsync(app, server);
         await LoginAsync(app, server);
@@ -166,10 +170,13 @@ public sealed class DownloadsTests : E2ETestBase
             "Karussell „Neu im Programm\" befüllt", Ct);
 
         // Option „Gesehene Downloads löschen" ohne Verzögerung aktivieren.
+        // Das Zahlenfeld speichert über Completed/Unfocused — echte
+        // UIA-Eingabe (Fokus + ValuePattern), damit der Wechsel der Seite
+        // den Wert persistiert.
         app.Ui.OpenFlyoutItem("Einstellungen");
         app.Ui.FindByAutomationId("AutoDeletePlayedSwitch", TimeSpan.FromSeconds(30));
         app.Ui.Toggle("AutoDeletePlayedSwitch");
-        await app.DevApi.SetTextAsync("DeleteAfterPlaybackDelayEntry", "0", Ct);
+        app.Ui.EnterText("DeleteAfterPlaybackDelayEntry", "0");
 
         // Manuellen Download auslösen und auf den Abschluss warten.
         app.Ui.OpenFlyoutItem("Startseite");
@@ -209,9 +216,10 @@ public sealed class DownloadsTests : E2ETestBase
             "Wiedergabe des Downloads beendet", Ct);
 
         // Neustart mit demselben Profil: der Abgleich beim Start
-        // entfernt den inzwischen abgelaufenen Eintrag.
-        app.Dispose();
-        using var restarted = await StartAppAsync(profile: "downloads-expiry");
+        // entfernt den inzwischen abgelaufenen Eintrag. Dispose ohne
+        // Profil-Löschung — sonst startet die Folge-Instanz ohne Ablage.
+        app.Dispose(deleteProfile: false);
+        using var restarted = await StartAppAsync(profile: profile);
         await restarted.DevApi.WaitForModelAsync(
             m => m.CurrentPage == "Home" && m.ConnectionState == "Connected",
             TimeSpan.FromSeconds(60),
