@@ -299,7 +299,7 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
                 await LogoutAsync();
                 break;
             case LoadDownloadsEffect load:
-                await LoadDownloadsAsync(load.Settings);
+                await LoadDownloadsAsync(load.Settings, cancellationToken);
                 break;
             case EnqueueDownloadEffect enqueue:
                 await EnqueueDownloadAsync(enqueue, cancellationToken);
@@ -325,8 +325,11 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
             case RunAutoDownloadsEffect autoRun:
                 await RunAutoDownloadsAsync(autoRun, cancellationToken);
                 break;
-            case DeleteWatchedDownloadEffect deleteWatched:
-                await DeleteDownloadAsync(deleteWatched.MediaType, deleteWatched.MediaId, cancellationToken, completedOnly: true);
+            case ExpireWatchedDownloadEffect expireWatched:
+                await ExpireWatchedDownloadAsync(expireWatched, cancellationToken);
+                break;
+            case ProtectDownloadExpiryEffect protect:
+                await ProtectDownloadExpiryAsync(protect, cancellationToken);
                 break;
             case SendLogProtocolEffect:
                 await SendLogProtocolAsync();
@@ -1465,7 +1468,7 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
         }
     }
 
-    private async Task LoadDownloadsAsync(AppSettings settings)
+    private async Task LoadDownloadsAsync(AppSettings settings, CancellationToken cancellationToken = default)
     {
         IReadOnlyList<DownloadListItem> items = [];
         long usedBytes = 0;
@@ -1473,10 +1476,13 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
         string? error = null;
         try
         {
-            // Abgleich Ablageort ↔ Manifest: überholte Teildateien werden
-            // entfernt, Restdaten ohne Manifest-Bezug werden erkannt und
-            // in der Belegungsanzeige ausgewiesen.
-            orphanedBytes = (await downloads.ReconcileAsync()).OrphanedBytes;
+            // Abgleich Ablageort ↔ Manifest inkl. Ablauf-Prüfung:
+            // überholte Teildateien werden entfernt, Restdaten ohne
+            // Manifest-Bezug werden erkannt und in der Belegungsanzeige
+            // ausgewiesen; abgelaufene Downloads werden entfernt bzw.
+            // als Auto-Download-Kandidat verlängert (offline ermittelte
+            // Kandidatenmenge des Vorlaufs).
+            orphanedBytes = (await ReconcileWithExpiryPassAsync(settings, cancellationToken)).OrphanedBytes;
             items = await downloads.LoadItemsAsync();
             usedBytes = downloads.GetUsedBytes();
         }
@@ -1498,9 +1504,13 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
                 ? null
                 : new DownloadSeriesContext(enqueue.ShowId, enqueue.ShowTitle, enqueue.SeasonNumber, enqueue.EpisodeNumber);
             result = await downloads.EnqueueAsync(
-                enqueue.MediaType, enqueue.MediaId, enqueue.Title, enqueue.Settings, seriesContext,
-                pictureId: enqueue.PictureId,
-                cancellationToken: cancellationToken);
+                new DownloadEnqueueRequest(
+                    enqueue.MediaType, enqueue.MediaId, enqueue.Title,
+                    SeriesContext: seriesContext,
+                    PictureId: enqueue.PictureId,
+                    Origin: DownloadOrigin.Manual),
+                enqueue.Settings,
+                cancellationToken);
         }
         catch (Exception ex)
         {
@@ -1524,22 +1534,14 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
     private async Task DeleteDownloadAsync(
         string mediaType,
         long mediaId,
-        CancellationToken cancellationToken,
-        bool completedOnly = false)
+        CancellationToken cancellationToken)
     {
         try
         {
             // Das Entfernen wird über das ItemRemoved-Ereignis des
             // Dienstes als DownloadDeletedMessage in den MVU-Zyklus
             // gemeldet — keine Rückmeldung nötig.
-            if (completedOnly)
-            {
-                await downloads.DeleteIfCompletedAsync(mediaType, mediaId, cancellationToken);
-            }
-            else
-            {
-                await downloads.DeleteAsync(mediaType, mediaId, cancellationToken);
-            }
+            await downloads.DeleteAsync(mediaType, mediaId, cancellationToken);
 
             // Der Lösch-Eintrag obliegt DownloadService (eine Schicht
             // pro Ereignis) — hier nur der Fehlerpfad.
@@ -1547,6 +1549,64 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
         catch (Exception ex)
         {
             logger.LogError(ex, "Download löschen fehlgeschlagen");
+        }
+    }
+
+    /// <summary>
+    /// Ablauf-Verkürzung eines gesehenen Downloads („Nach dem Abspielen
+    /// löschen"): das Ablaufdatum auf <c>jetzt + Löschverzögerung</c>
+    /// setzen — die eigentliche Entfernung übernimmt der nächste
+    /// Bereinigungslauf. Nicht abgeschlossene Downloads bleiben
+    /// unberührt; ein Fehler wird protokolliert und verschluckt.
+    /// </summary>
+    /// <param name="expireWatched">Der Ablauf-Verkürzungs-Effekt.</param>
+    /// <param name="cancellationToken">Bricht die Operation ab.</param>
+    /// <returns>Eine abgeschlossene Aufgabe nach der Verkürzung.</returns>
+    private async Task ExpireWatchedDownloadAsync(
+        ExpireWatchedDownloadEffect expireWatched, CancellationToken cancellationToken)
+    {
+        try
+        {
+            // Die Änderung wird über das ItemChanged-Ereignis des
+            // Dienstes in den MVU-Zyklus gemeldet — keine Rückmeldung
+            // nötig.
+            await downloads.ExpireAfterAsync(
+                expireWatched.MediaType, expireWatched.MediaId,
+                expireWatched.Delay,
+                cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Ablaufdatum des Downloads verkürzen fehlgeschlagen");
+        }
+    }
+
+    /// <summary>
+    /// Wiedergabe-Schutz: das Ablaufdatum des lokal wiedergegebenen
+    /// Downloads auf <c>jetzt + <see cref="DownloadService.PlaybackProtectionFactor"/> ×
+    /// Restdauer</c> hochsetzen, damit der Bereinigungslauf die Datei
+    /// während des Abspielens nicht entfernt. Ein Fehler wird
+    /// protokolliert und verschluckt.
+    /// </summary>
+    /// <param name="protect">Der Wiedergabe-Schutz-Effekt.</param>
+    /// <param name="cancellationToken">Bricht die Operation ab.</param>
+    /// <returns>Eine abgeschlossene Aufgabe nach der Hochsetzung.</returns>
+    private async Task ProtectDownloadExpiryAsync(
+        ProtectDownloadExpiryEffect protect, CancellationToken cancellationToken)
+    {
+        try
+        {
+            // Zielwert und Faktor (PlaybackProtectionFactor) rechnet der
+            // Dienst über seine Zeitquelle — der Handler reicht die
+            // Restdauer nur durch.
+            await downloads.ExtendExpiryAsync(
+                protect.MediaType, protect.MediaId,
+                protect.RemainingDuration,
+                cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Ablaufdatum des Downloads hochsetzen fehlgeschlagen");
         }
     }
 
@@ -1610,11 +1670,13 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
     {
         try
         {
-            // Abgleich Ablageort ↔ Manifest vor der Wiederaufnahme:
-            // überholte Teildateien werden entfernt, Restdaten ohne
-            // Manifest-Bezug und korrigierte Einträge werden gezählt —
-            // ein Fehler des Abgleichs unterbricht die Wiederaufnahme nicht.
-            await downloads.ReconcileAsync(cancellationToken);
+            // Abgleich Ablageort ↔ Manifest inkl. Ablauf-Prüfung vor der
+            // Wiederaufnahme: überholte Teildateien werden entfernt,
+            // Restdaten ohne Manifest-Bezug und korrigierte Einträge
+            // werden gezählt, abgelaufene Downloads werden entfernt bzw.
+            // als Auto-Download-Kandidat verlängert — ein Fehler des
+            // Abgleichs unterbricht die Wiederaufnahme nicht.
+            await ReconcileWithExpiryPassAsync(settings, cancellationToken);
             await downloads.ResumeInterruptedAsync(settings, cancellationToken);
             // Der Wiederaufnahme-Eintrag mit der Anzahl obliegt
             // DownloadService (eine Schicht pro Ereignis) — hier nur
@@ -1624,6 +1686,22 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
         {
             logger.LogError(ex, "Download-Wiederaufnahme fehlgeschlagen");
         }
+    }
+
+    /// <summary>
+    /// Bereinigungslauf mit Ablauf-Pass: ermittelt zuerst die
+    /// Auto-Download-Kandidatenmenge und führt den Abgleich damit
+    /// aus — die Kandidatenmenge steuert den Verlängerungs-Pass,
+    /// das gekoppelte Aufrufpaar bleibt an einer Stelle.
+    /// </summary>
+    /// <param name="settings">Aktuelle App-Einstellungen (Aufbewahrungszeit der Verlängerung).</param>
+    /// <param name="cancellationToken">Bricht die Operation ab.</param>
+    /// <returns>Das Abgleichsergebnis.</returns>
+    private async Task<DownloadReconcileResult> ReconcileWithExpiryPassAsync(
+        AppSettings settings, CancellationToken cancellationToken)
+    {
+        var candidateKeys = await autoDownloads.GetAutoDownloadCandidateKeysAsync(settings, cancellationToken);
+        return await downloads.ReconcileAsync(settings, candidateKeys, cancellationToken);
     }
 
     private async Task RunAutoDownloadsAsync(RunAutoDownloadsEffect autoRun, CancellationToken cancellationToken)

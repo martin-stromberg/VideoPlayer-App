@@ -136,7 +136,7 @@ public sealed class AutoDownloadService
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 var type = MediaTypeNames.Normalize(item.MediaType);
-                var hasPlaylistBinding = item.PlaylistId is > 0 && item.PlaylistEntryId is > 0;
+                var hasPlaylistBinding = HasPlaylistBinding(item);
                 try
                 {
                     if (type == "movie")
@@ -197,6 +197,144 @@ public sealed class AutoDownloadService
     }
 
     /// <summary>
+    /// Ermittelt die Auto-Download-Kandidatenmenge des Bereinigungslaufs
+    /// offline-fähig: je Weiterschauen-Eintrag (aus der
+    /// <see cref="HomeListService"/>-Cache-Kopie) der Selbst-Key; für
+    /// Episoden mit Serienbezug zusätzlich der Vorlauf ab der aktuellen
+    /// Episode über die gecachte Serienstruktur (<see cref="ShowDetailsCache"/>);
+    /// für playlist-gebundene Einträge der Vorlauf ab dem aktuellen
+    /// <see cref="HomeMediaItem.PlaylistEntryId"/> über die gecachte
+    /// Playlist-Struktur (<see cref="PlaylistEntriesCache"/>). Bei
+    /// deaktiviertem Auto-Download ist die Menge leer — es kann nichts
+    /// nachgeladen werden. Einträge ohne gecachten Stand liefern nur
+    /// ihren Selbst-Key (die Cache-Leser schlucken Fehler intern und
+    /// liefern <c>null</c>).
+    /// </summary>
+    /// <param name="settings">Aktuelle App-Einstellungen.</param>
+    /// <param name="cancellationToken">Bricht die Ermittlung ab.</param>
+    /// <returns>Die Kandidatenmenge im <see cref="DownloadService.ManifestKey"/>-Format (<c>{typ}:{mediaId}</c>).</returns>
+    public async Task<IReadOnlySet<string>> GetAutoDownloadCandidateKeysAsync(
+        AppSettings settings,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(settings);
+        var keys = new HashSet<string>(StringComparer.Ordinal);
+        if (!settings.AutoDownloadEnabled)
+        {
+            return keys;
+        }
+
+        var lists = await homeLists.LoadHomeListsAsync(cancellationToken);
+        foreach (var item in lists.ContinueWatching)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var type = MediaTypeNames.Normalize(item.MediaType);
+            keys.Add(DownloadService.ManifestKey(type, item.Id));
+
+            var playlistMatched = false;
+            if (HasPlaylistBinding(item))
+            {
+                playlistMatched = await AddPlaylistCandidateKeysAsync(item, settings, keys);
+            }
+
+            if (!playlistMatched && type == "tvshowepisode" && item.ShowId is > 0)
+            {
+                await AddSeriesCandidateKeysAsync(item, settings, keys, cancellationToken);
+            }
+        }
+
+        return keys;
+    }
+
+    /// <summary>
+    /// Ergänzt die Kandidatenmenge um den Playlist-Vorlauf eines
+    /// playlist-gebundenen Weiterschauen-Eintrags: ab dem aktuellen
+    /// <see cref="HomeMediaItem.PlaylistEntryId"/> die ladbaren und
+    /// zugänglichen Einträge (<c>movie</c>/<c>tvshowepisode</c>,
+    /// <see cref="CachedPlaylistEntry.IsAccessible"/>) bis zu
+    /// <see cref="AppSettings.PreloadEpisodeCount"/>.
+    /// </summary>
+    /// <param name="item">Der Weiterschauen-Eintrag mit Playlist-Bezug.</param>
+    /// <param name="settings">Aktuelle App-Einstellungen.</param>
+    /// <param name="keys">Die zu ergänzende Kandidatenmenge.</param>
+    /// <returns><c>true</c>, wenn der aktuelle Eintrag in der gecachten Playlist gefunden wurde (Playlist-Pfad greift); sonst <c>false</c> (Rückfall auf den Serien-Pfad).</returns>
+    private async Task<bool> AddPlaylistCandidateKeysAsync(
+        HomeMediaItem item,
+        AppSettings settings,
+        HashSet<string> keys)
+    {
+        var playlist = await PlaylistEntriesCache.ReadAsync(
+            cache, item.PlaylistId!.Value, logger);
+        if (playlist is null)
+        {
+            return false;
+        }
+
+        var index = IndexOf(playlist.Entries, e => e.EntryId == item.PlaylistEntryId!.Value);
+        if (index < 0)
+        {
+            return false;
+        }
+
+        var remaining = settings.PreloadEpisodeCount;
+        foreach (var entry in playlist.Entries.Skip(index))
+        {
+            if (remaining <= 0)
+            {
+                break;
+            }
+
+            var entryType = MediaTypeNames.Normalize(entry.MediaType);
+            if (entryType is not ("movie" or "tvshowepisode") || !entry.IsAccessible)
+            {
+                continue;
+            }
+
+            keys.Add(DownloadService.ManifestKey(entryType, entry.MediaId));
+            remaining--;
+        }
+
+        return true;
+    }
+
+    /// <summary>
+    /// Ergänzt die Kandidatenmenge um den Serien-Vorlauf eines
+    /// Weiterschauen-Episoden-Eintrags: ab der aktuellen Episode bis zu
+    /// <see cref="AppSettings.PreloadEpisodeCount"/> Episoden der
+    /// gecachten Serienstruktur (staffelübergreifend geordnet).
+    /// </summary>
+    /// <param name="item">Der Weiterschauen-Eintrag (Episode mit Serienbezug).</param>
+    /// <param name="settings">Aktuelle App-Einstellungen.</param>
+    /// <param name="keys">Die zu ergänzende Kandidatenmenge.</param>
+    /// <param name="cancellationToken">Bricht das Lesen ab.</param>
+    /// <returns>Eine abgeschlossene Aufgabe nach der Ergänzung.</returns>
+    private async Task AddSeriesCandidateKeysAsync(
+        HomeMediaItem item,
+        AppSettings settings,
+        HashSet<string> keys,
+        CancellationToken cancellationToken)
+    {
+        var show = await ShowDetailsCache.ReadAsync(
+            cache, item.ShowId!.Value, logger, cancellationToken);
+        if (show is null)
+        {
+            return;
+        }
+
+        var episodes = ShowDetailsCache.OrderedEpisodes(show);
+        var index = IndexOf(episodes, e => e.Episode.Id == item.Id);
+        if (index < 0)
+        {
+            return;
+        }
+
+        foreach (var episodeRef in episodes.Skip(index).Take(settings.PreloadEpisodeCount))
+        {
+            keys.Add(DownloadService.ManifestKey("tvshowepisode", episodeRef.Episode.Id));
+        }
+    }
+
+    /// <summary>
     /// Reiht die aktuelle und die folgenden Episoden eines
     /// Weiterschauen-Episoden-Eintrags ein: Serienkontext laden, alle
     /// Episoden staffelübergreifend ordnen und ab der aktuellen Episode
@@ -241,10 +379,13 @@ public sealed class AutoDownloadService
                 ? $"{showName} – Episode {episode.Number}"
                 : $"{showName} – {episode.Name}";
             var enqueueResult = await downloads.EnqueueAsync(
-                "tvshowepisode", episode.Id, title, settings,
-                new DownloadSeriesContext(show.Id, showName, season.Number, episode.Number),
-                pictureId: episode.GeneratedBackgroundPictureId ?? episode.PosterPictureId,
-                cancellationToken: cancellationToken);
+                new DownloadEnqueueRequest(
+                    "tvshowepisode", episode.Id, title,
+                    SeriesContext: new DownloadSeriesContext(show.Id, showName, season.Number, episode.Number),
+                    PictureId: episode.GeneratedBackgroundPictureId ?? episode.PosterPictureId,
+                    Origin: DownloadOrigin.Auto),
+                settings,
+                cancellationToken);
             if (enqueueResult.Notice == DownloadService.NoticeEnqueued)
             {
                 enqueued++;
@@ -289,31 +430,97 @@ public sealed class AutoDownloadService
         CancellationToken cancellationToken)
     {
         var client = authSession.Client;
-        if (client is null || item.PlaylistId is not > 0 || item.PlaylistEntryId is not > 0)
+        if (client is null || !HasPlaylistBinding(item))
         {
             return null;
         }
 
-        var currentEntryId = item.PlaylistEntryId.Value;
+        var scan = await ScanPlaylistFromCurrentAsync(
+            client, item.PlaylistId!.Value, item.PlaylistEntryId!.Value,
+            settings.PreloadEpisodeCount, cancellationToken);
+        if (scan is null)
+        {
+            // Playlist nicht erreichbar/entfernt/unlesbar → Rückfall
+            // auf den Serien-Pfad (bzw. nur die Selbst-Einreihung bei Filmen).
+            return null;
+        }
+
+        // Die geladenen Seiten im Cache ablegen — Grundlage der
+        // offline-fähigen Playlist-Nachfolger-Prüfung des
+        // Bereinigungslaufs.
+        await PlaylistEntriesCache.WriteAsync(cache, item.PlaylistId.Value, scan.LoadedEntries, logger);
+
+        if (!scan.FoundCurrent)
+        {
+            return null;
+        }
+
+        var enqueued = await EnqueuePlaylistCandidatesAsync(
+            item, scan.Candidates, settings, cancellationToken);
+        if (enqueued > 0)
+        {
+            logger.LogInformation(
+                "{EnqueuedCount} Playlist-Einträge ab dem aktuellen Eintrag für Playlist {PlaylistId} eingeplant.",
+                enqueued,
+                item.PlaylistId);
+        }
+
+        return enqueued;
+    }
+
+    /// <summary>
+    /// Ergebnis des seitenweisen Playlist-Scans: die geladenen Einträge
+    /// (Cache-Grundlage), die Kandidaten ab dem aktuellen Eintrag und
+    /// der Treffer-Status.
+    /// </summary>
+    /// <param name="LoadedEntries">Alle seitenweise geladenen Playlist-Einträge (Server-Reihenfolge).</param>
+    /// <param name="Candidates">Ladbare Einträge ab dem aktuellen Eintrag bis zum Budget.</param>
+    /// <param name="FoundCurrent"><c>true</c>, wenn der aktuelle Eintrag in der Playlist gefunden wurde.</param>
+    /// <returns>Ergebnis-Datensatz des Playlist-Scans.</returns>
+    private sealed record PlaylistScanResult(
+        List<PlaylistEntry> LoadedEntries,
+        List<PlaylistEntry> Candidates,
+        bool FoundCurrent);
+
+    /// <summary>
+    /// Seitenweises Laden der Playlist-Einträge mit Treffersuche: die
+    /// Einträge werden in Server-Reihenfolge geladen, bis der aktuelle
+    /// Eintrag (<paramref name="currentEntryId"/>) gefunden ist; ab
+    /// einschließlich dieses Eintrags werden die ladbaren und
+    /// zugänglichen Einträge (<c>movie</c>/<c>tvshowepisode</c>) bis zu
+    /// <paramref name="budget"/> als Kandidaten gesammelt.
+    /// </summary>
+    /// <param name="client">Der angemeldete API-Client.</param>
+    /// <param name="playlistId">Id der Playlist.</param>
+    /// <param name="currentEntryId">Id des aktuellen Playlist-Eintrags.</param>
+    /// <param name="budget">Maximale Kandidatenanzahl (<see cref="AppSettings.PreloadEpisodeCount"/>).</param>
+    /// <param name="cancellationToken">Bricht den Lauf ab.</param>
+    /// <returns>Das Scan-Ergebnis; <c>null</c>, wenn die Playlist nicht ladbar war.</returns>
+    private async Task<PlaylistScanResult?> ScanPlaylistFromCurrentAsync(
+        VideoPlayerApiClient client,
+        long playlistId,
+        long currentEntryId,
+        int budget,
+        CancellationToken cancellationToken)
+    {
         var found = false;
-        var enqueued = 0;
-        var remaining = settings.PreloadEpisodeCount;
-        for (var page = 1; remaining > 0; page++)
+        var loadedEntries = new List<PlaylistEntry>();
+        var candidates = new List<PlaylistEntry>();
+        for (var page = 1; candidates.Count < budget; page++)
         {
             PlaylistEntriesPagedResult result;
             try
             {
                 result = await client.GetPlaylistEntriesPagedAsync(
-                    item.PlaylistId.Value, page, PlaylistEntriesPageSize, cancellationToken);
+                    playlistId, page, PlaylistEntriesPageSize, cancellationToken);
             }
             catch (Exception ex) when (ex is ApiException or HttpRequestException or InvalidOperationException or System.Text.Json.JsonException)
             {
-                // Playlist nicht erreichbar/entfernt/unlesbar → Rückfall
-                // auf den Serien-Pfad (bzw. nur die Selbst-Einreihung bei Filmen).
-                logger.LogWarning(ex, "Playlist-Einträge nicht ladbar (Playlist {PlaylistId}).", item.PlaylistId);
+                logger.LogWarning(ex, "Playlist-Einträge nicht ladbar (Playlist {PlaylistId}).", playlistId);
                 return null;
             }
 
+            loadedEntries.AddRange(result.Entries);
             foreach (var entry in result.Entries)
             {
                 if (!found)
@@ -333,7 +540,7 @@ public sealed class AutoDownloadService
                     // übersprungen.
                 }
 
-                if (remaining <= 0)
+                if (candidates.Count >= budget)
                 {
                     break;
                 }
@@ -344,18 +551,7 @@ public sealed class AutoDownloadService
                     continue;
                 }
 
-                var enqueueResult = await downloads.EnqueueAsync(
-                    type, entry.MediaId, PlaylistEntryTitle(entry), settings,
-                    SeriesContextOf(entry),
-                    new DownloadPlaylistContext(item.PlaylistId, entry.Id, entry.SortOrder),
-                    entry.ResolvedPictureId,
-                    cancellationToken);
-                if (enqueueResult.Notice == DownloadService.NoticeEnqueued)
-                {
-                    enqueued++;
-                }
-
-                remaining--;
+                candidates.Add(entry);
             }
 
             if (!result.HasNextPage)
@@ -364,17 +560,41 @@ public sealed class AutoDownloadService
             }
         }
 
-        if (!found)
-        {
-            return null;
-        }
+        return new PlaylistScanResult(loadedEntries, candidates, found);
+    }
 
-        if (enqueued > 0)
+    /// <summary>
+    /// Reiht die Kandidaten des Playlist-Scans mit ihrem Playlist-Bezug
+    /// ein (Herkunft „auto"); bereits vorhandene Downloads werden
+    /// dedupliziert, verbrauchen aber trotzdem ihren Budget-Platz.
+    /// </summary>
+    /// <param name="item">Der Weiterschauen-Eintrag mit Playlist-Bezug.</param>
+    /// <param name="candidates">Die Kandidaten des Scans (ladbare, zugängliche Einträge).</param>
+    /// <param name="settings">Aktuelle App-Einstellungen.</param>
+    /// <param name="cancellationToken">Bricht den Lauf ab.</param>
+    /// <returns>Die Anzahl der tatsächlich eingereihten Einträge.</returns>
+    private async Task<int> EnqueuePlaylistCandidatesAsync(
+        HomeMediaItem item,
+        IReadOnlyList<PlaylistEntry> candidates,
+        AppSettings settings,
+        CancellationToken cancellationToken)
+    {
+        var enqueued = 0;
+        foreach (var entry in candidates)
         {
-            logger.LogInformation(
-                "{EnqueuedCount} Playlist-Einträge ab dem aktuellen Eintrag für Playlist {PlaylistId} eingeplant.",
-                enqueued,
-                item.PlaylistId);
+            var enqueueResult = await downloads.EnqueueAsync(
+                new DownloadEnqueueRequest(
+                    MediaTypeNames.Normalize(entry.MediaType), entry.MediaId, PlaylistEntryTitle(entry),
+                    SeriesContextOf(entry),
+                    new DownloadPlaylistContext(item.PlaylistId, entry.Id, entry.SortOrder),
+                    entry.ResolvedPictureId,
+                    DownloadOrigin.Auto),
+                settings,
+                cancellationToken);
+            if (enqueueResult.Notice == DownloadService.NoticeEnqueued)
+            {
+                enqueued++;
+            }
         }
 
         return enqueued;
@@ -440,14 +660,43 @@ public sealed class AutoDownloadService
         AppSettings settings,
         CancellationToken cancellationToken)
     {
-        var hasPlaylistBinding = item.PlaylistId is > 0 && item.PlaylistEntryId is > 0;
+        var hasPlaylistBinding = HasPlaylistBinding(item);
         var result = await downloads.EnqueueAsync(
-            mediaType, item.Id, item.Title, settings,
-            playlistContext: hasPlaylistBinding
-                ? new DownloadPlaylistContext(item.PlaylistId, item.PlaylistEntryId, null)
-                : null,
-            pictureId: item.PosterPictureId,
-            cancellationToken: cancellationToken);
+            new DownloadEnqueueRequest(
+                mediaType, item.Id, item.Title,
+                PlaylistContext: hasPlaylistBinding
+                    ? new DownloadPlaylistContext(item.PlaylistId, item.PlaylistEntryId, null)
+                    : null,
+                PictureId: item.PosterPictureId,
+                Origin: DownloadOrigin.Auto),
+            settings,
+            cancellationToken);
         return result.Notice == DownloadService.NoticeEnqueued;
+    }
+
+    /// <summary>Prüft, ob der Weiterschauen-Eintrag einen Playlist-Bezug trägt (Playlist-Id und Eintrags-Id bekannt).</summary>
+    /// <param name="item">Der Weiterschauen-Eintrag.</param>
+    /// <returns><c>true</c>, wenn der Eintrag playlist-gebunden ist.</returns>
+    private static bool HasPlaylistBinding(HomeMediaItem item)
+    {
+        return item.PlaylistId is > 0 && item.PlaylistEntryId is > 0;
+    }
+
+    /// <summary>Index des ersten Elements, das das Prädikat erfüllt; -1 = nicht gefunden.</summary>
+    /// <typeparam name="T">Der Elementtyp.</typeparam>
+    /// <param name="items">Die zu durchsuchende Liste.</param>
+    /// <param name="predicate">Das Suchprädikat.</param>
+    /// <returns>Der 0-basierte Index; -1, wenn kein Element passt.</returns>
+    private static int IndexOf<T>(IReadOnlyList<T> items, Func<T, bool> predicate)
+    {
+        for (var i = 0; i < items.Count; i++)
+        {
+            if (predicate(items[i]))
+            {
+                return i;
+            }
+        }
+
+        return -1;
     }
 }

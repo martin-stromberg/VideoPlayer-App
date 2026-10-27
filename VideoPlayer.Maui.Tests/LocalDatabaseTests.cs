@@ -343,6 +343,53 @@ public class LocalDatabaseTests : IDisposable
         await db.InitializeAsync();
     }
 
+    /// <summary>Prüft CacheDatabase: migriert Ablaufdatum- und Herkunfts-Spalten auf einer vorhandenen Manifest-Tabelle (Altbestand = null).</summary>
+    [Fact]
+    public async Task CacheDatabase_MigratesExpiryAndOriginOntoExistingManifest()
+    {
+        // Bestehende Installation ohne die neuen Spalten anlegen und
+        // eine Zeile befüllen.
+        var layout = CreateLayout();
+        SqliteBootstrap.EnsureInitialized();
+        var legacy = new SQLite.SQLiteAsyncConnection(layout.CacheDatabasePath);
+        await legacy.ExecuteAsync(
+            "CREATE TABLE download_manifest (" +
+            "Id integer primary key autoincrement, " +
+            "VideoId integer not null, " +
+            "VideoType varchar not null, " +
+            "FilePath varchar not null, " +
+            "SizeBytes bigint not null, " +
+            "Title varchar not null, " +
+            "DownloadedBytes bigint not null, " +
+            "TotalBytes bigint not null, " +
+            "Error varchar null, " +
+            "State varchar not null, " +
+            "UpdatedAtUtc datetime not null)");
+        await legacy.ExecuteAsync(
+            "INSERT INTO download_manifest (VideoId, VideoType, FilePath, SizeBytes, Title, " +
+            "DownloadedBytes, TotalBytes, State, UpdatedAtUtc) " +
+            "VALUES (31, 'movie', 'videos/31.mp4', 100, 'Film', 100, 100, 'completed', '2026-01-01 00:00:00')");
+        SQLite.SQLiteAsyncConnection.ResetPool();
+
+        var db = new CacheDatabase(layout);
+        await db.InitializeAsync();
+
+        var entry = Assert.Single(await db.Connection.Table<DownloadManifestEntry>().ToListAsync());
+        Assert.Equal(31, entry.VideoId);
+        Assert.Null(entry.ExpiresAtUtc);
+        Assert.Null(entry.Origin);
+        // Neue Spalten vorhanden und beschreibbar.
+        entry.ExpiresAtUtc = new DateTime(2030, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+        entry.Origin = "auto";
+        await db.Connection.UpdateAsync(entry);
+        var reloaded = await db.Connection.Table<DownloadManifestEntry>().FirstAsync();
+        Assert.Equal(new DateTime(2030, 1, 1, 0, 0, 0, DateTimeKind.Utc), reloaded.ExpiresAtUtc);
+        Assert.Equal("auto", reloaded.Origin);
+
+        // Idempotent: ein zweites Initialize läuft fehlerfrei.
+        await db.InitializeAsync();
+    }
+
     /// <summary>Prüft BackupDatabase: eine beschädigte Datei wird beiseitegelegt und neu initialisiert.</summary>
     [Fact]
     public async Task BackupDatabase_RecoversCorruptFile()

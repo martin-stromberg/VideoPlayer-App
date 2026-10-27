@@ -89,14 +89,44 @@
                         <BoxView HeightRequest="1"
                                  Color="{StaticResource VpBorder}" />
 
+                        <VerticalStackLayout Spacing="8">
+                            <Label Text="Aufbewahrungszeit für Downloads (Tage)"
+                                   Style="{StaticResource Caption}"
+                                   FontSize="13" />
+                            <Border Style="{StaticResource InputFrame}">
+                                <Entry x:Name="DownloadRetentionDaysEntry"
+                                       AutomationId="DownloadRetentionDaysEntry"
+                                       Keyboard="Numeric"
+                                       Placeholder="Standard: 7" />
+                            </Border>
+                        </VerticalStackLayout>
+
+                        <BoxView HeightRequest="1"
+                                 Color="{StaticResource VpBorder}" />
+
                         <Grid ColumnDefinitions="*,Auto">
-                            <Label Text="Gesehene Episoden automatisch löschen"
+                            <Label Text="Downloads nach dem Abspielen automatisch löschen"
                                    VerticalOptions="Center" />
-                            <Switch x:Name="AutoDeleteWatchedSwitch"
-                                    AutomationId="AutoDeleteWatchedSwitch"
+                            <Switch x:Name="AutoDeletePlayedSwitch"
+                                    AutomationId="AutoDeletePlayedSwitch"
                                     Grid.Column="1"
                                     VerticalOptions="Center" />
                         </Grid>
+
+                        <BoxView HeightRequest="1"
+                                 Color="{StaticResource VpBorder}" />
+
+                        <VerticalStackLayout Spacing="8">
+                            <Label Text="Löschverzögerung nach dem Abspielen (Minuten)"
+                                   Style="{StaticResource Caption}"
+                                   FontSize="13" />
+                            <Border Style="{StaticResource InputFrame}">
+                                <Entry x:Name="DeleteAfterPlaybackDelayEntry"
+                                       AutomationId="DeleteAfterPlaybackDelayEntry"
+                                       Keyboard="Numeric"
+                                       Placeholder="Standard: 15" />
+                            </Border>
+                        </VerticalStackLayout>
                     </VerticalStackLayout>
                 </Border>
             </VerticalStackLayout>

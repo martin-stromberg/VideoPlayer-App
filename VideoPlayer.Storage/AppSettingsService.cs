@@ -25,7 +25,21 @@ public sealed class AppSettingsService
     /// <summary>Ablageschlüssel für <see cref="AppSettings.DownloadQuotaGb"/>.</summary>
     public const string DownloadQuotaGbKey = "DownloadQuotaGb";
 
-    /// <summary>Ablageschlüssel für <see cref="AppSettings.AutoDeleteWatchedEpisodes"/>.</summary>
+    /// <summary>Ablageschlüssel für <see cref="AppSettings.DownloadRetentionDays"/>.</summary>
+    public const string DownloadRetentionDaysKey = "DownloadRetentionDays";
+
+    /// <summary>Ablageschlüssel für <see cref="AppSettings.AutoDeletePlayedDownloads"/>.</summary>
+    public const string AutoDeletePlayedDownloadsKey = "AutoDeletePlayedDownloads";
+
+    /// <summary>Ablageschlüssel für <see cref="AppSettings.DeleteAfterPlaybackDelayMinutes"/>.</summary>
+    public const string DeleteAfterPlaybackDelayMinutesKey = "DeleteAfterPlaybackDelayMinutes";
+
+    /// <summary>
+    /// Ehemaliger Ablageschlüssel der Option „Gesehene Episoden automatisch
+    /// löschen" — nur noch Lese-Fallback für die Migration auf
+    /// <see cref="AppSettings.AutoDeletePlayedDownloads"/>; wird nicht
+    /// mehr geschrieben.
+    /// </summary>
     public const string AutoDeleteWatchedEpisodesKey = "AutoDeleteWatchedEpisodes";
 
     /// <summary>Ablageschlüssel für <see cref="AppSettings.HomeHeroEnabled"/>.</summary>
@@ -59,7 +73,9 @@ public sealed class AppSettingsService
             WifiOnlyDownloads = store.GetBool(Key(WifiOnlyDownloadsKey), defaults.WifiOnlyDownloads),
             WatchedEndWindowSeconds = store.GetInt(Key(WatchedEndWindowSecondsKey), defaults.WatchedEndWindowSeconds),
             DownloadQuotaGb = store.GetInt(Key(DownloadQuotaGbKey), defaults.DownloadQuotaGb),
-            AutoDeleteWatchedEpisodes = store.GetBool(Key(AutoDeleteWatchedEpisodesKey), defaults.AutoDeleteWatchedEpisodes),
+            DownloadRetentionDays = store.GetInt(Key(DownloadRetentionDaysKey), defaults.DownloadRetentionDays),
+            AutoDeletePlayedDownloads = LoadAutoDeletePlayedDownloads(defaults),
+            DeleteAfterPlaybackDelayMinutes = store.GetInt(Key(DeleteAfterPlaybackDelayMinutesKey), defaults.DeleteAfterPlaybackDelayMinutes),
             HomeHeroEnabled = store.GetBool(Key(HomeHeroEnabledKey), defaults.HomeHeroEnabled),
             LoggingEnabled = store.GetBool(Key(LoggingEnabledKey), defaults.LoggingEnabled)
         }.Normalize();
@@ -78,9 +94,31 @@ public sealed class AppSettingsService
         store.Set(Key(WifiOnlyDownloadsKey), normalized.WifiOnlyDownloads);
         store.Set(Key(WatchedEndWindowSecondsKey), normalized.WatchedEndWindowSeconds);
         store.Set(Key(DownloadQuotaGbKey), normalized.DownloadQuotaGb);
-        store.Set(Key(AutoDeleteWatchedEpisodesKey), normalized.AutoDeleteWatchedEpisodes);
+        store.Set(Key(DownloadRetentionDaysKey), normalized.DownloadRetentionDays);
+        store.Set(Key(AutoDeletePlayedDownloadsKey), normalized.AutoDeletePlayedDownloads);
+        store.Set(Key(DeleteAfterPlaybackDelayMinutesKey), normalized.DeleteAfterPlaybackDelayMinutes);
         store.Set(Key(HomeHeroEnabledKey), normalized.HomeHeroEnabled);
         store.Set(Key(LoggingEnabledKey), normalized.LoggingEnabled);
+    }
+
+    /// <summary>
+    /// Liest <see cref="AppSettings.AutoDeletePlayedDownloads"/> mit
+    /// Migration: ist der neue Schlüssel vorhanden, gilt dessen Wert;
+    /// andernfalls fällt der Wert des Alt-Schlüssels
+    /// <see cref="AutoDeleteWatchedEpisodesKey"/> herbei, fehlt auch
+    /// dieser, der Standardwert.
+    /// </summary>
+    /// <param name="defaults">Standardwerte für fehlende Schlüssel.</param>
+    /// <returns>Der gelesene Schalterwert.</returns>
+    private bool LoadAutoDeletePlayedDownloads(AppSettings defaults)
+    {
+        var newKey = Key(AutoDeletePlayedDownloadsKey);
+        if (store.Contains(newKey))
+        {
+            return store.GetBool(newKey, defaults.AutoDeletePlayedDownloads);
+        }
+
+        return store.GetBool(Key(AutoDeleteWatchedEpisodesKey), defaults.AutoDeletePlayedDownloads);
     }
 
     private string Key(string key) => profile.PrefixKey(key);

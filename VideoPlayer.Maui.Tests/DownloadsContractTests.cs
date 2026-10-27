@@ -126,7 +126,8 @@ public class DownloadsContractTests
             "DeleteDownloadEffect",
             "ResumeDownloadsEffect",
             "RunAutoDownloadsEffect",
-            "DeleteWatchedDownloadEffect"
+            "ExpireWatchedDownloadEffect",
+            "ProtectDownloadExpiryEffect"
         })
         {
             Assert.Contains(effect, code, StringComparison.Ordinal);
@@ -344,5 +345,69 @@ public class DownloadsContractTests
 
         Assert.Contains("IDownloadBackend", code, StringComparison.Ordinal);
         Assert.Contains("CompleteExternalTransferAsync", code, StringComparison.Ordinal);
+    }
+
+    /// <summary>Prüft DownloadListItem: Herkunft „auto" zeigt die „Cache"-Kennzeichnung, „manual" keine.</summary>
+    [Fact]
+    public void DownloadListItem_AutoOrigin_CacheText()
+    {
+        var auto = new DownloadListItem
+        {
+            EntryId = 1,
+            MediaType = "movie",
+            MediaId = 42,
+            Title = "Film",
+            State = DownloadState.Completed,
+            Origin = DownloadOrigin.Auto
+        };
+        var manual = new DownloadListItem
+        {
+            EntryId = 2,
+            MediaType = "movie",
+            MediaId = 43,
+            Title = "Film",
+            State = DownloadState.Completed,
+            Origin = DownloadOrigin.Manual
+        };
+
+        Assert.Equal("Cache", auto.OriginText);
+        Assert.True(auto.HasOriginText);
+        Assert.Null(manual.OriginText);
+        Assert.False(manual.HasOriginText);
+    }
+
+    /// <summary>Prüft DownloadListItem: das Ablaufdatum wird nur bei fertigen Einträgen mit gesetztem Datum angezeigt.</summary>
+    [Fact]
+    public void DownloadListItem_ExpiresText_OnlyCompletedWithExpiry()
+    {
+        static DownloadListItem Entry(DownloadState state, DateTime? expires) => new()
+        {
+            EntryId = 1,
+            MediaType = "movie",
+            MediaId = 42,
+            Title = "Film",
+            State = state,
+            ExpiresAtUtc = expires
+        };
+
+        var completed = Entry(DownloadState.Completed, new DateTime(2030, 6, 1, 12, 0, 0, DateTimeKind.Utc));
+        Assert.NotNull(completed.ExpiresText);
+        Assert.True(completed.HasExpiresText);
+        Assert.StartsWith("Läuft ab am ", completed.ExpiresText);
+
+        Assert.False(Entry(DownloadState.Completed, null).HasExpiresText);
+        Assert.False(Entry(DownloadState.Downloading, DateTime.UtcNow.AddDays(1)).HasExpiresText);
+    }
+
+    /// <summary>Prüft DownloadOriginNames: fehlende/unbekannte Herkunft (Altbestand) wird als „manual" gelesen.</summary>
+    [Fact]
+    public void DownloadOriginNames_FromPersisted_NullIsManual()
+    {
+        Assert.Equal(DownloadOrigin.Manual, DownloadOriginNames.FromPersisted(null));
+        Assert.Equal(DownloadOrigin.Manual, DownloadOriginNames.FromPersisted("unbekannt"));
+        Assert.Equal(DownloadOrigin.Manual, DownloadOriginNames.FromPersisted("manual"));
+        Assert.Equal(DownloadOrigin.Auto, DownloadOriginNames.FromPersisted("auto"));
+        Assert.Equal("auto", DownloadOriginNames.ToPersisted(DownloadOrigin.Auto));
+        Assert.Equal("manual", DownloadOriginNames.ToPersisted(DownloadOrigin.Manual));
     }
 }

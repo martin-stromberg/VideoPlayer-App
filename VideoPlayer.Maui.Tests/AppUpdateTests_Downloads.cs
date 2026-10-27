@@ -525,13 +525,17 @@ public class AppUpdateTests_Downloads
         Assert.DoesNotContain(transition.Effects, e => e is RunAutoDownloadsEffect);
     }
 
-    /// <summary>Prüft die Fenster-Bestätigung: der Lösch-Effekt greift erst ab dem zweiten plausiblen Fenstertakt.</summary>
+    /// <summary>Prüft die Fenster-Bestätigung: der Ablauf-Effekt greift erst ab dem zweiten plausiblen Fenstertakt.</summary>
     [Fact]
-    public void PlaybackProgress_TwoWindowTicks_EmitsAutoDelete()
+    public void PlaybackProgress_TwoWindowTicks_EmitsExpireEffect()
     {
         var model = ConnectedModel() with
         {
-            Settings = new AppSettings { AutoDeleteWatchedEpisodes = true },
+            Settings = new AppSettings
+            {
+                AutoDeletePlayedDownloads = true,
+                DeleteAfterPlaybackDelayMinutes = 25
+            },
             Player = new PlayerState
             {
                 MediaType = "tvshowepisode",
@@ -540,32 +544,35 @@ public class AppUpdateTests_Downloads
             }
         };
 
-        // Einzelner Fenstertakt: noch keine Markierung, kein Lösch-Effekt.
+        // Einzelner Fenstertakt: noch keine Markierung, kein Ablauf-Effekt.
         var first = AppUpdate.Update(
             model,
             new PlaybackProgressMessage(
                 TimeSpan.FromMinutes(88), TimeSpan.FromMinutes(90), true, false, 33));
         Assert.Equal(1, first.Model.Player.EndWindowStreak);
         Assert.False(first.Model.Player.IsWatched);
-        Assert.DoesNotContain(first.Effects, e => e is DeleteWatchedDownloadEffect);
+        Assert.DoesNotContain(first.Effects, e => e is ExpireWatchedDownloadEffect);
 
-        // Erst der zweite plausible Fenstertakt löst Markierung und Löschung aus.
+        // Erst der zweite plausible Fenstertakt löst Markierung und Verkürzung aus.
         var transition = AppUpdate.Update(
             first.Model,
             new PlaybackProgressMessage(
                 TimeSpan.FromMinutes(89), TimeSpan.FromMinutes(90), true, false, 33));
         Assert.True(transition.Model.Player.IsWatched);
-        Assert.Contains(transition.Effects, e =>
-            e is DeleteWatchedDownloadEffect d && d.MediaId == 33);
+        var effect = Assert.Single(transition.Effects, e => e is ExpireWatchedDownloadEffect);
+        var expire = (ExpireWatchedDownloadEffect)effect;
+        Assert.Equal("tvshowepisode", expire.MediaType);
+        Assert.Equal(33, expire.MediaId);
+        Assert.Equal(TimeSpan.FromMinutes(25), expire.Delay);
     }
 
-    /// <summary>Prüft Progress: gesehener Film → kein Auto-Lösch-Effekt.</summary>
+    /// <summary>Prüft Progress: gesehener Film → Ablauf-Effekt (die Option gilt für alle ladbaren Medientypen).</summary>
     [Fact]
-    public void PlaybackProgress_WatchedMovie_NoAutoDelete()
+    public void PlaybackProgress_WatchedMovie_EmitsExpireEffect()
     {
         var model = ConnectedModel() with
         {
-            Settings = new AppSettings { AutoDeleteWatchedEpisodes = true },
+            Settings = new AppSettings { AutoDeletePlayedDownloads = true },
             Player = new PlayerState
             {
                 MediaType = "movie",
@@ -583,16 +590,17 @@ public class AppUpdateTests_Downloads
                 TimeSpan.FromMinutes(89), TimeSpan.FromMinutes(90), true, false, 33));
 
         Assert.True(transition.Model.Player.IsWatched);
-        Assert.DoesNotContain(transition.Effects, e => e is DeleteWatchedDownloadEffect);
+        Assert.Contains(transition.Effects, e =>
+            e is ExpireWatchedDownloadEffect d && d.MediaId == 33 && d.MediaType == "movie");
     }
 
-    /// <summary>Prüft Progress: deaktivierter Schalter → kein Auto-Lösch-Effekt.</summary>
+    /// <summary>Prüft Progress: deaktivierter Schalter → kein Ablauf-Effekt.</summary>
     [Fact]
     public void PlaybackProgress_AutoDeleteDisabled_NoEffect()
     {
         var model = ConnectedModel() with
         {
-            Settings = new AppSettings { AutoDeleteWatchedEpisodes = false },
+            Settings = new AppSettings { AutoDeletePlayedDownloads = false },
             Player = new PlayerState
             {
                 MediaType = "tvshowepisode",
@@ -610,16 +618,20 @@ public class AppUpdateTests_Downloads
                 TimeSpan.FromMinutes(89), TimeSpan.FromMinutes(90), true, false, 33));
 
         Assert.True(transition.Model.Player.IsWatched);
-        Assert.DoesNotContain(transition.Effects, e => e is DeleteWatchedDownloadEffect);
+        Assert.DoesNotContain(transition.Effects, e => e is ExpireWatchedDownloadEffect);
     }
 
-    /// <summary>Prüft Ended: gesehene Episode + Schalter → Lösch-Effekt.</summary>
+    /// <summary>Prüft Ended: gesehene Episode + Schalter → Ablauf-Effekt.</summary>
     [Fact]
-    public void PlaybackEnded_WatchedEpisode_EmitsAutoDelete()
+    public void PlaybackEnded_WatchedEpisode_EmitsExpireEffect()
     {
         var model = ConnectedModel() with
         {
-            Settings = new AppSettings { AutoDeleteWatchedEpisodes = true },
+            Settings = new AppSettings
+            {
+                AutoDeletePlayedDownloads = true,
+                DeleteAfterPlaybackDelayMinutes = 0
+            },
             Player = new PlayerState
             {
                 MediaType = "tvshowepisode",
@@ -635,6 +647,6 @@ public class AppUpdateTests_Downloads
 
         Assert.True(transition.Model.Player.IsWatched);
         Assert.Contains(transition.Effects, e =>
-            e is DeleteWatchedDownloadEffect d && d.MediaId == 33);
+            e is ExpireWatchedDownloadEffect d && d.MediaId == 33 && d.Delay == TimeSpan.Zero);
     }
 }

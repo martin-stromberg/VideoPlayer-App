@@ -8,6 +8,23 @@
              Title="Downloads"
              x:DataType="mvu:MvuHost">
 
+    <ContentPage.Resources>
+        <!-- Pill-Chip der Eintrags-Metadaten: getönte Primärfläche mit
+             weicher Schrift — gemeinsamer Stil des Zustands-Chips und
+             des Herkunfts-Chips („Cache"). -->
+        <Style x:Key="DownloadChip" TargetType="Border">
+            <Setter Property="StrokeShape" Value="RoundRectangle 999" />
+            <Setter Property="Stroke" Value="Transparent" />
+            <Setter Property="BackgroundColor" Value="{StaticResource VpPrimaryTint}" />
+            <Setter Property="Padding" Value="10,4" />
+        </Style>
+        <Style x:Key="DownloadChipText" TargetType="Label">
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="FontFamily" Value="InterSemiBold" />
+            <Setter Property="TextColor" Value="{StaticResource VpPrimarySoft}" />
+        </Style>
+    </ContentPage.Resources>
+
     <Grid Padding="24"
           RowDefinitions="Auto,Auto,Auto,*"
           RowSpacing="14">
@@ -142,26 +159,35 @@
                                     <!-- Zustand als Pill-Chip: getönte
                                          Primärfläche mit weicher Schrift. -->
                                     <Border Grid.Column="1"
-                                            StrokeShape="RoundRectangle 999"
-                                            Stroke="Transparent"
-                                            BackgroundColor="{StaticResource VpPrimaryTint}"
-                                            Padding="10,4"
+                                            Style="{StaticResource DownloadChip}"
                                             VerticalOptions="Center">
                                         <Label Text="{Binding StateText}"
-                                               FontSize="11"
-                                               FontFamily="InterSemiBold"
-                                               TextColor="{StaticResource VpPrimarySoft}" />
+                                               Style="{StaticResource DownloadChipText}" />
                                     </Border>
                                 </Grid>
                                 <HorizontalStackLayout Spacing="10">
                                     <Label Text="{Binding MediaTypeText}"
                                            Style="{StaticResource Caption}" />
+                                    <!-- Herkunfts-Kennzeichnung: „Cache"
+                                         bei automatischen Downloads —
+                                         Pill-Chip im Stil des
+                                         Zustands-Chips. -->
+                                    <Border Style="{StaticResource DownloadChip}"
+                                            IsVisible="{Binding HasOriginText}">
+                                        <Label Text="{Binding OriginText}"
+                                               AutomationId="OriginLabel"
+                                               Style="{StaticResource DownloadChipText}" />
+                                    </Border>
                                     <Label Text="{Binding SizeText}"
                                            Style="{StaticResource Caption}"
                                            IsVisible="{Binding HasSizeText}" />
                                     <Label Text="{Binding ProgressPercentText}"
                                            Style="{StaticResource Caption}"
                                            IsVisible="{Binding ShowProgress}" />
+                                    <Label Text="{Binding ExpiresText}"
+                                           AutomationId="ExpiresLabel"
+                                           Style="{StaticResource Caption}"
+                                           IsVisible="{Binding HasExpiresText}" />
                                 </HorizontalStackLayout>
                                 <ProgressBar Progress="{Binding Progress}"
                                              ProgressColor="{StaticResource VpPrimary}"

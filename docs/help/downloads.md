@@ -27,6 +27,13 @@ auch offline, weil der Bestand lokal im Download-Manifest liegt.
 - Je Eintrag: Titel, Medientyp (Film/Episode), Zustand („Wartend",
   „Läuft", „Fertig", „Abgebrochen", „Fehler"), Fortschrittsbalken
   mit Prozentangabe während des Laufs und verständliche Fehlertexte.
+- Automatisch vorgeladene Downloads tragen die Herkunfts-
+  Kennzeichnung **„Cache"** (Pill-Chip neben dem Medientyp);
+  manuell eingeplante Downloads zeigen keine Kennzeichnung.
+- Fertige Downloads zeigen ihr **Ablaufdatum** („Läuft ab am …") —
+  nach Ablauf entfernt der Bereinigungslauf Datei und Eintrag,
+  sofern der Download nicht als Auto-Download-Kandidat verlängert
+  wird (siehe „Ablaufdatum und Bereinigung").
 - Der Fortschrittsbalken aktualisiert sich flüssig: bei jedem
   Fortschritts-Tick wird nur der betroffene Eintrag aktualisiert —
   die übrige Liste wird nicht neu aufgebaut (kein Flackern).
@@ -111,17 +118,72 @@ auch offline, weil der Bestand lokal im Download-Manifest liegt.
   gedrosselt (mindestens 60 Sekunden Abstand) und respektiert die
   WLAN-Bedingung.
 - Bereits vorhandene oder laufende Downloads werden nicht doppelt
-  angelegt.
+  angelegt — berührt der Vorlauf einen Kandidaten, der bereits
+  fertig geladen ist, wird er stattdessen **verlängert**: das
+  Ablaufdatum wird auf „jetzt + Aufbewahrungszeit" hochgesetzt und
+  die Herkunft auf „Cache" umgestellt (auch ein manuell
+  eingeplanter Download wird damit zum automatischen).
 - Die Warteschlange arbeitet in Einplanungs-Reihenfolge (ältester
   wartender Auftrag zuerst) — dadurch werden playlist-gebundene
   Downloads auch in der Playlist-Reihenfolge ausgeführt, wie sie
   eingeplant wurden.
 
-## Gesehene Episoden automatisch löschen
+## Ablaufdatum und Bereinigung
 
-Ist die Einstellung aktiv, wird der fertige Download einer Episode
-entfernt, sobald sie als „angesehen" gilt (Endfenster-Schwelle oder
-Wiedergabe-Ende). Laufende oder wartende Downloads bleiben unberührt.
+- Jeder fertige Download erhält ein **Ablaufdatum**: Fertigstellung
+  plus der eingestellten „Aufbewahrungszeit für Downloads"
+  (1–365 Tage, Standard **7 Tage**). Wartende und laufende Aufträge
+  tragen kein Ablaufdatum — die Frist beginnt erst mit „Fertig".
+  Ein „Erneut versuchen" setzt das Ablaufdatum zurück (die Herkunft
+  bleibt erhalten).
+- Der **Bereinigungslauf** ist Teil des Abgleichs des Ablageorts
+  (siehe unten) und läuft beim App-Start, bei Online-Rückkehr und
+  beim Öffnen der Downloads-Seite — vollständig offline auf Basis
+  des Manifests und der gecachten Listen. Für jeden abgelaufenen
+  fertigen Eintrag gilt:
+  - Ist das Medium weiterhin **Auto-Download-Kandidat** — als
+    eigener Eintrag der Weiterschauen-Liste oder im Vorlauf-Fenster
+    eines Eintrags (Folge-Episoden in Serienreihenfolge bzw.
+    Nachfolger in Playlist-Reihenfolge bis zur eingestellten
+    „Anzahl vorzuladender Episoden") —, wird er **nicht gelöscht**:
+    das Ablaufdatum wird auf „jetzt + Aufbewahrungszeit" verlängert
+    und die Herkunft auf „Cache" umgestellt. Bei jedem weiteren
+    Lauf wird erneut geprüft — fällt der Kandidatenbezug weg und
+    die neue Frist läuft ab, greift die normale Entfernung.
+  - Andernfalls werden **Datei und Manifest-Eintrag entfernt** —
+    wie ein manuelles „Löschen". Ist „Automatische Downloads"
+    deaktiviert, gibt es keine Kandidaten.
+- Laufende und wartende Aufträge sowie fehlerhafte und abgebrochene
+  Einträge werden nie angefasst — fehlerhafte Einträge entfernt
+  weiterhin nur die bewusste Anwenderaktion „Alle Fehler löschen".
+- Änderungen der Aufbewahrungszeit oder Löschverzögerung wirken nur
+  auf **neu gesetzte Ablaufdaten** — bestehende Fristen werden
+  nicht nachträglich neu berechnet.
+- **Altbestand:** Downloads aus der Zeit vor dieser Funktion tragen
+  kein Ablaufdatum und gelten beim ersten Bereinigungslauf als
+  abgelaufen — verbleibende Auto-Download-Kandidaten werden
+  verlängert (Herkunft „Cache"), alle übrigen entfernt. Ihre
+  Herkunft gilt als manuell (keine „Cache"-Kennzeichnung).
+
+## Downloads nach dem Abspielen automatisch löschen
+
+Ist die Einstellung **„Downloads nach dem Abspielen automatisch
+löschen"** aktiv (Standard: aus), wird das Ablaufdatum des Downloads
+eines als „angesehen" geltenden Mediums (Endfenster-Schwelle oder
+plausibles Wiedergabe-Ende) auf **„jetzt + Löschverzögerung"**
+gesetzt — statt einer Sofort-Löschung. Die eigentliche Entfernung
+übernimmt der nächste Bereinigungslauf.
+
+- Die Option gilt für **alle ladbaren Medientypen** (Filme und
+  Episoden) und ersetzt die frühere, nur auf Episoden wirkende
+  Einstellung „Gesehene Episoden automatisch löschen" — deren
+  Schaltzustand wird übernommen.
+- Die **„Löschverzögerung nach dem Abspielen"** ist eine eigene
+  Einstellung in Minuten (0–1440, Standard **15**); der Wert 0 lässt
+  das Ablaufdatum sofort erreichen und entspricht damit der
+  früheren Sofort-Löschung (Entfernung beim nächsten Lauf).
+- Laufende, wartende und fehlerhafte Downloads sowie Medien ohne
+  abgeschlossenen Download (gestreamt) bleiben unberührt.
 
 ## Hintergrund-Downloads unter iOS
 
@@ -146,8 +208,12 @@ Video-Ablageort mit dem Download-Manifest ab:
   sie werden nicht automatisch gelöscht.
 - Als „Fertig" geführte Einträge ohne Datei werden als fehlgeschlagen
   korrigiert und können über „Erneut versuchen" neu eingeplant werden.
+- Zum Abschluss prüft die **Ablauf-Prüfung** alle fertigen Einträge:
+  abgelaufene Downloads werden entfernt bzw. als Auto-Download-
+  Kandidat verlängert (siehe „Ablaufdatum und Bereinigung").
 
-Laufende Transfers und fertige Downloads bleiben vom Abgleich unberührt.
+Laufende Transfers und nicht abgelaufene fertige Downloads bleiben
+vom Abgleich unberührt.
 
 ## Ablage und Wiedergabe
 
@@ -158,6 +224,12 @@ Laufende Transfers und fertige Downloads bleiben vom Abgleich unberührt.
 - Die Wiedergabe (`PlaybackSourceService`) bevorzugt automatisch die
   lokale Datei eines abgeschlossenen Downloads; fehlt sie, fällt die
   Wiedergabe auf den Server-Stream zurück.
+- **Wiedergabe-Schutz:** Wird ein heruntergeladenes Video abgespielt
+  (lokale Datei als Quelle), setzt die App beim Wiedergabestart das
+  Ablaufdatum auf **„jetzt + 2 × Restdauer"** hoch, falls es früher
+  läge — der Bereinigungslauf entfernt die Datei nicht während des
+  Abspielens. Ein weiter in der Zukunft liegendes Ablaufdatum bleibt
+  unverändert; ohne bekannte Restdauer entfällt die Hochsetzung.
 
 ## Fehlerbilder
 

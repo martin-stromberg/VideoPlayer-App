@@ -29,13 +29,15 @@ public partial class SettingsPage : ContentPage
         HomeHeroSwitch.Toggled += OnHomeHeroToggled;
         AutoDownloadSwitch.Toggled += OnAutoDownloadToggled;
         WifiOnlySwitch.Toggled += OnWifiOnlyToggled;
-        AutoDeleteWatchedSwitch.Toggled += OnAutoDeleteWatchedToggled;
+        AutoDeletePlayedSwitch.Toggled += OnAutoDeletePlayedToggled;
         AutoResumeSwitch.Toggled += OnAutoResumeToggled;
         LoggingSwitch.Toggled += OnLoggingToggled;
 
         WireNumeric(PreloadEpisodeCountEntry, OnPreloadEpisodeCountCompleted);
         WireNumeric(DownloadQuotaGbEntry, OnDownloadQuotaCompleted);
         WireNumeric(WatchedEndWindowEntry, OnWatchedEndWindowCompleted);
+        WireNumeric(DownloadRetentionDaysEntry, OnDownloadRetentionDaysCompleted);
+        WireNumeric(DeleteAfterPlaybackDelayEntry, OnDeleteAfterPlaybackDelayCompleted);
     }
 
     private static void WireNumeric(Entry entry, EventHandler handler)
@@ -71,13 +73,15 @@ public partial class SettingsPage : ContentPage
             HomeHeroSwitch.IsToggled = settings.HomeHeroEnabled;
             AutoDownloadSwitch.IsToggled = settings.AutoDownloadEnabled;
             WifiOnlySwitch.IsToggled = settings.WifiOnlyDownloads;
-            AutoDeleteWatchedSwitch.IsToggled = settings.AutoDeleteWatchedEpisodes;
+            AutoDeletePlayedSwitch.IsToggled = settings.AutoDeletePlayedDownloads;
             AutoResumeSwitch.IsToggled = settings.AutoResumeEnabled;
             LoggingSwitch.IsToggled = settings.LoggingEnabled;
 
             SetTextIfNotFocused(PreloadEpisodeCountEntry, settings.PreloadEpisodeCount);
             SetTextIfNotFocused(DownloadQuotaGbEntry, settings.DownloadQuotaGb);
             SetTextIfNotFocused(WatchedEndWindowEntry, settings.WatchedEndWindowSeconds);
+            SetTextIfNotFocused(DownloadRetentionDaysEntry, settings.DownloadRetentionDays);
+            SetTextIfNotFocused(DeleteAfterPlaybackDelayEntry, settings.DeleteAfterPlaybackDelayMinutes);
         }
         finally
         {
@@ -114,9 +118,9 @@ public partial class SettingsPage : ContentPage
         Save(s => s with { WifiOnlyDownloads = e.Value });
     }
 
-    private void OnAutoDeleteWatchedToggled(object? sender, ToggledEventArgs e)
+    private void OnAutoDeletePlayedToggled(object? sender, ToggledEventArgs e)
     {
-        Save(s => s with { AutoDeleteWatchedEpisodes = e.Value });
+        Save(s => s with { AutoDeletePlayedDownloads = e.Value });
     }
 
     private void OnAutoResumeToggled(object? sender, ToggledEventArgs e)
@@ -142,6 +146,16 @@ public partial class SettingsPage : ContentPage
     private void OnWatchedEndWindowCompleted(object? sender, EventArgs e)
     {
         SaveNumeric(WatchedEndWindowEntry, v => s => s with { WatchedEndWindowSeconds = v });
+    }
+
+    private void OnDownloadRetentionDaysCompleted(object? sender, EventArgs e)
+    {
+        SaveNumeric(DownloadRetentionDaysEntry, v => s => s with { DownloadRetentionDays = v });
+    }
+
+    private void OnDeleteAfterPlaybackDelayCompleted(object? sender, EventArgs e)
+    {
+        SaveNumeric(DeleteAfterPlaybackDelayEntry, v => s => s with { DeleteAfterPlaybackDelayMinutes = v });
     }
 
     /// <summary>„Server wechseln": Serververwaltung als geschobene Route öffnen.</summary>

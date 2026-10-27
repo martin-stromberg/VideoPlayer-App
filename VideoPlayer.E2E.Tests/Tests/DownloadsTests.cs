@@ -99,6 +99,164 @@ public sealed class DownloadsTests : E2ETestBase
             "Leerhinweis der Downloads-Seite");
     }
 
+    /// <summary>
+    /// Pflichtszenario Herkunft: ein automatisch geladener Download
+    /// (Weiterschauen-Kandidat) erscheint auf der Downloads-Seite mit
+    /// der Kennzeichnung „Cache"; ein manueller Download trägt sie nicht.
+    /// </summary>
+    [Fact]
+    public async Task DownloadsPage_AutoDownload_ShowsCacheBadge()
+    {
+        using var server = NewServer();
+        server.PlaybackMovieId = 501;
+        server.PlaybackMovieTitle = "E2E-Cache-Film";
+        // Weiterschauen-Eintrag → Auto-Download-Kandidat.
+        server.PlaybackResumePositionSeconds = 60;
+        server.PlaybackVideoPath = Path.Combine(AppContext.BaseDirectory, "Assets", "testvideo.mp4");
+        using var app = await StartAppAsync();
+        await ConnectToPairingRequiredAsync(app, server);
+        await PairAsync(app, server);
+        await LoginAsync(app, server);
+        await app.DevApi.WaitForModelAsync(
+            m => m.RecentEntriesCount > 0,
+            TimeSpan.FromSeconds(30),
+            "Karussell „Neu im Programm\" befüllt", Ct);
+
+        // Automatische Downloads aktivieren und die WLAN-Bedingung
+        // aufheben (der E2E-Rechner läuft nicht zwingend über WLAN).
+        app.Ui.OpenFlyoutItem("Einstellungen");
+        app.Ui.FindByAutomationId("AutoDownloadSwitch", TimeSpan.FromSeconds(30));
+        app.Ui.Toggle("WifiOnlySwitch");
+        app.Ui.Toggle("AutoDownloadSwitch");
+
+        // Der Auto-Download-Lauf läuft nach dem Schalterwechsel
+        // erzwungen — der Eintrag erscheint mit „Cache"-Kennzeichnung.
+        app.Ui.OpenFlyoutItem("Downloads");
+        await WaitForTreeAsync(
+            app,
+            t => ContainsText(t.FindByAutomationId("DownloadsCollection"), server.PlaybackMovieTitle),
+            $"Auto-Download-Eintrag „{server.PlaybackMovieTitle}\" auf der Downloads-Seite");
+        await WaitForTreeAsync(
+            app,
+            t => ContainsText(t.FindByAutomationId("DownloadsCollection"), "Cache"),
+            "Herkunfts-Kennzeichnung „Cache\" am Auto-Download-Eintrag");
+    }
+
+    /// <summary>
+    /// Pflichtszenario Bereinigung: ein Download, dessen Ablaufdatum
+    /// verstrichen ist (gesehen → „Löschen nach Wiedergabe, 0 Minuten"),
+    /// wird beim nächsten Abgleich-Lauf entfernt.
+    /// </summary>
+    [Fact]
+    public async Task DownloadsPage_WatchedDownload_IsCleanedUpAfterExpiry()
+    {
+        using var server = NewServer();
+        server.PlaybackMovieId = 501;
+        server.PlaybackMovieTitle = "E2E-Verfalls-Film";
+        server.PlaybackVideoPath = Path.Combine(AppContext.BaseDirectory, "Assets", "testvideo.mp4");
+        // Beide Starts teilen sich das Profil — das Manifest übersteht
+        // den Neustart und der Start-Abgleich wirkt auf die Ablage. Der
+        // Name ist je Lauf eindeutig: ein persistiertes Profil mit
+        // gespeicherten Zugangsdaten würde das Pairing direkt zur
+        // Startseite führen statt zur Anmelde-Wahl.
+        var profile = $"downloads-expiry-{Guid.NewGuid():N}";
+        var app = await StartAppAsync(profile: profile);
+        await ConnectToPairingRequiredAsync(app, server);
+        await PairAsync(app, server);
+        await LoginAsync(app, server);
+        await app.DevApi.WaitForModelAsync(
+            m => m.RecentEntriesCount > 0,
+            TimeSpan.FromSeconds(30),
+            "Karussell „Neu im Programm\" befüllt", Ct);
+
+        // Option „Gesehene Downloads löschen" ohne Verzögerung aktivieren.
+        // Das Zahlenfeld speichert über Completed/Unfocused — echte
+        // UIA-Eingabe (Fokus + ValuePattern), damit der Wechsel der Seite
+        // den Wert persistiert.
+        app.Ui.OpenFlyoutItem("Einstellungen");
+        app.Ui.FindByAutomationId("AutoDeletePlayedSwitch", TimeSpan.FromSeconds(30));
+        app.Ui.Toggle("AutoDeletePlayedSwitch");
+        app.Ui.EnterText("DeleteAfterPlaybackDelayEntry", "0");
+
+        // Manuellen Download auslösen und auf den Abschluss warten.
+        app.Ui.OpenFlyoutItem("Startseite");
+        var carousel = (await app.DevApi.GetTreeAsync(Ct)).FindByAutomationId("RecentCarousel");
+        Assert.NotNull(carousel?.Items);
+        var index = carousel!.Items!.FindIndex(i => i.Text == server.PlaybackMovieTitle);
+        Assert.True(index >= 0);
+        await app.DevApi.InvokeAsync("RecentCarousel", index, Ct);
+        app.Ui.FindByAutomationId("DownloadButton", TimeSpan.FromSeconds(30));
+        app.Ui.ClickButton("DownloadButton");
+
+        app.Ui.OpenFlyoutItem("Downloads");
+        await WaitForTreeAsync(
+            app,
+            t => ContainsText(t.FindByAutomationId("DownloadsCollection"), server.PlaybackMovieTitle),
+            "Fertiger Download-Eintrag auf der Downloads-Seite");
+
+        // Gesehen-Wiedergabe aus der Datei (Detailseite erneut öffnen) →
+        // Ablauf auf „jetzt" → der Abgleich beim nächsten App-Start
+        // entfernt den Eintrag.
+        app.Ui.OpenFlyoutItem("Startseite");
+        var detailsTree = await app.DevApi.GetTreeAsync(Ct);
+        var carousel2 = detailsTree.FindByAutomationId("RecentCarousel");
+        Assert.NotNull(carousel2?.Items);
+        await app.DevApi.InvokeAsync(
+            "RecentCarousel",
+            carousel2!.Items!.FindIndex(i => i.Text == server.PlaybackMovieTitle), Ct);
+        app.Ui.FindByAutomationId("PlayButton", TimeSpan.FromSeconds(30));
+        app.Ui.ClickButton("PlayButton");
+        await app.DevApi.WaitForModelAsync(
+            m => m.PlayerIsPlaying,
+            TimeSpan.FromSeconds(60),
+            "Wiedergabe des Downloads läuft", Ct);
+        await app.DevApi.WaitForModelAsync(
+            m => !m.PlayerIsPlaying,
+            TimeSpan.FromSeconds(120),
+            "Wiedergabe des Downloads beendet", Ct);
+
+        // Neustart mit demselben Profil: der Abgleich beim Start
+        // entfernt den inzwischen abgelaufenen Eintrag. Dispose ohne
+        // Profil-Löschung — sonst startet die Folge-Instanz ohne Ablage.
+        app.Dispose(deleteProfile: false);
+        using var restarted = await StartAppAsync(profile: profile);
+        await restarted.DevApi.WaitForModelAsync(
+            m => m.CurrentPage == "Home" && m.ConnectionState == "Connected",
+            TimeSpan.FromSeconds(60),
+            "Neustart mit bestehendem Profil → Startseite", Ct);
+        restarted.Ui.OpenFlyoutItem("Downloads");
+        await WaitForTreeAsync(
+            restarted,
+            t => !ContainsText(t.FindByAutomationId("DownloadsCollection"), server.PlaybackMovieTitle),
+            "Abgelaufener Download-Eintrag wurde entfernt");
+    }
+
+    /// <summary>Prüft rekursiv, ob ein Baumknoten, seine Einträge oder Kinder den Text tragen.</summary>
+    /// <param name="node">Der zu durchsuchende Knoten.</param>
+    /// <param name="text">Der gesuchte Text.</param>
+    /// <returns><c>true</c>, wenn der Text gefunden wurde.</returns>
+    private static bool ContainsText(DevApiTreeNode? node, string text)
+    {
+        if (node is null)
+        {
+            return false;
+        }
+
+        if (node.Text?.Contains(text, StringComparison.Ordinal) == true)
+        {
+            return true;
+        }
+
+        if (node.Items?.Any(i =>
+                i.Text?.Contains(text, StringComparison.Ordinal) == true
+                || i.Detail?.Contains(text, StringComparison.Ordinal) == true) == true)
+        {
+            return true;
+        }
+
+        return node.Children.Any(c => ContainsText(c, text));
+    }
+
     /// <summary>Wartet, bis der DevApi-Elementbaum eine Bedingung erfüllt.</summary>
     /// <param name="app">Die laufende App-Instanz.</param>
     /// <param name="predicate">Bedingung auf dem Baum.</param>

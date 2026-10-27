@@ -50,6 +50,8 @@ public sealed class CacheDatabase
         await EnsureColumnAsync("download_manifest", "PlaylistEntryId", "bigint NULL");
         await EnsureColumnAsync("download_manifest", "PlaylistSortOrder", "bigint NULL");
         await EnsureColumnAsync("download_manifest", "PictureId", "bigint NULL");
+        await EnsureColumnAsync("download_manifest", "ExpiresAtUtc", "bigint NULL");
+        await EnsureColumnAsync("download_manifest", "Origin", "varchar NULL");
     }
 
     /// <summary>

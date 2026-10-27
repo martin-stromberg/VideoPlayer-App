@@ -37,7 +37,9 @@ public class AppSettingsServiceTests
             WifiOnlyDownloads = false,
             WatchedEndWindowSeconds = 120,
             DownloadQuotaGb = 42,
-            AutoDeleteWatchedEpisodes = true,
+            DownloadRetentionDays = 14,
+            AutoDeletePlayedDownloads = true,
+            DeleteAfterPlaybackDelayMinutes = 30,
             HomeHeroEnabled = false,
             LoggingEnabled = true
         };
@@ -115,6 +117,46 @@ public class AppSettingsServiceTests
         Assert.Equal(1, loaded.DownloadQuotaGb);
         Assert.Equal(10, loaded.PreloadEpisodeCount);
         Assert.Equal(30, loaded.WatchedEndWindowSeconds);
+    }
+
+    /// <summary>Prüft Load: fehlt der neue Schlüssel, fällt die Migration auf den Alt-Schlüssel zurück.</summary>
+    [Fact]
+    public void Load_MigratesAutoDeleteWatchedEpisodes()
+    {
+        var store = new InMemorySettingsStore();
+        var service = CreateService(store);
+        store.Set(AppSettingsService.AutoDeleteWatchedEpisodesKey, true);
+
+        var loaded = service.Load();
+
+        Assert.True(loaded.AutoDeletePlayedDownloads);
+    }
+
+    /// <summary>Prüft Load: ein vorhandener neuer Schlüssel gewinnt gegen den Alt-Schlüssel.</summary>
+    [Fact]
+    public void Load_MigratesAutoDeleteWatchedEpisodes_NewKeyWins()
+    {
+        var store = new InMemorySettingsStore();
+        var service = CreateService(store);
+        store.Set(AppSettingsService.AutoDeleteWatchedEpisodesKey, true);
+        store.Set(AppSettingsService.AutoDeletePlayedDownloadsKey, false);
+
+        var loaded = service.Load();
+
+        Assert.False(loaded.AutoDeletePlayedDownloads);
+    }
+
+    /// <summary>Prüft Save: der Alt-Schlüssel wird nicht mehr geschrieben.</summary>
+    [Fact]
+    public void Save_DoesNotWriteLegacyAutoDeleteKey()
+    {
+        var store = new InMemorySettingsStore();
+        var service = CreateService(store);
+
+        service.Save(new AppSettings { AutoDeletePlayedDownloads = true });
+
+        Assert.True(store.GetBool(AppSettingsService.AutoDeletePlayedDownloadsKey, false));
+        Assert.False(store.Contains(AppSettingsService.AutoDeleteWatchedEpisodesKey));
     }
 
     /// <summary>Prüft Save: normalisiert die Werte vor dem Schreiben.</summary>

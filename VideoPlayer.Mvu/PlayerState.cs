@@ -132,6 +132,13 @@ public sealed record PlayerState
     /// </summary>
     public int EndWindowStreak { get; init; }
 
+    /// <summary>
+    /// Die Schutzprüfung des Download-Ablaufdatums wurde für dieses
+    /// Medium bereits durchgeführt (Einmal-Semantik je Wiedergabe;
+    /// Reset bei jedem Medienwechsel).
+    /// </summary>
+    public bool DownloadExpiryProtected { get; init; }
+
     /// <summary>Eine Wiedergabe ist angefordert (State belegt).</summary>
     public bool IsActive => MediaId > 0 && MediaType is not null;
 }

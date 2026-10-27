@@ -83,7 +83,8 @@ public class DownloadServiceReconcileTests : IDisposable
     }
 
     private async Task<DownloadManifestEntry> InsertEntryAsync(
-        string state, string filePath, long mediaId = 42)
+        string state, string filePath, long mediaId = 42,
+        DateTime? expiresAtUtc = null, string? origin = null)
     {
         var entry = new DownloadManifestEntry
         {
@@ -92,18 +93,19 @@ public class DownloadServiceReconcileTests : IDisposable
             Title = "Ein Film",
             FilePath = filePath,
             State = state,
+            ExpiresAtUtc = expiresAtUtc,
+            Origin = origin,
             UpdatedAtUtc = DateTime.UtcNow
         };
         await cache.Connection.InsertAsync(entry);
         return entry;
     }
 
-    private async Task<DownloadManifestEntry?> ReadEntryAsync(long mediaId = 42)
+    // Die Manifest-Lese-Hilfe liegt gemeinsam in ManifestTestHelpers —
+    // der Wrapper reicht die cache-Ablage durch.
+    private Task<DownloadManifestEntry?> ReadEntryAsync(long mediaId = 42)
     {
-        var rows = await cache.Connection.Table<DownloadManifestEntry>()
-            .Where(e => e.VideoId == (int)mediaId)
-            .ToListAsync();
-        return rows.FirstOrDefault(e => e.VideoType == "movie");
+        return ManifestTestHelpers.ReadEntryAsync(cache, "movie", mediaId);
     }
 
     private string WriteFile(string name, int size)
@@ -233,7 +235,7 @@ public class DownloadServiceReconcileTests : IDisposable
             return new HttpResponseMessage(HttpStatusCode.OK); // unerreichbar
         });
         var service = CreateService();
-        await service.EnqueueAsync("movie", 42, "Ein Film", new AppSettings());
+        await service.EnqueueAsync(new DownloadEnqueueRequest("movie", 42, "Ein Film"), new AppSettings());
 
         var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(15);
         DownloadManifestEntry? entry;
@@ -340,7 +342,7 @@ public class DownloadServiceReconcileTests : IDisposable
         await InsertEntryAsync("completed", stalePath);
         var service = CreateService();
 
-        var result = await service.EnqueueAsync("movie", 42, "Ein Film", new AppSettings());
+        var result = await service.EnqueueAsync(new DownloadEnqueueRequest("movie", 42, "Ein Film"), new AppSettings());
 
         Assert.Equal(DownloadService.NoticeAlreadyPresent, result.Notice);
         Assert.Equal("completed", (await ReadEntryAsync())!.State);
@@ -365,16 +367,105 @@ public class DownloadServiceReconcileTests : IDisposable
         Assert.Equal("completed", (await ReadEntryAsync())!.State);
     }
 
-    private sealed class FakeNetworkMonitor : INetworkStatusMonitor
+    /// <summary>Prüft Ablauf-Prüfung: abgelaufener Eintrag ohne Kandidatenbezug verliert Datei und Zeile; ItemRemoved wird gemeldet.</summary>
+    [Fact]
+    public async Task Reconcile_ExpiredCompleted_RemovesFileAndEntry()
     {
-        public bool IsOnline { get; set; } = true;
-        public bool IsWifi { get; set; } = true;
-        public event EventHandler<bool>? AvailabilityChanged;
-        public void Start() { }
-        public void SetOnline(bool online)
-        {
-            IsOnline = online;
-            AvailabilityChanged?.Invoke(this, online);
-        }
+        var path = WriteFile("movie_42.mp4", 512);
+        await InsertEntryAsync("completed", path, expiresAtUtc: DateTime.UtcNow.AddDays(-1));
+        var service = CreateService();
+        var removed = new List<DownloadRemovedEventArgs>();
+        service.ItemRemoved += (_, e) => removed.Add(e);
+
+        var result = await service.ReconcileAsync(new AppSettings());
+
+        Assert.Equal(1, result.RemovedExpiredCount);
+        Assert.Equal(0, result.ExtendedExpiryCount);
+        Assert.False(File.Exists(path));
+        Assert.Null(await ReadEntryAsync());
+        var removal = Assert.Single(removed);
+        Assert.Equal(42, removal.MediaId);
+        Assert.Equal("movie", removal.MediaType);
+    }
+
+    /// <summary>Prüft Ablauf-Prüfung: abgelaufener Kandidat wird verlängert und auf Herkunft „auto" gestellt; ItemChanged wird gemeldet.</summary>
+    [Fact]
+    public async Task Reconcile_ExpiredCandidate_ExtendsAndSetsAuto()
+    {
+        var path = WriteFile("movie_42.mp4", 512);
+        await InsertEntryAsync("completed", path,
+            expiresAtUtc: DateTime.UtcNow.AddDays(-1), origin: "manual");
+        var service = CreateService();
+        var changed = new List<DownloadListItem>();
+        service.ItemChanged += (_, e) => changed.Add(e.Item);
+        var settings = new AppSettings { DownloadRetentionDays = 7 };
+        var candidateKeys = new HashSet<string> { DownloadService.ManifestKey("movie", 42) };
+
+        var result = await service.ReconcileAsync(settings, candidateKeys);
+
+        Assert.Equal(1, result.ExtendedExpiryCount);
+        Assert.Equal(0, result.RemovedExpiredCount);
+        Assert.True(File.Exists(path));
+        var entry = await ReadEntryAsync();
+        Assert.Equal("completed", entry!.State);
+        Assert.Equal("auto", entry.Origin);
+        var expected = DateTime.UtcNow + TimeSpan.FromDays(7);
+        Assert.True(entry.ExpiresAtUtc > DateTime.UtcNow.AddDays(6));
+        Assert.True(entry.ExpiresAtUtc <= expected + TimeSpan.FromMinutes(1));
+        Assert.Contains(changed, i => i.MediaId == 42 && i.Origin == DownloadOrigin.Auto);
+    }
+
+    /// <summary>Prüft Altbestand: Eintrag ohne Ablaufdatum gilt als abgelaufen und wird entfernt.</summary>
+    [Fact]
+    public async Task Reconcile_LegacyEntryWithoutExpiry_TreatedAsExpired()
+    {
+        var path = WriteFile("movie_42.mp4", 512);
+        await InsertEntryAsync("completed", path);
+        var service = CreateService();
+
+        var result = await service.ReconcileAsync(new AppSettings());
+
+        Assert.Equal(1, result.RemovedExpiredCount);
+        Assert.False(File.Exists(path));
+        Assert.Null(await ReadEntryAsync());
+    }
+
+    /// <summary>Prüft Ablauf-Prüfung: nicht abgelaufene Einträge bleiben unberührt.</summary>
+    [Fact]
+    public async Task Reconcile_ExpiredNonCandidate_QueuedOrRunning_NotTouched()
+    {
+        var queuedPath = WriteFile("movie_43.mp4", 64);
+        var completedPath = WriteFile("movie_42.mp4", 512);
+        // Wartender Eintrag ohne Ablaufdatum (Ablauf gilt nur für „completed").
+        await InsertEntryAsync("queued", queuedPath, 43);
+        // Fertiger Eintrag mit Ablaufdatum in der Zukunft.
+        await InsertEntryAsync("completed", completedPath, 42,
+            expiresAtUtc: DateTime.UtcNow.AddDays(5));
+        var service = CreateService();
+
+        var result = await service.ReconcileAsync(new AppSettings());
+
+        Assert.Equal(0, result.RemovedExpiredCount);
+        Assert.Equal(0, result.ExtendedExpiryCount);
+        Assert.Equal("queued", (await ReadEntryAsync(43))!.State);
+        var completed = await ReadEntryAsync(42);
+        Assert.Equal("completed", completed!.State);
+        Assert.NotNull(completed.ExpiresAtUtc);
+        Assert.True(File.Exists(completedPath));
+    }
+
+    /// <summary>Prüft Rückwärtskompatibilität: ohne Settings läuft kein Ablauf-Pass — abgelaufene Einträge bleiben.</summary>
+    [Fact]
+    public async Task Reconcile_WithoutSettings_SkipsExpiryPass()
+    {
+        var path = WriteFile("movie_42.mp4", 512);
+        await InsertEntryAsync("completed", path, expiresAtUtc: DateTime.UtcNow.AddDays(-1));
+        var service = CreateService();
+
+        var result = await service.ReconcileAsync();
+
+        Assert.Equal(0, result.RemovedExpiredCount);
+        Assert.True(File.Exists(path));
+        Assert.Equal("completed", (await ReadEntryAsync())!.State);
     }
 }
