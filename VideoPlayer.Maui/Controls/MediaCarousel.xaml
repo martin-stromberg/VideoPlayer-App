@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentView xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:controls="clr-namespace:VideoPlayer.Maui.Controls"
+             xmlns:mvu="clr-namespace:VideoPlayer.Mvu;assembly=VideoPlayer.Mvu"
+             x:Class="VideoPlayer.Maui.Controls.MediaCarousel"
+             x:Name="Root">
+    <VerticalStackLayout Spacing="12">
+        <Label Text="{Binding Source={x:Reference Root}, Path=Title}"
+               Style="{StaticResource SectionTitle}"
+               Padding="24,0" />
+        <ScrollView Orientation="Horizontal"
+                    HorizontalScrollBarVisibility="Never">
+            <HorizontalStackLayout BindableLayout.ItemsSource="{Binding Source={x:Reference Root}, Path=Items}"
+                                   Spacing="14"
+                                   Padding="24,2,24,10">
+                <BindableLayout.ItemTemplate>
+                    <DataTemplate x:DataType="mvu:HomeMediaItem">
+                        <VerticalStackLayout WidthRequest="{Binding Source={x:Reference Root}, Path=ItemWidth}"
+                                             Spacing="8">
+                            <!-- Bildkarte im Seitenverhältnis des Abschnitts
+                                 (Poster 2:3; Weiterschauen 16:9-Stills) —
+                                 der Rahmen schneidet Bild, Fortschrittsbalken
+                                 und Badge in die Rundung. -->
+                            <Border WidthRequest="{Binding Source={x:Reference Root}, Path=ItemWidth}"
+                                    HeightRequest="{Binding Source={x:Reference Root}, Path=ItemHeight}"
+                                    Padding="0"
+                                    Margin="0"
+                                    Stroke="{StaticResource VpBorder}"
+                                    StrokeThickness="1"
+                                    Opacity="{Binding CardOpacity}"
+                                    BackgroundColor="{StaticResource VpSurface}">
+                                <Border.StrokeShape>
+                                    <RoundRectangle CornerRadius="12" />
+                                </Border.StrokeShape>
+                                <Border.Shadow>
+                                    <Shadow Brush="{StaticResource VpShadowBrush}" Offset="0,4" Radius="10" Opacity="0.3" />
+                                </Border.Shadow>
+                                <Border.GestureRecognizers>
+                                    <TapGestureRecognizer Tapped="OnItemTapped" />
+                                    <!-- Long-Press (2 s) für das Kontextmenü:
+                                         nur aktiv, wenn die Seite
+                                         LongPressEnabled setzt — kurzer
+                                         Tap bleibt dem TapGestureRecognizer
+                                         vorbehalten. -->
+                                    <PointerGestureRecognizer PointerPressed="OnItemPointerPressed"
+                                                              PointerReleased="OnItemPointerEnded"
+                                                              PointerExited="OnItemPointerEnded" />
+                                </Border.GestureRecognizers>
+                                <Grid>
+                                    <!-- Titel-Fallback: liegt unter dem Bild und bleibt sichtbar,
+                                         solange kein Poster geladen ist. -->
+                                    <Label Text="{Binding Title}"
+                                           TextColor="{StaticResource VpText}"
+                                           FontSize="13"
+                                           Padding="10"
+                                           HorizontalTextAlignment="Center"
+                                           VerticalOptions="Center"
+                                           MaxLines="4"
+                                           LineBreakMode="WordWrap" />
+                                    <controls:CachedPosterImage PictureId="{Binding PosterPictureId}"
+                                                                Aspect="AspectFill"
+                                                                IsVisible="{Binding HasPoster}" />
+                                    <ProgressBar Progress="{Binding Progress}"
+                                                 IsVisible="{Binding ShowProgress}"
+                                                 ProgressColor="{StaticResource VpPrimary}"
+                                                 BackgroundColor="{StaticResource VpOverlay}"
+                                                 HeightRequest="5"
+                                                 VerticalOptions="End" />
+                                    <!-- Platzhalter-Markierung fehlender
+                                         Offline-Episoden (nicht abspielbar). -->
+                                    <Border x:Name="PlaceholderBadge"
+                                            IsVisible="{Binding IsPlaceholder}"
+                                            Stroke="{StaticResource VpBadgeBorder}"
+                                            StrokeThickness="1"
+                                            BackgroundColor="{StaticResource VpBadgeBg}"
+                                            Padding="10,5"
+                                            HorizontalOptions="Center"
+                                            VerticalOptions="End"
+                                            Margin="0,0,0,12">
+                                        <Border.StrokeShape>
+                                            <RoundRectangle CornerRadius="999" />
+                                        </Border.StrokeShape>
+                                        <Label Text="Nicht heruntergeladen"
+                                               TextColor="{StaticResource VpText}"
+                                               FontSize="11" />
+                                    </Border>
+                                </Grid>
+                            </Border>
+                            <Label Text="{Binding Title}"
+                                   FontSize="13"
+                                   FontFamily="InterMedium"
+                                   MaxLines="2"
+                                   LineBreakMode="TailTruncation" />
+                        </VerticalStackLayout>
+                    </DataTemplate>
+                </BindableLayout.ItemTemplate>
+            </HorizontalStackLayout>
+        </ScrollView>
+    </VerticalStackLayout>
+</ContentView>

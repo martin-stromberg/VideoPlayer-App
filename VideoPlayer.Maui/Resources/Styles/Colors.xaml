@@ -1,0 +1,66 @@
+﻿<?xml version="1.0" encoding="UTF-8" ?>
+<ResourceDictionary 
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    x:Class="VideoPlayer.Maui.Resources.Styles.Colors">
+
+    <!-- Design-Tokens der Webanwendung (deployter Stand, dokumentiert in
+         docs/projects/.../web-design-recherche.md). Die App ist dunkel-only;
+         Schlüssel spiegeln die CSS-Variablen vp-*. -->
+
+    <!-- Hintergründe -->
+    <Color x:Key="VpBg">#131313</Color>
+    <Color x:Key="VpBgDeep">#0e0e0e</Color>
+
+    <!-- Flächen, abgestuft -->
+    <Color x:Key="VpSurfaceLow">#1c1b1b</Color>
+    <Color x:Key="VpSurface">#201f1f</Color>
+    <Color x:Key="VpSurfaceHigh">#2a2a2a</Color>
+    <Color x:Key="VpSurfaceBright">#393939</Color>
+
+    <!-- Text -->
+    <Color x:Key="VpText">#e5e2e1</Color>
+    <Color x:Key="VpTextMuted">#bda9a6</Color>
+    <Color x:Key="VpTextSoft">#e9bcb6</Color>
+
+    <!-- Rahmen (rgba(255,255,255,0.1) bzw. rgba(255,180,170,0.42) als ARGB) -->
+    <Color x:Key="VpBorder">#1AFFFFFF</Color>
+    <Color x:Key="VpBorderStrong">#6BFFB4AA</Color>
+
+    <!-- Akzente -->
+    <Color x:Key="VpPrimary">#e50914</Color>
+    <Color x:Key="VpPrimaryHover">#c0000c</Color>
+    <Color x:Key="VpPrimarySoft">#ffb4aa</Color>
+    <Color x:Key="VpSecondary">#00a8e8</Color>
+    <Color x:Key="VpSecondarySoft">#83cfff</Color>
+    <Color x:Key="VpDanger">#ffb4ab</Color>
+
+    <!-- App-eigene Hilfstokens: transluzente Abdunklung (Scrim/Badge,
+         Web-Muster rgba(0,0,0,.68)) und Karten-Schatten. -->
+    <Color x:Key="VpOverlay">#80000000</Color>
+    <Color x:Key="VpShadow">#000000</Color>
+    <SolidColorBrush x:Key="VpShadowBrush" Color="{StaticResource VpShadow}"/>
+
+    <!-- Angesehen-Badge der Episodenlisten (Web .watched-indicator):
+         Grund rgba(0,0,0,.68) und feiner Rand rgba(255,255,255,.28). -->
+    <Color x:Key="VpBadgeBg">#AD000000</Color>
+    <Color x:Key="VpBadgeBorder">#47FFFFFF</Color>
+
+    <!-- Hero-Kopfbereich der Startseite: transluzente Ableitungen der
+         Tokens für die geschichteten Gradienten des Web-Heros
+         (seitlicher Verlauf rgba(19,19,19,.98→.76→.18) über VpBg,
+         radiale Akzente rgba(229,9,20,.3)/rgba(0,168,232,.22)). -->
+    <Color x:Key="VpHeroSideStrong">#FA131313</Color>
+    <Color x:Key="VpHeroSideMid">#C2131313</Color>
+    <Color x:Key="VpHeroSideSoft">#2E131313</Color>
+    <Color x:Key="VpHeroFadeClear">#00131313</Color>
+    <Color x:Key="VpHeroAccentPrimary">#4DE50914</Color>
+    <Color x:Key="VpHeroAccentSecondary">#3800A8E8</Color>
+
+    <!-- Ergänzende Tokens des Redesigns: getönte Primärfläche für
+         ausgewählte Chips/Zustands-Badges (rgba(229,9,20,.18)) und ein
+         schwarzer Scrim-Verlauf für Video-Overlays. -->
+    <Color x:Key="VpPrimaryTint">#2EE50914</Color>
+    <Color x:Key="VpScrimStart">#B3000000</Color>
+    <Color x:Key="VpScrimEnd">#00000000</Color>
+</ResourceDictionary>
