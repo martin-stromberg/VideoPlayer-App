@@ -185,21 +185,21 @@ namespace VideoPlayer.TvOS.Ui
             {
                 desired.Add(new HomeSectionDescriptor(
                     "continue", "Weiterschauen", model.ContinueWatching,
-                    ContinueWatchingItemSize, isContinueWatching: true, "ContinueWatchingCarousel"));
+                    ContinueWatchingItemSize, IsContinueWatching: true, "ContinueWatchingCarousel"));
             }
 
             if (model.Favorites.Count > 0)
             {
                 desired.Add(new HomeSectionDescriptor(
                     "favorites", "Favoriten", model.Favorites,
-                    PosterItemSize, isContinueWatching: false, "FavoritesCarousel"));
+                    PosterItemSize, IsContinueWatching: false, "FavoritesCarousel"));
             }
 
             if (model.RecentEntries.Count > 0)
             {
                 desired.Add(new HomeSectionDescriptor(
                     "recent", "Neu im Programm", model.RecentEntries,
-                    PosterItemSize, isContinueWatching: false, "RecentCarousel"));
+                    PosterItemSize, IsContinueWatching: false, "RecentCarousel"));
             }
 
             foreach (var section in model.SeasonalGenres)
@@ -208,7 +208,7 @@ namespace VideoPlayer.TvOS.Ui
                 {
                     desired.Add(new HomeSectionDescriptor(
                         $"seasonal:{section.GenreId}", section.Name, section.Items,
-                        PosterItemSize, isContinueWatching: false, section.AutomationId));
+                        PosterItemSize, IsContinueWatching: false, section.AutomationId));
                 }
             }
 
