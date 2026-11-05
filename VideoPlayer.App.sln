@@ -19,6 +19,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "msTools.DeveloperApi", "msT
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "msTools.DeveloperApi.Maui", "msTools.DeveloperApi.Maui\msTools.DeveloperApi.Maui.csproj", "{1D14A79C-7B86-446F-9168-4E382E1A4FDB}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "VideoPlayer.TvOS", "VideoPlayer.TvOS\VideoPlayer.TvOS.csproj", "{AFA373E3-112A-46C6-B275-2E13DD469DEB}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -125,6 +127,18 @@ Global
 		{1D14A79C-7B86-446F-9168-4E382E1A4FDB}.Release|x64.Build.0 = Release|Any CPU
 		{1D14A79C-7B86-446F-9168-4E382E1A4FDB}.Release|x86.ActiveCfg = Release|Any CPU
 		{1D14A79C-7B86-446F-9168-4E382E1A4FDB}.Release|x86.Build.0 = Release|Any CPU
+		{AFA373E3-112A-46C6-B275-2E13DD469DEB}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{AFA373E3-112A-46C6-B275-2E13DD469DEB}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{AFA373E3-112A-46C6-B275-2E13DD469DEB}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{AFA373E3-112A-46C6-B275-2E13DD469DEB}.Debug|x64.Build.0 = Debug|Any CPU
+		{AFA373E3-112A-46C6-B275-2E13DD469DEB}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{AFA373E3-112A-46C6-B275-2E13DD469DEB}.Debug|x86.Build.0 = Debug|Any CPU
+		{AFA373E3-112A-46C6-B275-2E13DD469DEB}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{AFA373E3-112A-46C6-B275-2E13DD469DEB}.Release|Any CPU.Build.0 = Release|Any CPU
+		{AFA373E3-112A-46C6-B275-2E13DD469DEB}.Release|x64.ActiveCfg = Release|Any CPU
+		{AFA373E3-112A-46C6-B275-2E13DD469DEB}.Release|x64.Build.0 = Release|Any CPU
+		{AFA373E3-112A-46C6-B275-2E13DD469DEB}.Release|x86.ActiveCfg = Release|Any CPU
+		{AFA373E3-112A-46C6-B275-2E13DD469DEB}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
