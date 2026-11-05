@@ -73,16 +73,55 @@ tvOS nicht).
 
 | Paket | Version | Ergebnis |
 |-------|---------|----------|
-| `SQLitePCLRaw.lib.e_sqlite3` | 3.53.3 | kompatibel — natives tvOS-Asset vorhanden (`net6.0-tvos` bis `net10.0-tvos` in den kompatiblen TFMs gelistet) |
-| `SQLitePCLRaw.bundle_green` | 2.1.11 | kompatibel (`netstandard2.0`-Bundle, wählt `e_sqlite3`) |
-| `sqlite-net-pcl` | 1.11.285 | kompatibel (`netstandard2.0`) |
+| `SQLitePCLRaw.lib.e_sqlite3` | 3.53.3 | unter tvOS ohne natives Asset — das Paket liefert `runtimes/`-Ordner nur für iOS/Android/macOS/Windows/Linux, die tvOS-RID-Kette (`tvossimulator-arm64 → tvos → unix`) fällt **nicht** auf iOS zurück; Beitrag unter tvOS daher nur die verwaltete `netstandard2.0`-Assembly |
+| `SQLitePCLRaw.bundle_green` | 2.1.11 | kompatibel — zieht für `net6.0-tvos` transitiv `SQLitePCLRaw.lib.e_sqlite3.tvos` + `SQLitePCLRaw.provider.internal` (siehe Sonderregelung unten) |
+| `SQLitePCLRaw.lib.e_sqlite3.tvos` | 2.1.11 | **Linkfehler unter `tvossimulator-arm64`** — siehe Sonderregelung unten |
+| `sqlite-net-pcl` | 1.11.285 | kompatibel (`netstandard2.0`); zieht `SQLitePCLRaw.provider.sqlite3` ≥ 3.0.3 transitiv |
+| `SQLitePCLRaw.provider.sqlite3` | 3.0.3 | kompatibel (rein verwaltet, `DllImport("sqlite3")` → System-`libsqlite3.dylib`) |
 | `SQLitePCLRaw.lib.e_sqlite3.android` | 2.1.13 | unproblematisch — Android-RID-Zusatz, unter tvOS ohne Wirkung |
 | `Zeroconf` | 3.7.16 | kompilierbar (`netstandard`, rein verwaltete UDP/mDNS-Implementierung) — **Laufzeitrisiko:** mDNS-Multicast verlangt auf tvOS-Geräten das Entitlement `com.apple.developer.networking.multicast` sowie `NSLocalNetworkUsageDescription` + `NSBonjourServices` (`_http._tcp`); die `Info.plist` ist vorbereitet. **Ausweichvorschlag bei Inkompatibilität:** UDP-only-/Broadcast-Discovery bzw. direkte Servereingabe — `UdpServerDiscovery` in `VideoPlayer.ApiClient` ist der vorhandene Referenzpfad |
 | `Microsoft.Extensions.Logging.Abstractions` | 10.0.10 | kompatibel (plattformneutral) |
 
-Kein Paket ist inkompatibel; kein Ersatz erforderlich. Die einzige
-Einschränkung ist das dokumentierte Multicast-Entitlement-Risiko von
-`Zeroconf` auf echten Geräten (Simulator meist unbetroffen).
+### Sonderregelung SQLite unter tvOS (e_sqlite3 vs. System-libsqlite3)
+
+`SQLitePCLRaw.lib.e_sqlite3.tvos` bettet `e_sqlite3.a` als Ressource in die
+verwaltete Assembly ein. Die Analyse des fat archive (alle Versionen bis
+einschließlich 2.1.14, Stand 2026-11) ergab nur zwei Slices:
+
+| Slice | `LC_BUILD_VERSION`-Plattform |
+|-------|------------------------------|
+| `x86_64` | `tvossimulator` (8) |
+| `arm64` | `tvos` (3) — **Gerät, kein Simulator** |
+
+Eine `tvossimulator-arm64`-Slice existiert in keiner veröffentlichten
+Version. Der `build-tvos`-Job (RID `tvossimulator-arm64`) schlug deshalb
+beim nativen Linken fehl:
+
+```
+ld: building for 'tvOS-simulator', but linking in object file
+  (.../linker-cache/e_sqlite3.a[arm64][2](sqlite3.o)) built for 'tvOS'
+```
+
+**Lösung (Provider-Wechsel statt Paket-Update):**
+
+- `VideoPlayer.TvOS.csproj` unterdrückt das transitive
+  `SQLitePCLRaw.lib.e_sqlite3.tvos` per Direktreferenz mit
+  `ExcludeAssets="all"` (nur unter `IncludeTvOsTarget=true`) — kein
+  natives Archiv landet mehr im Link.
+- `SqliteBootstrap.EnsureInitialized()` wählt unter tvOS zur Laufzeit
+  (`OperatingSystem.IsTvOS()`) den Provider der im System vorhandenen
+  `libsqlite3.dylib`:
+  `SQLitePCL.raw.SetProvider(new SQLitePCL.SQLite3Provider_sqlite3())`.
+  Das ist derselbe Mechanismus, den `bundle_green` auf iOS ohnehin
+  verwendet — die System-SQLite ist auf tvOS (Gerät und Simulator)
+  verfügbar. `Batteries_V2.Init()` (internal-Provider auf `__Internal`)
+  wird auf tvOS nicht aufgerufen.
+- Alle übrigen Plattformen bleiben unverändert bei
+  `Batteries_V2.Init()`/`e_sqlite3`. `SQLitePCLRaw.provider.sqlite3`
+  (3.0.3, kommt ohnehin transitiv via `sqlite-net-pcl` herein) ist rein
+  verwaltet und liegt auf Windows/Android/macOS lediglich ungenutzt bei.
+
+Damit gilt für Gerät **und** Simulator derselbe Provider-Pfad.
 
 ## Überprüfung
 

@@ -49,6 +49,19 @@
     <ProjectReference Include="..\VideoPlayer.Mvu\VideoPlayer.Mvu.csproj" />
     <ProjectReference Include="..\VideoPlayer.Storage\VideoPlayer.Storage.csproj" />
   </ItemGroup>
+  <ItemGroup Condition="'$(IncludeTvOsTarget)' == 'true'">
+    <!-- SQLitePCLRaw.lib.e_sqlite3.tvos kommt transitiv ueber
+         bundle_green (Dependency-Gruppe net6.0-tvos) herein und bettet
+         e_sqlite3.a in der verwalteten Assembly ein. Das Archiv enthaelt
+         nur tvos-arm64 (Geraet) + tvossimulator-x64 — keine
+         tvossimulator-arm64-Slice — womit der Simulator-Link auf
+         Apple-Silicon fehlschlaegt (ld: object file built for 'tvOS').
+         Auch das neueste Paket 2.1.14 hat diese Luecke. Die Direktreferenz
+         mit ExcludeAssets unterdrueckt das native Archiv; SqliteBootstrap
+         waehlt unter tvOS stattdessen die System-libsqlite3
+         (SQLitePCLRaw.provider.sqlite3, DllImport 'sqlite3'). -->
+    <PackageReference Include="SQLitePCLRaw.lib.e_sqlite3.tvos" Version="2.1.11" ExcludeAssets="all" />
+  </ItemGroup>
   <ItemGroup>
     <None Include="../LICENSE" Pack="true" PackagePath="\" />
   </ItemGroup>

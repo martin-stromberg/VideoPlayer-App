@@ -1,5 +1,35 @@
 # Änderungsprotokoll
 
+## 2026-11-06 — tvOS-App: Fix nativer Linkfehler `e_sqlite3` unter `tvossimulator-arm64`
+
+- **Befund:** `SQLitePCLRaw.lib.e_sqlite3.tvos` (transitiv via
+  `bundle_green`, alle Versionen bis einschließlich 2.1.14) bettet ein
+  `e_sqlite3.a` ein, das nur `tvos-arm64` (Gerät) und `tvossimulator-x64`
+  enthält — die `tvossimulator-arm64`-Slice fehlt, der `build-tvos`-Job
+  scheiterte beim Linken (`ld: ... built for 'tvOS'`).
+- **Fix:** tvOS nutzt jetzt die System-`libsqlite3.dylib` statt des
+  gebündelten e_sqlite3 — derselbe Provider-Mechanismus, den
+  `bundle_green` auf iOS ohnehin verwendet:
+  - `VideoPlayer.TvOS.csproj` unterdrückt das transitive
+    `SQLitePCLRaw.lib.e_sqlite3.tvos` per `ExcludeAssets="all"` (nur unter
+    `IncludeTvOsTarget=true`), sodass kein natives Archiv im Link landet.
+  - `SqliteBootstrap.EnsureInitialized()` setzt unter tvOS
+    (`OperatingSystem.IsTvOS()`) den Provider direkt auf
+    `SQLite3Provider_sqlite3` (`DllImport("sqlite3")`); alle übrigen
+    Plattformen bleiben unverändert bei `Batteries_V2.Init()`.
+  - `VideoPlayer.Storage.csproj` referenziert
+    `SQLitePCLRaw.provider.sqlite3` 3.0.3 explizit (kommt ohnehin
+    transitiv via `sqlite-net-pcl` ≥ 3.0.3 herein; rein verwaltet, auf
+    Nicht-tvOS-Plattformen ungenutzt).
+- **Contract-Test:** `TvOsProject_HasNoPackageReferencesOrMaui` lässt
+  jetzt wirkungslose Unterdrückungs-Referenzen (`ExcludeAssets="all"`)
+  zu und blockiert weiterhin jede Paket-Referenz mit beitragenden
+  Assets.
+- **Absicherung:** `dotnet build VideoPlayer.App.sln` grün,
+  `VideoPlayer.Maui.Tests` 1472/1472 grün; Verifikation des tvOS-Links
+  über den macOS-CI-Job `build-tvos`. Details:
+  `docs/help/tv-app/installation.md` (Paketkompatibilität).
+
 ## 2026-11-06 — tvOS-App: Serververbindung — Einrichtung, Pairing und Anmeldung
 
 - **Einrichtungsseite (`ServerSetupViewController`):** vollständige
