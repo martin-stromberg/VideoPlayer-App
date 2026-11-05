@@ -1,6 +1,6 @@
 using VideoPlayer.Storage;
 
-namespace VideoPlayer.Maui.Services;
+namespace VideoPlayer.Mvu;
 
 /// <summary>
 /// Löst die Server-Basisadresse auf: zuletzt verbundener Server aus der

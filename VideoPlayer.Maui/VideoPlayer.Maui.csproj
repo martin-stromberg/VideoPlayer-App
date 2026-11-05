@@ -66,7 +66,8 @@
     <PackageReference Include="Microsoft.Maui.Controls" Version="10.0.90" />
     <PackageReference Include="Microsoft.Maui.Essentials" Version="10.0.90" />
     <PackageReference Include="CommunityToolkit.Maui.MediaElement" Version="10.0.0" />
-    <PackageReference Include="Microsoft.AspNetCore.SignalR.Client" Version="10.0.10" />
+    <!-- SignalR-Client: liegt in VideoPlayer.Mvu (SignalRServerEventsConnection wurde
+         dorthin verschoben, damit auch die tvOS-App ihn nutzen kann). -->
     <PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="10.0.10" />
     <!-- QR-/Ticket-Onboarding: Kamera-Scan nur iOS/Android (MIT-Lizenz;
          ZXing hat keinen Windows-Kamera-Support — Windows/MacCatalyst

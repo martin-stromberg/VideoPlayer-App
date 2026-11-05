@@ -1,8 +1,10 @@
 # Apple-TV-App (tvOS)
 
 Eigenständige App für Apple TV als Grundlage des geplanten Lean-back-Players.
-Aktueller Stand: minimale Programmhülle ohne fachliche Funktion, deren
-Kompilierbarkeit über einen macOS-CI-Job fortlaufend gesichert wird.
+Aktueller Stand: MVU-Grundgerüst — der plattformneutrale Zustandskern läuft
+mit tvOS-Effekt-Handler und Plattform-Adaptern; Navigation und
+Verbindungszustände sind per Siri Remote bedienbar. Kompilierbarkeit wird
+über einen macOS-CI-Job fortlaufend gesichert.
 
 ## Inhalt
 
