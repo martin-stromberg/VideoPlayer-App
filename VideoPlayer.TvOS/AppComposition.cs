@@ -78,6 +78,9 @@ namespace VideoPlayer.TvOS
             OfflineContinueWatching = new OfflineContinueWatchingService(
                 CacheDatabase, BackupDatabase, HomeLists, StorageLayout,
                 new AppLogger<OfflineContinueWatchingService>(LoggerFactory));
+            PosterImages = new TvosPosterImageService(
+                AuthSession, StorageLayout,
+                new AppLogger<TvosPosterImageService>(LoggerFactory));
             ServerDiscovery = ServerDiscoveryService.CreateDefault();
         }
 
@@ -147,6 +150,9 @@ namespace VideoPlayer.TvOS
         /// <summary>Offline-Zusammenstellung der Weiterschauen-Liste.</summary>
         public OfflineContinueWatchingService OfflineContinueWatching { get; }
 
+        /// <summary>Poster-/Vorschaubild-Cache der Startseiten-Karussells.</summary>
+        public TvosPosterImageService PosterImages { get; }
+
         /// <summary>Netzwerk-Erkennung (mDNS + UDP-Broadcast).</summary>
         public ServerDiscoveryService ServerDiscovery { get; }
 
@@ -190,7 +196,7 @@ namespace VideoPlayer.TvOS
             Task Dispatch(AppMessage message) =>
                 MainThreadInvoker.InvokeOnMainThreadAsync(() => Host.DispatchAsync(message));
 
-            navigator = new TvosNavigator(Dispatch);
+            navigator = new TvosNavigator(Dispatch, PosterImages);
             navigator.Attach(main);
             var effectHandler = new TvosAppEffectHandler(
                 this,

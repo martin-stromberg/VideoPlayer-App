@@ -1,5 +1,6 @@
 using UIKit;
 using VideoPlayer.Mvu;
+using VideoPlayer.TvOS.Services;
 
 namespace VideoPlayer.TvOS.Ui
 {
@@ -24,12 +25,15 @@ namespace VideoPlayer.TvOS.Ui
             };
 
         private readonly Func<AppMessage, Task> dispatch;
+        private readonly TvosPosterImageService posters;
 
         /// <summary>Initialisiert eine neue Instanz der <see cref="MenuTabBarController"/>-Klasse.</summary>
         /// <param name="dispatch">Rückmeldung in den MVU-Zyklus (Hauptthread).</param>
-        public MenuTabBarController(Func<AppMessage, Task> dispatch)
+        /// <param name="posters">Poster-Cache-/Ladedienst der Startseiten-Karussells.</param>
+        public MenuTabBarController(Func<AppMessage, Task> dispatch, TvosPosterImageService posters)
         {
             this.dispatch = dispatch ?? throw new ArgumentNullException(nameof(dispatch));
+            this.posters = posters ?? throw new ArgumentNullException(nameof(posters));
         }
 
         /// <inheritdoc/>
@@ -92,6 +96,7 @@ namespace VideoPlayer.TvOS.Ui
         {
             UIViewController controller = page switch
             {
+                AppPage.Home => new HomePageViewController(dispatch, posters),
                 AppPage.Profile => new ProfilePageViewController(dispatch),
                 AppPage.Settings => new SettingsPageViewController(dispatch),
                 _ => new PagePlaceholderViewController(
