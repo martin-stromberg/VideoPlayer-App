@@ -127,8 +127,7 @@ public class TvOsDetailsContractTests
 
     /// <summary>
     /// Prüft: der Navigator stapelt Detailseiten modal über dem obersten
-    /// Controller und rendert sie modellgetrieben — der Platzhalter
-    /// bleibt den vorbereiteten Wiedergabezielen vorbehalten.
+    /// Controller und rendert sie modellgetrieben.
     /// </summary>
     [Fact]
     public void Navigator_StacksModalDetailPages()
@@ -139,7 +138,6 @@ public class TvOsDetailsContractTests
         Assert.Contains("MediaDetailsViewController", navigator, StringComparison.Ordinal);
         Assert.Contains("UIModalPresentationStyle.FullScreen", navigator, StringComparison.Ordinal);
         Assert.Contains("TopmostPresented", navigator, StringComparison.Ordinal);
-        Assert.Contains("PresentPreparedTarget", navigator, StringComparison.Ordinal);
     }
 
     /// <summary>

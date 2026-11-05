@@ -138,42 +138,26 @@ public class TvOsHomePageContractTests
         Assert.Contains("PosterImages", composition, StringComparison.Ordinal);
 
         var navigator = TvOsFile("Ui", "TvosNavigator.cs");
-        Assert.Contains("PresentPreparedTarget", navigator, StringComparison.Ordinal);
-        Assert.Contains("PreparedTargetViewController", navigator, StringComparison.Ordinal);
+        Assert.Contains("PresentPlayer", navigator, StringComparison.Ordinal);
+        Assert.Contains("TvosPlayerViewController", navigator, StringComparison.Ordinal);
         Assert.Contains("PresentViewController", navigator, StringComparison.Ordinal);
         Assert.Contains("UIModalPresentationStyle.FullScreen", navigator, StringComparison.Ordinal);
     }
 
     /// <summary>
-    /// Prüft: das vorbereitete Navigationsziel ist modal, schließt per
-    /// Menü-Taste und aktualisiert sich statt zu stapeln.
-    /// </summary>
-    [Fact]
-    public void PreparedTarget_DismissesViaMenuAndUpdates()
-    {
-        var target = TvOsFile("Ui", "PreparedTargetViewController.cs");
-
-        Assert.Contains("PressesBegan", target, StringComparison.Ordinal);
-        Assert.Contains("UIPressType.Menu", target, StringComparison.Ordinal);
-        Assert.Contains("DismissViewController", target, StringComparison.Ordinal);
-        Assert.Contains("Update(", target, StringComparison.Ordinal);
-    }
-
-    /// <summary>
     /// Prüft: der tvOS-Effekt-Handler bildet die Navigations-Effekte der
-    /// Eintrags-Auswahl ab — die Medien-Detailseite ist seit dem
-    /// Detailseiten-Schritt real (`PresentMediaDetails`), die
-    /// Wiedergabe-Ziele bleiben vorbereitet (`PresentPreparedTarget`).
+    /// Eintrags-Auswahl ab — die Medien-Detailseite (`PresentMediaDetails`)
+    /// und die Wiedergabe (`PresentPlayer`) sind real verdrahtet.
     /// </summary>
     [Fact]
-    public void TvOsEffectHandler_MapsSelectionEffectsToPreparedTarget()
+    public void TvOsEffectHandler_MapsSelectionEffectsToRealTargets()
     {
         var handler = TvOsFile("Services", "TvosAppEffectHandler.cs");
 
         Assert.Contains("case NavigateToMediaDetailsEffect", handler, StringComparison.Ordinal);
         Assert.Contains("case NavigateToPlayerEffect", handler, StringComparison.Ordinal);
         Assert.Contains("case StartPlaylistPlaybackEffect", handler, StringComparison.Ordinal);
-        Assert.Contains("PresentPreparedTarget", handler, StringComparison.Ordinal);
+        Assert.Contains("PresentPlayer", handler, StringComparison.Ordinal);
         Assert.Contains("PresentMediaDetails", handler, StringComparison.Ordinal);
     }
 

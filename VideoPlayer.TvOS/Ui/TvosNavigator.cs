@@ -15,12 +15,14 @@ namespace VideoPlayer.TvOS.Ui
     {
         private readonly Func<AppMessage, Task> dispatch;
         private readonly TvosPosterImageService posters;
+        private readonly Microsoft.Extensions.Logging.ILogger<TvosPlayerViewController> playerLogger;
 
         private MainViewController? main;
         private MenuTabBarController? tabBar;
         private ServerSetupViewController? serverSetupPage;
         private LoginViewController? loginPage;
         private SourceBrowserViewController? sourceBrowserPage;
+        private TvosPlayerViewController? playerPage;
 
         /// <summary>Offene modale Detailseiten (Stapel wie der Shell-Navigationsstack — Detail → Detail).</summary>
         private readonly List<MediaDetailsViewController> detailPages = [];
@@ -28,13 +30,21 @@ namespace VideoPlayer.TvOS.Ui
         /// <summary>Die zuletzt dargestellte Menüseite — Rückziel der Menü-Taste auf Workflow-Seiten.</summary>
         private AppPage LastMenuPage { get; set; } = AppPage.Home;
 
+        /// <summary>Zuletzt gerenderter Modellstand — Vorgriff für Seiten, die zwischen zwei Modelländerungen präsentiert werden (Player).</summary>
+        private AppModel? lastModel;
+
         /// <summary>Initialisiert eine neue Instanz der <see cref="TvosNavigator"/>-Klasse.</summary>
         /// <param name="dispatch">Rückmeldung in den MVU-Zyklus (Hauptthread).</param>
         /// <param name="posters">Poster-Cache-/Ladedienst der Startseiten-Karussells.</param>
-        public TvosNavigator(Func<AppMessage, Task> dispatch, TvosPosterImageService posters)
+        /// <param name="playerLogger">Logger für den Wiedergabe-Controller (Programmprotokoll).</param>
+        public TvosNavigator(
+            Func<AppMessage, Task> dispatch,
+            TvosPosterImageService posters,
+            Microsoft.Extensions.Logging.ILogger<TvosPlayerViewController> playerLogger)
         {
             this.dispatch = dispatch ?? throw new ArgumentNullException(nameof(dispatch));
             this.posters = posters ?? throw new ArgumentNullException(nameof(posters));
+            this.playerLogger = playerLogger ?? throw new ArgumentNullException(nameof(playerLogger));
         }
 
         /// <summary>Verbindet den Navigator mit dem Fensterrahmen.</summary>
@@ -93,6 +103,7 @@ namespace VideoPlayer.TvOS.Ui
         /// <param name="model">Das aktuelle App-Modell.</param>
         public void Render(AppModel model)
         {
+            lastModel = model;
             _ = NavigateTo(model.CurrentPage);
             main?.UpdateLoadingStatus(model.StartupStatusText, model.StorageNotice);
             serverSetupPage?.Render(model);
@@ -103,6 +114,8 @@ namespace VideoPlayer.TvOS.Ui
             {
                 page.Render(model);
             }
+
+            playerPage?.Render(model);
         }
 
         /// <summary>
@@ -142,6 +155,65 @@ namespace VideoPlayer.TvOS.Ui
             detailPages.Remove(page);
 
         /// <summary>
+        /// Präsentiert die Wiedergabe-Seite modal über dem obersten
+        /// Controller (<see cref="NavigateToPlayerEffect"/>) — Pendant
+        /// zur Shell-Route <c>player</c> der MAUI-App. Je Effekt entsteht
+        /// eine eigene <see cref="TvosPlayerViewController"/>-Instanz;
+        /// eine bereits präsentierte Instanz wird nicht erneut gestapelt
+        /// (die Folgeidentität läuft über <see cref="Render"/>). Die
+        /// Menü-Taste der Siri Remote schließt den Player — die Seite
+        /// meldet dann <c>PlayerClosedMessage</c> und gibt sich über den
+        /// Freigabe-Callback zurück.
+        /// </summary>
+        public void PresentPlayer()
+        {
+            if (main is null)
+            {
+                return;
+            }
+
+            if (playerPage is not null
+                && (playerPage.PresentingViewController is not null
+                    || ReferenceEquals(TopmostPresented(), playerPage)))
+            {
+                // Der Player ist bereits präsentiert — der neue Stand
+                // (z. B. Playlist-Start bei offenem Player) läuft über
+                // die Modell-Render-Kette statt eines zweiten Stapels.
+                if (lastModel is not null)
+                {
+                    playerPage.Render(lastModel);
+                }
+
+                return;
+            }
+
+            var page = new TvosPlayerViewController(
+                dispatch,
+                ReleasePlayerPage,
+                playerLogger);
+            playerPage = page;
+            page.ModalPresentationStyle = UIModalPresentationStyle.FullScreen;
+            // Sofort mit dem letzten Modellstand rendern — die nächste
+            // Modelländerung (Quellauflösung) folgt über Render.
+            if (lastModel is not null)
+            {
+                page.Render(lastModel);
+            }
+
+            TopmostPresented().PresentViewController(page, true, null);
+        }
+
+        /// <summary>Gibt den geschlossenen Player aus dem Render-Verzeichnis frei (Callback der Seite).</summary>
+        /// <param name="page">Der geschlossene Player-Controller.</param>
+        private void ReleasePlayerPage(TvosPlayerViewController page)
+        {
+            if (ReferenceEquals(playerPage, page))
+            {
+                playerPage = null;
+            }
+        }
+
+        /// <summary>
         /// Präsentiert die Browsing-Seite einer Quelle modal über dem
         /// Menürahmen (<see cref="NavigateToSourceOverviewEffect"/>) —
         /// Gegenstück zur Shell-Route <c>sourceoverview</c> der
@@ -178,44 +250,6 @@ namespace VideoPlayer.TvOS.Ui
             }
 
             host.PresentViewController(sourceBrowserPage, true, null);
-        }
-
-        /// <summary>
-        /// Präsentiert das vorbereitete Navigationsziel einer
-        /// Eintrags-Auswahl: Detailansicht und Wiedergabe entstehen in
-        /// späteren Entwicklungsschritten — bis dahin erscheint ein
-        /// modaler Platzhalter mit Titel und Hinweis (kein Fehler, kein
-        /// No-Op). Die Präsentation ist modal, damit der modellgetriebene
-        /// <see cref="MainViewController.Show"/>-Rahmen das Ziel beim
-        /// nächsten <see cref="Render"/> nicht sofort wieder verdrängt;
-        /// ein bereits präsentiertes Ziel wird mit dem Folgeziel
-        /// aktualisiert statt gestapelt (Effekt-Folge Detail →
-        /// Wiedergabe der Weiterschauen-Einträge).
-        /// </summary>
-        /// <param name="title">Titel des angesteuerten Eintrags.</param>
-        /// <param name="detail">Hinweistext des vorbereiteten Zielzustands.</param>
-        public void PresentPreparedTarget(string title, string detail)
-        {
-            if (main is null)
-            {
-                return;
-            }
-
-            var host = TopmostPresented();
-            if (host is PreparedTargetViewController existing)
-            {
-                existing.Update(title, detail);
-                return;
-            }
-
-            var target = new PreparedTargetViewController(title, detail)
-            {
-                ModalPresentationStyle = UIModalPresentationStyle.FullScreen
-            };
-            // Auf dem obersten präsentierten Controller stapeln — die
-            // Eintrags-Auswahl der modalen Browser-Seite muss das Ziel
-            // über dem Browser zeigen können (Rückkehr führt dorthin).
-            host.PresentViewController(target, true, null);
         }
 
         /// <summary>
