@@ -144,7 +144,8 @@ namespace VideoPlayer.TvOS.Ui
             stateView.Hidden = true;
             View.AddSubview(stateView);
 
-            loadingMoreLabel = TvosControls.Status("Weitere Einträge werden geladen…");
+            loadingMoreLabel = TvosControls.Status();
+            loadingMoreLabel.Text = "Weitere Einträge werden geladen…";
             loadingMoreLabel.Hidden = true;
             View.AddSubview(loadingMoreLabel);
 
@@ -299,23 +300,23 @@ namespace VideoPlayer.TvOS.Ui
 
             if (browser.IsLoading && !browser.HasItems)
             {
-                stateLabel.Text = "Einträge werden geladen…";
-                retryButton.Hidden = true;
-                stateView.Hidden = false;
+                stateLabel!.Text = "Einträge werden geladen…";
+                retryButton!.Hidden = true;
+                stateView!.Hidden = false;
                 return;
             }
 
             if (browser.ShowEmpty)
             {
-                stateLabel.Text = string.IsNullOrWhiteSpace(browser.SearchText)
+                stateLabel!.Text = string.IsNullOrWhiteSpace(browser.SearchText)
                     ? "Keine Einträge in dieser Sicht."
                     : "Keine Einträge gefunden.";
-                retryButton.Hidden = true;
-                stateView.Hidden = false;
+                retryButton!.Hidden = true;
+                stateView!.Hidden = false;
                 return;
             }
 
-            stateView.Hidden = true;
+            stateView!.Hidden = true;
         }
 
         // Datenquelle/Delegat der Genre-Filterleiste.
