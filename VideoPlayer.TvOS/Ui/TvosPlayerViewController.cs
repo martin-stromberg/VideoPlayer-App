@@ -187,7 +187,7 @@ namespace VideoPlayer.TvOS.Ui
 
             var previous = UIAction.Create(
                 "Vorheriger Eintrag", null, null,
-                _ =>
+                action =>
                 {
                     _ = dispatch(new PlaylistPreviousRequestedMessage());
                 });
@@ -198,7 +198,7 @@ namespace VideoPlayer.TvOS.Ui
 
             var next = UIAction.Create(
                 "Nächster Eintrag", null, null,
-                _ =>
+                action =>
                 {
                     _ = dispatch(new PlaylistNextRequestedMessage());
                 });
@@ -346,21 +346,13 @@ namespace VideoPlayer.TvOS.Ui
                     logger.LogInformation("Wiedergabe beendet: {Title}.", CurrentTitleForLog());
                     DispatchIfActive(new PlaybackEndedMessage());
                 });
-            // Der ObserveFailedToPlayToEndTime-Helfer fehlt im
-            // tvOS-Binding — das Ende-Fehlerereignis wird direkt über
-            // das NotificationCenter mit dem stabilen
-            // AVPlayerItem-Notification-Namen abonniert.
-            failedEndObserver = NSNotificationCenter.DefaultCenter.AddObserver(
-                new NSString("AVPlayerItemFailedToPlayToEndTimeNotification"),
+            failedEndObserver = AVPlayerItem.Notifications.ObserveItemFailedToPlayToEndTime(
                 item,
-                notification =>
+                (_, args) =>
                 {
-                    var error = notification.Object is AVPlayerItem failedItem
-                        ? failedItem.Error?.LocalizedDescription
-                        : notification.UserInfo?[new NSString("error")] is NSError nsError
-                            ? nsError.LocalizedDescription
-                            : null;
-                    logger.LogError("Wiedergabe fehlgeschlagen: {LogMessage}", SanitizeForLog(error));
+                    logger.LogError(
+                        "Wiedergabe fehlgeschlagen: {LogMessage}",
+                        SanitizeForLog(args.Error?.LocalizedDescription));
                     DispatchIfActive(new PlaybackFailedMessage());
                 });
             stalledObserver = AVPlayerItem.Notifications.ObservePlaybackStalled(
