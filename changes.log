@@ -31,9 +31,9 @@
   zu und blockiert weiterhin jede Paket-Referenz mit beitragenden
   Assets.
 - **Absicherung:** `dotnet build VideoPlayer.App.sln` grün,
-  `VideoPlayer.Maui.Tests` 1472/1472 grün; Verifikation des tvOS-Links
-  über den macOS-CI-Job `build-tvos`. Details:
-  `docs/help/tv-app/installation.md` (Paketkompatibilität).
+  `VideoPlayer.Maui.Tests` 1472/1472 grün; tvOS-Link verifiziert über
+  den macOS-CI-Job `build-tvos` (Run 42110023939 — beide Jobs grün).
+  Details: `docs/help/tv-app/installation.md` (Paketkompatibilität).
 
 ## 2026-11-06 — tvOS-App: Serververbindung — Einrichtung, Pairing und Anmeldung
 
