@@ -170,17 +170,36 @@ namespace VideoPlayer.TvOS.Services
                     });
                     break;
                 case NavigateToMediaDetailsEffect details:
-                    // Vorbereitetes Navigationsziel der Eintrags-Auswahl —
-                    // die eigentliche Detailansicht entsteht im
-                    // Detailseiten-Schritt; der Platzhalter löst keinen
-                    // Fehler aus (Hauptthread: UIKit-Präsentation).
+                    // Echte Detailseite des Mediums — Pendant zur
+                    // Shell-Route mediadetails (Hauptthread:
+                    // UIKit-Präsentation auf dem modalen Stapel).
                     await MainThreadInvoker.InvokeOnMainThreadAsync(() =>
                     {
-                        navigator.PresentPreparedTarget(
-                            details.Title,
-                            "Die Detailansicht folgt in einem späteren Entwicklungsschritt.");
+                        navigator.PresentMediaDetails(details);
                         return Task.CompletedTask;
                     });
+                    break;
+                case LoadMediaDetailsEffect loadDetails:
+                    await LoadMediaDetailsAsync(loadDetails, cancellationToken);
+                    break;
+                case LoadMediaDetailsHeaderEffect header:
+                    await LoadMediaDetailsHeaderAsync(header, cancellationToken);
+                    break;
+                case ToggleFavoriteEffect toggle:
+                    await ToggleFavoriteAsync(toggle, cancellationToken);
+                    break;
+                case EnqueueDownloadEffect enqueue:
+                    // Vorbereitete Download-Aktion: der Download-Schritt
+                    // verdrahtet das Einreihen erst später — bis dahin
+                    // meldet der Handler den Hinweis der Detailseite
+                    // über den regulären Ergebnis-Nachrichtenpfad
+                    // (DownloadNotice), ohne Fehler und ohne Dateizugriff.
+                    await DispatchMessageAsync(new DownloadEnqueueCompletedMessage(
+                        null,
+                        "Der Download folgt in einem späteren Entwicklungsschritt.",
+                        false,
+                        MediaTypeNames.Normalize(enqueue.MediaType),
+                        enqueue.MediaId));
                     break;
                 case NavigateToPlayerEffect:
                     // Vorbereitetes Ziel des Wiedergabestarts — die
@@ -777,6 +796,90 @@ namespace VideoPlayer.TvOS.Services
 
             await DispatchMessageAsync(new SourceItemsLoadedMessage(
                 items.SourceId, page.Page, page.Items, page.HasMore, items.Append, error));
+        }
+
+        private async Task LoadMediaDetailsAsync(LoadMediaDetailsEffect loadDetails, CancellationToken cancellationToken)
+        {
+            MediaDetailsView? details = null;
+            string? error = null;
+            try
+            {
+                // Online aus dem Server, ohne Client aus dem gespeicherten
+                // Offline-Snapshot (Muster: ShellAppEffectHandler).
+                details = await services.MediaDetails.LoadAsync(
+                    loadDetails.MediaType, loadDetails.MediaId, loadDetails.Title,
+                    loadDetails.ShowId, loadDetails.SeasonId, loadDetails.EpisodeId,
+                    cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Detail-Ladung fehlgeschlagen");
+                error = "Die Details konnten nicht geladen werden.";
+            }
+
+            await DispatchMessageAsync(new MediaDetailsLoadedMessage(
+                loadDetails.MediaType, loadDetails.MediaId, details, error));
+        }
+
+        private async Task LoadMediaDetailsHeaderAsync(LoadMediaDetailsHeaderEffect header, CancellationToken cancellationToken)
+        {
+            byte[]? imageBytes = null;
+            try
+            {
+                // Episoden-Still-Endpunkt bzw. aufgelöste Bildquelle
+                // (Bearer + stille Token-Erneuerung in der
+                // Sende-Pipeline). Ohne Sitzung bzw. bei Fehlschlag
+                // bleibt das Bild aus — der Kopfbereich zeigt dann nur
+                // Verlauf und Texte.
+                var client = authSession.Client;
+                if (client is not null)
+                {
+                    var bytes = header.HeaderEpisodeId is > 0
+                        ? await client.GetEpisodeBackgroundImageAsync(header.HeaderEpisodeId.Value, cancellationToken)
+                        : header.HeaderPictureId is > 0
+                            ? await client.GetPictureAsync(header.HeaderPictureId.Value, cancellationToken)
+                            : [];
+                    imageBytes = bytes.Length > 0 ? bytes : null;
+                }
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Detail-Kopfbild laden fehlgeschlagen");
+            }
+
+            await DispatchMessageAsync(new MediaDetailsHeaderImageLoadedMessage(
+                header.MediaType, header.MediaId,
+                header.HeaderPictureId, header.HeaderEpisodeId, imageBytes));
+        }
+
+        private async Task ToggleFavoriteAsync(ToggleFavoriteEffect toggle, CancellationToken cancellationToken)
+        {
+            bool? isFavorite = null;
+            try
+            {
+                // Erlaubtes Nutzungsdatum: Favoriten-Umschaltung über den
+                // Server (kein Inhalts-Schreibzugriff).
+                isFavorite = await services.Favorites.ToggleAsync(
+                    toggle.MediaType, toggle.MediaId, toggle.Title, cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Favoriten-Umschaltung fehlgeschlagen");
+            }
+
+            await DispatchMessageAsync(new FavoriteToggleCompletedMessage(
+                isFavorite, toggle.MediaType, toggle.MediaId));
+
+            if (isFavorite is not null)
+            {
+                // Die lokale Favoriten-Kopie wurde aktualisiert — die
+                // Startseiten-Liste lädt den neuen Stand nach.
+                await DispatchMessageAsync(new CachedListsChangedMessage());
+            }
         }
 
         private async Task LogoutAsync()

@@ -66,9 +66,8 @@ und von Reihe zu Reihe; die fokussierte Karte vergrößert sich
 sichtbar. Gespeicherte Inhalte erscheinen sofort, Aktualisierungen
 des Servers folgen automatisch im Hintergrund und bei jeder Rückkehr
 in den Vordergrund. Wähle einen Eintrag mit der Touch-Fläche: es
-öffnet sich das vorbereitete Ziel mit einem Hinweis — die
-Detailansicht und die Wiedergabe folgen in späteren Schritten.
-Zurück geht es mit der Menü-Taste oder „Zurück". Ohne
+öffnet sich die Detailansicht des Mediums (siehe Schritt 7).
+Zurück geht es mit der Menü-Taste. Ohne
 Serververbindung zeigt die Startseite die lokal gespeicherten
 Bereiche mit einem Offline-Hinweis; leere Reihen entfallen.
 
@@ -83,10 +82,31 @@ den Suchtext ein; er bleibt sichtbar und filtert die Liste ab der
 ersten Seite. Liefert die Quelle Genres, erscheint eine
 Filterleiste — „Alle" zeigt die ungefilterte Liste. Das Poster-Raster
 darunter zeigt Titel und Vorschaubilder und lädt am Listenende
-selbsttätig weitere Einträge nach. Eintrags-Auswahl öffnet das
-vorbereitete Ziel (Detailansicht folgt später); die Menü-Taste kehrt
+selbsttätig weitere Einträge nach. Eintrags-Auswahl öffnet die
+Detailansicht; die Menü-Taste kehrt
 zur Startseite zurück. Ladefehler zeigen „Erneut versuchen" — sowohl
 bei der Quellen-Reihe als auch in der Browsing-Seite.
+
+### 7. Detailansicht nutzen
+
+Die Detailansicht zeigt zu einem Film, einer Filmsammlung, einer
+Serie, einer Staffel oder einer Episode Titel, Jahr, Genres,
+Beschreibung und Bildmaterial. Markierungen kennzeichnen gesehene
+Inhalte („✓ Gesehen"), lokal vorhandene Dateien („Auf diesem Gerät")
+und einen Offline-Stand ohne Serververbindung. Bei Serien wählst du
+Staffeln über die Reihe der Staffel-Kacheln; darunter liegt die
+Episodenreihe — jede Episode zeigt Gesehen-Status und den
+lokalen-Datei-Hinweis, nicht geladene Offline-Episoden sind als
+„nicht heruntergeladen" abgedunkelt. Eine Episode oder ein Film der
+Sammlung öffnet die eigene Detailansicht; die Menü-Taste führt eine
+Ebene zurück. Die Aktionsleiste bietet „Abspielen" (bei Filmen und
+Episoden), „Herunterladen" sowie „★/☆ Favorit" — die
+Favoriten-Markierung gilt sofort auf dem Server und in der App;
+Abspielen und Download sind vorbereitete Einstiege für die nächsten
+Ausbauschritte und lösen keinen Fehler aus. Ohne Serververbindung
+zeigt die Seite den gespeicherten Stand mit deaktiviertem
+Favoriten-Schalter und ohne Download-Aktion; „Abspielen" bleibt bei
+vorhandener lokaler Datei verfügbar.
 
 ## Barrierefreiheit
 

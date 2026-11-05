@@ -26,7 +26,7 @@ Die App koppelt sich beim Erststart über einen vom Server erzeugten Einmal-QR-C
 |-----------|--------|
 | Windows | Unterstützt (primäres Entwicklungsziel, E2E-getestet) |
 | iOS | Unterstützt (Geräte-Deployment via Pair-to-Mac) |
-| tvOS | Eigenständige App `VideoPlayer.TvOS` (nativ, kein MAUI) — MVU-Grundgerüst mit fernbedienbarer Tab-Navigation, vollständiger Serververbindung (Erkennung, Pairing-/Kurzcode-Kopplung, Anmeldung, Serverwechsel), Lean-back-Startseite mit fokussierbaren Karussells (Cache-First) sowie Browsing und Suche (Quellen-Auswahl, Genre-Filter, seitenweises Poster-Raster, Suche per Diktat/Continuity-Tastatur); Kompilierbarkeit via macOS-CI-Job `build-tvos` gesichert |
+| tvOS | Eigenständige App `VideoPlayer.TvOS` (nativ, kein MAUI) — MVU-Grundgerüst mit fernbedienbarer Tab-Navigation, vollständiger Serververbindung (Erkennung, Pairing-/Kurzcode-Kopplung, Anmeldung, Serverwechsel), Lean-back-Startseite mit fokussierbaren Karussells (Cache-First), Browsing und Suche (Quellen-Auswahl, Genre-Filter, seitenweises Poster-Raster, Suche per Diktat/Continuity-Tastatur) sowie Detailansichten für Film/Sammlung/Serie/Staffel/Episode (Staffel- und Episodenauswahl, Gesehen-/lokale-Datei-Kennzeichnung, Favoriten-Umschaltung, Offline-Snapshot; Wiedergabe-/Download-Einstiege vorbereitet); Kompilierbarkeit via macOS-CI-Job `build-tvos` gesichert |
 | MacCatalyst | Baubar, nicht aktiv gepflegt |
 | Android | Build möglich, **nicht offiziell unterstützt** — kein Test-/CI-Gate |
 
@@ -56,7 +56,7 @@ dotnet build .\VideoPlayer.Maui\VideoPlayer.Maui.csproj -f net10.0-windows10.0.1
 | Projekt | Zweck |
 |---------|-------|
 | `VideoPlayer.Maui` | Die App (MVU-Architektur): Seitenmenü, Serververwaltung, Startseite, Quellen-Browsing, Detailseiten, Wiedergabe/PiP, Downloads, Offline-Modus |
-| `VideoPlayer.TvOS` | Eigenständige Apple-TV-App (`net10.0-tvos`, UIKit): Lean-back-Player auf dem plattformneutralen MVU-Kern — Effekt-Handler, Plattform-Adapter (Einstellungen, Schlüsselbund, Ablage, Netzwerk), `UITabBarController`-Navigation, Startseiten-Karussells (`UICollectionView`, Poster-Cache) und Quellen-Browsing mit Suche (Genre-Filter, seitenweises Poster-Raster, Systemtastatur/Diktat); TFM nur unter macOS aktiv (`IncludeTvOsTarget`-Schalter, sonst leere `net10.0`-Bibliothek) |
+| `VideoPlayer.TvOS` | Eigenständige Apple-TV-App (`net10.0-tvos`, UIKit): Lean-back-Player auf dem plattformneutralen MVU-Kern — Effekt-Handler, Plattform-Adapter (Einstellungen, Schlüsselbund, Ablage, Netzwerk), `UITabBarController`-Navigation, Startseiten-Karussells (`UICollectionView`, Poster-Cache), Quellen-Browsing mit Suche (Genre-Filter, seitenweises Poster-Raster, Systemtastatur/Diktat) und modal gestapelte Detailansichten aller Medientypen (Favoriten-Toggle, Staffel-/Episoden-Fokus, Offline-Snapshot); TFM nur unter macOS aktiv (`IncludeTvOsTarget`-Schalter, sonst leere `net10.0`-Bibliothek) |
 | `VideoPlayer.Mvu` | Plattformneutrale MVU-Schicht: Modell, Update, Effekte; Authentifizierung, Synchronisation, Ereignisverbindung, Pairing-Flows |
 | `VideoPlayer.ApiClient` | Zugriff auf die öffentliche Server-API: Pairing/Bootstrap (ECDH-nistP256 + AES-256-GCM), Refresh/Logout, Server-Discovery |
 | `VideoPlayer.Storage` | Lokale Datenhaltung: SQLite-Cache, Einstellungen, Geheimnis-Ablage (`SecureStorage`), Download-Manifest, schaltbares Programmprotokoll (Datei-Logging mit Ablauf-Einträgen, Token-Maskierung und Rotation) |

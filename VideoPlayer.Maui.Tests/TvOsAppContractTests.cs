@@ -112,7 +112,15 @@ public class TvOsAppContractTests
         Assert.Contains("ConnectionClosed", handler, StringComparison.Ordinal);
     }
 
-    /// <summary>Prüft: der Handler verdrahtet die für tvOS nicht vorgesehenen Bereiche nicht.</summary>
+    /// <summary>
+    /// Prüft: der Handler verdrahtet die für tvOS nicht vorgesehenen
+    /// Bereiche nicht — Playlist-/Inhalts-Verwaltung, Auto-Download,
+    /// PiP und Protokollversand bleiben No-Op. Das manuelle
+    /// Download-Einreihen ist seit dem Detailseiten-Schritt lediglich
+    /// als vorbereitete Aktion verdrahtet (Hinweis statt
+    /// DownloadService-Aufruf) — echter Download-Code existiert im
+    /// Handler nicht.
+    /// </summary>
     [Fact]
     public void TvOsEffectHandler_DoesNotWireExcludedAreas()
     {
@@ -122,11 +130,16 @@ public class TvOsAppContractTests
         Assert.DoesNotContain("DeletePlaylistEffect", handler, StringComparison.Ordinal);
         Assert.DoesNotContain("RemovePlaylistEntryEffect", handler, StringComparison.Ordinal);
         Assert.DoesNotContain("AddPlaylistEntryEffect", handler, StringComparison.Ordinal);
-        Assert.DoesNotContain("EnqueueDownloadEffect", handler, StringComparison.Ordinal);
         Assert.DoesNotContain("RunAutoDownloadsEffect", handler, StringComparison.Ordinal);
         Assert.DoesNotContain("TogglePictureInPictureEffect", handler, StringComparison.Ordinal);
         Assert.DoesNotContain("SendLogProtocolEffect", handler, StringComparison.Ordinal);
         Assert.DoesNotContain("MediaElement", handler, StringComparison.Ordinal);
+
+        // Kein echter Download-Schreibpfad: EnqueueDownloadEffect läuft
+        // auf die vorbereitete Hinweis-Rückmeldung, nicht auf den
+        // DownloadService (der kommt mit dem Download-Schritt).
+        Assert.DoesNotContain("DownloadService", handler, StringComparison.Ordinal);
+        Assert.DoesNotContain("EnqueueAsync", handler, StringComparison.Ordinal);
     }
 
     /// <summary>Prüft: die Komposition verdrahtet die Kerndienste und den MVU-Host.</summary>

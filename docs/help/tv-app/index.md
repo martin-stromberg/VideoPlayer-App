@@ -11,7 +11,11 @@ lokalen Cache mit Servernachladung. Das Browsing ist als
 Lean-back-Oberfläche umgesetzt: Quellen-Auswahl auf der Startseite,
 modale Browsing-Seite mit Genre-Filter („Alle"), Suchfeld
 (Diktat/Continuity-Tastatur) und seitenweise nachladendem
-Poster-Raster; Einträge öffnen ein vorbereitetes Navigationsziel.
+Poster-Raster. Detailansichten für Film, Filmsammlung, Serie, Staffel
+und Episode zeigen Bildmaterial, Metadaten, Gesehen-/lokale-Datei-
+Kennzeichnung, Staffel- und Episodenauswahl sowie die Aktionen
+Abspielen (vorbereitet), Download (vorbereitet) und Favoriten-Umschaltung;
+offline greift der gespeicherte Detail-Snapshot.
 Kompilierbarkeit wird über einen macOS-CI-Job fortlaufend gesichert.
 
 ## Inhalt
