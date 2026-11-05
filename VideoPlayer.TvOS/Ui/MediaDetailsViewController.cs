@@ -57,7 +57,7 @@ namespace VideoPlayer.TvOS.Ui
         private UILabel? episodesHeading;
         private UIView? episodesHeadingWrap;
         private HomeCarouselView? moviesCarousel;
-        private UIView? contentView;
+        private UIStackView? contentView;
         private UIStackView? stateView;
         private UILabel? stateLabel;
         private UIButton? retryButton;
@@ -120,7 +120,7 @@ namespace VideoPlayer.TvOS.Ui
             };
             View.AddSubview(scroll);
 
-            contentView = new UIStackView
+            var contentStack = new UIStackView
             {
                 Axis = UILayoutConstraintAxis.Vertical,
                 Alignment = UIStackViewAlignment.Fill,
@@ -128,12 +128,13 @@ namespace VideoPlayer.TvOS.Ui
                 Spacing = 34,
                 TranslatesAutoresizingMaskIntoConstraints = false
             };
-            scroll.AddSubview(contentView);
+            contentView = contentStack;
+            scroll.AddSubview(contentStack);
 
-            BuildHeader(contentView);
-            BuildSeasonSection(contentView);
-            BuildEpisodesSection(contentView);
-            BuildMoviesSection(contentView);
+            BuildHeader(contentStack);
+            BuildSeasonSection(contentStack);
+            BuildEpisodesSection(contentStack);
+            BuildMoviesSection(contentStack);
 
             // Lade-/Fehlerzustand über dem Scrollbereich — er bleibt
             // sichtbar, solange der Inhalt verborgen ist.
@@ -154,11 +155,11 @@ namespace VideoPlayer.TvOS.Ui
                 scroll.TopAnchor.ConstraintEqualTo(View.TopAnchor),
                 scroll.BottomAnchor.ConstraintEqualTo(View.BottomAnchor),
 
-                contentView.LeadingAnchor.ConstraintEqualTo(scroll.ContentLayoutGuide.LeadingAnchor),
-                contentView.TrailingAnchor.ConstraintEqualTo(scroll.ContentLayoutGuide.TrailingAnchor),
-                contentView.TopAnchor.ConstraintEqualTo(scroll.ContentLayoutGuide.TopAnchor),
-                contentView.BottomAnchor.ConstraintEqualTo(scroll.ContentLayoutGuide.BottomAnchor),
-                contentView.WidthAnchor.ConstraintEqualTo(scroll.FrameLayoutGuide.WidthAnchor),
+                contentStack.LeadingAnchor.ConstraintEqualTo(scroll.ContentLayoutGuide.LeadingAnchor),
+                contentStack.TrailingAnchor.ConstraintEqualTo(scroll.ContentLayoutGuide.TrailingAnchor),
+                contentStack.TopAnchor.ConstraintEqualTo(scroll.ContentLayoutGuide.TopAnchor),
+                contentStack.BottomAnchor.ConstraintEqualTo(scroll.ContentLayoutGuide.BottomAnchor),
+                contentStack.WidthAnchor.ConstraintEqualTo(scroll.FrameLayoutGuide.WidthAnchor),
 
                 stateView.CenterXAnchor.ConstraintEqualTo(View.CenterXAnchor),
                 stateView.CenterYAnchor.ConstraintEqualTo(View.CenterYAnchor),
