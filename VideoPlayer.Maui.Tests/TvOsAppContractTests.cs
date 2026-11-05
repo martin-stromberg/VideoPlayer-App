@@ -189,8 +189,8 @@ public class TvOsAppContractTests
         var loading = TvOsFile("Ui", "LoadingViewController.cs");
         Assert.Contains("UIActivityIndicatorView", loading, StringComparison.Ordinal);
 
-        var statePage = TvOsFile("Ui", "ConnectionStatePageViewController.cs");
-        Assert.Contains("UIButton", statePage, StringComparison.Ordinal);
+        var setupPage = TvOsFile("Ui", "ServerSetupViewController.cs");
+        Assert.Contains("UIButton", setupPage, StringComparison.Ordinal);
 
         var main = TvOsFile("MainViewController.cs");
         Assert.Contains("AddChildViewController", main, StringComparison.Ordinal);

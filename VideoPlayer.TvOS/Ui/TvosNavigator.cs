@@ -8,7 +8,7 @@ namespace VideoPlayer.TvOS.Ui
     /// Modellgetriebene Navigation des tvOS-Seitenrahmens — Pendant zur
     /// <c>NavigateAsync</c>-Logik des <c>ShellAppEffectHandler</c>: bildet
     /// <see cref="AppModel.CurrentPage"/> und den Verbindungszustand auf den
-    /// Fensterinhalt ab (Ladeanzeige, Verbindungs-Zustandsseiten oder den
+    /// Fensterinhalt ab (Ladeanzeige, Verbindungs-Workflow-Seiten oder den
     /// Tab-Rahmen). Alle Darstellungswechsel sind idempotent.
     /// </summary>
     public sealed class TvosNavigator
@@ -17,8 +17,11 @@ namespace VideoPlayer.TvOS.Ui
 
         private MainViewController? main;
         private MenuTabBarController? tabBar;
-        private ConnectionStatePageViewController? serverSetupPage;
-        private ConnectionStatePageViewController? loginPage;
+        private ServerSetupViewController? serverSetupPage;
+        private LoginViewController? loginPage;
+
+        /// <summary>Die zuletzt dargestellte Menüseite — Rückziel der Menü-Taste auf Workflow-Seiten.</summary>
+        private AppPage LastMenuPage { get; set; } = AppPage.Home;
 
         /// <summary>Initialisiert eine neue Instanz der <see cref="TvosNavigator"/>-Klasse.</summary>
         /// <param name="dispatch">Rückmeldung in den MVU-Zyklus (Hauptthread).</param>
@@ -55,19 +58,18 @@ namespace VideoPlayer.TvOS.Ui
                     main.ShowLoading();
                     return Task.CompletedTask;
                 case AppPage.ServerSetup:
-                    serverSetupPage ??= new ConnectionStatePageViewController(
-                        "Server einrichten", RetryStartup);
+                    serverSetupPage ??= new ServerSetupViewController(dispatch, NavigateBackToMenu);
                     main.Show(serverSetupPage);
                     return Task.CompletedTask;
                 case AppPage.Login:
-                    loginPage ??= new ConnectionStatePageViewController(
-                        "Anmelden", RetryStartup);
+                    loginPage ??= new LoginViewController(dispatch, NavigateBackToMenu);
                     main.Show(loginPage);
                     return Task.CompletedTask;
                 default:
                     tabBar ??= new MenuTabBarController(dispatch);
                     if (tabBar.Select(page))
                     {
+                        LastMenuPage = page;
                         main.Show(tabBar);
                     }
 
@@ -78,52 +80,27 @@ namespace VideoPlayer.TvOS.Ui
         /// <summary>
         /// Spiegelt den aktuellen Modellstand auf die sichtbare Seite:
         /// stellt <see cref="AppModel.CurrentPage"/> dar (idempotent) und
-        /// aktualisiert Status-/Fehlertexte der Zustandsseiten.
+        /// verteilt das Modell an die Workflow-Seiten und die
+        /// modellgetriebenen Menüseiten.
         /// </summary>
         /// <param name="model">Das aktuelle App-Modell.</param>
         public void Render(AppModel model)
         {
             _ = NavigateTo(model.CurrentPage);
             main?.UpdateLoadingStatus(model.StartupStatusText, model.StorageNotice);
-            serverSetupPage?.UpdateStatus(ServerSetupStatusText(model), model.ServerSetupError ?? model.PairingError ?? model.BootstrapError);
-            loginPage?.UpdateStatus(LoginStatusText(model), model.LoginError);
+            serverSetupPage?.Render(model);
+            loginPage?.Render(model);
+            tabBar?.Render(model);
         }
 
-        private static string ServerSetupStatusText(AppModel model)
-        {
-            if (model.IsBootstrapRunning)
-            {
-                return "Kopplung mit dem Server läuft …";
-            }
-
-            if (model.IsPairingRunning)
-            {
-                return "Geräte-Kopplung läuft …";
-            }
-
-            if (model.IsServerCheckRunning)
-            {
-                return "Verbindung zum Server wird geprüft …";
-            }
-
-            if (model.IsDiscoveryRunning)
-            {
-                return "Suche nach Servern im Netzwerk läuft …";
-            }
-
-            return model.IsPairingRequired
-                ? "Der Server verlangt eine Geräte-Kopplung."
-                : "Es ist noch kein Server eingerichtet.";
-        }
-
-        private static string LoginStatusText(AppModel model)
-        {
-            return model.IsLoginRunning
-                ? "Anmeldung beim Server läuft …"
-                : "Anmeldung am Server erforderlich.";
-        }
-
-        private void RetryStartup() =>
-            _ = dispatch(new StartupRequestedMessage());
+        /// <summary>
+        /// Rückkehr von einer Workflow-Seite zur zuletzt dargestellten
+        /// Menüseite — die Zustandsprüfung des Updates
+        /// (<c>UpdateNavigateTo</c>) entscheidet, ob die Navigation
+        /// tatsächlich stattfindet.
+        /// </summary>
+        /// <returns>Die Dispatch-Aufgabe der Navigationsanforderung.</returns>
+        private Task NavigateBackToMenu() =>
+            dispatch(new NavigateToMessage(LastMenuPage));
     }
 }

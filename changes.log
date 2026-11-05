@@ -1,5 +1,29 @@
 # Änderungsprotokoll
 
+## 2026-11-06 — tvOS-App: Serververbindung — Einrichtung, Pairing und Anmeldung
+
+- **Einrichtungsseite (`ServerSetupViewController`):** vollständige
+  fernbedienungstaugliche Serververbindung — Liste bekannter Server,
+  Netzwerk-Erkennung (mDNS + UDP) mit Auswahl, manuelle Adresseingabe,
+  Ticket-/Kurzcode-Kopplung, Geräte-Pairing per Einmal-Code und
+  Zugangsdaten-Anmeldung, jeweils mit Lauf-, Leer- und Inline-
+  Fehlerzuständen (ungültiger/abgelaufener Code, Versuchssperre,
+  unerreichbarer Server, abgelehnte Anmeldung, verworfenes Geräte-Token)
+  sowie „Erneut prüfen".
+- **Anmeldemaske (`LoginViewController`):** Benutzername/Passwort mit
+  einmaliger Vorbefüllung, Kurzcode-Alternative und Ausstieg zur
+  Servereinrichtung.
+- **Menü-Einstiege:** „Server wechseln" auf der Einstellungsseite,
+  „Abmelden" auf der Profilseite (`LogoutRequestedMessage` +
+  `LogoutEffect` nun im `TvosAppEffectHandler` verdrahtet); bei
+  bestehender Verbindung führt die Menü-Taste der Siri Remote bzw.
+  „Zurück zum Menü" zurück in den Tab-Rahmen.
+- **Eingaben:** alle Textfelder nutzen die tvOS-Systemtastatur
+  (Diktat/Continuity-Tastatur); kein QR-Scan (keine Kamera).
+- **Absicherung:** neue `TvOsConnectionContractTests` (7 Quell-Contract-
+  Tests); Gesamtsuite `VideoPlayer.Maui.Tests`: 1460/1460 grün. Der
+  tvOS-Kompiliernachweis erfolgt über den macOS-CI-Job `build-tvos`.
+
 ## 2026-11-06 — tvOS-App: MVU-Grundgerüst, Plattform-Anbindung, Navigation und Fokus
 
 - **MVU-Verdrahtung:** `MvuHost` + `AppUpdate` laufen in der tvOS-App; der

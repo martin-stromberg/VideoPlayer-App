@@ -150,6 +150,9 @@ namespace VideoPlayer.TvOS.Services
                 case LoadHomeListsEffect:
                     await LoadHomeListsAsync();
                     break;
+                case LogoutEffect:
+                    await LogoutAsync();
+                    break;
                 default:
                     // Für tvOS nicht verdrahtete Bereiche (Downloads,
                     // Wiedergabe/PiP, Inhalts-/Playlist-Verwaltung,
@@ -664,6 +667,20 @@ namespace VideoPlayer.TvOS.Services
             }
 
             await DispatchMessageAsync(new HomeListsLoadedMessage(lists));
+        }
+
+        private async Task LogoutAsync()
+        {
+            try
+            {
+                await authSession.LogoutAsync();
+                // Der Erfolgs-Eintrag obliegt AuthSessionService (eine
+                // Schicht pro Ereignis) — hier nur der Fehlerpfad.
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Abmeldung fehlgeschlagen");
+            }
         }
 
         private void OnSessionExpired(object? sender, EventArgs e) =>
