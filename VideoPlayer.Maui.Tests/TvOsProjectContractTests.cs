@@ -53,16 +53,28 @@ public class TvOsProjectContractTests
     }
 
     /// <summary>
-    /// Prüft: das tvOS-Projekt referenziert keine NuGet-Pakete und kein
-    /// MAUI (UseMaui) — die leere Programmhülle kommt ohne externe
-    /// Abhängigkeiten aus.
+    /// Prüft: das tvOS-Projekt referenziert keine NuGet-Pakete mit
+    /// beitragenden Assets und kein MAUI (UseMaui) — die App-Hülle kommt
+    /// ohne externe Abhängigkeiten aus. Zulässig sind lediglich
+    /// wirkungslose Unterdrückungs-Referenzen (`ExcludeAssets="all"`),
+    /// mit denen defekte transitive Native-Assets abgeklemmt werden —
+    /// konkret `SQLitePCLRaw.lib.e_sqlite3.tvos`, dessen eingebettetes
+    /// e_sqlite3.a keine tvossimulator-arm64-Slice enthält (siehe
+    /// docs/help/tv-app/installation.md).
     /// </summary>
     [Fact]
     public void TvOsProject_HasNoPackageReferencesOrMaui()
     {
         var project = LoadProject();
 
-        Assert.Empty(project.Descendants("PackageReference"));
+        var contributingReferences = project.Descendants("PackageReference")
+            .Where(element => !string.Equals(
+                element.Attribute("ExcludeAssets")?.Value,
+                "all",
+                StringComparison.OrdinalIgnoreCase))
+            .ToArray();
+
+        Assert.Empty(contributingReferences);
         Assert.Empty(project.Descendants("UseMaui"));
     }
 

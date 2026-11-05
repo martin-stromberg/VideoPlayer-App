@@ -1,5 +1,40 @@
 # Änderungsprotokoll
 
+## 2026-11-06 — tvOS-App: Fix nativer Linkfehler `e_sqlite3` unter `tvossimulator-arm64`
+
+- **Befund:** `SQLitePCLRaw.lib.e_sqlite3.tvos` (transitiv via
+  `bundle_green`, alle Versionen bis einschließlich 2.1.14) bettet ein
+  `e_sqlite3.a` ein, das nur `tvos-arm64` (Gerät) und `tvossimulator-x64`
+  enthält — die `tvossimulator-arm64`-Slice fehlt, der `build-tvos`-Job
+  scheiterte beim Linken (`ld: ... built for 'tvOS'`).
+- **Fix:** Die `e_sqlite3.a` aus `SQLitePCLRaw.lib.e_sqlite3` 3.53.3
+  (iOS/ios-simulator) unterscheidet sich von einem tvOS-Build nur im
+  Plattform-Tag der Mach-O-Objekte — `scripts/Retag-Esqlite3-For-Tvos.py`
+  schreibt `LC_BUILD_VERSION` (7→8) bzw. `LC_VERSION_MIN_IPHONEOS`
+  (0x25→0x2f) um und erzeugt die eingecheckten Archive
+  `VideoPlayer.TvOS/NativeLibs/e_sqlite3.tvossimulator.a`
+  (x86_64+arm64-Simulator) und `e_sqlite3.tvos-arm64.a` (Gerät):
+  - `VideoPlayer.TvOS.csproj` unterdrückt das transitive
+    `SQLitePCLRaw.lib.e_sqlite3.tvos` per `ExcludeAssets="all"` (nur unter
+    `IncludeTvOsTarget=true`) und linkt die retaggten Archive als
+    `NativeReference` RID-konditioniert (`Static`, `ForceLoad`).
+  - `SqliteBootstrap`/Storage bleiben unverändert: der upstream-Pfad
+    `Batteries_V2.Init()` → `provider.internal` → `__Internal` löst die
+    Symbole aus der gelinkten `e_sqlite3.a` — keine Auswirkung auf
+    iOS/Android/Windows/macOS.
+  - Verworfen: Provider-Wechsel auf System-`libsqlite3.dylib` (tvOS
+    exportiert `sqlite3_load_extension`/`sqlite3_enable_load_extension`
+    nicht; `-U`-Linkerflags erwiesen sich als Sackgasse) — Details in
+    `docs/help/tv-app/installation.md`.
+- **Contract-Test:** `TvOsProject_HasNoPackageReferencesOrMaui` lässt
+  jetzt wirkungslose Unterdrückungs-Referenzen (`ExcludeAssets="all"`)
+  zu und blockiert weiterhin jede Paket-Referenz mit beitragenden
+  Assets.
+- **Absicherung:** `dotnet build VideoPlayer.App.sln` grün,
+  `VideoPlayer.Maui.Tests` 1472/1472 grün; tvOS-Link verifiziert über
+  den macOS-CI-Job `build-tvos` (Run 42110023939 — beide Jobs grün).
+  Details: `docs/help/tv-app/installation.md` (Paketkompatibilität).
+
 ## 2026-11-06 — tvOS-App: Serververbindung — Einrichtung, Pairing und Anmeldung
 
 - **Einrichtungsseite (`ServerSetupViewController`):** vollständige

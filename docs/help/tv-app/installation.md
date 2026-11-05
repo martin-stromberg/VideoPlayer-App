@@ -73,16 +73,76 @@ tvOS nicht).
 
 | Paket | Version | Ergebnis |
 |-------|---------|----------|
-| `SQLitePCLRaw.lib.e_sqlite3` | 3.53.3 | kompatibel — natives tvOS-Asset vorhanden (`net6.0-tvos` bis `net10.0-tvos` in den kompatiblen TFMs gelistet) |
-| `SQLitePCLRaw.bundle_green` | 2.1.11 | kompatibel (`netstandard2.0`-Bundle, wählt `e_sqlite3`) |
-| `sqlite-net-pcl` | 1.11.285 | kompatibel (`netstandard2.0`) |
+| `SQLitePCLRaw.lib.e_sqlite3` | 3.53.3 | unter tvOS ohne natives Asset — das Paket liefert `runtimes/`-Ordner nur für iOS/Android/macOS/Windows/Linux, die tvOS-RID-Kette (`tvossimulator-arm64 → tvos → unix`) fällt **nicht** auf iOS zurück; Beitrag unter tvOS daher nur die verwaltete `netstandard2.0`-Assembly |
+| `SQLitePCLRaw.bundle_green` | 2.1.11 | kompatibel — zieht für `net6.0-tvos` transitiv `SQLitePCLRaw.lib.e_sqlite3.tvos` + `SQLitePCLRaw.provider.internal` (siehe Sonderregelung unten) |
+| `SQLitePCLRaw.lib.e_sqlite3.tvos` | 2.1.11 | **Linkfehler unter `tvossimulator-arm64`** — siehe Sonderregelung unten |
+| `sqlite-net-pcl` | 1.11.285 | kompatibel (`netstandard2.0`); zieht `SQLitePCLRaw.provider.sqlite3` ≥ 3.0.3 transitiv |
+| `SQLitePCLRaw.provider.sqlite3` | 3.0.3 | kompatibel (rein verwaltet, `DllImport("sqlite3")` → System-`libsqlite3.dylib`) |
 | `SQLitePCLRaw.lib.e_sqlite3.android` | 2.1.13 | unproblematisch — Android-RID-Zusatz, unter tvOS ohne Wirkung |
 | `Zeroconf` | 3.7.16 | kompilierbar (`netstandard`, rein verwaltete UDP/mDNS-Implementierung) — **Laufzeitrisiko:** mDNS-Multicast verlangt auf tvOS-Geräten das Entitlement `com.apple.developer.networking.multicast` sowie `NSLocalNetworkUsageDescription` + `NSBonjourServices` (`_http._tcp`); die `Info.plist` ist vorbereitet. **Ausweichvorschlag bei Inkompatibilität:** UDP-only-/Broadcast-Discovery bzw. direkte Servereingabe — `UdpServerDiscovery` in `VideoPlayer.ApiClient` ist der vorhandene Referenzpfad |
 | `Microsoft.Extensions.Logging.Abstractions` | 10.0.10 | kompatibel (plattformneutral) |
 
-Kein Paket ist inkompatibel; kein Ersatz erforderlich. Die einzige
-Einschränkung ist das dokumentierte Multicast-Entitlement-Risiko von
-`Zeroconf` auf echten Geräten (Simulator meist unbetroffen).
+### Sonderregelung SQLite unter tvOS (retaggte e_sqlite3-Archive)
+
+`SQLitePCLRaw.lib.e_sqlite3.tvos` bettet `e_sqlite3.a` als Ressource in die
+verwaltete Assembly ein. Die Analyse des fat archive (alle Versionen bis
+einschließlich 2.1.14, Stand 2026-11) ergab nur zwei Slices:
+
+| Slice | `LC_BUILD_VERSION`-Plattform |
+|-------|------------------------------|
+| `x86_64` | `tvossimulator` (8) |
+| `arm64` | `tvos` (3) — **Gerät, kein Simulator** |
+
+Eine `tvossimulator-arm64`-Slice existiert in keiner veröffentlichten
+Version. Der `build-tvos`-Job (RID `tvossimulator-arm64`) schlug deshalb
+beim nativen Linken fehl:
+
+```
+ld: building for 'tvOS-simulator', but linking in object file
+  (.../linker-cache/e_sqlite3.a[arm64][2](sqlite3.o)) built for 'tvOS'
+```
+
+**Lösung (Plattform-Tag der iOS-Archive umschreiben):**
+
+Die `e_sqlite3.a` aus `SQLitePCLRaw.lib.e_sqlite3` 3.53.3
+(`runtimes/ios-arm64` bzw. `runtimes/iossimulator-*`) unterscheidet sich
+von einem tvOS-Build nur im Plattform-Tag der Mach-O-Objekte —
+Architektur, ABI und Funktionsumfang sind identisch (Simulator- und
+Geräte-Plattformen teilen das SDK-Featureset; SQLite ist reines
+POSIX-C). Das Skript `scripts/Retag-Esqlite3-For-Tvos.py` schreibt das
+Plattformfeld um (`LC_BUILD_VERSION` 7→8 bzw. ältere
+`LC_VERSION_MIN_IPHONEOS`-Kommandos 0x25→0x2f/`LC_VERSION_MIN_TVOS`) und
+erzeugt die eingecheckten Archive unter `VideoPlayer.TvOS/NativeLibs/`:
+
+| Datei | Quelle | Slices |
+|-------|--------|--------|
+| `e_sqlite3.tvossimulator.a` | `runtimes/iossimulator-arm64` (fat) | `x86_64` + `arm64`, je `tvossimulator` |
+| `e_sqlite3.tvos-arm64.a` | `runtimes/ios-arm64` (thin) | `arm64`, `tvos` |
+
+- `VideoPlayer.TvOS.csproj` unterdrückt das transitive
+  `SQLitePCLRaw.lib.e_sqlite3.tvos` per Direktreferenz mit
+  `ExcludeAssets="all"` (nur unter `IncludeTvOsTarget=true`) und linkt
+  stattdessen die retaggten Archive als `NativeReference`
+  (`Kind=Static`, `ForceLoad`, `SmartLink=false`), RID-konditioniert
+  (`tvos-arm64` vs. Simulator-RIDs).
+- Der verwaltete Pfad bleibt unverändert der upstream-vorgesehene:
+  `Batteries_V2.Init()` → `SQLite3Provider_internal` →
+  `DllImport("__Internal")` löst die `sqlite3_*`-Symbole aus der
+  statisch gelinkten `e_sqlite3.a` — auf Gerät **und** Simulator. Eine
+  Änderung an `SqliteBootstrap` oder den übrigen Plattformen ist nicht
+  erforderlich.
+
+#### Verworfene Alternative: System-libsqlite3
+
+Ein Provider-Wechsel auf `SQLitePCLRaw.provider.sqlite3`
+(System-`libsqlite3.dylib`) funktioniert auf tvOS **nicht** ohne
+Weiteres: die tvOS-Bibliothek exportiert — anders als iOS/macOS —
+`sqlite3_load_extension`/`sqlite3_enable_load_extension` nicht
+(`SQLITE_OMIT_LOAD_EXTENSION`), die ILC-Wrapper der
+`SQLitePCLRaw.provider.*`-Assemblies referenzieren die Symbole aber
+statisch (`Undefined symbols for architecture arm64`). `-U`-Linkerflags
+als Ausweg wurden geprüft und verworfen — der retaggte e_sqlite3-Pfad
+ist funktionsgleich mit den übrigen Plattformen und ohne Symbollücken.
 
 ## Überprüfung
 
