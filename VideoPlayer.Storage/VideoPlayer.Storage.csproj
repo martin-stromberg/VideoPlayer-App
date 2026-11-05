@@ -18,16 +18,6 @@
     <PackageReference Include="SQLitePCLRaw.bundle_green" Version="2.1.11" />
     <PackageReference Include="SQLitePCLRaw.lib.e_sqlite3" Version="3.53.3" />
     <PackageReference Include="SQLitePCLRaw.lib.e_sqlite3.android" Version="2.1.13" />
-    <!-- Rein verwalteter Provider für die System-libsqlite3 — kommt
-         bereits transitiv via sqlite-net-pcl (>= 3.0.3) herein, die
-         Direktreferenz fixiert nur die Version und macht die Nutzung in
-         SqliteBootstrap explizit. Aktiviert wird der Provider
-         ausschließlich unter tvOS zur Laufzeit:
-         SQLitePCLRaw.lib.e_sqlite3.tvos liefert kein
-         tvossimulator-arm64-Binary, der Simulator-Link schlägt dort sonst
-         fehl. Auf Windows/Android/macOS bleibt die Assembly ungenutzt
-         (kein Verhaltenswechsel). -->
-    <PackageReference Include="SQLitePCLRaw.provider.sqlite3" Version="3.0.3" />
   </ItemGroup>
   <ItemGroup>
     <None Include="../LICENSE" Pack="true" PackagePath="\" />

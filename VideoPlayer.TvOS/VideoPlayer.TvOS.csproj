@@ -57,24 +57,29 @@
          tvossimulator-arm64-Slice — womit der Simulator-Link auf
          Apple-Silicon fehlschlaegt (ld: object file built for 'tvOS').
          Auch das neueste Paket 2.1.14 hat diese Luecke. Die Direktreferenz
-         mit ExcludeAssets unterdrueckt das native Archiv; SqliteBootstrap
-         waehlt unter tvOS stattdessen die System-libsqlite3
-         (SQLitePCLRaw.provider.sqlite3, DllImport 'sqlite3'). -->
+         mit ExcludeAssets unterdrueckt das native Archiv; ersetzt wird es
+         unten durch RID-passende, selbst retaggte Archive (siehe
+         scripts/Retag-Esqlite3-For-Tvos.py und
+         docs/help/tv-app/installation.md). -->
     <PackageReference Include="SQLitePCLRaw.lib.e_sqlite3.tvos" Version="2.1.11" ExcludeAssets="all" />
-    <!-- Die System-libsqlite3 explizit gegen den Simulator-/Geraete-Link
-         legen (ILC-Item -> '-lsqlite3'). -->
-    <NativeSystemLibrary Include="sqlite3" />
-    <!-- tvOS-libsqlite3 exportiert — anders als iOS/macOS — die
-         Load-Extension-API nicht (SQLITE_OMIT_LOAD_EXTENSION). Die
-         SQLitePCLRaw.provider.*-Assemblies deklarieren die P/Invokes
-         trotzdem, ihre ILC-Wrapper erzeugen direkte Symbolreferenzen.
-         Mit '-U' darf das Symbol beim statischen Link undefiniert bleiben;
-         es wird per dyld erst bei Aufruf gebunden — und die Methoden
-         werden nie aufgerufen (sqlite-net nutzt sie nicht). -->
-    <ExtraLinkerArg Include="-U" />
-    <ExtraLinkerArg Include="_sqlite3_load_extension" />
-    <ExtraLinkerArg Include="-U" />
-    <ExtraLinkerArg Include="_sqlite3_enable_load_extension" />
+    <!-- Retaggte e_sqlite3-Archive aus SQLitePCLRaw.lib.e_sqlite3 3.53.3:
+         das Plattform-Tag (LC_BUILD_VERSION/LC_VERSION_MIN) wurde von
+         ios/iossimulator auf tvos/tvossimulator umgeschrieben — Inhalt
+         und Slices sind unveraendert, damit bleibt der upstream-
+         vorgesehene Provider-Pfad (Batteries_V2/internal -> __Internal)
+         auf allen RIDs funktionsfaehig. -->
+    <NativeReference Include="NativeLibs\e_sqlite3.tvos-arm64.a"
+                     Condition="'$(RuntimeIdentifier)' == 'tvos-arm64'">
+      <Kind>Static</Kind>
+      <ForceLoad>true</ForceLoad>
+      <SmartLink>false</SmartLink>
+    </NativeReference>
+    <NativeReference Include="NativeLibs\e_sqlite3.tvossimulator.a"
+                     Condition="'$(RuntimeIdentifier)' != 'tvos-arm64'">
+      <Kind>Static</Kind>
+      <ForceLoad>true</ForceLoad>
+      <SmartLink>false</SmartLink>
+    </NativeReference>
   </ItemGroup>
   <ItemGroup>
     <None Include="../LICENSE" Pack="true" PackagePath="\" />
