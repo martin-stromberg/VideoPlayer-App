@@ -434,3 +434,6 @@ issue.md
 
 # Lokale iOS-Deployment-Konfiguration (Signatur/Provision, benutzerspezifisch)
 .ios-deploy.user.json
+
+# E2E-Testartefakte (Prozesslogs)
+.work/
