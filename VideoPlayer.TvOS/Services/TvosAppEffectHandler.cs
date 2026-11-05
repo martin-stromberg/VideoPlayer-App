@@ -150,6 +150,41 @@ namespace VideoPlayer.TvOS.Services
                 case LoadHomeListsEffect:
                     await LoadHomeListsAsync();
                     break;
+                case NavigateToMediaDetailsEffect details:
+                    // Vorbereitetes Navigationsziel der Eintrags-Auswahl —
+                    // die eigentliche Detailansicht entsteht im
+                    // Detailseiten-Schritt; der Platzhalter löst keinen
+                    // Fehler aus (Hauptthread: UIKit-Präsentation).
+                    await MainThreadInvoker.InvokeOnMainThreadAsync(() =>
+                    {
+                        navigator.PresentPreparedTarget(
+                            details.Title,
+                            "Die Detailansicht folgt in einem späteren Entwicklungsschritt.");
+                        return Task.CompletedTask;
+                    });
+                    break;
+                case NavigateToPlayerEffect:
+                    // Vorbereitetes Ziel des Wiedergabestarts — die
+                    // eigentliche Wiedergabe entsteht im Wiedergabe-Schritt.
+                    await MainThreadInvoker.InvokeOnMainThreadAsync(() =>
+                    {
+                        navigator.PresentPreparedTarget(
+                            services.Host.Model.Player.Title ?? "Wiedergabe",
+                            "Die Wiedergabe folgt in einem späteren Entwicklungsschritt.");
+                        return Task.CompletedTask;
+                    });
+                    break;
+                case StartPlaylistPlaybackEffect:
+                    // Playlist-gebundene Weiterschauen-Einträge landen auf
+                    // demselben vorbereiteten Wiedergabeziel.
+                    await MainThreadInvoker.InvokeOnMainThreadAsync(() =>
+                    {
+                        navigator.PresentPreparedTarget(
+                            "Wiedergabe",
+                            "Die Playlist-Wiedergabe folgt in einem späteren Entwicklungsschritt.");
+                        return Task.CompletedTask;
+                    });
+                    break;
                 case LogoutEffect:
                     await LogoutAsync();
                     break;

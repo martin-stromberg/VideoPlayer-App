@@ -48,6 +48,26 @@ Wiederholung. „Server wechseln" ist über die Einstellungsseite,
 führt die Menü-Taste der Siri Remote aus der Einrichtung zurück ins
 Menü.
 
+Die Startseite ist eine Lean-back-Ansicht mit vertikal gestapelten,
+horizontalen Karussell-Reihen (`UICollectionView` mit
+Fokus-Hervorhebung): „Weiterschauen" mit Fortschrittsbalken (und
+Platzhalter-Kennzeichnung nicht abspielbarer Offline-Einträge),
+„Favoriten", „Neu im Programm" sowie die saisonalen Genre-Sektionen
+des Servers (mit Ablauf-Timer, der beim Erreichen der
+Ablaufgrenze nachlädt). Die Listen folgen dem Cache-First-Prinzip der
+App: gespeicherte Daten erscheinen sofort, Aktualisierung läuft über
+Synchronisation im Hintergrund, Server-Ereignisse (SignalR) und bei
+jeder Rückkehr in den Vordergrund. Poster werden über
+`api/pictures/{id}` vom Server nachgeladen und dreistufig
+zwischengespeichert (Arbeitsspeicher, Datei im Cache-Verzeichnis,
+Serverabruf); fehlende Bilder erhalten einen Titel-Platzhalter. Die
+Auswahl eines Eintrags führt auf ein vorbereitetes
+Navigationsziel: ein modaler Hinweis (Menü-Taste oder „Zurück"
+schließt) — die eigentliche Detailansicht und die Wiedergabe
+folgen in späteren Entwicklungsschritten. Im Offline-Zustand zeigt die
+Startseite die aus lokalen Daten gespeisten Bereiche samt Hinweis;
+leere Listen blenden ihre Sektion aus.
+
 Plattform-Anschlüsse: `NSUserDefaults` für nicht-geheime Einstellungen,
 Schlüsselbund (`SecKeyChain`, Generic Password) für Zugangsdaten und
 Geräte-Tokens, `Library/Caches`-Verzeichnisse als Ablagewurzeln und
@@ -60,9 +80,10 @@ Geräte-Tokens, `Library/Caches`-Verzeichnisse als Ablagewurzeln und
   System geräumt werden — eine Räumung erzwingt die Neu-Einrichtung.
   Geheimnisse (Schlüsselbund) und Einstellungen (`NSUserDefaults`)
   sind davon nicht betroffen.
-- Die Inhaltsseiten (Startseiten-Listen, Browsing, Detailansichten,
-  Wiedergabe, Playlist- und Download-Ansichten, weitere
-  Einstellungsbereiche) folgen in späteren Entwicklungsschritten —
-  betroffene Menüseiten zeigen derzeit Platzhaltertexte.
+- Detailansichten und Wiedergabe sind als vorbereitete
+  Navigationsziele vorhanden, aber noch nicht funktional; Browsing,
+  Playlist-, Download-Ansichten und weitere Einstellungsbereiche
+  folgen in späteren Entwicklungsschritten — betroffene Menüseiten
+  zeigen derzeit Platzhaltertexte.
 - Eine Veröffentlichung (App Store / TestFlight) ist noch nicht
   eingerichtet; die dafür nötigen Signatur-Artefakte liegen nicht vor.

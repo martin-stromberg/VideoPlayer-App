@@ -56,6 +56,22 @@ Nach erfolgreicher Anmeldung öffnet der Menürahmen mit den Bereichen
 Startseite, Favoriten, Playlists, Downloads, Profil und Einstellungen.
 Gespeicherte Server und Zugangsdaten überstehen einen App-Neustart.
 
+### 5. Startseite durchblättern
+
+Die Startseite zeigt horizontale Reihen: „Weiterschauen" (mit
+Fortschrittsbalken unter dem Bild), „Favoriten", „Neu im Programm"
+und — zeitweise — besondere Genre-Sektionen des Servers. Mit der
+Siri Remote bewegst du den Fokus zwischen den Einträgen einer Reihe
+und von Reihe zu Reihe; die fokussierte Karte vergrößert sich
+sichtbar. Gespeicherte Inhalte erscheinen sofort, Aktualisierungen
+des Servers folgen automatisch im Hintergrund und bei jeder Rückkehr
+in den Vordergrund. Wähle einen Eintrag mit der Touch-Fläche: es
+öffnet sich das vorbereitete Ziel mit einem Hinweis — die
+Detailansicht und die Wiedergabe folgen in späteren Schritten.
+Zurück geht es mit der Menü-Taste oder „Zurück". Ohne
+Serververbindung zeigt die Startseite die lokal gespeicherten
+Bereiche mit einem Offline-Hinweis; leere Reihen entfallen.
+
 ## Barrierefreiheit
 
 Sämtliche Elemente sind über die tvOS-Focus-Engine per Siri Remote
