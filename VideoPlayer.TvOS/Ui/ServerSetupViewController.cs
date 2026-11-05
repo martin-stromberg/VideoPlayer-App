@@ -33,7 +33,7 @@ namespace VideoPlayer.TvOS.Ui
         private UILabel? discoveryStatusLabel;
         private UITableView? discoveredTable;
         private ServerListTableSource? discoveredSource;
-        private UIView? addressStage;
+        private UIStackView? addressStage;
         private UITextField? addressField;
         private UIButton? connectButton;
         private UILabel? checkStatusLabel;
@@ -42,7 +42,7 @@ namespace VideoPlayer.TvOS.Ui
         private UIButton? ticketButton;
         private UILabel? bootstrapStatusLabel;
         private UILabel? bootstrapErrorLabel;
-        private UIView? authStage;
+        private UIStackView? authStage;
         private UITextField? shortCodeField;
         private UIButton? shortCodeButton;
         private UILabel? shortCodeStatusLabel;

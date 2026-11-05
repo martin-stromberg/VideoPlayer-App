@@ -57,7 +57,7 @@ namespace VideoPlayer.TvOS.Ui
         /// <returns><c>true</c>, wenn die Seite einem Menüeintrag entspricht.</returns>
         public bool Select(AppPage page)
         {
-            var index = AppRoutes.MenuPages.IndexOf(page);
+            var index = IndexOfMenuPage(page);
             if (index < 0)
             {
                 return false;
@@ -101,8 +101,26 @@ namespace VideoPlayer.TvOS.Ui
             controller.TabBarItem = new UITabBarItem(
                 PageTitles[page].Title,
                 null,
-                (nint)AppRoutes.MenuPages.IndexOf(page));
+                IndexOfMenuPage(page));
             return controller;
+        }
+
+        /// <summary>Sucht die Position einer Menüseite in <see cref="AppRoutes.MenuPages"/>.</summary>
+        /// <param name="page">Die gesuchte Menüseite.</param>
+        /// <returns>Der Zeilenindex oder <c>-1</c>, wenn die Seite kein Menüeintrag ist.</returns>
+        private static int IndexOfMenuPage(AppPage page)
+        {
+            // AppRoutes.MenuPages ist IReadOnlyList<AppPage> und besitzt
+            // kein IndexOf-Mitglied.
+            for (var index = 0; index < AppRoutes.MenuPages.Count; index++)
+            {
+                if (AppRoutes.MenuPages[index] == page)
+                {
+                    return index;
+                }
+            }
+
+            return -1;
         }
     }
 }
