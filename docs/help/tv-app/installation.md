@@ -116,12 +116,40 @@ ld: building for 'tvOS-simulator', but linking in object file
   verwendet — die System-SQLite ist auf tvOS (Gerät und Simulator)
   verfügbar. `Batteries_V2.Init()` (internal-Provider auf `__Internal`)
   wird auf tvOS nicht aufgerufen.
+- `VideoPlayer.TvOS.csproj` legt die System-Bibliothek explizit in den
+  nativen Link (`<NativeSystemLibrary Include="sqlite3" />` →
+  `-lsqlite3`).
 - Alle übrigen Plattformen bleiben unverändert bei
   `Batteries_V2.Init()`/`e_sqlite3`. `SQLitePCLRaw.provider.sqlite3`
   (3.0.3, kommt ohnehin transitiv via `sqlite-net-pcl` herein) ist rein
   verwaltet und liegt auf Windows/Android/macOS lediglich ungenutzt bei.
 
 Damit gilt für Gerät **und** Simulator derselbe Provider-Pfad.
+
+#### Nachbefund: fehlende `load_extension`-Symbole in tvOS-libsqlite3
+
+Nach der Unterdrückung von `e_sqlite3.a` blieben beim Link zwei
+undefinierte Symbole:
+
+```
+Undefined symbols for architecture arm64:
+  "_sqlite3_enable_load_extension", referenced from:
+    wrapper_managed_to_native_... in SQLitePCLRaw.provider.*.dll.o
+  "_sqlite3_load_extension", referenced from: ...
+```
+
+Alle übrigen `sqlite3_*`-Symbole lösen über die System-`libsqlite3`
+auf — nur die Load-Extension-API exportiert die tvOS-Bibliothek nicht
+(Apple baut tvOS-SQLite mit `SQLITE_OMIT_LOAD_EXTENSION`; auf iOS/macOS
+sind die Symbole dagegen vorhanden). Die ILC-Wrapper der
+`SQLitePCLRaw.provider.*`-Assemblies erzeugen für **alle** deklarierten
+P/Invokes direkte Symbolreferenzen — auch für nie aufgerufene.
+
+**Lösung:** Zwei `-U`-Linkerflags in `VideoPlayer.TvOS.csproj`
+(`ExtraLinkerArg` → `-Wl,…`) lassen `_sqlite3_load_extension` und
+`_sqlite3_enable_load_extension` beim statischen Link undefiniert; dyld
+bindet sie erst bei tatsächlichem Aufruf — `sqlite-net` ruft die
+Load-Extension-API nicht auf, der Pfad ist daher tot und unkritisch.
 
 ## Überprüfung
 

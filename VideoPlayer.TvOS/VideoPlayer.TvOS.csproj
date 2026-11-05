@@ -61,6 +61,20 @@
          waehlt unter tvOS stattdessen die System-libsqlite3
          (SQLitePCLRaw.provider.sqlite3, DllImport 'sqlite3'). -->
     <PackageReference Include="SQLitePCLRaw.lib.e_sqlite3.tvos" Version="2.1.11" ExcludeAssets="all" />
+    <!-- Die System-libsqlite3 explizit gegen den Simulator-/Geraete-Link
+         legen (ILC-Item -> '-lsqlite3'). -->
+    <NativeSystemLibrary Include="sqlite3" />
+    <!-- tvOS-libsqlite3 exportiert — anders als iOS/macOS — die
+         Load-Extension-API nicht (SQLITE_OMIT_LOAD_EXTENSION). Die
+         SQLitePCLRaw.provider.*-Assemblies deklarieren die P/Invokes
+         trotzdem, ihre ILC-Wrapper erzeugen direkte Symbolreferenzen.
+         Mit '-U' darf das Symbol beim statischen Link undefiniert bleiben;
+         es wird per dyld erst bei Aufruf gebunden — und die Methoden
+         werden nie aufgerufen (sqlite-net nutzt sie nicht). -->
+    <ExtraLinkerArg Include="-U" />
+    <ExtraLinkerArg Include="_sqlite3_load_extension" />
+    <ExtraLinkerArg Include="-U" />
+    <ExtraLinkerArg Include="_sqlite3_enable_load_extension" />
   </ItemGroup>
   <ItemGroup>
     <None Include="../LICENSE" Pack="true" PackagePath="\" />

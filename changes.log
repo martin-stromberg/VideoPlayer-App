@@ -21,6 +21,12 @@
     `SQLitePCLRaw.provider.sqlite3` 3.0.3 explizit (kommt ohnehin
     transitiv via `sqlite-net-pcl` ≥ 3.0.3 herein; rein verwaltet, auf
     Nicht-tvOS-Plattformen ungenutzt).
+  - `VideoPlayer.TvOS.csproj` linkt explizit `-lsqlite3`
+    (`NativeSystemLibrary`) und lässt die von tvOS-`libsqlite3` nicht
+    exportierten Symbole `sqlite3_load_extension`/
+    `sqlite3_enable_load_extension` per `-U`-Flag undefiniert (ILC-
+    Wrapper der Provider-Assemblies referenzieren sie, sqlite-net ruft
+    sie nie auf).
 - **Contract-Test:** `TvOsProject_HasNoPackageReferencesOrMaui` lässt
   jetzt wirkungslose Unterdrückungs-Referenzen (`ExcludeAssets="all"`)
   zu und blockiert weiterhin jede Paket-Referenz mit beitragenden
