@@ -1,5 +1,31 @@
 # Änderungsprotokoll
 
+## 2026-11-06 — tvOS-App: MVU-Grundgerüst, Plattform-Anbindung, Navigation und Fokus
+
+- **MVU-Verdrahtung:** `MvuHost` + `AppUpdate` laufen in der tvOS-App; der
+  neue `TvosAppEffectHandler` führt die Effekte des Start- und
+  Verbindungs-Workflows aus (Ablage, Einstellungen, Serververwaltung,
+  Erreichbarkeitsprüfung, Pairing/Bootstrap, Anmeldung, Netzwerk-Monitoring,
+  Server-Ereignisse, Synchronisation, Startseiten-Listen, Navigation).
+  Nicht für tvOS vorgesehene Effekte laufen protokolliert ins Leere —
+  kein Schreibzugriff auf verwaltete Inhalte.
+- **Plattform-Adapter:** `NSUserDefaultsSettingsStore` (ISettingsStore),
+  `KeychainSecretStore` (ISecretStore via Schlüsselbund),
+  `TvosStorageLayoutProvider` (`Library/Caches`-Wurzeln) und
+  `TvosNetworkStatusMonitor` (`NWPathMonitor`) ersetzen die MAUI-Pendants.
+- **Plattformneutrale Dienste nach `VideoPlayer.Mvu` verschoben:**
+  `ServerAddressProvider`/`IServerAddressProvider`, `ServerHealthProbe`/
+  `IServerHealthProbe`, `SignalRServerEventsConnection` inkl.
+  `Microsoft.AspNetCore.SignalR.Client` — beide Apps teilen sich nun
+  denselben Code.
+- **Lean-back-Navigation:** `UITabBarController`-Seitenrahmen (Startseite,
+  Favoriten, Playlists, Downloads, Profil, Einstellungen) per Siri Remote
+  fokussierbar; modellgetriebene Zustandsseiten (Ladeanzeige, Server
+  einrichten, Anmelden) mit „Erneut prüfen"-Aktion.
+- **Tests:** neue `TvOsAppContractTests` sichern Adapter, Effekt-Abdeckung,
+  Komposition und Navigation über Quell-Assertions ab (1421/1421 grün);
+  tvOS-Kompiliernachweis weiterhin über macOS-CI-Job `build-tvos`.
+
 ## 2026-11-05 — tvOS-Projektgerüst mit macOS-CI-Build-Validierung
 
 - **Neues App-Projekt `VideoPlayer.TvOS`:** eigenständige .NET-for-tvOS-App

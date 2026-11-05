@@ -108,7 +108,7 @@ public class SettingsStorageContractTests
         // Schritt 4: Die Serveradresse kommt aus der backup-pflichtigen
         // Serververwaltung (zuletzt verbundener Server); der Legacy-
         // Ablageschlüssel wird über KnownServersService migriert.
-        var provider = ReadMaui("Services", "ServerAddressProvider.cs");
+        var provider = File.ReadAllText(Path.Combine(Root, "VideoPlayer.Mvu", "ServerAddressProvider.cs"));
 
         Assert.Contains("KnownServersService", provider, StringComparison.Ordinal);
         Assert.Contains("GetLastConnectedAddressAsync", provider, StringComparison.Ordinal);

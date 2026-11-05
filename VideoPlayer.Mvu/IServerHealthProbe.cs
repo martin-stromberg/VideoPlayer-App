@@ -1,6 +1,6 @@
 using VideoPlayer.ApiClient;
 
-namespace VideoPlayer.Maui.Services;
+namespace VideoPlayer.Mvu;
 
 /// <summary>Prüft die Erreichbarkeit eines VideoPlayer-Servers.</summary>
 public interface IServerHealthProbe
