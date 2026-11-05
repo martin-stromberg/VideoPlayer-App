@@ -3,6 +3,11 @@ name: PR Checks
 on:
   pull_request:
     branches: [main, staging]
+  # Laufende tvOS-Verifikation waehrend des Projekts: der tvOS-Build kann
+  # unter Windows nicht kompiliert werden, deshalb laeuft der Check bei
+  # jedem Push auf die Projekt-Branches mit (Job build-tvos, macOS).
+  push:
+    branches: ['task/issue-86-**']
 
 permissions:
   contents: read
