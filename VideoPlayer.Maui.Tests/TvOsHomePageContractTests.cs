@@ -160,9 +160,10 @@ public class TvOsHomePageContractTests
     }
 
     /// <summary>
-    /// Prüft: der tvOS-Effekt-Handler bildet die drei
-    /// Navigations-Effekte der Eintrags-Auswahl auf das vorbereitete
-    /// Ziel ab — kein Fehler, kein unbemerkt verworfener Effekt.
+    /// Prüft: der tvOS-Effekt-Handler bildet die Navigations-Effekte der
+    /// Eintrags-Auswahl ab — die Medien-Detailseite ist seit dem
+    /// Detailseiten-Schritt real (`PresentMediaDetails`), die
+    /// Wiedergabe-Ziele bleiben vorbereitet (`PresentPreparedTarget`).
     /// </summary>
     [Fact]
     public void TvOsEffectHandler_MapsSelectionEffectsToPreparedTarget()
@@ -173,11 +174,16 @@ public class TvOsHomePageContractTests
         Assert.Contains("case NavigateToPlayerEffect", handler, StringComparison.Ordinal);
         Assert.Contains("case StartPlaylistPlaybackEffect", handler, StringComparison.Ordinal);
         Assert.Contains("PresentPreparedTarget", handler, StringComparison.Ordinal);
+        Assert.Contains("PresentMediaDetails", handler, StringComparison.Ordinal);
     }
 
     /// <summary>
-    /// Prüft: die Startseite verdrahtet keinerlei Schreibzugriff —
-    /// Kontextmenü- und Mutations-Effekte bleiben No-Op.
+    /// Prüft: keinerlei Schreibzugriff auf verwaltete Inhalte —
+    /// Weiterschauen-Kontextmenü- und Favoriten-Entfernen-Effekte bleiben
+    /// No-Op. Die Favoriten-Umschaltung selbst ist seit dem
+    /// Detailseiten-Schritt verdrahtet (erlaubtes Nutzungsdatum), das
+    /// Download-Einreihen ist nur als vorbereitete Hinweis-Aktion
+    /// verdrahtet — beides ohne Inhalts-Schreibzugriff.
     /// </summary>
     [Fact]
     public void TvOsEffectHandler_DoesNotWireContentMutations()
@@ -186,8 +192,6 @@ public class TvOsHomePageContractTests
 
         Assert.DoesNotContain("ContinueWatchingHide", handler, StringComparison.Ordinal);
         Assert.DoesNotContain("ContinueWatchingSkip", handler, StringComparison.Ordinal);
-        Assert.DoesNotContain("ToggleFavoriteEffect", handler, StringComparison.Ordinal);
         Assert.DoesNotContain("RemoveFavoriteEffect", handler, StringComparison.Ordinal);
-        Assert.DoesNotContain("EnqueueDownloadEffect", handler, StringComparison.Ordinal);
     }
 }

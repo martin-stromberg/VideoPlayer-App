@@ -61,12 +61,9 @@ jeder Rückkehr in den Vordergrund. Poster werden über
 `api/pictures/{id}` vom Server nachgeladen und dreistufig
 zwischengespeichert (Arbeitsspeicher, Datei im Cache-Verzeichnis,
 Serverabruf); fehlende Bilder erhalten einen Titel-Platzhalter. Die
-Auswahl eines Eintrags führt auf ein vorbereitetes
-Navigationsziel: ein modaler Hinweis (Menü-Taste oder „Zurück"
-schließt) — die eigentliche Detailansicht und die Wiedergabe
-folgen in späteren Entwicklungsschritten. Im Offline-Zustand zeigt die
-Startseite die aus lokalen Daten gespeisten Bereiche samt Hinweis;
-leere Listen blenden ihre Sektion aus.
+Auswahl eines Eintrags öffnet die Detailansicht des Mediums. Im
+Offline-Zustand zeigt die Startseite die aus lokalen Daten gespeisten
+Bereiche samt Hinweis; leere Listen blenden ihre Sektion aus.
 
 Das Browsing folgt demselben plattformneutralen Quellenbrowser wie die
 Hauptanwendung (`AppModel.SourcesOverview`, `AppModel.SourceBrowser`):
@@ -82,9 +79,33 @@ bei Annäherung an das Listenende weitere Seiten nachlädt
 (`SourceItemsNextPageRequestedMessage`). Lade-, Leer- und
 Fehlerzustände sind fernbedienungstauglich sichtbar; Ladefehler zeigen
 eine „Erneut versuchen"-Aktion. Die Auswahl eines Eintrags führt — wie
-auf der Startseite — auf das vorbereitete Navigationsziel; die
-Menü-Taste schließt die Seite zurück in den Menürahmen. Das Browsing
-ist rein lesend; kein Schreibzugriff auf Inhalte wird verdrahtet.
+auf der Startseite — auf die Detailansicht; die Menü-Taste schließt die
+Seite zurück in den Menürahmen. Das Browsing ist rein lesend; kein
+Schreibzugriff auf Inhalte wird verdrahtet.
+
+Die Detailansicht (`MediaDetailsViewController`) ist das tvOS-Pendant
+der Detailseiten der Hauptanwendung und wird modal gestapelt —
+Detail → Detail wie im Navigationsstack (Episode aus einer Serie,
+Film aus einer Sammlung). Sie nutzt denselben plattformneutralen
+Detailseiten-Dienst (`MediaDetailsService`): online kommen die Daten
+vom Server, ohne Verbindung aus dem gespeicherten Detail-Snapshot
+(Download-Manifest, gecachte Serienstruktur, Favoriten-Kopie) statt
+einer Fehlerseite. Der Kopfbereich zeigt Bildmaterial (Banner bzw.
+Episoden-Still), Titel, Genre-/Jahres-Metadaten und Handlung sowie die
+Kennzeichnungen „Gesehen", „Auf diesem Gerät" (lokal vorhandene
+Download-Datei) und „Offline-Stand". Abgedeckt werden alle Medientypen:
+Film, Filmsammlung (mit enthaltenen Filmen als Karussell), Serie,
+Staffel und Episode — im Serienkontext steuern fokussierbare
+Staffel-Chips und eine Episodenreihe die Auswahl; Episoden tragen je
+einen Gesehen-Status, den lokale-Datei-Hinweis und bei
+Offline-Platzhaltern die Markierung „nicht heruntergeladen". Als
+Aktionen stehen „Abspielen" (Wiedergabeeinstieg — wird mit dem
+Wiedergabe-Schritt funktional), „Herunterladen" (vorbereitete Aktion
+mit Hinweistext — wird mit dem Download-Schritt funktional) und das
+Umschalten der Favoriten-Markierung über `api/favorites/toggle` zur
+Verfügung; die Favoriten-Änderung erneuert zugleich die lokale
+Favoriten-Kopie. Eine Bearbeitung von Inhalten oder Playlists gibt es
+nicht.
 
 Plattform-Anschlüsse: `NSUserDefaults` für nicht-geheime Einstellungen,
 Schlüsselbund (`SecKeyChain`, Generic Password) für Zugangsdaten und
@@ -98,11 +119,12 @@ Geräte-Tokens, `Library/Caches`-Verzeichnisse als Ablagewurzeln und
   System geräumt werden — eine Räumung erzwingt die Neu-Einrichtung.
   Geheimnisse (Schlüsselbund) und Einstellungen (`NSUserDefaults`)
   sind davon nicht betroffen.
-- Detailansichten und Wiedergabe sind als vorbereitete
-  Navigationsziele vorhanden, aber noch nicht funktional — die
-  Eintrags-Auswahl (Startseite, Browsing) öffnet einen modalen
-  Platzhalter ohne Fehler. Playlist-, Download-Ansichten und weitere
-  Einstellungsbereiche folgen in späteren Entwicklungsschritten —
-  betroffene Menüseiten zeigen derzeit Platzhaltertexte.
+- Wiedergabe und Downloads sind als vorbereitete Einstiege in den
+  Detailansichten sichtbar, aber noch nicht funktional — sie lösen
+  keinen Fehler aus (Wiedergabe öffnet einen vorbereiteten
+  Platzhalter, der Download meldet einen Hinweistext). Playlist-,
+  Download-Ansichten und weitere Einstellungsbereiche folgen in
+  späteren Entwicklungsschritten — betroffene Menüseiten zeigen
+  derzeit Platzhaltertexte.
 - Eine Veröffentlichung (App Store / TestFlight) ist noch nicht
   eingerichtet; die dafür nötigen Signatur-Artefakte liegen nicht vor.

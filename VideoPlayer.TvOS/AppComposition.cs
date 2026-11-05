@@ -76,6 +76,10 @@ namespace VideoPlayer.TvOS
             HomeLists = new HomeListService(
                 CacheDatabase, new AppLogger<HomeListService>(LoggerFactory), TimeProvider.System);
             SourceBrowser = new SourceBrowserService(AuthSession);
+            MediaDetails = new MediaDetailsService(
+                AuthSession, CacheDatabase, StorageLayout,
+                new AppLogger<MediaDetailsService>(LoggerFactory));
+            Favorites = new FavoritesService(AuthSession, ServerSync);
             OfflineContinueWatching = new OfflineContinueWatchingService(
                 CacheDatabase, BackupDatabase, HomeLists, StorageLayout,
                 new AppLogger<OfflineContinueWatchingService>(LoggerFactory));
@@ -150,6 +154,12 @@ namespace VideoPlayer.TvOS
 
         /// <summary>Ladedienst des Quellen-Browsers (Quellen, Genres, paginierte Einträge, Suche).</summary>
         public SourceBrowserService SourceBrowser { get; }
+
+        /// <summary>Detailseiten-Dienst (Server-Details bzw. Offline-Snapshot).</summary>
+        public MediaDetailsService MediaDetails { get; }
+
+        /// <summary>Favoriten-Umschaltung mit Server-Rückmeldung und Cache-Erneuerung.</summary>
+        public FavoritesService Favorites { get; }
 
         /// <summary>Offline-Zusammenstellung der Weiterschauen-Liste.</summary>
         public OfflineContinueWatchingService OfflineContinueWatching { get; }

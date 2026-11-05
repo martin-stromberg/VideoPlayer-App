@@ -22,6 +22,9 @@ namespace VideoPlayer.TvOS.Ui
         private LoginViewController? loginPage;
         private SourceBrowserViewController? sourceBrowserPage;
 
+        /// <summary>Offene modale Detailseiten (Stapel wie der Shell-Navigationsstack — Detail → Detail).</summary>
+        private readonly List<MediaDetailsViewController> detailPages = [];
+
         /// <summary>Die zuletzt dargestellte Menüseite — Rückziel der Menü-Taste auf Workflow-Seiten.</summary>
         private AppPage LastMenuPage { get; set; } = AppPage.Home;
 
@@ -96,7 +99,47 @@ namespace VideoPlayer.TvOS.Ui
             loginPage?.Render(model);
             tabBar?.Render(model);
             sourceBrowserPage?.Render(model);
+            foreach (var page in detailPages)
+            {
+                page.Render(model);
+            }
         }
+
+        /// <summary>
+        /// Präsentiert die Detailseite eines Mediums modal über dem
+        /// obersten Controller (<see cref="NavigateToMediaDetailsEffect"/>)
+        /// — Gegenstück zur Shell-Route <c>mediadetails</c> der
+        /// MAUI-App. Je Effekt entsteht eine eigene
+        /// <see cref="MediaDetailsViewController"/>-Instanz auf dem
+        /// modalen Stapel (Detail → Detail wie der
+        /// Navigationsstack); die Menü-Taste der Siri Remote löst eine
+        /// Ebene auf, die darunterliegende Seite fordert ihre Identität
+        /// beim Erscheinen erneut an.
+        /// </summary>
+        /// <param name="details">Der Navigations-Effekt mit Identität und Hints des Mediums.</param>
+        public void PresentMediaDetails(NavigateToMediaDetailsEffect details)
+        {
+            if (main is null)
+            {
+                return;
+            }
+
+            var page = new MediaDetailsViewController(dispatch, posters, ReleaseDetailPage)
+            {
+                ModalPresentationStyle = UIModalPresentationStyle.FullScreen
+            };
+            page.SetMedium(
+                details.MediaType, details.MediaId, details.Title,
+                details.ShowId, details.SeasonId, details.EpisodeId);
+
+            detailPages.Add(page);
+            TopmostPresented().PresentViewController(page, true, null);
+        }
+
+        /// <summary>Entfernt eine geschlossene Detailseite aus dem Render-Verzeichnis (Callback der Seite).</summary>
+        /// <param name="page">Die geschlossene Detailseite.</param>
+        private void ReleaseDetailPage(MediaDetailsViewController page) =>
+            detailPages.Remove(page);
 
         /// <summary>
         /// Präsentiert die Browsing-Seite einer Quelle modal über dem
