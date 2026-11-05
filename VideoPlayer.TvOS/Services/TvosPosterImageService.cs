@@ -30,6 +30,11 @@ namespace VideoPlayer.TvOS.Services
         // der Icon- und Poster-Endpunkte sind nicht disjunkt.
         private readonly System.Collections.Concurrent.ConcurrentDictionary<long, UIImage> iconCache = new();
 
+        // Eigenständiger Schlüsselraum der Playlist-Cover — der
+        // Cover-Endpunkt wird über die Playlist-Id adressiert, nicht
+        // über eine Bild-Id.
+        private readonly System.Collections.Concurrent.ConcurrentDictionary<long, UIImage> coverCache = new();
+
         /// <summary>Initialisiert eine neue Instanz der <see cref="TvosPosterImageService"/>-Klasse.</summary>
         /// <param name="authSession">Sitzungsdienst; liefert den angemeldeten API-Client für Bildabrufe.</param>
         /// <param name="layout">Ablage-Layout mit dem nicht backup-pflichtigen Vorschaubild-Verzeichnis.</param>
@@ -77,6 +82,28 @@ namespace VideoPlayer.TvOS.Services
                 $"{pictureId}.sourceicon",
                 iconCache,
                 (client, ct) => client.GetSourceIconAsync(pictureId, ct),
+                cancellationToken);
+
+        /// <summary>
+        /// Liefert das Cover einer Playlist zu ihrer Playlist-Id —
+        /// gleiche Cache-Konvention wie <see cref="GetImageAsync"/>, aber
+        /// über den Server-Endpunkt <c>api/playlists/{id}/cover</c>
+        /// (schlüsselt auf die Playlist-Id, nicht auf eine Bild-Id) und
+        /// mit eigenem Datei-Suffix <c>.playlistcover</c> sowie eigenem
+        /// Speicher-Cache. <c>null</c>, wenn kein Cover verfügbar ist
+        /// (die Playlist hat kein Cover — HTTP 404 — oder der Abruf
+        /// scheiterte).
+        /// </summary>
+        /// <param name="playlistId">Id der Playlist, deren Cover angezeigt wird.</param>
+        /// <param name="cancellationToken">Bricht den Bildabruf ab.</param>
+        /// <returns>Das Cover oder <c>null</c>, wenn keines verfügbar ist.</returns>
+        public Task<UIImage?> GetPlaylistCoverAsync(long playlistId, CancellationToken cancellationToken = default) =>
+            LoadImageAsync(
+                playlistId,
+                $"{playlistId}.playlistcover",
+                coverCache,
+                async (client, ct) =>
+                    await client.GetPlaylistCoverAsync(playlistId, ct) ?? [],
                 cancellationToken);
 
         // Gemeinsame Cache-Kaskade beider Bildarten: Arbeitsspeicher →

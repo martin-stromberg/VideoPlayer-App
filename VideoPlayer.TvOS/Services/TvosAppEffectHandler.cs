@@ -14,8 +14,10 @@ namespace VideoPlayer.TvOS.Services
     /// Verbindungs-Workflows (Ablage, Einstellungen, Serververwaltung,
     /// Erreichbarkeitsprüfung, Pairing/Bootstrap, Anmeldung,
     /// Netzwerk-Monitoring, Ereignisverbindung, Synchronisation, Startseiten-
-    /// Listen, Navigation). Alle übrigen Effekte (Downloads, Wiedergabe/PiP,
-    /// Inhalts-/Playlist-Verwaltung, Protokollversand u. a.) laufen in ein
+    /// Listen, Navigation) sowie des lesenden Playlist-Zugriffs
+    /// (Übersicht, Kopfdaten, paginierte Einträge, Wiedergabekontext).
+    /// Alle übrigen Effekte (Downloads, Inhalts-/Playlist-Verwaltung,
+    /// Protokollversand u. a.) laufen in ein
     /// protokolliertes No-Op — für tvOS nicht vorgesehene Bereiche werden
     /// bewusst nicht verdrahtet und erzeugen keine Fehler.
     /// </summary>
@@ -226,6 +228,26 @@ namespace VideoPlayer.TvOS.Services
                     break;
                 case ReportPlaybackProgressEffect report:
                     await ReportPlaybackProgressAsync(report, cancellationToken);
+                    break;
+                case LoadPlaylistsEffect:
+                    await LoadPlaylistsAsync(cancellationToken);
+                    break;
+                case NavigateToPlaylistDetailsEffect playlistDetails:
+                    // Modale Playlist-Detailseite — Pendant zur
+                    // Shell-Route playlistdetails (Hauptthread:
+                    // UIKit-Präsentation auf dem modalen Stapel).
+                    await MainThreadInvoker.InvokeOnMainThreadAsync(() =>
+                    {
+                        navigator.PresentPlaylistDetails(
+                            playlistDetails.PlaylistId, playlistDetails.Name);
+                        return Task.CompletedTask;
+                    });
+                    break;
+                case LoadPlaylistDetailsEffect playlistDetailsLoad:
+                    await LoadPlaylistDetailsAsync(playlistDetailsLoad, cancellationToken);
+                    break;
+                case LoadPlaylistEntriesEffect playlistEntries:
+                    await LoadPlaylistEntriesAsync(playlistEntries, cancellationToken);
                     break;
                 case StartPlaylistPlaybackEffect start:
                     await StartPlaylistPlaybackAsync(start, cancellationToken);
@@ -985,6 +1007,68 @@ namespace VideoPlayer.TvOS.Services
                 // meldet erneut.
                 logger.LogWarning(ex, "Fortschrittsmeldung fehlgeschlagen");
             }
+        }
+
+        private async Task LoadPlaylistsAsync(CancellationToken cancellationToken)
+        {
+            IReadOnlyList<PlaylistListItem> own = [];
+            IReadOnlyList<PlaylistListItem> publicPlaylists = [];
+            string? error = null;
+            try
+            {
+                var overview = await services.Playlists.LoadPlaylistsAsync(cancellationToken);
+                own = overview.Own;
+                publicPlaylists = overview.Public;
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Playlists laden fehlgeschlagen");
+                error = AppUpdate.PlaylistsLoadError;
+            }
+
+            await DispatchMessageAsync(new PlaylistsLoadedMessage(own, publicPlaylists, error));
+        }
+
+        private async Task LoadPlaylistDetailsAsync(LoadPlaylistDetailsEffect details, CancellationToken cancellationToken)
+        {
+            PlaylistListItem? info = null;
+            var isAdmin = false;
+            try
+            {
+                info = await services.Playlists.LoadPlaylistAsync(details.PlaylistId, cancellationToken);
+                // Der IsAdmin-Claim steuert die Sichtbarkeit des
+                // Öffentlich-Schalters (auf tvOS ohne Oberfläche); er
+                // ist nicht fatal — bei Fehlschlag bleibt er aus.
+                isAdmin = await services.Playlists.IsCurrentUserAdminAsync();
+            }
+            catch (Exception ex)
+            {
+                // Kopf-Nachschlag ist nicht fatal — die Detailseite zeigt
+                // dann die Felder der Listenauswahl bzw. den Pfad-Namen.
+                logger.LogError(ex, "Playlist-Kopfdaten laden fehlgeschlagen");
+            }
+
+            await DispatchMessageAsync(new PlaylistDetailsLoadedMessage(details.PlaylistId, info, isAdmin));
+        }
+
+        private async Task LoadPlaylistEntriesAsync(LoadPlaylistEntriesEffect entries, CancellationToken cancellationToken)
+        {
+            PlaylistEntriesPage page;
+            string? error = null;
+            try
+            {
+                page = await services.Playlists.LoadEntriesAsync(
+                    entries.PlaylistId, entries.Page, cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Playlist-Einträge laden fehlgeschlagen");
+                page = new PlaylistEntriesPage(entries.Page, [], HasMore: false, TotalCount: 0);
+                error = AppUpdate.PlaylistEntriesLoadError;
+            }
+
+            await DispatchMessageAsync(new PlaylistEntriesLoadedMessage(
+                entries.PlaylistId, page.Page, page.Items, page.HasMore, page.TotalCount, entries.Append, error));
         }
 
         private async Task StartPlaylistPlaybackAsync(StartPlaylistPlaybackEffect start, CancellationToken cancellationToken)
