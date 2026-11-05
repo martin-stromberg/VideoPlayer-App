@@ -73,6 +73,12 @@ namespace VideoPlayer.TvOS.Services
             this.networkMonitor.AvailabilityChanged += OnNetworkAvailabilityChanged;
             this.serverEvents.EventReceived += OnServerEventReceived;
             this.serverEvents.ConnectionClosed += OnServerEventsConnectionClosed;
+            // Zustands-/Entfernungsmeldungen des Download-Manifests in
+            // den MVU-Zyklus (Wiedergabe-Schutz/Ablauf-Verkürzung
+            // melden ihre Änderungen darüber zurück — Muster
+            // ShellAppEffectHandler).
+            services.Downloads.ItemChanged += OnDownloadItemChanged;
+            services.Downloads.ItemRemoved += OnDownloadItemRemoved;
         }
 
         /// <inheritdoc/>
@@ -202,26 +208,45 @@ namespace VideoPlayer.TvOS.Services
                         enqueue.MediaId));
                     break;
                 case NavigateToPlayerEffect:
-                    // Vorbereitetes Ziel des Wiedergabestarts — die
-                    // eigentliche Wiedergabe entsteht im Wiedergabe-Schritt.
+                    // Nativer Vollbild-Player (AVPlayerViewController) —
+                    // Pendant zur Shell-Route player der MAUI-App
+                    // (Hauptthread: UIKit-Präsentation auf dem modalen
+                    // Stapel).
                     await MainThreadInvoker.InvokeOnMainThreadAsync(() =>
                     {
-                        navigator.PresentPreparedTarget(
-                            services.Host.Model.Player.Title ?? "Wiedergabe",
-                            "Die Wiedergabe folgt in einem späteren Entwicklungsschritt.");
+                        navigator.PresentPlayer();
                         return Task.CompletedTask;
                     });
                     break;
-                case StartPlaylistPlaybackEffect:
-                    // Playlist-gebundene Weiterschauen-Einträge landen auf
-                    // demselben vorbereiteten Wiedergabeziel.
-                    await MainThreadInvoker.InvokeOnMainThreadAsync(() =>
-                    {
-                        navigator.PresentPreparedTarget(
-                            "Wiedergabe",
-                            "Die Playlist-Wiedergabe folgt in einem späteren Entwicklungsschritt.");
-                        return Task.CompletedTask;
-                    });
+                case ResolvePlaybackSourceEffect resolve:
+                    await ResolvePlaybackSourceAsync(resolve, cancellationToken);
+                    break;
+                case LoadUpcomingEpisodesEffect loadUpcoming:
+                    await LoadUpcomingEpisodesAsync(loadUpcoming, cancellationToken);
+                    break;
+                case ReportPlaybackProgressEffect report:
+                    await ReportPlaybackProgressAsync(report, cancellationToken);
+                    break;
+                case StartPlaylistPlaybackEffect start:
+                    await StartPlaylistPlaybackAsync(start, cancellationToken);
+                    break;
+                case LoadNextPlaylistEntryEffect next:
+                    await NavigatePlaylistEntryAsync(
+                        next.PlaylistId, next.CurrentEntryId, forward: true, advance: false, cancellationToken);
+                    break;
+                case LoadPreviousPlaylistEntryEffect previous:
+                    await NavigatePlaylistEntryAsync(
+                        previous.PlaylistId, previous.CurrentEntryId, forward: false, advance: false, cancellationToken);
+                    break;
+                case AdvancePlaylistEntryEffect advance:
+                    await NavigatePlaylistEntryAsync(
+                        advance.PlaylistId, advance.CurrentEntryId, forward: true, advance: true, cancellationToken);
+                    break;
+                case ProtectDownloadExpiryEffect protect:
+                    await ProtectDownloadExpiryAsync(protect, cancellationToken);
+                    break;
+                case ExpireWatchedDownloadEffect expireWatched:
+                    await ExpireWatchedDownloadAsync(expireWatched, cancellationToken);
                     break;
                 case LogoutEffect:
                     await LogoutAsync();
@@ -881,6 +906,173 @@ namespace VideoPlayer.TvOS.Services
                 await DispatchMessageAsync(new CachedListsChangedMessage());
             }
         }
+
+        private async Task ResolvePlaybackSourceAsync(ResolvePlaybackSourceEffect resolve, CancellationToken cancellationToken)
+        {
+            PlaybackSource? source = null;
+            string? error = null;
+            try
+            {
+                // Im Offline-Zustand werden nur lokale Dateien aufgelöst —
+                // eine unerreichbare Stream-URL würde erst im Player
+                // fehlschlagen (Muster: ShellAppEffectHandler).
+                var allowServerStream = !services.Host.Model.IsOffline;
+                source = await services.PlaybackSources.ResolveAsync(
+                    resolve.MediaType, resolve.MediaId, cancellationToken,
+                    allowServerStream: allowServerStream,
+                    resumePositionSecondsOverride: resolve.StartPositionSeconds);
+                if (source is null)
+                {
+                    error = AppUpdate.PlaybackUnavailableError;
+                }
+                else
+                {
+                    // Die Quell-Adresse bleibt absichtlich unprotokolliert
+                    // (access_token-Query).
+                    var player = services.Host.Model.Player;
+                    logger.LogInformation(
+                        "Wiedergabe gestartet: {MediaType}/{MediaId} ({Title}) über {Kind}.",
+                        resolve.MediaType,
+                        resolve.MediaId,
+                        player.MediaId == resolve.MediaId ? player.Title : null,
+                        source.Kind);
+                }
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Quellauflösung fehlgeschlagen");
+                error = AppUpdate.PlaybackUnavailableError;
+            }
+
+            await DispatchMessageAsync(new PlaybackSourceResolvedMessage(
+                resolve.MediaType, resolve.MediaId, source, error));
+        }
+
+        private async Task LoadUpcomingEpisodesAsync(LoadUpcomingEpisodesEffect loadUpcoming, CancellationToken cancellationToken)
+        {
+            IReadOnlyList<PlayerEpisodeRef> episodes = [];
+            try
+            {
+                episodes = await services.UpcomingEpisodes.LoadAsync(
+                    loadUpcoming.MediaId, loadUpcoming.ShowId, cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                // Fehlschlag ergibt eine leere Fortsetzungsliste statt
+                // eines Fehlerzustands (Muster: ShellAppEffectHandler).
+                logger.LogError(ex, "Folge-Episoden laden fehlgeschlagen");
+            }
+
+            await DispatchMessageAsync(new UpcomingEpisodesLoadedMessage(loadUpcoming.MediaId, episodes));
+        }
+
+        private async Task ReportPlaybackProgressAsync(ReportPlaybackProgressEffect report, CancellationToken cancellationToken)
+        {
+            try
+            {
+                await services.ProgressReports.ReportProgressAsync(
+                    report.MediaType, (int)report.MediaId,
+                    report.Position, report.Duration, report.PlaylistId,
+                    cancellationToken);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                // Ein Fehlschlag ist nicht fatal — der nächste Takt
+                // meldet erneut.
+                logger.LogWarning(ex, "Fortschrittsmeldung fehlgeschlagen");
+            }
+        }
+
+        private async Task StartPlaylistPlaybackAsync(StartPlaylistPlaybackEffect start, CancellationToken cancellationToken)
+        {
+            PlaylistPlaybackStartInfo? info = null;
+            string? error = null;
+            try
+            {
+                info = await services.Playlists.StartPlaybackAsync(
+                    start.PlaylistId, start.EntryId, cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Playlist-Wiedergabestart fehlgeschlagen");
+                error = AppUpdate.PlaybackUnavailableError;
+            }
+
+            await DispatchMessageAsync(new PlaylistPlaybackStartedMessage(start.PlaylistId, info, error));
+        }
+
+        private async Task NavigatePlaylistEntryAsync(
+            long playlistId,
+            long currentEntryId,
+            bool forward,
+            bool advance,
+            CancellationToken cancellationToken)
+        {
+            PlaylistNavigationItem? result = null;
+            string? error = null;
+            try
+            {
+                var service = services.Playlists;
+                result = advance
+                    ? await service.AdvanceAsync(playlistId, currentEntryId, cancellationToken)
+                    : forward
+                        ? await service.GetNextEntryAsync(playlistId, currentEntryId, cancellationToken)
+                        : await service.GetPreviousEntryAsync(playlistId, currentEntryId, cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Playlist-Navigation fehlgeschlagen");
+                error = AppUpdate.PlaybackUnavailableError;
+            }
+
+            await DispatchMessageAsync(new PlaylistNavigationCompletedMessage(
+                playlistId, currentEntryId, result, forward, error));
+        }
+
+        private async Task ProtectDownloadExpiryAsync(
+            ProtectDownloadExpiryEffect protect, CancellationToken cancellationToken)
+        {
+            try
+            {
+                // Wiedergabe-Schutz: Ablaufdatum des lokal gespielten
+                // Downloads hochsetzen (Zielwert/Faktor rechnet der
+                // Dienst über seine Zeitquelle).
+                await services.Downloads.ExtendExpiryAsync(
+                    protect.MediaType, protect.MediaId,
+                    protect.RemainingDuration,
+                    cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Ablaufdatum des Downloads hochsetzen fehlgeschlagen");
+            }
+        }
+
+        private async Task ExpireWatchedDownloadAsync(
+            ExpireWatchedDownloadEffect expireWatched, CancellationToken cancellationToken)
+        {
+            try
+            {
+                await services.Downloads.ExpireAfterAsync(
+                    expireWatched.MediaType, expireWatched.MediaId,
+                    expireWatched.Delay,
+                    cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Ablaufdatum des Downloads verkürzen fehlgeschlagen");
+            }
+        }
+
+        private void OnDownloadItemChanged(object? sender, DownloadItemEventArgs e) =>
+            _ = DispatchMessageAsync(new DownloadItemChangedMessage(e.Item));
+
+        private void OnDownloadItemRemoved(object? sender, DownloadRemovedEventArgs e) =>
+            _ = DispatchMessageAsync(new DownloadDeletedMessage(e.MediaType, e.MediaId));
 
         private async Task LogoutAsync()
         {

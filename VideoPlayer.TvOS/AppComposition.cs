@@ -86,6 +86,20 @@ namespace VideoPlayer.TvOS
             PosterImages = new TvosPosterImageService(
                 AuthSession, StorageLayout,
                 new AppLogger<TvosPosterImageService>(LoggerFactory));
+            PlaybackSources = new PlaybackSourceService(
+                AuthSession, Secrets, CacheDatabase, StorageLayout,
+                new AppLogger<PlaybackSourceService>(LoggerFactory));
+            UpcomingEpisodes = new UpcomingEpisodesService(
+                AuthSession, CacheDatabase,
+                new AppLogger<UpcomingEpisodesService>(LoggerFactory));
+            Playlists = new PlaylistService(AuthSession, Secrets);
+            // DownloadService ohne Plattform-Backend: der Wiedergabe-Schritt
+            // benötigt nur die Ablauf-Methoden (Wiedergabe-Schutz,
+            // gesehene Downloads verkürzen); das tvOS-Transfer-Backend
+            // folgt mit dem Download-Schritt.
+            Downloads = new DownloadService(
+                AuthSession, Secrets, CacheDatabase, StorageLayout, NetworkMonitor,
+                new AppLogger<DownloadService>(LoggerFactory));
             ServerDiscovery = ServerDiscoveryService.CreateDefault();
         }
 
@@ -167,6 +181,18 @@ namespace VideoPlayer.TvOS
         /// <summary>Poster-/Vorschaubild-Cache der Startseiten-Karussells.</summary>
         public TvosPosterImageService PosterImages { get; }
 
+        /// <summary>Quellauflösung der Wiedergabe (lokale Datei vor Server-Stream, Fortsetzungsposition).</summary>
+        public PlaybackSourceService PlaybackSources { get; }
+
+        /// <summary>Fortsetzungsliste einer gestarteten Episode (Serienkontext ohne Detailseite).</summary>
+        public UpcomingEpisodesService UpcomingEpisodes { get; }
+
+        /// <summary>Playlist-Wiedergabekontext (start/next/previous/advance-Endpunkte).</summary>
+        public PlaylistService Playlists { get; }
+
+        /// <summary>Download-Manifestdienst — im Wiedergabe-Schritt nur für die Ablauf-Methoden (Wiedergabe-Schutz, gesehene Downloads verkürzen) genutzt.</summary>
+        public DownloadService Downloads { get; }
+
         /// <summary>Netzwerk-Erkennung (mDNS + UDP-Broadcast).</summary>
         public ServerDiscoveryService ServerDiscovery { get; }
 
@@ -210,7 +236,9 @@ namespace VideoPlayer.TvOS
             Task Dispatch(AppMessage message) =>
                 MainThreadInvoker.InvokeOnMainThreadAsync(() => Host.DispatchAsync(message));
 
-            navigator = new TvosNavigator(Dispatch, PosterImages);
+            navigator = new TvosNavigator(
+                Dispatch, PosterImages,
+                new AppLogger<TvosPlayerViewController>(LoggerFactory));
             navigator.Attach(main);
             var effectHandler = new TvosAppEffectHandler(
                 this,

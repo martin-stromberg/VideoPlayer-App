@@ -1,5 +1,41 @@
 # Änderungsprotokoll
 
+## 2026-11-08 — tvOS-App: Videowiedergabe mit Fortschritts-Tracking, Auto-Fortsetzung und Spurwahl
+
+- **Nativer Player (`TvosPlayerViewController`):** `AVPlayerViewController`-
+  Vollbildansicht mit System-Transport-UI als reiner Ereignis-Übersetzer
+  in den MVU-Zyklus — Quellanwendung aus `PlayerState.Source`
+  (`appliedLocation`/`appliedMediaId`/`sourceApplyFailed`-Muster der
+  MAUI-`PlayerPage`), Fortsetzungs-Seek bei `ReadyToPlay`, 5-s-Takt per
+  `AddPeriodicTimeObserver` → `PlaybackProgressMessage`, Ende/Fehler über
+  `DidPlayToEndTime`/`FailedToPlayToEndTime`/Item-`status` →
+  `PlaybackEndedMessage`/`PlaybackFailedMessage`;
+  `PlayerPageOpenedMessage`/`PlayerClosedMessage` im Lebenszyklus.
+  Takt-, Schwellen- und Fortsetzungslogik bleiben im plattformneutralen
+  `AppUpdate` (Endfenster/`EndWindowStreak`, Ende-Toleranz,
+  Auto-Fortsetzung).
+- **Playlist-Kontext:** next/previous als
+  `TransportBarCustomMenuItems` (`CanNavigate*`); Titel,
+  `PlaylistLabel` und Gesehen-Hinweis im Info-Tab
+  (`CustomInfoViewControllers`, tvOS 15); die systemeigene Spurwahl
+  greift, wenn der Stream `AVMediaSelectionGroup`s anbietet — sonst
+  entfällt sie ersatzlos.
+- **Verdrahtung:** `TvosAppEffectHandler` führt jetzt
+  `NavigateToPlayerEffect` (`TvosNavigator.PresentPlayer`),
+  `ResolvePlaybackSourceEffect` (`PlaybackSourceService`, offline nur
+  lokale Dateien), `LoadUpcomingEpisodesEffect`,
+  `ReportPlaybackProgressEffect` (`pending_progress`-Queue),
+  `StartPlaylistPlaybackEffect` und die Playlist-Navigation
+  (next/previous/advance) sowie `ProtectDownloadExpiryEffect`/
+  `ExpireWatchedDownloadEffect` (`DownloadService`) echt aus;
+  `AppComposition` hält die neuen Singletons.
+  `PreparedTargetViewController`/`PresentPreparedTarget` entfernt —
+  alle Navigationsziele sind real.
+- **Absicherung:** neue `TvOsPlaybackContractTests` (5 Contract-Tests),
+  bestehende tvOS-Contract-Tests angepasst; Gesamtsuite
+  `VideoPlayer.Maui.Tests`: 1492/1492 grün. tvOS-Kompiliernachweis über
+  den macOS-CI-Job `build-tvos`.
+
 ## 2026-11-07 — tvOS-App: Browsing und Suche als Lean-back-Oberfläche
 
 - **Quellen-Auswahl auf der Startseite:** neue „Quellen"-Reihe

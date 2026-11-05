@@ -107,6 +107,17 @@ Verfügung; die Favoriten-Änderung erneuert zugleich die lokale
 Favoriten-Kopie. Eine Bearbeitung von Inhalten oder Playlists gibt es
 nicht.
 
+Der Player (`TvosPlayerViewController`) ist ein reiner
+Ereignis-Übersetzer in den MVU-Zyklus: er wendet die aufgelöste
+Quelle des `PlayerState` an, springt die Fortsetzungsposition bei
+Wiedergabebereitschaft an und meldet Takt, Ende und Fehler als
+Messages — die Schwellen- und Fortsetzungslogik verbleibt im
+plattformneutralen `AppUpdate`. Playlist-Navigation liegt als
+eigene Einträge in der Transport-Bar; Titel, Playlist-Position und
+Gesehen-Hinweis zeigt ein eigener Tab im Pull-down-Infobereich
+(`CustomInfoViewControllers`, tvOS 15), der zugleich die
+systemeigene Spurwahl enthält.
+
 Plattform-Anschlüsse: `NSUserDefaults` für nicht-geheime Einstellungen,
 Schlüsselbund (`SecKeyChain`, Generic Password) für Zugangsdaten und
 Geräte-Tokens, `Library/Caches`-Verzeichnisse als Ablagewurzeln und
@@ -119,12 +130,22 @@ Geräte-Tokens, `Library/Caches`-Verzeichnisse als Ablagewurzeln und
   System geräumt werden — eine Räumung erzwingt die Neu-Einrichtung.
   Geheimnisse (Schlüsselbund) und Einstellungen (`NSUserDefaults`)
   sind davon nicht betroffen.
-- Wiedergabe und Downloads sind als vorbereitete Einstiege in den
-  Detailansichten sichtbar, aber noch nicht funktional — sie lösen
-  keinen Fehler aus (Wiedergabe öffnet einen vorbereiteten
-  Platzhalter, der Download meldet einen Hinweistext). Playlist-,
-  Download-Ansichten und weitere Einstellungsbereiche folgen in
-  späteren Entwicklungsschritten — betroffene Menüseiten zeigen
-  derzeit Platzhaltertexte.
+- Die Wiedergabe läuft im nativen tvOS-Vollbildplayer
+  (`AVPlayerViewController` mit systemeigenem Transport-UI):
+  Server-Stream oder lokale Datei ab der Fortsetzungsposition,
+  5-Sekunden-Fortschrittstakt an den Server bzw. die
+  Offline-Warteschlange, „angesehen" erst nach bestätigtem
+  Endfenstereintritt, Auto-Fortsetzung über Serien- und
+  Playlist-Kontext (advance/next/previous-Endpunkte) gemäß
+  Einstellung, Fehler-Rückfall auf den nächsten Eintrag sowie
+  Wiedergabe-Schutz für Downloads (Ablauf-Verlängerung während des
+  Abspielens). Die Ton-/Untertitel-Auswahl steht über den
+  System-Infobereich zur Verfügung, sofern der Stream Spurgruppen
+  anbietet — sonst entfällt sie.
+- Downloads sind als vorbereiteter Einstieg in den Detailansichten
+  sichtbar, aber noch nicht funktional — der Anstoß meldet einen
+  Hinweistext. Playlist- und Download-Ansichten sowie weitere
+  Einstellungsbereiche folgen in späteren Entwicklungsschritten —
+  betroffene Menüseiten zeigen derzeit Platzhaltertexte.
 - Eine Veröffentlichung (App Store / TestFlight) ist noch nicht
   eingerichtet; die dafür nötigen Signatur-Artefakte liegen nicht vor.
