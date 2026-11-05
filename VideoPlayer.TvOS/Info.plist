@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!-- Bundle-Identifier, Name und Versionen injiziert der Build aus den
+         MSBuild-Properties ApplicationId / ApplicationDisplayVersion /
+         ApplicationVersion. -->
+    <!-- 3 = Apple TV -->
+    <key>UIDeviceFamily</key>
+    <array>
+        <integer>3</integer>
+    </array>
+    <!-- Vorbereitung der Server-Discovery (MdnsServerDiscovery in
+         VideoPlayer.ApiClient nutzt Zeroconf mit _http._tcp.local.):
+         tvOS verlangt fuer mDNS im lokalen Netzwerk dieselben
+         Datenschutzschluessel wie iOS. -->
+    <key>NSLocalNetworkUsageDescription</key>
+    <string>Die App sucht im lokalen Netzwerk nach Video-Servern.</string>
+    <key>NSBonjourServices</key>
+    <array>
+        <string>_http._tcp</string>
+    </array>
+    <!-- Lokale Medienwiedergabe und unverschluesselte lokale
+         Server-Verbindungen (LAN), analog zur iOS-App. -->
+    <key>NSAppTransportSecurity</key>
+    <dict>
+        <key>NSAllowsArbitraryLoads</key>
+        <true/>
+    </dict>
+</dict>
+</plist>

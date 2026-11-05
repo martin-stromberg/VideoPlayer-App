@@ -1,0 +1,55 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <!-- tvOS-TFM nur auf macOS aktiv (bzw. explizit per
+         -p:IncludeTvOsTarget=true erzwingbar): die tvOS-Workload ist
+         unter Windows nicht installierbar; ein festes net10.0-tvos-TFM
+         wuerde 'dotnet restore'/'build'/'test' der gesamten Solution
+         unter Windows (lokale Entwicklung und der verify-Job in
+         .github/workflows/pr-checks.yml) mit NETSDK1147 brechen. Bei
+         deaktiviertem Ziel degradiert das Projekt zu einer leeren
+         net10.0-Bibliothek — gleiches Schalter-Muster wie die
+         Include*Target-Properties in VideoPlayer.Maui.csproj. -->
+    <IncludeTvOsTarget Condition="'$(IncludeTvOsTarget)' == ''">$([MSBuild]::IsOSPlatform('osx'))</IncludeTvOsTarget>
+    <TargetFramework Condition="'$(IncludeTvOsTarget)' == 'true'">net10.0-tvos</TargetFramework>
+    <TargetFramework Condition="'$(IncludeTvOsTarget)' != 'true'">net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <WarningsAsErrors>CS1591</WarningsAsErrors>
+    <RootNamespace>VideoPlayer.TvOS</RootNamespace>
+    <PackageLicenseFile>LICENSE</PackageLicenseFile>
+    <Copyright>Copyright (c) Martin Stromberg</Copyright>
+    <Authors>Martin Stromberg</Authors>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(IncludeTvOsTarget)' == 'true'">
+    <OutputType>Exe</OutputType>
+    <!-- Bundle-ID: Arbeitsannahme nach dem bestehenden
+         de.martinstromberg.videos-Schema; die endgueltige tvOS-Bundle-ID
+         wird im Apple-Developer-Account eingerichtet (manueller Vorlauf,
+         siehe Projektschritt 11 / Deployment-Pfad). -->
+    <ApplicationId>de.martinstromberg.videos.tv</ApplicationId>
+    <ApplicationDisplayVersion>0.1</ApplicationDisplayVersion>
+    <ApplicationVersion>1</ApplicationVersion>
+    <SupportedOSPlatformVersion>15.0</SupportedOSPlatformVersion>
+    <RuntimeIdentifiers>tvossimulator-x64;tvossimulator-arm64;tvos-arm64</RuntimeIdentifiers>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(IncludeTvOsTarget)' != 'true'">
+    <!-- Degradierte Huelle fuer Nicht-macOS-Hosts: keine Quelldateien
+         und eine leere Bibliothek, damit Solution-Restore/-Build/-Tests
+         ohne tvOS-Workload fehlerfrei durchlaufen. -->
+    <OutputType>Library</OutputType>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- Ausschliesslich plattformneutrale net10.0-Bibliotheken — keine
+         MAUI-Projekte (msTools.DeveloperApi.Maui, VideoPlayer.Maui),
+         da MAUI tvOS nicht unterstuetzt. -->
+    <ProjectReference Include="..\msTools.DeveloperApi\msTools.DeveloperApi.csproj" />
+    <ProjectReference Include="..\VideoPlayer.ApiClient\VideoPlayer.ApiClient.csproj" />
+    <ProjectReference Include="..\VideoPlayer.Mvu\VideoPlayer.Mvu.csproj" />
+    <ProjectReference Include="..\VideoPlayer.Storage\VideoPlayer.Storage.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="../LICENSE" Pack="true" PackagePath="\" />
+  </ItemGroup>
+</Project>

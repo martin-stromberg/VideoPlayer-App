@@ -1,5 +1,31 @@
 # Änderungsprotokoll
 
+## 2026-11-05 — tvOS-Projektgerüst mit macOS-CI-Build-Validierung
+
+- **Neues App-Projekt `VideoPlayer.TvOS`:** eigenständige .NET-for-tvOS-App
+  (`net10.0-tvos`, UIKit) als minimale Programmhülle — Fenster mit dunkler
+  Startansicht „Heimkino TV", ohne fachliche Funktion. Referenziert
+  ausschließlich die plattformneutralen `net10.0`-Bibliotheken
+  (`VideoPlayer.Mvu`, `VideoPlayer.Storage`, `VideoPlayer.ApiClient`,
+  `msTools.DeveloperApi`); in `VideoPlayer.App.sln` aufgenommen.
+- **`IncludeTvOsTarget`-Schalter:** das tvOS-TFM ist nur unter macOS aktiv;
+  auf anderen Systemen degradiert das Projekt zu einer leeren
+  `net10.0`-Bibliothek, damit Solution-Restore/-Build/-Tests unter Windows
+  weiter laufen (Muster der `Include*Target`-Schalter in
+  `VideoPlayer.Maui.csproj`).
+- **Neuer CI-Job `build-tvos`** in `pr-checks.yml` auf `macos-latest`:
+  SDK-Band-Pin, tvOS-Workload-Rollback `26.5.10318` (analog dem iOS-Pfad)
+  und Simulator-Build ohne Codesignierung — sichert die tvOS-
+  Kompilierbarkeit fortlaufend ab.
+- **Paketkompatibilität geprüft und dokumentiert:** SQLite-Stack
+  (`SQLitePCLRaw.*`, `sqlite-net-pcl`) unter `net10.0-tvos` kompatibel;
+  `Zeroconf` (mDNS) kompilierbar mit dokumentiertem
+  Multicast-Entitlement-Risiko und UDP-only-Ausweich
+  (`UdpServerDiscovery`). Details: `docs/help/tv-app/`.
+- **Tests:** Neue Contract-Tests `TvOsProjectContractTests` sichern
+  Solution-Mitgliedschaft, Referenzmenge, TFM-Schalter und die
+  CI-Job-Konfiguration ab (1446/1446 Tests grün).
+
 ## 2026-10-27 — Downloadbereinigung: Ablaufdatum, Herkunft und automatische Entfernung von Downloads
 
 - **Ablaufdatum je Download:** Jeder fertiggestellte Download trägt jetzt `ExpiresAtUtc` (`DownloadManifestEntry`, neue Spalte via `EnsureColumnAsync`) = Fertigstellungszeitpunkt + „Aufbewahrungszeit für Downloads" (neue Einstellung `AppSettings.DownloadRetentionDays`, 1–365 Tage, Standard 7). Wartende und laufende Aufträge haben kein Ablaufdatum — die Frist beginnt erst mit `completed`; ein erneutes Einreihen („Erneut versuchen") setzt es zurück. Geänderte Einstellungen wirken nur auf neu gesetzte Ablaufdaten. Der Altbestand ohne `ExpiresAtUtc` gilt im ersten Bereinigungslauf als abgelaufen.
