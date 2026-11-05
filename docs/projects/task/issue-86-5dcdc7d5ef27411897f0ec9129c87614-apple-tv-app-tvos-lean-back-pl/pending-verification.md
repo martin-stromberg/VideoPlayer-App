@@ -4,7 +4,7 @@ Register aller Anforderungspunkte, deren Nachweis in der aktuellen Umgebung (Win
 
 | Schritt | Kriterium | Benötigte Voraussetzung | Stand |
 |---------|-----------|--------------------------|-------|
-| 1–laufend | `net10.0-tvos` kompiliert auf macOS; CI-Job `build-tvos` läuft erfolgreich (Simulator-Build ohne Signierung) | Push der Branches → CI-Lauf auf GitHub-macos-Runner | Ausstehend — bereits 2 tvOS-Kompilierfehler (CS1061, CS1739) nachträglich in Abnahme gefunden und behoben |
+| 1–laufend | `net10.0-tvos` kompiliert auf macOS; CI-Job `build-tvos` läuft erfolgreich (Simulator-Build ohne Signierung) | Push der Branches → CI-Lauf auf GitHub-macos-Runner | **FEHLGESCHLAGEN (Run 42103098219, 2026-11-05):** C# kompiliert sauber, aber nativer Linker-Fehler — `ld: building for 'tvOS-simulator', but linking in object file (e_sqlite3.a[arm64](sqlite3.o)) built for 'tvOS'`. `SQLitePCLRaw.lib.e_sqlite3` 3.53.3 hat keine tvossimulator-Slice. Fix auf eigenem Branch in Arbeit |
 | 2–laufend | App startet auf tvOS-Simulator; UI/Focus-Navigation funktioniert tatsächlich (Runtime-Verhalten jenseits von Kompilierung) | tvOS-Simulator/-Gerät oder CI-Testlauf | Ausstehend |
 | 11 | Release-Kandidat landet automatisiert in App Store Connect | Apple-Account-Artefakte (Bundle-ID, Provisioning-Profil, Zertifikate — manueller Vorlauf Kontoinhaber) + Secrets + Push | Ausstehend; Gate-Ansatz hält Pipeline bis dahin grün |
 
