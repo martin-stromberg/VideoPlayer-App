@@ -51,7 +51,7 @@
 <body>
   <div class="card">
     <h1>Apple TV-App (tvOS) — Lean-back-Player via .NET for tvOS, Deployment nach App Store Connect</h1>
-    <div class="meta">Branch <code>task/issue-86-5dcdc7d5ef27411897f0ec9129c87614-apple-tv-app-tvos-lean-back-pl</code> · Stand 05.11.2026 22:31</div>
+    <div class="meta">Branch <code>task/issue-86-5dcdc7d5ef27411897f0ec9129c87614-apple-tv-app-tvos-lean-back-pl</code> · Stand 05.11.2026 22:33</div>
     <p class="overview">Neben der bestehenden MAUI-App (Windows/iOS/Android/MacCatalyst) wird eine eigenständige App für Apple TV (tvOS) als Lean-back-Player mit dem Kern-Funktionsumfang gebaut: Serververbindung per Pairing-Code-Flow, Startseiten-Karussells, Quellen-/Genre-Browsing und Suche, Detailseiten, Wiedergabe mit Fortschritts-Tracking und Auto-Fortsetzung, lesender Playlist-Zugriff sowie manuelle Downloads über eine suspensionstaugliche Hintergrund-URL-Session mit Ablaufdatum und Quota. Umsetzung mit .NET for tvOS (`net10.0-tvos`) und tvOS-nativem UI (Focus-Engine für die Siri Remote); die plattformneutralen Schichten (`net10.0`: MVU-Kern, Storage, API-Client, Domain-Logik) werden wiederverwendet. Da Build und Signierung von tvOS zwingend macOS erfordern, der Entwicklungsrechner aber Windows ist, werden tvOS-spezifische Validierungen früh und laufend über einen macOS-CI-Pfad abgesichert; alle plattformneutralen Anteile (inkl. neuer MVU-Messages) bleiben unter Windows mit der bestehenden Testsuite entwickel- und prüfbar. Abschließend baut, signiert und lädt ein CI-Workflow den Release-Kandidaten nach App Store Connect.</p>
     
     
