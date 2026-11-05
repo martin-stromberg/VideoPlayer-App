@@ -4,7 +4,7 @@ Branch: `task/issue-86-5dcdc7d5ef27411897f0ec9129c87614-apple-tv-app-tvos-lean-b
 
 | # | Titel | Abhängigkeiten | Branch | Status |
 |---|-------|----------------|--------|--------|
-| 1 | tvOS-Projektgerüst und frühe Build-Validierung über macOS-CI | Keine | `task/issue-86-5dcdc7d5ef27411897f0ec9129c87614-apple-tv-app-tvos-lean-back-pl-schritt-1-tvos-projektgeruest` | In Arbeit |
+| 1 | tvOS-Projektgerüst und frühe Build-Validierung über macOS-CI | Keine | `task/issue-86-5dcdc7d5ef27411897f0ec9129c87614-apple-tv-app-tvos-lean-back-pl-schritt-1-tvos-projektgeruest` | Fertig |
 | 2 | MVU-Grundgerüst, Plattform-Anbindung, Navigation und Fokus | 1 | `task/issue-86-5dcdc7d5ef27411897f0ec9129c87614-apple-tv-app-tvos-lean-back-pl-schritt-2-mvu-grundgeruest` | Offen |
 | 3 | Serververbindung — Einrichtung, Pairing und Anmeldung | 2 | `task/issue-86-5dcdc7d5ef27411897f0ec9129c87614-apple-tv-app-tvos-lean-back-pl-schritt-3-serververbindung` | Offen |
 | 4 | Startseite mit fokussierbaren Karussells | 3 | `task/issue-86-5dcdc7d5ef27411897f0ec9129c87614-apple-tv-app-tvos-lean-back-pl-schritt-4-startseite` | Offen |
