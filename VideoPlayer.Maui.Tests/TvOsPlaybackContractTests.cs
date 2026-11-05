@@ -55,7 +55,7 @@ public class TvOsPlaybackContractTests
         Assert.Contains("PlaybackProgressMessage", page, StringComparison.Ordinal);
         Assert.Contains("ObserveDidPlayToEndTime", page, StringComparison.Ordinal);
         Assert.Contains("PlaybackEndedMessage", page, StringComparison.Ordinal);
-        Assert.Contains("ObserveFailedToPlayToEndTime", page, StringComparison.Ordinal);
+        Assert.Contains("AVPlayerItemFailedToPlayToEndTimeNotification", page, StringComparison.Ordinal);
         Assert.Contains("PlaybackFailedMessage", page, StringComparison.Ordinal);
         Assert.Contains("PlayerPageOpenedMessage", page, StringComparison.Ordinal);
         Assert.Contains("PlayerClosedMessage", page, StringComparison.Ordinal);

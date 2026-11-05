@@ -59,8 +59,8 @@ namespace VideoPlayer.TvOS.Ui
         private TimeSpan? pendingResumePosition;
 
         private NSObject? periodicObserver;
-        private NSObject? itemStatusObserver;
-        private NSObject? timeControlObserver;
+        private IDisposable? itemStatusObserver;
+        private IDisposable? timeControlObserver;
         private NSObject? didEndObserver;
         private NSObject? failedEndObserver;
         private NSObject? stalledObserver;
@@ -187,7 +187,10 @@ namespace VideoPlayer.TvOS.Ui
 
             var previous = UIAction.Create(
                 "Vorheriger Eintrag", null, null,
-                _ => _ = dispatch(new PlaylistPreviousRequestedMessage()));
+                _ =>
+                {
+                    _ = dispatch(new PlaylistPreviousRequestedMessage());
+                });
             if (!player.CanNavigatePrevious)
             {
                 previous.Attributes = UIMenuElementAttributes.Disabled;
@@ -195,7 +198,10 @@ namespace VideoPlayer.TvOS.Ui
 
             var next = UIAction.Create(
                 "Nächster Eintrag", null, null,
-                _ => _ = dispatch(new PlaylistNextRequestedMessage()));
+                _ =>
+                {
+                    _ = dispatch(new PlaylistNextRequestedMessage());
+                });
             if (!player.CanNavigateNext)
             {
                 next.Attributes = UIMenuElementAttributes.Disabled;
@@ -340,13 +346,20 @@ namespace VideoPlayer.TvOS.Ui
                     logger.LogInformation("Wiedergabe beendet: {Title}.", CurrentTitleForLog());
                     DispatchIfActive(new PlaybackEndedMessage());
                 });
-            failedEndObserver = AVPlayerItem.Notifications.ObserveFailedToPlayToEndTime(
+            // Der ObserveFailedToPlayToEndTime-Helfer fehlt im
+            // tvOS-Binding — das Ende-Fehlerereignis wird direkt über
+            // das NotificationCenter mit dem stabilen
+            // AVPlayerItem-Notification-Namen abonniert.
+            failedEndObserver = NSNotificationCenter.DefaultCenter.AddObserver(
+                new NSString("AVPlayerItemFailedToPlayToEndTimeNotification"),
                 item,
-                (_, args) =>
+                notification =>
                 {
-                    var error = args.Notification.Object is AVPlayerItem failedItem
+                    var error = notification.Object is AVPlayerItem failedItem
                         ? failedItem.Error?.LocalizedDescription
-                        : null;
+                        : notification.UserInfo?[new NSString("error")] is NSError nsError
+                            ? nsError.LocalizedDescription
+                            : null;
                     logger.LogError("Wiedergabe fehlgeschlagen: {LogMessage}", SanitizeForLog(error));
                     DispatchIfActive(new PlaybackFailedMessage());
                 });
