@@ -6,7 +6,7 @@ Branch: `task/issue-86-5dcdc7d5ef27411897f0ec9129c87614-apple-tv-app-tvos-lean-b
 |---|-------|----------------|--------|--------|
 | 1 | tvOS-Projektgerüst und frühe Build-Validierung über macOS-CI | Keine | `task/issue-86-5dcdc7d5ef27411897f0ec9129c87614-apple-tv-app-tvos-lean-back-pl-schritt-1-tvos-projektgeruest` | Fertig |
 | 2 | MVU-Grundgerüst, Plattform-Anbindung, Navigation und Fokus | 1 | `task/issue-86-5dcdc7d5ef27411897f0ec9129c87614-apple-tv-app-tvos-lean-back-pl-schritt-2-mvu-grundgeruest` | Fertig |
-| 3 | Serververbindung — Einrichtung, Pairing und Anmeldung | 2 | `task/issue-86-5dcdc7d5ef27411897f0ec9129c87614-apple-tv-app-tvos-lean-back-pl-schritt-3-serververbindung` | In Arbeit |
+| 3 | Serververbindung — Einrichtung, Pairing und Anmeldung | 2 | `task/issue-86-5dcdc7d5ef27411897f0ec9129c87614-apple-tv-app-tvos-lean-back-pl-schritt-3-serververbindung` | Fertig |
 | 4 | Startseite mit fokussierbaren Karussells | 3 | `task/issue-86-5dcdc7d5ef27411897f0ec9129c87614-apple-tv-app-tvos-lean-back-pl-schritt-4-startseite` | Offen |
 | 5 | Quellen- und Genre-Browsing sowie Suche | 3 | `task/issue-86-5dcdc7d5ef27411897f0ec9129c87614-apple-tv-app-tvos-lean-back-pl-schritt-5-browsing-suche` | Offen |
 | 6 | Detailseiten für Film, Sammlung, Serie, Staffel und Episode | 4, 5 | `task/issue-86-5dcdc7d5ef27411897f0ec9129c87614-apple-tv-app-tvos-lean-back-pl-schritt-6-detailseiten` | Offen |
