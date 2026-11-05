@@ -26,7 +26,7 @@ Die App koppelt sich beim Erststart über einen vom Server erzeugten Einmal-QR-C
 |-----------|--------|
 | Windows | Unterstützt (primäres Entwicklungsziel, E2E-getestet) |
 | iOS | Unterstützt (Geräte-Deployment via Pair-to-Mac) |
-| tvOS | Eigenständige App `VideoPlayer.TvOS` (nativ, kein MAUI) — MVU-Grundgerüst mit Plattform-Adaptern und fernbedienbarer Tab-Navigation; Kompilierbarkeit via macOS-CI-Job `build-tvos` gesichert |
+| tvOS | Eigenständige App `VideoPlayer.TvOS` (nativ, kein MAUI) — MVU-Grundgerüst mit fernbedienbarer Tab-Navigation und vollständiger Serververbindung (Erkennung, Pairing-/Kurzcode-Kopplung, Anmeldung, Serverwechsel); Kompilierbarkeit via macOS-CI-Job `build-tvos` gesichert |
 | MacCatalyst | Baubar, nicht aktiv gepflegt |
 | Android | Build möglich, **nicht offiziell unterstützt** — kein Test-/CI-Gate |
 

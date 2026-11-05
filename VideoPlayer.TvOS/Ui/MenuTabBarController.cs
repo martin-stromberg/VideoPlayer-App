@@ -38,13 +38,7 @@ namespace VideoPlayer.TvOS.Ui
             base.ViewDidLoad();
 
             var controllers = AppRoutes.MenuPages
-                .Select(page => new PagePlaceholderViewController(
-                    PageTitles[page].Title,
-                    PageTitles[page].Subtitle)
-                {
-                    TabBarItem = new UITabBarItem(PageTitles[page].Title, null, (nint)AppRoutes.MenuPages.IndexOf(page))
-                })
-                .Cast<UIViewController>()
+                .Select(CreatePageController)
                 .ToArray();
             ViewControllers = controllers;
 
@@ -71,6 +65,44 @@ namespace VideoPlayer.TvOS.Ui
 
             SelectedIndex = index;
             return true;
+        }
+
+        /// <summary>Verteilt den Modellstand an die modellgetriebenen Menüseiten.</summary>
+        /// <param name="model">Das aktuelle App-Modell.</param>
+        public void Render(AppModel model)
+        {
+            if (ViewControllers is null)
+            {
+                return;
+            }
+
+            foreach (var controller in ViewControllers)
+            {
+                if (controller is IModelRenderable renderable)
+                {
+                    renderable.Render(model);
+                }
+            }
+        }
+
+        /// <summary>Erzeugt den Inhaltscontroller einer Menüseite samt Tab-Eintrag.</summary>
+        /// <param name="page">Die Menüseite.</param>
+        /// <returns>Der Seitencontroller für die Tab-Leiste.</returns>
+        private UIViewController CreatePageController(AppPage page)
+        {
+            UIViewController controller = page switch
+            {
+                AppPage.Profile => new ProfilePageViewController(dispatch),
+                AppPage.Settings => new SettingsPageViewController(dispatch),
+                _ => new PagePlaceholderViewController(
+                    PageTitles[page].Title,
+                    PageTitles[page].Subtitle)
+            };
+            controller.TabBarItem = new UITabBarItem(
+                PageTitles[page].Title,
+                null,
+                (nint)AppRoutes.MenuPages.IndexOf(page));
+            return controller;
         }
     }
 }
