@@ -1,5 +1,37 @@
 # Änderungsprotokoll
 
+## 2026-11-07 — tvOS-App: Browsing und Suche als Lean-back-Oberfläche
+
+- **Quellen-Auswahl auf der Startseite:** neue „Quellen"-Reihe
+  (`SourceCarouselView`/`SourceItemCell`) aus dem Modellstand
+  `AppModel.SourcesOverview` — mit Server-Icons über
+  `api/sourceicons/{id}` (`TvosPosterImageService.GetSourceIconAsync`,
+  eigener Schlüsselraum `.sourceicon`) sowie Lade-, Leer- und
+  Fehlerzustand mit „Erneut versuchen" (`SourcesReloadRequestedMessage`).
+- **Modale Browsing-Seite (`SourceBrowserViewController`):** Auswahl
+  einer Quelle (`SourceSelectedMessage` → `NavigateToSourceOverviewEffect`)
+  öffnet die Seite über `TvosNavigator.PresentSourceBrowser` —
+  Genre-Filterleiste inklusive „Alle" (`SourceGenreCell` mit
+  Auswahlzustand, ausgeblendet ohne Server-Genres), Suchfeld per
+  tvOS-Systemtastatur (Diktat/Continuity-Tastatur; der eingegebene Text
+  bleibt über einen Spiegel-Guard sichtbar) und vertikal scrollendes
+  Poster-Raster mit Nachladen am Listenende
+  (`SourceItemsNextPageRequestedMessage`). Lade-, Leer- und
+  Fehlerzustände mit Wiederholmöglichkeit
+  (`SourceItemsRetryRequestedMessage`); die Menü-Taste schließt zurück
+  zum Menürahmen.
+- **Verdrahtung:** `TvosAppEffectHandler` führt jetzt
+  `LoadSourcesEffect`, `LoadSourceGenresEffect`, `LoadSourceItemsEffect`
+  (über `SourceBrowserService`/`api/Sources`, `api/SourceGenres`,
+  `api/items` — rein lesend) und `NavigateToSourceOverviewEffect` aus;
+  `AppComposition` hält den `SourceBrowserService`-Singleton.
+  `PresentPreparedTarget` stapelt auf dem obersten präsentierten
+  Controller — Eintrags-Auswahl im Browser öffnet das vorbereitete
+  Navigationsziel ohne Fehler (Detailansicht folgt im Detailseiten-Schritt).
+- **Absicherung:** neue `TvOsBrowsingContractTests` (8 Quell-Contract-
+  Tests); Gesamtsuite `VideoPlayer.Maui.Tests`: 1480/1480 grün. Der
+  tvOS-Kompiliernachweis erfolgt über den macOS-CI-Job `build-tvos`.
+
 ## 2026-11-06 — tvOS-App: Fix nativer Linkfehler `e_sqlite3` unter `tvossimulator-arm64`
 
 - **Befund:** `SQLitePCLRaw.lib.e_sqlite3.tvos` (transitiv via

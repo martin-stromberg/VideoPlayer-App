@@ -20,6 +20,7 @@ namespace VideoPlayer.TvOS.Ui
         private MenuTabBarController? tabBar;
         private ServerSetupViewController? serverSetupPage;
         private LoginViewController? loginPage;
+        private SourceBrowserViewController? sourceBrowserPage;
 
         /// <summary>Die zuletzt dargestellte Menüseite — Rückziel der Menü-Taste auf Workflow-Seiten.</summary>
         private AppPage LastMenuPage { get; set; } = AppPage.Home;
@@ -94,6 +95,46 @@ namespace VideoPlayer.TvOS.Ui
             serverSetupPage?.Render(model);
             loginPage?.Render(model);
             tabBar?.Render(model);
+            sourceBrowserPage?.Render(model);
+        }
+
+        /// <summary>
+        /// Präsentiert die Browsing-Seite einer Quelle modal über dem
+        /// Menürahmen (<see cref="NavigateToSourceOverviewEffect"/>) —
+        /// Gegenstück zur Shell-Route <c>sourceoverview</c> der
+        /// MAUI-App. Die Seite wird einmal erzeugt und bei erneuter
+        /// Präsentation mit dem neuen Quellen-Kontext versehen statt
+        /// gestapelt (Duplikat-Guard: eine bereits präsentierte
+        /// Browser-Seite bleibt unverändert).
+        /// </summary>
+        /// <param name="sourceId">Id der zu öffnenden Quelle.</param>
+        /// <param name="sourceName">Anzeigename der Quelle (Seitentitel).</param>
+        public void PresentSourceBrowser(long sourceId, string sourceName)
+        {
+            if (main is null)
+            {
+                return;
+            }
+
+            sourceBrowserPage ??= new SourceBrowserViewController(dispatch, posters)
+            {
+                ModalPresentationStyle = UIModalPresentationStyle.FullScreen
+            };
+            sourceBrowserPage.SetSource(sourceId, sourceName);
+
+            var host = TopmostPresented();
+            if (host is SourceBrowserViewController
+                || sourceBrowserPage.PresentingViewController is not null)
+            {
+                // Die Browser-Seite ist bereits präsentiert (oben oder
+                // unter einem Folgeziel) — nur der Quellen-Kontext
+                // wurde aktualisiert; ein erneutes Presentieren eines
+                // bereits präsentierten Controllers wäre ein
+                // UIKit-Verstoß.
+                return;
+            }
+
+            host.PresentViewController(sourceBrowserPage, true, null);
         }
 
         /// <summary>
@@ -117,7 +158,8 @@ namespace VideoPlayer.TvOS.Ui
                 return;
             }
 
-            if (main.PresentedViewController is PreparedTargetViewController existing)
+            var host = TopmostPresented();
+            if (host is PreparedTargetViewController existing)
             {
                 existing.Update(title, detail);
                 return;
@@ -127,7 +169,28 @@ namespace VideoPlayer.TvOS.Ui
             {
                 ModalPresentationStyle = UIModalPresentationStyle.FullScreen
             };
-            main.PresentViewController(target, true, null);
+            // Auf dem obersten präsentierten Controller stapeln — die
+            // Eintrags-Auswahl der modalen Browser-Seite muss das Ziel
+            // über dem Browser zeigen können (Rückkehr führt dorthin).
+            host.PresentViewController(target, true, null);
+        }
+
+        /// <summary>
+        /// Ermittelt den obersten Controller der modalen
+        /// Präsentationskette (<see cref="MainViewController"/> selbst,
+        /// wenn nichts präsentiert ist) — Präsentationsanker für
+        /// modale Ziele über dem Menürahmen oder der Browser-Seite.
+        /// </summary>
+        /// <returns>Der oberste präsentierte Controller bzw. der Fensterrahmen.</returns>
+        private UIViewController TopmostPresented()
+        {
+            UIViewController host = main!;
+            while (host.PresentedViewController is { } presented)
+            {
+                host = presented;
+            }
+
+            return host;
         }
 
         /// <summary>

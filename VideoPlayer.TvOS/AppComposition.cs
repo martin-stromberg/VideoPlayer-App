@@ -75,6 +75,7 @@ namespace VideoPlayer.TvOS
                 new AppLogger<ProgressReportService>(LoggerFactory));
             HomeLists = new HomeListService(
                 CacheDatabase, new AppLogger<HomeListService>(LoggerFactory), TimeProvider.System);
+            SourceBrowser = new SourceBrowserService(AuthSession);
             OfflineContinueWatching = new OfflineContinueWatchingService(
                 CacheDatabase, BackupDatabase, HomeLists, StorageLayout,
                 new AppLogger<OfflineContinueWatchingService>(LoggerFactory));
@@ -146,6 +147,9 @@ namespace VideoPlayer.TvOS
 
         /// <summary>Lesezugriff auf die gecachten Startseiten-Listen.</summary>
         public HomeListService HomeLists { get; }
+
+        /// <summary>Ladedienst des Quellen-Browsers (Quellen, Genres, paginierte Einträge, Suche).</summary>
+        public SourceBrowserService SourceBrowser { get; }
 
         /// <summary>Offline-Zusammenstellung der Weiterschauen-Liste.</summary>
         public OfflineContinueWatchingService OfflineContinueWatching { get; }

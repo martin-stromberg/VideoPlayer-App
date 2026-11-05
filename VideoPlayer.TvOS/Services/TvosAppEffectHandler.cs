@@ -150,6 +150,25 @@ namespace VideoPlayer.TvOS.Services
                 case LoadHomeListsEffect:
                     await LoadHomeListsAsync();
                     break;
+                case LoadSourcesEffect:
+                    await LoadSourcesAsync(cancellationToken);
+                    break;
+                case LoadSourceGenresEffect genres:
+                    await LoadSourceGenresAsync(genres, cancellationToken);
+                    break;
+                case LoadSourceItemsEffect items:
+                    await LoadSourceItemsAsync(items, cancellationToken);
+                    break;
+                case NavigateToSourceOverviewEffect overview:
+                    // Modale Browsing-Seite der Quelle — Pendant zur
+                    // Shell-Route sourceoverview (Hauptthread:
+                    // UIKit-Präsentation).
+                    await MainThreadInvoker.InvokeOnMainThreadAsync(() =>
+                    {
+                        navigator.PresentSourceBrowser(overview.SourceId, overview.SourceName);
+                        return Task.CompletedTask;
+                    });
+                    break;
                 case NavigateToMediaDetailsEffect details:
                     // Vorbereitetes Navigationsziel der Eintrags-Auswahl —
                     // die eigentliche Detailansicht entsteht im
@@ -702,6 +721,62 @@ namespace VideoPlayer.TvOS.Services
             }
 
             await DispatchMessageAsync(new HomeListsLoadedMessage(lists));
+        }
+
+        private async Task LoadSourcesAsync(CancellationToken cancellationToken)
+        {
+            IReadOnlyList<SourceItem> sources = [];
+            string? error = null;
+            try
+            {
+                sources = await services.SourceBrowser.LoadSourcesAsync(cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Quellen laden fehlgeschlagen");
+                error = "Die Quellen konnten nicht geladen werden.";
+            }
+
+            await DispatchMessageAsync(new SourcesLoadedMessage(sources, error));
+        }
+
+        private async Task LoadSourceGenresAsync(LoadSourceGenresEffect genres, CancellationToken cancellationToken)
+        {
+            IReadOnlyList<SourceGenreItem> items;
+            try
+            {
+                items = await services.SourceBrowser.LoadGenresAsync(genres.SourceId, cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                // Genre-Ladefehler sind nicht fatal — die Leiste zeigt
+                // dann nur „Alle" (kein Filter) — Muster:
+                // ShellAppEffectHandler.
+                logger.LogError(ex, "Genres laden fehlgeschlagen");
+                items = [new SourceGenreItem { Id = 0, Name = SourceBrowserService.AllGenresName, IsSelected = true }];
+            }
+
+            await DispatchMessageAsync(new SourceGenresLoadedMessage(genres.SourceId, items));
+        }
+
+        private async Task LoadSourceItemsAsync(LoadSourceItemsEffect items, CancellationToken cancellationToken)
+        {
+            SourceItemsPage page;
+            string? error = null;
+            try
+            {
+                page = await services.SourceBrowser.LoadItemsAsync(
+                    items.SourceId, items.Page, items.SearchText, items.GenreId, cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Quelleneinträge laden fehlgeschlagen");
+                page = new SourceItemsPage(items.Page, [], HasMore: false);
+                error = "Die Einträge konnten nicht geladen werden.";
+            }
+
+            await DispatchMessageAsync(new SourceItemsLoadedMessage(
+                items.SourceId, page.Page, page.Items, page.HasMore, items.Append, error));
         }
 
         private async Task LogoutAsync()
