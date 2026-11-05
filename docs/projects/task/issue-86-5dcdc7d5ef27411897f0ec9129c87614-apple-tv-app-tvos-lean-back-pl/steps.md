@@ -8,7 +8,7 @@ Branch: `task/issue-86-5dcdc7d5ef27411897f0ec9129c87614-apple-tv-app-tvos-lean-b
 | 2 | MVU-Grundgerüst, Plattform-Anbindung, Navigation und Fokus | 1 | `task/issue-86-5dcdc7d5ef27411897f0ec9129c87614-apple-tv-app-tvos-lean-back-pl-schritt-2-mvu-grundgeruest` | Fertig |
 | 3 | Serververbindung — Einrichtung, Pairing und Anmeldung | 2 | `task/issue-86-5dcdc7d5ef27411897f0ec9129c87614-apple-tv-app-tvos-lean-back-pl-schritt-3-serververbindung` | Fertig |
 | 4 | Startseite mit fokussierbaren Karussells | 3 | `task/issue-86-5dcdc7d5ef27411897f0ec9129c87614-apple-tv-app-tvos-lean-back-pl-schritt-4-startseite` | Fertig |
-| 5 | Quellen- und Genre-Browsing sowie Suche | 3 | `task/issue-86-5dcdc7d5ef27411897f0ec9129c87614-apple-tv-app-tvos-lean-back-pl-schritt-5-browsing-suche` | In Arbeit |
+| 5 | Quellen- und Genre-Browsing sowie Suche | 3 | `task/issue-86-5dcdc7d5ef27411897f0ec9129c87614-apple-tv-app-tvos-lean-back-pl-schritt-5-browsing-suche` | Fertig |
 | 6 | Detailseiten für Film, Sammlung, Serie, Staffel und Episode | 4, 5 | `task/issue-86-5dcdc7d5ef27411897f0ec9129c87614-apple-tv-app-tvos-lean-back-pl-schritt-6-detailseiten` | Offen |
 | 7 | Wiedergabe mit Fortschritts-Tracking, Auto-Fortsetzung und Spurwahl | 6 | `task/issue-86-5dcdc7d5ef27411897f0ec9129c87614-apple-tv-app-tvos-lean-back-pl-schritt-7-wiedergabe` | Offen |
 | 8 | Playlists — lesender Zugriff und Wiedergabe | 7 | `task/issue-86-5dcdc7d5ef27411897f0ec9129c87614-apple-tv-app-tvos-lean-back-pl-schritt-8-playlists` | Offen |
