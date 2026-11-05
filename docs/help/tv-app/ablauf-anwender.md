@@ -72,6 +72,22 @@ Zurück geht es mit der Menü-Taste oder „Zurück". Ohne
 Serververbindung zeigt die Startseite die lokal gespeicherten
 Bereiche mit einem Offline-Hinweis; leere Reihen entfallen.
 
+### 6. Quellen durchsuchen
+
+Die Reihe „Quellen" auf der Startseite führt die freigegebenen
+Medienbereiche des Servers. Wähle eine Quelle: die Browsing-Seite
+öffnet sich im Vollbild mit dem Quellennamen als Titel. Darunter
+findest du das Suchfeld — bei Auswahl öffnet sich die tvOS-Tastatur,
+Diktat per Siri Remote oder die Tastatur des verbundenen iPhone geben
+den Suchtext ein; er bleibt sichtbar und filtert die Liste ab der
+ersten Seite. Liefert die Quelle Genres, erscheint eine
+Filterleiste — „Alle" zeigt die ungefilterte Liste. Das Poster-Raster
+darunter zeigt Titel und Vorschaubilder und lädt am Listenende
+selbsttätig weitere Einträge nach. Eintrags-Auswahl öffnet das
+vorbereitete Ziel (Detailansicht folgt später); die Menü-Taste kehrt
+zur Startseite zurück. Ladefehler zeigen „Erneut versuchen" — sowohl
+bei der Quellen-Reihe als auch in der Browsing-Seite.
+
 ## Barrierefreiheit
 
 Sämtliche Elemente sind über die tvOS-Focus-Engine per Siri Remote

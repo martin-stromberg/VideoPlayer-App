@@ -28,6 +28,9 @@ namespace VideoPlayer.TvOS.Ui
         // Kartengröße der Poster-Reihen (2:3-Poster plus Titelbereich).
         private static readonly CGSize PosterItemSize = new(300f, 514f);
 
+        // Kartengröße der Quellen-Reihe (quadratisches Icon plus Namensbereich).
+        private static readonly CGSize SourceItemSize = new(340f, 420f);
+
         private readonly Func<AppMessage, Task> dispatch;
         private readonly TvosPosterImageService posters;
         private readonly TimeProvider timeProvider;
@@ -35,6 +38,10 @@ namespace VideoPlayer.TvOS.Ui
         private UIStackView? content;
         private UILabel? offlineBanner;
         private UILabel? noticeBanner;
+        private UIStackView? sourcesSection;
+        private UILabel? sourcesStatus;
+        private UIButton? sourcesRetry;
+        private SourceCarouselView? sourcesCarousel;
         private readonly List<HomeCarouselView> sections = [];
         private string[] appliedKeys = [];
         private AppModel? lastModel;
@@ -96,6 +103,30 @@ namespace VideoPlayer.TvOS.Ui
             content.AddArrangedSubview(TvosControls.Title("Startseite"));
             content.AddArrangedSubview(offlineBanner);
             content.AddArrangedSubview(noticeBanner);
+
+            // Quellen-Sektion: Auswahl der freigegebenen Medienbereiche
+            // des Servers samt Lade-/Leer-/Fehlerzustand — die Auswahl
+            // öffnet die Browsing-Seite der Quelle.
+            sourcesSection = TvosControls.Section();
+            sourcesSection.Hidden = true;
+
+            sourcesStatus = TvosControls.Status();
+            sourcesStatus.Hidden = true;
+
+            sourcesRetry = TvosControls.Button(
+                "Erneut versuchen",
+                () => _ = dispatch(new SourcesReloadRequestedMessage()));
+            sourcesRetry.Hidden = true;
+
+            sourcesCarousel = new SourceCarouselView(
+                SourceItemSize, posters, OnSourceSelected);
+            sourcesCarousel.Hidden = true;
+
+            sourcesSection.AddArrangedSubview(TvosControls.Heading("Quellen"));
+            sourcesSection.AddArrangedSubview(sourcesStatus);
+            sourcesSection.AddArrangedSubview(sourcesRetry);
+            sourcesSection.AddArrangedSubview(sourcesCarousel);
+            content.AddArrangedSubview(sourcesSection);
 
             NSLayoutConstraint.ActivateConstraints(
             [
@@ -161,6 +192,8 @@ namespace VideoPlayer.TvOS.Ui
             offlineBanner!.Hidden = !model.IsOffline;
             noticeBanner!.Hidden = model.StorageNotice is null;
             noticeBanner.Text = model.StorageNotice ?? string.Empty;
+
+            ApplySourcesOverview(model.SourcesOverview);
 
             var desired = BuildSections(model);
             var keys = desired.Select(d => d.Key).ToArray();
@@ -239,6 +272,61 @@ namespace VideoPlayer.TvOS.Ui
 
             appliedKeys = desired.Select(d => d.Key).ToArray();
         }
+
+        // Quellen-Sektion aus dem Menüstand: Karten bei vorhandenen
+        // Quellen, Statustext bei Ladung/Leere, Fehlertext mit
+        // Wiederholmöglichkeit bei Ladefehlern.
+        private void ApplySourcesOverview(SourcesOverviewState overview)
+        {
+            if (overview.HasSources)
+            {
+                sourcesSection!.Hidden = false;
+                sourcesStatus!.Hidden = true;
+                sourcesRetry!.Hidden = true;
+                sourcesCarousel!.Hidden = false;
+                sourcesCarousel.SetItems(overview.Sources);
+                return;
+            }
+
+            if (overview.IsLoading)
+            {
+                sourcesSection!.Hidden = false;
+                sourcesStatus!.Text = "Quellen werden geladen…";
+                sourcesStatus.Hidden = false;
+                sourcesRetry!.Hidden = true;
+                sourcesCarousel!.Hidden = true;
+                return;
+            }
+
+            if (overview.HasError)
+            {
+                sourcesSection!.Hidden = false;
+                sourcesStatus!.Text = overview.Error ?? "Die Quellen konnten nicht geladen werden.";
+                sourcesStatus.Hidden = false;
+                sourcesRetry!.Hidden = false;
+                sourcesCarousel!.Hidden = true;
+                return;
+            }
+
+            if (overview.ShowEmpty)
+            {
+                sourcesSection!.Hidden = false;
+                sourcesStatus!.Text = "Keine Quellen freigegeben.";
+                sourcesStatus.Hidden = false;
+                sourcesRetry!.Hidden = true;
+                sourcesCarousel!.Hidden = true;
+                return;
+            }
+
+            // Noch kein Ladeversuch — Sektion ausblenden statt eine
+            // funktionslose Zeile zu zeigen.
+            sourcesSection!.Hidden = true;
+        }
+
+        // Auswahl eines Quelleneintrags: öffnet die Browsing-Seite der
+        // Quelle (Update emittiert Navigation + Lade-Effekte).
+        private void OnSourceSelected(SourceItem source) =>
+            _ = dispatch(new SourceSelectedMessage(source));
 
         // Auswahl eines Karten-Eintrags: Weiterschauen-Einträge lösen den Fortsetzungs-/Wiedergabepfad aus, alle übrigen die Detail-Navigation — Update entscheidet über Effekte und Platzhalter-Auswahl.
         private void OnItemSelected(HomeSectionDescriptor section, HomeMediaItem item)

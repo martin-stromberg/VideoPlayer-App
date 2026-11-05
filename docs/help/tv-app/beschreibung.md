@@ -68,6 +68,24 @@ folgen in späteren Entwicklungsschritten. Im Offline-Zustand zeigt die
 Startseite die aus lokalen Daten gespeisten Bereiche samt Hinweis;
 leere Listen blenden ihre Sektion aus.
 
+Das Browsing folgt demselben plattformneutralen Quellenbrowser wie die
+Hauptanwendung (`AppModel.SourcesOverview`, `AppModel.SourceBrowser`):
+die Startseite trägt eine „Quellen"-Reihe der freigegebenen
+Medienbereiche (`SourceItemCell`-Karten mit Server-Icon aus
+`api/sourceicons/{id}`); deren Auswahl öffnet die modale Browsing-Seite
+(`SourceBrowserViewController`). Sie zeigt den Quellennamen als Titel,
+ein Suchfeld (tvOS-Systemtastatur mit Diktat bzw.
+Continuity-Tastatur — der eingegebene Text bleibt sichtbar), die
+Genre-Filterleiste inklusive „Alle" (ausgeblendet, wenn die Quelle
+keine Genres liefert) und ein vertikal scrollendes Poster-Raster, das
+bei Annäherung an das Listenende weitere Seiten nachlädt
+(`SourceItemsNextPageRequestedMessage`). Lade-, Leer- und
+Fehlerzustände sind fernbedienungstauglich sichtbar; Ladefehler zeigen
+eine „Erneut versuchen"-Aktion. Die Auswahl eines Eintrags führt — wie
+auf der Startseite — auf das vorbereitete Navigationsziel; die
+Menü-Taste schließt die Seite zurück in den Menürahmen. Das Browsing
+ist rein lesend; kein Schreibzugriff auf Inhalte wird verdrahtet.
+
 Plattform-Anschlüsse: `NSUserDefaults` für nicht-geheime Einstellungen,
 Schlüsselbund (`SecKeyChain`, Generic Password) für Zugangsdaten und
 Geräte-Tokens, `Library/Caches`-Verzeichnisse als Ablagewurzeln und
@@ -81,9 +99,10 @@ Geräte-Tokens, `Library/Caches`-Verzeichnisse als Ablagewurzeln und
   Geheimnisse (Schlüsselbund) und Einstellungen (`NSUserDefaults`)
   sind davon nicht betroffen.
 - Detailansichten und Wiedergabe sind als vorbereitete
-  Navigationsziele vorhanden, aber noch nicht funktional; Browsing,
-  Playlist-, Download-Ansichten und weitere Einstellungsbereiche
-  folgen in späteren Entwicklungsschritten — betroffene Menüseiten
-  zeigen derzeit Platzhaltertexte.
+  Navigationsziele vorhanden, aber noch nicht funktional — die
+  Eintrags-Auswahl (Startseite, Browsing) öffnet einen modalen
+  Platzhalter ohne Fehler. Playlist-, Download-Ansichten und weitere
+  Einstellungsbereiche folgen in späteren Entwicklungsschritten —
+  betroffene Menüseiten zeigen derzeit Platzhaltertexte.
 - Eine Veröffentlichung (App Store / TestFlight) ist noch nicht
   eingerichtet; die dafür nötigen Signatur-Artefakte liegen nicht vor.

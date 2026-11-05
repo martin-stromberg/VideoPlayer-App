@@ -1,22 +1,23 @@
 using Foundation;
 using Microsoft.Extensions.Logging;
 using UIKit;
+using VideoPlayer.ApiClient;
 using VideoPlayer.Mvu;
 using VideoPlayer.Storage;
 
 namespace VideoPlayer.TvOS.Services
 {
     /// <summary>
-    /// Lädt Vorschaubilder (Poster) vom Server-Endpunkt
-    /// <c>api/pictures/{id}</c> — tvOS-Pendant zum
-    /// <c>PosterImageService</c> der MAUI-App mit derselben
-    /// Cache-Konvention: Arbeitsspeicher, dann Datei
-    /// <c>{pictureId}.poster</c> im nicht backup-pflichtigen
-    /// <see cref="AppStorageLayout.PreviewsDirectory"/>, dann Abruf über
-    /// den angemeldeten API-Client samt Ablage. Fehlende oder nicht
-    /// ladbare Bilder liefern <c>null</c> — die Karte zeigt dann den
-    /// Titel als Fallback (fehlende Vorschaubilder sind kein
-    /// Fehlerzustand).
+    /// Lädt Vorschaubilder (Poster) und Quellen-Icons vom Server —
+    /// tvOS-Pendant zum <c>PosterImageService</c> der MAUI-App mit
+    /// derselben Cache-Konvention: Arbeitsspeicher, dann Datei im nicht
+    /// backup-pflichtigen <see cref="AppStorageLayout.PreviewsDirectory"/>,
+    /// dann Abruf über den angemeldeten API-Client samt Ablage. Fehlende
+    /// oder nicht ladbare Bilder liefern <c>null</c> — die Karte zeigt
+    /// dann den Titel als Fallback (fehlende Vorschaubilder sind kein
+    /// Fehlerzustand). Poster (<c>api/pictures/{id}</c>) und Quellen-Icons
+    /// (<c>api/sourceicons/{id}</c>) nutzen getrennte Schlüsselräume, da
+    /// ihre Bild-Ids nicht disjunkt sind.
     /// </summary>
     public sealed class TvosPosterImageService
     {
@@ -24,6 +25,10 @@ namespace VideoPlayer.TvOS.Services
         private readonly AppStorageLayout layout;
         private readonly ILogger<TvosPosterImageService> logger;
         private readonly System.Collections.Concurrent.ConcurrentDictionary<long, UIImage> memoryCache = new();
+
+        // Eigenständiger Schlüsselraum der Quellen-Icons — die Bild-Ids
+        // der Icon- und Poster-Endpunkte sind nicht disjunkt.
+        private readonly System.Collections.Concurrent.ConcurrentDictionary<long, UIImage> iconCache = new();
 
         /// <summary>Initialisiert eine neue Instanz der <see cref="TvosPosterImageService"/>-Klasse.</summary>
         /// <param name="authSession">Sitzungsdienst; liefert den angemeldeten API-Client für Bildabrufe.</param>
@@ -48,19 +53,52 @@ namespace VideoPlayer.TvOS.Services
         /// <param name="pictureId">Server-Bild-Id des Posters (<c>api/pictures/{id}</c>).</param>
         /// <param name="cancellationToken">Bricht den Bildabruf ab.</param>
         /// <returns>Das Bild oder <c>null</c>, wenn kein Bild verfügbar ist.</returns>
-        public async Task<UIImage?> GetImageAsync(long pictureId, CancellationToken cancellationToken = default)
+        public Task<UIImage?> GetImageAsync(long pictureId, CancellationToken cancellationToken = default) =>
+            LoadImageAsync(
+                pictureId,
+                $"{pictureId}.poster",
+                memoryCache,
+                (client, ct) => client.GetPictureAsync(pictureId, ct),
+                cancellationToken);
+
+        /// <summary>
+        /// Liefert das Icon einer Medienquelle zu einer Bild-Id —
+        /// gleiche Cache-Konvention wie <see cref="GetImageAsync"/>, aber
+        /// über den Server-Endpunkt <c>api/sourceicons/{id}</c> und mit
+        /// eigenem Datei-Suffix <c>.sourceicon</c> sowie eigenem
+        /// Speicher-Cache. <c>null</c>, wenn kein Icon verfügbar ist.
+        /// </summary>
+        /// <param name="pictureId">Server-Bild-Id des Quellen-Icons (<c>api/sourceicons/{id}</c>).</param>
+        /// <param name="cancellationToken">Bricht den Bildabruf ab.</param>
+        /// <returns>Das Icon oder <c>null</c>, wenn keines verfügbar ist.</returns>
+        public Task<UIImage?> GetSourceIconAsync(long pictureId, CancellationToken cancellationToken = default) =>
+            LoadImageAsync(
+                pictureId,
+                $"{pictureId}.sourceicon",
+                iconCache,
+                (client, ct) => client.GetSourceIconAsync(pictureId, ct),
+                cancellationToken);
+
+        // Gemeinsame Cache-Kaskade beider Bildarten: Arbeitsspeicher →
+        // Datei im Vorschaubild-Verzeichnis → Serverabruf samt Ablage.
+        private async Task<UIImage?> LoadImageAsync(
+            long pictureId,
+            string fileName,
+            System.Collections.Concurrent.ConcurrentDictionary<long, UIImage> cache,
+            Func<VideoPlayerApiClient, CancellationToken, Task<byte[]>> fetch,
+            CancellationToken cancellationToken)
         {
             if (pictureId <= 0)
             {
                 return null;
             }
 
-            if (memoryCache.TryGetValue(pictureId, out var cached))
+            if (cache.TryGetValue(pictureId, out var cached))
             {
                 return cached;
             }
 
-            var path = Path.Combine(layout.PreviewsDirectory, $"{pictureId}.poster");
+            var path = Path.Combine(layout.PreviewsDirectory, fileName);
             try
             {
                 if (File.Exists(path))
@@ -69,7 +107,7 @@ namespace VideoPlayer.TvOS.Services
                     var fileImage = data is null ? null : UIImage.LoadFromData(data);
                     if (fileImage is not null)
                     {
-                        memoryCache[pictureId] = fileImage;
+                        cache[pictureId] = fileImage;
                     }
 
                     return fileImage;
@@ -81,7 +119,7 @@ namespace VideoPlayer.TvOS.Services
                     return null;
                 }
 
-                var bytes = await client.GetPictureAsync(pictureId, cancellationToken);
+                var bytes = await fetch(client, cancellationToken);
                 if (bytes.Length == 0)
                 {
                     return null;
@@ -91,15 +129,15 @@ namespace VideoPlayer.TvOS.Services
                 var image = UIImage.LoadFromData(NSData.FromArray(bytes));
                 if (image is not null)
                 {
-                    memoryCache[pictureId] = image;
+                    cache[pictureId] = image;
                 }
 
                 return image;
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
-                // Fehlende Vorschaubilder sind kein Fehlerzustand der Seite
-                // — die Karte zeigt den Titel als Fallback.
+                // Fehlende Bilder sind kein Fehlerzustand der Seite —
+                // die Karte zeigt den Titel als Fallback.
                 logger.LogWarning(ex, "Bild {PictureId} nicht ladbar.", pictureId);
                 return null;
             }
