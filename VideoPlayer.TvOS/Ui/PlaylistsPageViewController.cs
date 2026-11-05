@@ -57,7 +57,6 @@ namespace VideoPlayer.TvOS.Ui
             tableView = new UITableView(CGRect.Empty, UITableViewStyle.Plain)
             {
                 BackgroundColor = UIColor.Clear,
-                SeparatorStyle = UITableViewCellSeparatorStyle.None,
                 ShowsVerticalScrollIndicator = true,
                 RemembersLastFocusedIndexPath = true,
                 TranslatesAutoresizingMaskIntoConstraints = false,
