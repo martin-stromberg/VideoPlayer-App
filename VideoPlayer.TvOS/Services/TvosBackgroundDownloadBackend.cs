@@ -63,8 +63,22 @@ namespace VideoPlayer.TvOS.Services
 
         private NSUrlSession CreateSession()
         {
-            var config = NSUrlSessionConfiguration.CreateBackgroundSessionConfiguration(SessionIdentifier);
-            config.SessionSendsLaunchEvents = true;
+            // Der tvOS-Simulator lehnt Hintergrund-Sessions ab
+            // (Tasks brechen sofort mit NSURLErrorUnknown -1 ab) —
+            // dort läuft die Übertragung über eine Vordergrund-Session,
+            // die nur bei aktiver App lädt. Auf dem Gerät bleibt die
+            // Hintergrund-Session für suspensionsfähige Downloads aktiv.
+            NSUrlSessionConfiguration config;
+            if (ObjCRuntime.Runtime.Arch == ObjCRuntime.Arch.SIMULATOR)
+            {
+                config = NSUrlSessionConfiguration.DefaultSessionConfiguration;
+            }
+            else
+            {
+                config = NSUrlSessionConfiguration.CreateBackgroundSessionConfiguration(SessionIdentifier);
+                config.SessionSendsLaunchEvents = true;
+            }
+
             return NSUrlSession.FromConfiguration(config, this, null);
         }
 
