@@ -11,15 +11,15 @@ Branch: `task/issue-86-5dcdc7d5ef27411897f0ec9129c87614-apple-tv-app-tvos-lean-b
 | [x] | 4 | Bestandsaufnahme (selbst ausgeführt) | `inventory.md` |
 | [x] | 5 | Umsetzungsplanung (selbst ausgeführt) | `plan.md` |
 | [x] | 5a | Offene Punkte prüfen und ggf. Planung wiederholen | `plan.md` (keine offenen Punkte) |
-| [ ] | 5b | Planungscommit | – |
-| [ ] | 6 | Implementierung (selbst ausgeführt) | Codeänderungen |
-| [ ] | 7 | Plan-Review (selbst ausgeführt) | `review.md` |
-| [ ] | 8 | Code-Review (selbst ausgeführt) | `review-code.md` |
-| [ ] | 8b | Tests ausführen (selbst ausgeführt) | `test-results.md` |
-| [ ] | – | Iteration oder Abschluss entscheiden | – |
-| [ ] | 8a | Folgeaufgaben dokumentieren (bei Schleifenabbruch) | `continue.md` |
-| [ ] | 9 | Dokumentation erstellen (selbst ausgeführt) | `docs/help/` |
-| [ ] | 9b | README aktualisieren (selbst ausgeführt) | `README.md` |
-| [ ] | – | CI-Verifikation: Push + grüner `build-tvos` (Run-ID) | – |
-| [ ] | – | Feature-Verzeichnis löschen | – |
-| [ ] | – | Commit durchführen | – |
+| [x] | 5b | Planungscommit | – |
+| [x] | 6 | Implementierung (selbst ausgeführt) | Codeänderungen |
+| [x] | 7 | Plan-Review (selbst ausgeführt) | `review.md` — Vollständig umgesetzt |
+| [x] | 8 | Code-Review (selbst ausgeführt) | `review-code.md` — Keine Befunde |
+| [x] | 8b | Tests ausführen (selbst ausgeführt) | `test-results.md` — 1482/1482 grün |
+| [x] | – | Iteration oder Abschluss entscheiden | – alle Prüfungen grün, keine Iteration |
+| [x] | 8a | Folgeaufgaben dokumentieren (bei Schleifenabbruch) | entfällt (kein Abbruch) |
+| [x] | 9 | Dokumentation erstellen (selbst ausgeführt) | `docs/help/tv-app/deployment.md` u. a. |
+| [x] | 9b | README aktualisieren (selbst ausgeführt) | `README.md` |
+| [x] | – | CI-Verifikation: Push + grüner `build-tvos` | Run 42141296638 — success |
+| [x] | – | Feature-Verzeichnis löschen | – |
+| [x] | – | Commit durchführen | – |
