@@ -24,6 +24,7 @@ namespace VideoPlayer.TvOS.Ui
         private AppModel? model;
         private bool usernamePrefilled;
         private bool manualEntryMode;
+        private bool serverSelectionOverride;
         private AuthMethod chosenMethod = AuthMethod.None;
 
         private UILabel? activeServerLabel;
@@ -159,7 +160,7 @@ namespace VideoPlayer.TvOS.Ui
             ticketField = TvosControls.TextField("Ticket-Adresse");
             ticketButton = TvosControls.Button(
                 "Ticket einlösen",
-                () => _ = dispatch(new BootstrapTicketSubmittedMessage(ticketField.Text ?? string.Empty)));
+                () => { serverSelectionOverride = false; _ = dispatch(new BootstrapTicketSubmittedMessage(ticketField.Text ?? string.Empty)); });
             bootstrapStatusLabel = TvosControls.Status();
             bootstrapErrorLabel = TvosControls.Error();
             var ticketSection = TvosControls.Section(
@@ -180,7 +181,7 @@ namespace VideoPlayer.TvOS.Ui
             addressField = TvosControls.TextField("http://server/videoplayer/");
             connectButton = TvosControls.Button(
                 "Verbinden",
-                () => _ = dispatch(new ServerAddressSubmittedMessage(addressField.Text ?? string.Empty)));
+                () => { serverSelectionOverride = false; _ = dispatch(new ServerAddressSubmittedMessage(addressField.Text ?? string.Empty)); });
             checkStatusLabel = TvosControls.Status();
             setupErrorLabel = TvosControls.Error();
             manualSection = TvosControls.Section(
@@ -202,7 +203,9 @@ namespace VideoPlayer.TvOS.Ui
                 TvosControls.Button("Mit Kurzcode anmelden",
                     () => { chosenMethod = AuthMethod.ShortCode; ApplyStages(); }),
                 TvosControls.Button("Mit Zugangsdaten anmelden",
-                    () => { chosenMethod = AuthMethod.Credentials; ApplyStages(); }));
+                    () => { chosenMethod = AuthMethod.Credentials; ApplyStages(); }),
+                TvosControls.Button("Anderen Server wählen",
+                    () => { serverSelectionOverride = true; ApplyStages(); }));
 
             authBackButton = TvosControls.Button(
                 "Andere Methode wählen",
@@ -271,6 +274,12 @@ namespace VideoPlayer.TvOS.Ui
             {
                 _ = dispatch(new ServerDiscoveryRequestedMessage());
             }
+
+            // Wird die Seite bei bereits aktivem Server geöffnet (z. B.
+            // „Server wechseln" aus den Einstellungen), startet der Wizard
+            // in Stufe 1 statt in der erzwungenen Methodenwahl.
+            serverSelectionOverride = model?.ActiveServerAddress is not null;
+            ApplyStages();
         }
 
         /// <inheritdoc/>
@@ -348,6 +357,7 @@ namespace VideoPlayer.TvOS.Ui
         {
             var model = this.model;
             var authChoice = model is not null
+                && !serverSelectionOverride
                 && (model.ConnectionState == ConnectionState.NeedsLogin
                     || model.IsPairingRequired);
             if (authChoice)
@@ -437,6 +447,7 @@ namespace VideoPlayer.TvOS.Ui
             if (servers is not null && row >= 0 && row < servers.Count)
             {
                 var server = servers[(int)row];
+                serverSelectionOverride = false;
                 _ = dispatch(new ServerSwitchRequestedMessage(server.Address, server.DisplayName));
             }
         }
@@ -447,6 +458,7 @@ namespace VideoPlayer.TvOS.Ui
             if (servers is not null && row >= 0 && row < servers.Count)
             {
                 var server = servers[(int)row];
+                serverSelectionOverride = false;
                 _ = dispatch(new DiscoveredServerSelectedMessage(server.Address, server.Name));
             }
         }
