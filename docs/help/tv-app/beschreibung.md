@@ -18,8 +18,10 @@ Modell-Update-Kreislauf mit serialisiertem Dispatch; ein tvOS-seitiger
 Verbindungs-Workflows am App-Rand aus (Ablage-Initialisierung, Einstellungen,
 Serververwaltung, Erreichbarkeitsprüfung, Pairing-/Bootstrap-Austausch,
 Anmeldung, Netzwerk-Monitoring, Server-Ereignisse, Synchronisation,
-Cache-First-Startseiten-Listen, Navigation). Nicht für tvOS vorgesehene
-Effekte (Downloads, Wiedergabe/PiP, Inhalts-/Playlist-Verwaltung,
+Cache-First-Startseiten-Listen, Navigation) sowie den lesenden
+Playlist-Zugriff (Übersicht, Kopfdaten, paginierte Einträge,
+Wiedergabekontext). Nicht für tvOS vorgesehene
+Effekte (Downloads, Inhalts-/Playlist-Verwaltung,
 Protokollversand) laufen protokolliert ins Leere — es gibt keinerlei
 Schreibzugriff auf verwaltete Inhalte.
 
@@ -118,6 +120,35 @@ Gesehen-Hinweis zeigt ein eigener Tab im Pull-down-Infobereich
 (`CustomInfoViewControllers`, tvOS 15), der zugleich die
 systemeigene Spurwahl enthält.
 
+Der Playlist-Zugriff ist rein lesend und nutzt denselben
+plattformneutralen Dienst (`PlaylistService`) wie die Hauptanwendung.
+Die Menüseite „Playlists" (`PlaylistsPageViewController`) zeigt die
+eigenen und die öffentlichen Playlists des angemeldeten Benutzers in
+einer gruppierten Liste — je Sektion „Meine Playlists" bzw.
+„Öffentliche Playlists", je Zeile Cover (`api/playlists/{id}/cover`),
+Name, Sortiermodus und Anzeige-Genres. Playlists sind ein reines
+Online-Feature: ohne Serververbindung erscheint eine verständliche
+Fehleranzeige mit Wiederholmöglichkeit statt eines veralteten Stands.
+Die Auswahl öffnet die modale Detailseite
+(`PlaylistDetailsViewController`): Kopfbereich mit Cover, Name,
+Zusammenfassung (Eintragszahl, Sortiermodus), Genres und Beschreibung
+sowie der Aktion „Abspielen", die den serverseitigen Wiedergabestart
+ab dem ersten abspielbaren Eintrag auslöst. Darunter scrollt das
+Poster-Raster der Einträge in serverseitiger Reihenfolge — Titel,
+Poster über `api/pictures/{id}` und der übergeordnete Kontext (z. B.
+„Serie · Episode N") — und lädt bei Annäherung ans Listenende
+seitenweise nach (`api/playlists/{id}/entries/paged`). Die Auswahl
+eines Eintrags entscheidet das Update: zugängliche Filme und Episoden
+starten die Wiedergabe ab genau diesem Eintrag, alle übrigen Einträge
+(Serien, Staffeln, Sammlungen, nicht zugängliche Medien) öffnen die
+Medien-Detailansicht. Die Wiedergabe läuft über den Playlist-Kontext
+des Players — Positionsanzeige im Infobereich, Übergang zum nächsten
+bzw. vorherigen Eintrag per Transport-Leiste und Auto-Fortsetzung über
+den advance-Endpunkt. Jegliche Playlist-Verwaltung (Anlegen,
+Umbenennen, Sortieren, Eintragsverwaltung, Genre-Editor,
+Öffentlich-Schalter) ist nicht verdrahtet und in der Oberfläche nicht
+erreichbar.
+
 Plattform-Anschlüsse: `NSUserDefaults` für nicht-geheime Einstellungen,
 Schlüsselbund (`SecKeyChain`, Generic Password) für Zugangsdaten und
 Geräte-Tokens, `Library/Caches`-Verzeichnisse als Ablagewurzeln und
@@ -144,8 +175,10 @@ Geräte-Tokens, `Library/Caches`-Verzeichnisse als Ablagewurzeln und
   anbietet — sonst entfällt sie.
 - Downloads sind als vorbereiteter Einstieg in den Detailansichten
   sichtbar, aber noch nicht funktional — der Anstoß meldet einen
-  Hinweistext. Playlist- und Download-Ansichten sowie weitere
+  Hinweistext. Die Download-Ansicht sowie weitere
   Einstellungsbereiche folgen in späteren Entwicklungsschritten —
-  betroffene Menüseiten zeigen derzeit Platzhaltertexte.
+  betroffene Menüseiten zeigen derzeit Platzhaltertexte. Playlists
+  sind auf tvOS ausschließlich lesend verfügbar; jegliche
+  Playlist-Verwaltung bleibt der Hauptanwendung vorbehalten.
 - Eine Veröffentlichung (App Store / TestFlight) ist noch nicht
   eingerichtet; die dafür nötigen Signatur-Artefakte liegen nicht vor.

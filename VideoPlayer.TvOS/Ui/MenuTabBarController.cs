@@ -97,6 +97,7 @@ namespace VideoPlayer.TvOS.Ui
             UIViewController controller = page switch
             {
                 AppPage.Home => new HomePageViewController(dispatch, posters),
+                AppPage.Playlists => new PlaylistsPageViewController(dispatch, posters),
                 AppPage.Profile => new ProfilePageViewController(dispatch),
                 AppPage.Settings => new SettingsPageViewController(dispatch),
                 _ => new PagePlaceholderViewController(

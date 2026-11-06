@@ -1,5 +1,44 @@
 # Änderungsprotokoll
 
+## 2026-11-08 — tvOS-App: Playlists — lesender Zugriff und Wiedergabe
+
+- **Übersicht (`PlaylistsPageViewController`):** neue Menüseite
+  „Playlists" statt Platzhalter — gruppierte `UITableView` mit den
+  Sektionen „Meine Playlists"/„Öffentliche Playlists" (aus der flachen
+  `PlaylistOverviewItem`-Liste), Zeilen mit Cover
+  (`api/playlists/{id}/cover`, neuer `GetPlaylistCoverAsync`-Pfad im
+  `TvosPosterImageService` mit eigenem Cache-Schlüsselraum), Name,
+  Sortiermodus und Genres; reines Online-Feature mit Lade-/Leer-/
+  Fehlerzustand und Wiederholmöglichkeit (`PlaylistsPageOpenedMessage`
+  beim Erscheinen, `PlaylistSelectedMessage` bei Auswahl).
+- **Detailseite (`PlaylistDetailsViewController`):** modal vom
+  `TvosNavigator` (`PresentPlaylistDetails`, Singleton mit
+  Duplikat-Guard und Freigabe-Callback) — Kopf mit Cover, Name,
+  Zusammenfassung, Genres, Beschreibung und „Abspielen"
+  (`PlaylistPlaybackStartRequestedMessage`); Eintragsraster
+  (`PlaylistEntryCell`: Poster über `ResolvedPictureId`, Titel,
+  `Subtitle`-Elternkontext, `IsAccessible`-Abdunklung) mit
+  `WillDisplayCell`-Lookahead-Paging
+  (`PlaylistEntriesNextPageRequestedMessage`), Retry
+  (`PlaylistEntriesRetryRequestedMessage`), Identitäts-Guard und
+  `PlaylistDetailsOpenedMessage`-Wiederherstellungspfad; Menü-Taste
+  schließt die Seite.
+- **Verdrahtung:** `TvosAppEffectHandler` führt jetzt
+  `LoadPlaylistsEffect` (`PlaylistsLoadedMessage`),
+  `NavigateToPlaylistDetailsEffect` (Hauptthread → Navigator),
+  `LoadPlaylistDetailsEffect` (`PlaylistDetailsLoadedMessage` inkl.
+  nicht-fataler `IsCurrentUserAdminAsync`-Lesung) und
+  `LoadPlaylistEntriesEffect` (`PlaylistEntriesLoadedMessage`) aus —
+  Muster und Fehlerkonstanten des `ShellAppEffectHandler`.
+  Wiedergabe mit Playlist-Kontext (Positionsanzeige,
+  next/previous, advance-Auto-Fortsetzung) nutzt die
+  Schritt-7-Verdrahtung; Verwaltung bleibt ohne Oberfläche und ohne
+  Effekt-Verdrahtung.
+- **Absicherung:** neue `TvOsPlaylistsContractTests` (6 Contract-Tests
+  inkl. Verwaltungs-Negativprüfung); Gesamtsuite
+  `VideoPlayer.Maui.Tests`: 1498/1498 grün. tvOS-Kompiliernachweis
+  über den macOS-CI-Job `build-tvos` (Run 42131194033).
+
 ## 2026-11-08 — tvOS-App: Videowiedergabe mit Fortschritts-Tracking, Auto-Fortsetzung und Spurwahl
 
 - **Nativer Player (`TvosPlayerViewController`):** `AVPlayerViewController`-

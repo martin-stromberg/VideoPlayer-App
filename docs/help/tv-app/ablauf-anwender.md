@@ -102,11 +102,35 @@ Sammlung öffnet die eigene Detailansicht; die Menü-Taste führt eine
 Ebene zurück. Die Aktionsleiste bietet „Abspielen" (bei Filmen und
 Episoden), „Herunterladen" sowie „★/☆ Favorit" — die
 Favoriten-Markierung gilt sofort auf dem Server und in der App;
-Abspielen und Download sind vorbereitete Einstiege für die nächsten
-Ausbauschritte und lösen keinen Fehler aus. Ohne Serververbindung
+„Abspielen" startet die Wiedergabe im Vollbild-Player (Fortsetzung
+an der gespeicherten Position), der Download-Einstieg ist für einen
+späteren Ausbauschritt vorbereitet und meldet einen Hinweistext.
+Ohne Serververbindung
 zeigt die Seite den gespeicherten Stand mit deaktiviertem
 Favoriten-Schalter und ohne Download-Aktion; „Abspielen" bleibt bei
 vorhandener lokaler Datei verfügbar.
+
+### 8. Playlists nutzen
+
+Der Menübereich „Playlists" führt deine eigenen Listen („Meine
+Playlists") und die öffentlichen Playlists des Servers in einer
+gruppierten Liste — mit Cover, Name, Sortiermodus und Genres. Der
+Bereich braucht eine Serververbindung; bei einem Ladefehler steht
+„Erneut versuchen" zur Verfügung. Wähle eine Playlist: die Detailseite
+zeigt Kopfzeilen (Name, Eintragszahl, Sortiermodus, Genres,
+Beschreibung) und darunter die Einträge als Poster-Raster mit Titel
+und übergeordnetem Kontext (z. B. Serie und Episodennummer); am
+Listenende lädt die Seite selbsttätig weitere Einträge nach. Die
+Aktion „▶ Abspielen" startet die Wiedergabe der gesamten Playlist;
+die Auswahl eines abspielbaren Eintrags (Film, Episode) startet die
+Wiedergabe ab genau dort — andere Einträge (Serie, Staffel,
+Sammlung) öffnen ihre Detailansicht. Während der Wiedergabe zeigt der
+Infobereich die Playlist-Position; über die Transport-Leiste wechselst
+du zum nächsten bzw. vorherigen Eintrag, am Titelende schaltet die
+App gemäß Einstellung automatisch weiter. Die Menü-Taste führt eine
+Ebene zurück. Das Bearbeiten von Playlists (Anlegen, Umbenennen,
+Sortieren, Einträge, Öffentlich-Schalter) ist auf dem TV nicht
+möglich — dafür dient die Hauptanwendung.
 
 ## Barrierefreiheit
 

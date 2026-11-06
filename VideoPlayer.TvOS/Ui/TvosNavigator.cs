@@ -22,6 +22,7 @@ namespace VideoPlayer.TvOS.Ui
         private ServerSetupViewController? serverSetupPage;
         private LoginViewController? loginPage;
         private SourceBrowserViewController? sourceBrowserPage;
+        private PlaylistDetailsViewController? playlistDetailsPage;
         private TvosPlayerViewController? playerPage;
 
         /// <summary>Offene modale Detailseiten (Stapel wie der Shell-Navigationsstack — Detail → Detail).</summary>
@@ -110,6 +111,7 @@ namespace VideoPlayer.TvOS.Ui
             loginPage?.Render(model);
             tabBar?.Render(model);
             sourceBrowserPage?.Render(model);
+            playlistDetailsPage?.Render(model);
             foreach (var page in detailPages)
             {
                 page.Render(model);
@@ -250,6 +252,57 @@ namespace VideoPlayer.TvOS.Ui
             }
 
             host.PresentViewController(sourceBrowserPage, true, null);
+        }
+
+        /// <summary>
+        /// Präsentiert die Detailseite einer Playlist modal über dem
+        /// obersten Controller (<see cref="NavigateToPlaylistDetailsEffect"/>)
+        /// — Gegenstück zur Shell-Route <c>playlistdetails</c> der
+        /// MAUI-App. Die Seite wird einmal erzeugt und bei erneuter
+        /// Präsentation mit dem neuen Playlist-Kontext versehen statt
+        /// gestapelt (Duplikat-Guard wie <see cref="PresentSourceBrowser"/>):
+        /// der <see cref="AppModel.PlaylistDetails"/>-Zustand ist global
+        /// eindeutig; Medien-Detailseiten und der Player können darüber
+        /// gestapelt werden.
+        /// </summary>
+        /// <param name="playlistId">Id der zu öffnenden Playlist.</param>
+        /// <param name="name">Anzeigename der Playlist (Seitentitel).</param>
+        public void PresentPlaylistDetails(long playlistId, string name)
+        {
+            if (main is null)
+            {
+                return;
+            }
+
+            playlistDetailsPage ??= new PlaylistDetailsViewController(
+                dispatch, posters, ReleasePlaylistDetailsPage)
+            {
+                ModalPresentationStyle = UIModalPresentationStyle.FullScreen
+            };
+            playlistDetailsPage.SetPlaylist(playlistId, name);
+
+            var host = TopmostPresented();
+            if (host is PlaylistDetailsViewController
+                || playlistDetailsPage.PresentingViewController is not null)
+            {
+                // Die Seite ist bereits präsentiert (oben oder unter
+                // einem Folgeziel) — nur der Playlist-Kontext wurde
+                // aktualisiert; ein erneutes Presentieren eines bereits
+                // präsentierten Controllers wäre ein UIKit-Verstoß.
+                return;
+            }
+
+            host.PresentViewController(playlistDetailsPage, true, null);
+        }
+
+        /// <summary>Gibt die geschlossene Playlist-Detailseite aus dem Render-Verzeichnis frei (Callback der Seite).</summary>
+        /// <param name="page">Die geschlossene Detailseite.</param>
+        private void ReleasePlaylistDetailsPage(PlaylistDetailsViewController page)
+        {
+            if (ReferenceEquals(playlistDetailsPage, page))
+            {
+                playlistDetailsPage = null;
+            }
         }
 
         /// <summary>
