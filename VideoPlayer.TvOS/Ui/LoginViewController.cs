@@ -31,6 +31,24 @@ namespace VideoPlayer.TvOS.Ui
         private UIButton? shortCodeButton;
         private UILabel? shortCodeStatusLabel;
         private UILabel? shortCodeErrorLabel;
+        private UIView? methodSection;
+        private UIView? credentialsSection;
+        private UIView? shortCodeSection;
+        private UIButton? authBackButton;
+        private AuthMethod chosenMethod = AuthMethod.None;
+
+        /// <summary>Gewählte Anmeldeform der Maske.</summary>
+        private enum AuthMethod
+        {
+            /// <summary>Methodenwahl wird gezeigt.</summary>
+            None,
+
+            /// <summary>Kurzcode aus dem Benutzerprofil.</summary>
+            ShortCode,
+
+            /// <summary>Benutzername + Passwort.</summary>
+            Credentials
+        }
 
         /// <summary>Initialisiert eine neue Instanz der <see cref="LoginViewController"/>-Klasse.</summary>
         /// <param name="dispatch">Rückmeldung in den MVU-Zyklus (Hauptthread).</param>
@@ -78,6 +96,19 @@ namespace VideoPlayer.TvOS.Ui
             serverLabel.TextColor = UIColor.White;
             content.AddArrangedSubview(serverLabel);
 
+            methodSection = TvosControls.Section(
+                TvosControls.Heading("Anmeldemethode wählen"),
+                TvosControls.Button("Mit Kurzcode anmelden",
+                    () => { chosenMethod = AuthMethod.ShortCode; ApplyStages(); }),
+                TvosControls.Button("Mit Zugangsdaten anmelden",
+                    () => { chosenMethod = AuthMethod.Credentials; ApplyStages(); }));
+            content.AddArrangedSubview(methodSection);
+
+            authBackButton = TvosControls.Button(
+                "Andere Methode wählen",
+                () => { chosenMethod = AuthMethod.None; ApplyStages(); });
+            authBackButton.Hidden = true;
+
             usernameField = TvosControls.TextField("Benutzername");
             passwordField = TvosControls.TextField("Passwort", secure: true);
             loginButton = TvosControls.Button(
@@ -87,10 +118,12 @@ namespace VideoPlayer.TvOS.Ui
                     passwordField.Text ?? string.Empty)));
             loginStatusLabel = TvosControls.Status();
             loginErrorLabel = TvosControls.Error();
-            content.AddArrangedSubview(TvosControls.Section(
+            credentialsSection = TvosControls.Section(
                 TvosControls.Heading("Mit Zugangsdaten anmelden"),
                 TvosControls.Body("Mit den Zugangsdaten des VideoPlayer-Servers anmelden."),
-                usernameField, passwordField, loginButton, loginStatusLabel, loginErrorLabel));
+                usernameField, passwordField, loginButton, loginStatusLabel, loginErrorLabel);
+            credentialsSection.Hidden = true;
+            content.AddArrangedSubview(credentialsSection);
 
             shortCodeField = TvosControls.TextField("Kurzcode");
             shortCodeButton = TvosControls.Button(
@@ -98,10 +131,13 @@ namespace VideoPlayer.TvOS.Ui
                 () => _ = dispatch(new BootstrapTicketSubmittedMessage(shortCodeField.Text ?? string.Empty)));
             shortCodeStatusLabel = TvosControls.Status();
             shortCodeErrorLabel = TvosControls.Error();
-            content.AddArrangedSubview(TvosControls.Section(
+            shortCodeSection = TvosControls.Section(
                 TvosControls.Heading("Mit Kurzcode anmelden"),
-                TvosControls.Body("Kurzcode aus der Serververwaltung (Profilseite „Geräte“) eingeben — er wird gegen den verbundenen Server eingelöst, ohne Passwort."),
-                shortCodeField, shortCodeButton, shortCodeStatusLabel, shortCodeErrorLabel));
+                TvosControls.Body("Kurzcode aus dem Benutzerprofil („Gerät koppeln“) eingeben — er wird gegen den verbundenen Server eingelöst, ohne Passwort."),
+                shortCodeField, shortCodeButton, shortCodeStatusLabel, shortCodeErrorLabel);
+            shortCodeSection.Hidden = true;
+            content.AddArrangedSubview(shortCodeSection);
+            content.AddArrangedSubview(authBackButton);
 
             content.AddArrangedSubview(TvosControls.Button(
                 "Anderen Server einrichten",
@@ -158,6 +194,14 @@ namespace VideoPlayer.TvOS.Ui
             shortCodeField!.Enabled = !shortCodeBusy;
             shortCodeStatusLabel!.Text = model.IsBootstrapRunning ? "Kopplung läuft …" : string.Empty;
             shortCodeErrorLabel!.Text = model.BootstrapError ?? string.Empty;
+        }
+
+        private void ApplyStages()
+        {
+            methodSection!.Hidden = chosenMethod != AuthMethod.None;
+            credentialsSection!.Hidden = chosenMethod != AuthMethod.Credentials;
+            shortCodeSection!.Hidden = chosenMethod != AuthMethod.ShortCode;
+            authBackButton!.Hidden = chosenMethod == AuthMethod.None;
         }
     }
 }
