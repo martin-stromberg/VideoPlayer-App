@@ -47,7 +47,8 @@ namespace VideoPlayer.TvOS
         /// <inheritdoc/>
         public override void OnActivated(UIApplication application)
         {
-            base.OnActivated(application);
+            // Kein base-Aufruf: die generierte Basismethode wirft
+            // You_Should_Not_Call_base_In_This_Method.
             // Hintergrund-Session herstellen, damit Transfers, die die
             // App überlebt haben, ihre Delegate-Rückrufe erhalten
             // (Fortsetzung der Downloads nach Suspension).
