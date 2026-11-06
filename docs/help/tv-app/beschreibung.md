@@ -18,10 +18,12 @@ Modell-Update-Kreislauf mit serialisiertem Dispatch; ein tvOS-seitiger
 Verbindungs-Workflows am App-Rand aus (Ablage-Initialisierung, Einstellungen,
 Serververwaltung, Erreichbarkeitsprüfung, Pairing-/Bootstrap-Austausch,
 Anmeldung, Netzwerk-Monitoring, Server-Ereignisse, Synchronisation,
-Cache-First-Startseiten-Listen, Navigation) sowie den lesenden
+Cache-First-Startseiten-Listen, Navigation), den lesenden
 Playlist-Zugriff (Übersicht, Kopfdaten, paginierte Einträge,
-Wiedergabekontext). Nicht für tvOS vorgesehene
-Effekte (Downloads, Inhalts-/Playlist-Verwaltung,
+Wiedergabekontext) sowie die manuellen Downloads (Einreihen,
+Abbrechen, Wiederholen, Löschen, Wiederaufnahme,
+Ablauf-/Abgleichslauf). Nicht für tvOS vorgesehene
+Effekte (Auto-Download-Vorlauf, Inhalts-/Playlist-Verwaltung,
 Protokollversand) laufen protokolliert ins Leere — es gibt keinerlei
 Schreibzugriff auf verwaltete Inhalte.
 
@@ -101,9 +103,8 @@ Staffel und Episode — im Serienkontext steuern fokussierbare
 Staffel-Chips und eine Episodenreihe die Auswahl; Episoden tragen je
 einen Gesehen-Status, den lokale-Datei-Hinweis und bei
 Offline-Platzhaltern die Markierung „nicht heruntergeladen". Als
-Aktionen stehen „Abspielen" (Wiedergabeeinstieg — wird mit dem
-Wiedergabe-Schritt funktional), „Herunterladen" (vorbereitete Aktion
-mit Hinweistext — wird mit dem Download-Schritt funktional) und das
+Aktionen stehen „Abspielen", „Herunterladen" (manueller Download des
+Mediums inklusive Serienkontext bei Episoden) und das
 Umschalten der Favoriten-Markierung über `api/favorites/toggle` zur
 Verfügung; die Favoriten-Änderung erneuert zugleich die lokale
 Favoriten-Kopie. Eine Bearbeitung von Inhalten oder Playlists gibt es
@@ -149,6 +150,38 @@ Umbenennen, Sortieren, Eintragsverwaltung, Genre-Editor,
 Öffentlich-Schalter) ist nicht verdrahtet und in der Oberfläche nicht
 erreichbar.
 
+Die Downloads nutzen denselben plattformneutralen `DownloadService`
+mit Manifest wie die Hauptanwendung — ohne Auto-Download (kein
+Vorlauf, keine „Cache"-Herkunft). Der eigentliche Transfer läuft
+suspensionstauglich über eine `NSUrlSession`-Hintergrund-Session
+(`TvosBackgroundDownloadBackend` hinter `IDownloadBackend`), weil
+tvOS-Apps wochenlang suspendiert bleiben können: laufende Downloads
+setzen sich bei suspendierter App fort; startet das System die App
+für abgeschlossene Hintergrund-Transfers neu, meldet der
+Completion-Sink deren Ergebnis dem Manifest
+(`CompleteExternalTransferAsync`), und verwaist gebliebene Aufträge
+werden über den Unterbrechungspfad (`ResumeInterruptedAsync`) neu
+eingeplant. Der Anstoß erfolgt je Eintrag über die Detailansicht;
+die Menüseite „Downloads" (`DownloadsPageViewController`) zeigt die
+Manifest-Einträge mit Vorschaubild, Zustand, Fortschrittsbalken,
+Größen- und Ablaufdatum-Angabe sowie Fehlerhinweis — die
+Zeilenauswahl öffnet ein Aktionsmenü mit „Abbrechen" (aktive
+Downloads), „Erneut versuchen" (fehlgeschlagene/abgebrochene) und
+„Löschen"; im Kopf stehen die Kontingent-Belegung samt Hinweis auf
+nicht zugeordnete Restdaten und die Sammelaktion „Fehlerhafte
+löschen". Jeder Download trägt ein Ablaufdatum gemäß der
+eingestellten Aufbewahrungszeit; die Quota-Obergrenze wird bereits
+vor der Einplanung geprüft und bei Überschreitung verständlich
+gemeldet. Der Pflicht-Abgleich (Teildateien entfernen, „fertig" ohne
+Datei auf den Fehler für fehlende Dateien korrigieren — tvOS räumt
+App-Daten unter Speicherdruck —, Waisen erkennen, Abgelaufenes
+entfernen) läuft beim App-Start, bei Online-Rückkehr, beim Aufruf
+der Download-Seite und zusätzlich über die plattformneutrale
+`AppActivatedMessage` bei jedem Vordergrund-Eintritt aus dem
+Suspend-Zustand. Heruntergeladene Dateien stehen der Wiedergabe als
+bevorzugte Quelle zur Verfügung; ein automatisches Löschen nach dem
+Abspielen wird auf tvOS nicht angeboten.
+
 Plattform-Anschlüsse: `NSUserDefaults` für nicht-geheime Einstellungen,
 Schlüsselbund (`SecKeyChain`, Generic Password) für Zugangsdaten und
 Geräte-Tokens, `Library/Caches`-Verzeichnisse als Ablagewurzeln und
@@ -173,9 +206,13 @@ Geräte-Tokens, `Library/Caches`-Verzeichnisse als Ablagewurzeln und
   Abspielens). Die Ton-/Untertitel-Auswahl steht über den
   System-Infobereich zur Verfügung, sofern der Stream Spurgruppen
   anbietet — sonst entfällt sie.
-- Downloads sind als vorbereiteter Einstieg in den Detailansichten
-  sichtbar, aber noch nicht funktional — der Anstoß meldet einen
-  Hinweistext. Die Download-Ansicht sowie weitere
+- Downloads laufen suspensionstauglich über die
+  `NSUrlSession`-Hintergrund-Session; Dateien liegen wie alle
+  lokalen Daten in `Library/Caches` und können vom System geräumt
+  werden — der Abgleich meldet solche Einträge dann als
+  fehlgeschlagen („Datei nicht mehr vorhanden") und erlaubt die
+  Neu-Einplanung. Es gibt keinen Auto-Download-Vorlauf und kein
+  automatisches Löschen nach dem Abspielen auf tvOS. Weitere
   Einstellungsbereiche folgen in späteren Entwicklungsschritten —
   betroffene Menüseiten zeigen derzeit Platzhaltertexte. Playlists
   sind auf tvOS ausschließlich lesend verfügbar; jegliche

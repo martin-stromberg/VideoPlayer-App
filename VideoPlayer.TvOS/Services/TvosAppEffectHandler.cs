@@ -14,12 +14,14 @@ namespace VideoPlayer.TvOS.Services
     /// Verbindungs-Workflows (Ablage, Einstellungen, Serververwaltung,
     /// Erreichbarkeitsprüfung, Pairing/Bootstrap, Anmeldung,
     /// Netzwerk-Monitoring, Ereignisverbindung, Synchronisation, Startseiten-
-    /// Listen, Navigation) sowie des lesenden Playlist-Zugriffs
-    /// (Übersicht, Kopfdaten, paginierte Einträge, Wiedergabekontext).
-    /// Alle übrigen Effekte (Downloads, Inhalts-/Playlist-Verwaltung,
-    /// Protokollversand u. a.) laufen in ein
-    /// protokolliertes No-Op — für tvOS nicht vorgesehene Bereiche werden
-    /// bewusst nicht verdrahtet und erzeugen keine Fehler.
+    /// Listen, Navigation), des lesenden Playlist-Zugriffs
+    /// (Übersicht, Kopfdaten, paginierte Einträge, Wiedergabekontext)
+    /// sowie der manuellen Downloads (Einreihen, Abbrechen,
+    /// Wiederholen, Löschen, Wiederaufnahme, Ablauf-/Abgleichslauf).
+    /// Alle übrigen Effekte (Auto-Download-Vorlauf,
+    /// Inhalts-/Playlist-Verwaltung, Protokollversand u. a.) laufen in
+    /// ein protokolliertes No-Op — für tvOS nicht vorgesehene Bereiche
+    /// werden bewusst nicht verdrahtet und erzeugen keine Fehler.
     /// </summary>
     public sealed class TvosAppEffectHandler : IAppEffectHandler
     {
@@ -196,18 +198,32 @@ namespace VideoPlayer.TvOS.Services
                 case ToggleFavoriteEffect toggle:
                     await ToggleFavoriteAsync(toggle, cancellationToken);
                     break;
+                case LoadDownloadsEffect load:
+                    await LoadDownloadsAsync(load.Settings, cancellationToken);
+                    break;
                 case EnqueueDownloadEffect enqueue:
-                    // Vorbereitete Download-Aktion: der Download-Schritt
-                    // verdrahtet das Einreihen erst später — bis dahin
-                    // meldet der Handler den Hinweis der Detailseite
-                    // über den regulären Ergebnis-Nachrichtenpfad
-                    // (DownloadNotice), ohne Fehler und ohne Dateizugriff.
-                    await DispatchMessageAsync(new DownloadEnqueueCompletedMessage(
-                        null,
-                        "Der Download folgt in einem späteren Entwicklungsschritt.",
-                        false,
-                        MediaTypeNames.Normalize(enqueue.MediaType),
-                        enqueue.MediaId));
+                    await EnqueueDownloadAsync(enqueue, cancellationToken);
+                    break;
+                case CancelDownloadEffect cancel:
+                    await CancelDownloadAsync(cancel, cancellationToken);
+                    break;
+                case DeleteDownloadEffect delete:
+                    await DeleteDownloadAsync(delete, cancellationToken);
+                    break;
+                case DeleteAllDownloadsEffect deleteAll:
+                    await DeleteAllDownloadsAsync(deleteAll.Settings, cancellationToken);
+                    break;
+                case PurgeOrphanedDownloadsEffect purge:
+                    await PurgeOrphanedDownloadsAsync(purge.Settings, cancellationToken);
+                    break;
+                case DeleteFailedDownloadsEffect deleteFailed:
+                    await DeleteFailedDownloadsAsync(deleteFailed.Settings, cancellationToken);
+                    break;
+                case ResumeDownloadsEffect resume:
+                    await ResumeDownloadsAsync(resume.Settings, cancellationToken);
+                    break;
+                case ReconcileDownloadsEffect reconcile:
+                    await ReconcileDownloadsAsync(reconcile.Settings, cancellationToken);
                     break;
                 case NavigateToPlayerEffect:
                     // Nativer Vollbild-Player (AVPlayerViewController) —
@@ -274,9 +290,10 @@ namespace VideoPlayer.TvOS.Services
                     await LogoutAsync();
                     break;
                 default:
-                    // Für tvOS nicht verdrahtete Bereiche (Downloads,
-                    // Wiedergabe/PiP, Inhalts-/Playlist-Verwaltung,
-                    // Protokollversand u. a.): bewusst wirkungslos.
+                    // Für tvOS nicht verdrahtete Bereiche (Auto-
+                    // Download-Vorlauf, Wiedergabe/PiP, Inhalts-/
+                    // Playlist-Verwaltung, Protokollversand u. a.):
+                    // bewusst wirkungslos.
                     logger.LogDebug("Effekt {EffectType} nicht verdrahtet — wird ignoriert.", effect.GetType().Name);
                     break;
             }
@@ -1149,6 +1166,181 @@ namespace VideoPlayer.TvOS.Services
             catch (Exception ex)
             {
                 logger.LogError(ex, "Ablaufdatum des Downloads verkürzen fehlgeschlagen");
+            }
+        }
+
+        // --- Downloads (Muster: ShellAppEffectHandler) ----------------
+
+        private async Task LoadDownloadsAsync(AppSettings settings, CancellationToken cancellationToken = default)
+        {
+            IReadOnlyList<DownloadListItem> items = [];
+            long usedBytes = 0;
+            long orphanedBytes = 0;
+            string? error = null;
+            try
+            {
+                // Abgleich Ablageort ↔ Manifest inkl. Ablauf-Prüfung:
+                // überholte Teildateien werden entfernt, „fertig" ohne
+                // Datei wird auf den Fehler für fehlende Dateien
+                // korrigiert (tvOS purgt App-Daten unter Speicherdruck),
+                // Restdaten ohne Manifest-Bezug werden erkannt und
+                // abgelaufene Downloads entfernt. Auto-Download-
+                // Kandidaten gibt es auf tvOS nicht (kein Vorlauf).
+                orphanedBytes = (await services.Downloads.ReconcileAsync(
+                    settings, null, cancellationToken)).OrphanedBytes;
+                items = await services.Downloads.LoadItemsAsync(cancellationToken);
+                usedBytes = services.Downloads.GetUsedBytes();
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Download-Liste laden fehlgeschlagen");
+                error = "Die Downloads konnten nicht geladen werden.";
+            }
+
+            await DispatchMessageAsync(new DownloadsLoadedMessage(
+                items, usedBytes, settings.DownloadQuotaGb, error, orphanedBytes));
+        }
+
+        private async Task EnqueueDownloadAsync(EnqueueDownloadEffect enqueue, CancellationToken cancellationToken)
+        {
+            DownloadEnqueueResult result;
+            try
+            {
+                var seriesContext = enqueue.ShowId is null && enqueue.SeasonNumber is null && enqueue.EpisodeNumber is null
+                    ? null
+                    : new DownloadSeriesContext(enqueue.ShowId, enqueue.ShowTitle, enqueue.SeasonNumber, enqueue.EpisodeNumber);
+                result = await services.Downloads.EnqueueAsync(
+                    new DownloadEnqueueRequest(
+                        enqueue.MediaType, enqueue.MediaId, enqueue.Title,
+                        SeriesContext: seriesContext,
+                        PictureId: enqueue.PictureId,
+                        Origin: DownloadOrigin.Manual),
+                    enqueue.Settings,
+                    cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Download einreihen fehlgeschlagen");
+                result = new DownloadEnqueueResult
+                {
+                    Item = null,
+                    Notice = "Der Download konnte nicht eingeplant werden.",
+                    IsError = true
+                };
+            }
+
+            // Der Einplanungs-Eintrag mit dem Notice-Text obliegt
+            // DownloadService (eine Schicht pro Ereignis) — hier nur
+            // der Fehlerpfad. Quota-Hinweise kommen ebenfalls als
+            // Notice aus dem Dienst.
+            await DispatchMessageAsync(new DownloadEnqueueCompletedMessage(
+                result.Item, result.Notice, result.IsError,
+                MediaTypeNames.Normalize(enqueue.MediaType), enqueue.MediaId));
+        }
+
+        private async Task CancelDownloadAsync(CancelDownloadEffect cancel, CancellationToken cancellationToken)
+        {
+            try
+            {
+                await services.Downloads.CancelAsync(cancel.MediaType, cancel.MediaId, cancellationToken);
+                // Der Abbruch-Eintrag (Zustand Cancelled) obliegt
+                // DownloadService (eine Schicht pro Ereignis) — hier
+                // nur der Fehlerpfad.
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Download-Abbruch fehlgeschlagen");
+            }
+        }
+
+        private async Task DeleteDownloadAsync(DeleteDownloadEffect delete, CancellationToken cancellationToken)
+        {
+            try
+            {
+                // Das Entfernen wird über das ItemRemoved-Ereignis des
+                // Dienstes als DownloadDeletedMessage in den MVU-Zyklus
+                // gemeldet — keine Rückmeldung nötig.
+                await services.Downloads.DeleteAsync(delete.MediaType, delete.MediaId, cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Download löschen fehlgeschlagen");
+            }
+        }
+
+        private async Task DeleteAllDownloadsAsync(AppSettings settings, CancellationToken cancellationToken)
+        {
+            try
+            {
+                await services.Downloads.DeleteAllAsync(cancellationToken);
+                // Liste + Belegung neu laden (OrphanedBytes aktualisieren).
+                await LoadDownloadsAsync(settings, cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Alle Downloads löschen fehlgeschlagen");
+            }
+        }
+
+        private async Task PurgeOrphanedDownloadsAsync(AppSettings settings, CancellationToken cancellationToken)
+        {
+            try
+            {
+                await services.Downloads.PurgeOrphansAsync(cancellationToken);
+                await LoadDownloadsAsync(settings, cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Restdaten bereinigen fehlgeschlagen");
+            }
+        }
+
+        private async Task DeleteFailedDownloadsAsync(AppSettings settings, CancellationToken cancellationToken)
+        {
+            try
+            {
+                await services.Downloads.DeleteFailedAsync(cancellationToken);
+                // Liste + Belegung neu laden.
+                await LoadDownloadsAsync(settings, cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Fehlerhafte Downloads löschen fehlgeschlagen");
+            }
+        }
+
+        private async Task ResumeDownloadsAsync(AppSettings settings, CancellationToken cancellationToken)
+        {
+            try
+            {
+                // Abgleich Ablageort ↔ Manifest inkl. Ablauf-Prüfung vor
+                // der Wiederaufnahme (gleicher Lauf wie beim Laden der
+                // Liste); ein Fehler des Abgleichs unterbricht die
+                // Wiederaufnahme nicht.
+                await services.Downloads.ReconcileAsync(settings, null, cancellationToken);
+                await services.Downloads.ResumeInterruptedAsync(settings, cancellationToken);
+                // Der Wiederaufnahme-Eintrag mit der Anzahl obliegt
+                // DownloadService (eine Schicht pro Ereignis) — hier
+                // nur der Fehlerpfad.
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Download-Wiederaufnahme fehlgeschlagen");
+            }
+        }
+
+        private async Task ReconcileDownloadsAsync(AppSettings settings, CancellationToken cancellationToken)
+        {
+            try
+            {
+                // Reiner Ablauf-/Abgleichslauf (App-Aktivierung ohne
+                // Verbindung) — Fehler protokollieren, Zyklus nicht
+                // unterbrechen.
+                await services.Downloads.ReconcileAsync(settings, null, cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Download-Abgleich fehlgeschlagen");
             }
         }
 

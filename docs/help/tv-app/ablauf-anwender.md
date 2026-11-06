@@ -103,8 +103,10 @@ Ebene zurück. Die Aktionsleiste bietet „Abspielen" (bei Filmen und
 Episoden), „Herunterladen" sowie „★/☆ Favorit" — die
 Favoriten-Markierung gilt sofort auf dem Server und in der App;
 „Abspielen" startet die Wiedergabe im Vollbild-Player (Fortsetzung
-an der gespeicherten Position), der Download-Einstieg ist für einen
-späteren Ausbauschritt vorbereitet und meldet einen Hinweistext.
+an der gespeicherten Position), „Herunterladen" plant den Download
+des Mediums ein (bei Episoden samt Serienkontext) und meldet das
+Ergebnis als Hinweistext — auch die Meldung, wenn das
+Speicherplatzkontingent erreicht ist.
 Ohne Serververbindung
 zeigt die Seite den gespeicherten Stand mit deaktiviertem
 Favoriten-Schalter und ohne Download-Aktion; „Abspielen" bleibt bei
@@ -131,6 +133,26 @@ App gemäß Einstellung automatisch weiter. Die Menü-Taste führt eine
 Ebene zurück. Das Bearbeiten von Playlists (Anlegen, Umbenennen,
 Sortieren, Einträge, Öffentlich-Schalter) ist auf dem TV nicht
 möglich — dafür dient die Hauptanwendung.
+
+### 9. Downloads verwalten
+
+Der Menübereich „Downloads" führt die Einträge des Download-Manifests:
+Vorschaubild, Titel, Zustand (Wartend/Läuft/Fertig/Fehler/Abgebrochen),
+bei laufenden Downloads ein Fortschrittsbalken samt übertragener
+Datenmenge, bei fertigen das Ablaufdatum — jeder Download läuft nach
+der eingestellten Aufbewahrungszeit ab und wird dann automatisch
+entfernt. Im Kopf steht die Belegung des Speicherplatzkontingents
+sowie ein Hinweis auf nicht zugeordnete Restdaten. Downloads werden
+über „Herunterladen" in der Detailansicht eingeplant und laufen auch
+weiter, wenn die App im Hintergrund liegt oder suspendiert ist.
+Wähle einen Eintrag: ein Menü bietet „Abbrechen" (bei laufenden),
+„Erneut versuchen" (bei fehlgeschlagenen/abgebrochenen) und
+„Löschen". Die Kopf-Aktion „Fehlerhafte löschen" entfernt alle
+fehlgeschlagenen und abgebrochenen Einträge gesammelt. Die Seite
+funktioniert ohne Serververbindung; vom System geräumte Dateien
+erscheinen nach dem automatischen Abgleich als fehlgeschlagene
+Einträge und können erneut eingeplant werden. Fertige Downloads
+stehen der Wiedergabe auch offline als Quelle zur Verfügung.
 
 ## Barrierefreiheit
 
