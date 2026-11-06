@@ -23,6 +23,8 @@ namespace VideoPlayer.TvOS.Ui
         private readonly Func<Task> backToMenu;
         private AppModel? model;
         private bool usernamePrefilled;
+        private bool manualEntryMode;
+        private AuthMethod chosenMethod = AuthMethod.None;
 
         private UILabel? activeServerLabel;
         private UILabel? healthLabel;
@@ -33,7 +35,13 @@ namespace VideoPlayer.TvOS.Ui
         private UILabel? discoveryStatusLabel;
         private UITableView? discoveredTable;
         private ServerListTableSource? discoveredSource;
-        private UIStackView? addressStage;
+        private UIStackView? serverSelectSection;
+        private UIButton? manualEntryButton;
+        private UIButton? manualCancelButton;
+        private UIView? manualSection;
+        private UIStackView? methodSection;
+        private UIButton? authBackButton;
+        private UIView? shortCodeSection;
         private UITextField? addressField;
         private UIButton? connectButton;
         private UILabel? checkStatusLabel;
@@ -59,6 +67,22 @@ namespace VideoPlayer.TvOS.Ui
         private UILabel? loginStatusLabel;
         private UILabel? loginErrorLabel;
         private UIButton? backButton;
+
+        /// <summary>Gewählte Anmeldemethode in Stufe 2 des Einrichtungs-Wizards.</summary>
+        private enum AuthMethod
+        {
+            /// <summary>Noch keine Methode gewählt — die Auswahl wird gezeigt.</summary>
+            None,
+
+            /// <summary>Einmal-Pairing-Code (api/pairing/exchange).</summary>
+            Pairing,
+
+            /// <summary>Kurzcode/Ticket aus dem Benutzerprofil (api/pairing/bootstrap).</summary>
+            ShortCode,
+
+            /// <summary>Benutzername + Passwort.</summary>
+            Credentials
+        }
 
         /// <summary>Initialisiert eine neue Instanz der <see cref="ServerSetupViewController"/>-Klasse.</summary>
         /// <param name="dispatch">Rückmeldung in den MVU-Zyklus (Hauptthread).</param>
@@ -111,38 +135,26 @@ namespace VideoPlayer.TvOS.Ui
             healthLabel = TvosControls.Status();
             content.AddArrangedSubview(healthLabel);
 
-            // Bekannte Server.
+            // Stufe 1 des Wizards: Serverwahl — Auto-Discovery beim
+            // Öffnen (ViewWillAppear), bekannte + gefundene Server als
+            // Listen, dazu „Suche wiederholen" und der Unterschritt
+            // „Serveradresse manuell eingeben" (blendet die Listen aus,
+            // „Abbrechen" bringt sie zurück).
             knownHeader = TvosControls.Heading("Bekannte Server");
-            content.AddArrangedSubview(knownHeader);
             knownSource = new ServerListTableSource(OnKnownServerSelected);
             knownTable = CreateServerTable(knownSource);
-            content.AddArrangedSubview(knownTable);
-
-            // Netzwerk-Erkennung.
-            content.AddArrangedSubview(TvosControls.Heading("Im Netzwerk suchen"));
-            content.AddArrangedSubview(TvosControls.Body(
-                "Die App kann VideoPlayer-Server im eigenen Netzwerk automatisch finden."));
             discoverButton = TvosControls.Button(
-                "Server im Netzwerk suchen",
+                "Suche wiederholen",
                 () => _ = dispatch(new ServerDiscoveryRequestedMessage()));
-            content.AddArrangedSubview(discoverButton);
             discoveryStatusLabel = TvosControls.Status();
-            content.AddArrangedSubview(discoveryStatusLabel);
             discoveredSource = new ServerListTableSource(OnDiscoveredServerSelected);
             discoveredTable = CreateServerTable(discoveredSource);
-            content.AddArrangedSubview(discoveredTable);
-
-            // Stufe 1: Serverwahl (manuelle Adresse + Ticket-Adresse).
-            addressField = TvosControls.TextField("http://server/videoplayer/");
-            connectButton = TvosControls.Button(
-                "Verbinden",
-                () => _ = dispatch(new ServerAddressSubmittedMessage(addressField.Text ?? string.Empty)));
-            checkStatusLabel = TvosControls.Status();
-            setupErrorLabel = TvosControls.Error();
-            var manualSection = TvosControls.Section(
-                TvosControls.Heading("Adresse selbst eingeben"),
-                TvosControls.Body("Adresse des Servers manuell eingeben."),
-                addressField, connectButton, checkStatusLabel, setupErrorLabel);
+            manualEntryButton = TvosControls.Button(
+                "Serveradresse manuell eingeben",
+                () => { manualEntryMode = true; ApplyStages(); });
+            manualCancelButton = TvosControls.Button(
+                "Abbrechen",
+                () => { manualEntryMode = false; ApplyStages(); });
 
             ticketField = TvosControls.TextField("Ticket-Adresse");
             ticketButton = TvosControls.Button(
@@ -155,19 +167,55 @@ namespace VideoPlayer.TvOS.Ui
                 TvosControls.Body("Im Benutzerprofil unter „Gerät koppeln“ stellt der Server eine Kopplungsadresse bereit — sie enthält die Serveradresse und koppelt das Gerät direkt."),
                 ticketField, ticketButton, bootstrapStatusLabel, bootstrapErrorLabel);
 
-            addressStage = TvosControls.Section(manualSection, ticketSection);
-            addressStage.Spacing = 30;
-            content.AddArrangedSubview(addressStage);
+            serverSelectSection = TvosControls.Section(
+                knownHeader, knownTable,
+                TvosControls.Heading("Im Netzwerk suchen"),
+                TvosControls.Body("Die App sucht VideoPlayer-Server im eigenen Netzwerk automatisch."),
+                discoverButton, discoveryStatusLabel, discoveredTable,
+                manualEntryButton, ticketSection);
+            serverSelectSection.Spacing = 30;
+            content.AddArrangedSubview(serverSelectSection);
 
-            // Stufe 2: Anmeldung am geprüften Server (Kurzcode, Pairing
-            // oder Zugangsdaten).
+            // Unterschritt der Stufe 1: manuelle Adresseingabe.
+            addressField = TvosControls.TextField("http://server/videoplayer/");
+            connectButton = TvosControls.Button(
+                "Verbinden",
+                () => _ = dispatch(new ServerAddressSubmittedMessage(addressField.Text ?? string.Empty)));
+            checkStatusLabel = TvosControls.Status();
+            setupErrorLabel = TvosControls.Error();
+            manualSection = TvosControls.Section(
+                TvosControls.Heading("Serveradresse eingeben"),
+                TvosControls.Body("Adresse des Servers manuell eingeben."),
+                addressField, connectButton, checkStatusLabel, setupErrorLabel,
+                manualCancelButton);
+            manualSection.Hidden = true;
+            content.AddArrangedSubview(manualSection);
+
+            // Stufe 2: Methodenwahl — erst die Auswahl, dann nur das
+            // zugehörige Formular (Pairing-Code, Kurzcode oder
+            // Zugangsdaten).
+            methodSection = TvosControls.Section(
+                TvosControls.Heading("Anmeldemethode wählen"),
+                TvosControls.Body("Der Server ist verbunden. Wähle aus, wie du dieses Gerät anmelden möchtest."),
+                TvosControls.Button("Mit Pairing-Code koppeln",
+                    () => { chosenMethod = AuthMethod.Pairing; ApplyStages(); }),
+                TvosControls.Button("Mit Kurzcode anmelden",
+                    () => { chosenMethod = AuthMethod.ShortCode; ApplyStages(); }),
+                TvosControls.Button("Mit Zugangsdaten anmelden",
+                    () => { chosenMethod = AuthMethod.Credentials; ApplyStages(); }));
+
+            authBackButton = TvosControls.Button(
+                "Andere Methode wählen",
+                () => { chosenMethod = AuthMethod.None; ApplyStages(); });
+            authBackButton.Hidden = true;
+
             shortCodeField = TvosControls.TextField("Kurzcode");
             shortCodeButton = TvosControls.Button(
                 "Kurzcode einlösen",
                 () => _ = dispatch(new BootstrapTicketSubmittedMessage(shortCodeField.Text ?? string.Empty)));
             shortCodeStatusLabel = TvosControls.Status();
             shortCodeErrorLabel = TvosControls.Error();
-            var shortCodeSection = TvosControls.Section(
+            shortCodeSection = TvosControls.Section(
                 TvosControls.Heading("Mit Kurzcode anmelden"),
                 TvosControls.Body("Kurzcode aus dem Benutzerprofil („Gerät koppeln“) eingeben — er wird gegen den verbundenen Server eingelöst, ohne Passwort."),
                 shortCodeField, shortCodeButton, shortCodeStatusLabel, shortCodeErrorLabel);
@@ -198,7 +246,8 @@ namespace VideoPlayer.TvOS.Ui
                 usernameField, passwordField, loginButton, loginStatusLabel, loginErrorLabel);
 
             authStage = TvosControls.Section(
-                shortCodeSection, pairingSection, credentialsSection);
+                methodSection, shortCodeSection, pairingSection, credentialsSection,
+                authBackButton);
             authStage.Spacing = 30;
             content.AddArrangedSubview(authStage);
 
@@ -215,8 +264,13 @@ namespace VideoPlayer.TvOS.Ui
         {
             base.ViewWillAppear(animated);
             // Beim Öffnen aus den Einstellungen die Serverliste
-            // aktualisieren (Muster: ServerSetupPage der MAUI-App).
+            // aktualisieren (Muster: ServerSetupPage der MAUI-App) und
+            // die Netzwerk-Suche automatisch anstoßen.
             _ = dispatch(new LoadServersRequestedMessage());
+            if (model?.IsDiscoveryRunning != true)
+            {
+                _ = dispatch(new ServerDiscoveryRequestedMessage());
+            }
         }
 
         /// <inheritdoc/>
@@ -282,17 +336,38 @@ namespace VideoPlayer.TvOS.Ui
             discoveredTable.ReloadData();
         }
 
-        private void RenderStages(AppModel model)
+        private void RenderStages(AppModel model) => ApplyStages();
+
+        /// <summary>
+        /// Stufenlogik des Wizards: Stufe 1 zeigt die Serverwahl
+        /// (bekannte + gefundene Server) oder — im Unterschritt — die
+        /// manuelle Adresseingabe, Stufe 2 die Methodenwahl oder das
+        /// jeweils gewählte Anmeldeformular.
+        /// </summary>
+        private void ApplyStages()
         {
-            // Stufenlogik (Muster: ServerSetupPage der MAUI-App): Stufe 1
-            // (Adresswahl), solange kein verbundener Server eine Anmeldung
-            // oder ein Geräte-Pairing erwartet.
-            var authChoice = model.ConnectionState == ConnectionState.NeedsLogin
-                || model.IsPairingRequired;
-            addressStage!.Hidden = authChoice;
+            var model = this.model;
+            var authChoice = model is not null
+                && (model.ConnectionState == ConnectionState.NeedsLogin
+                    || model.IsPairingRequired);
+            if (authChoice)
+            {
+                manualEntryMode = false;
+            }
+            else
+            {
+                chosenMethod = AuthMethod.None;
+            }
+
+            serverSelectSection!.Hidden = authChoice || manualEntryMode;
+            manualSection!.Hidden = authChoice || !manualEntryMode;
+
             authStage!.Hidden = !authChoice;
-            pairingSection!.Hidden = !model.IsPairingRequired;
-            credentialsSection!.Hidden = model.IsPairingRequired;
+            methodSection!.Hidden = chosenMethod != AuthMethod.None;
+            pairingSection!.Hidden = chosenMethod != AuthMethod.Pairing;
+            shortCodeSection!.Hidden = chosenMethod != AuthMethod.ShortCode;
+            credentialsSection!.Hidden = chosenMethod != AuthMethod.Credentials;
+            authBackButton!.Hidden = chosenMethod == AuthMethod.None;
         }
 
         private void RenderBusyAndErrors(AppModel model)
