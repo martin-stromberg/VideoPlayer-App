@@ -23,5 +23,5 @@ Abweichung: Keine Unteragenten verfügbar — alle Schritte werden vom Hauptagen
 | [x] | 9 | Dokumentation erstellen | `docs/help/` |
 | [x] | 9b | README aktualisieren | `README.md` |
 | [x] | – | Feature-Verzeichnis löschen | – (behalten, Konvention der Schritte 7–9: Review-Artefakte bleiben committed) |
-| [ ] | – | Commit durchführen | – |
-| [ ] | – | Push + CI `build-tvos` grün | – |
+| [x] | – | Commit durchführen | – |
+| [x] | – | Push + CI `build-tvos` grün | Run 42138055992 (verify ✓, build-tvos ✓) |
