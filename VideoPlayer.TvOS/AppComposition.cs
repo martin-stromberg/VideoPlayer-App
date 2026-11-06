@@ -93,13 +93,21 @@ namespace VideoPlayer.TvOS
                 AuthSession, CacheDatabase,
                 new AppLogger<UpcomingEpisodesService>(LoggerFactory));
             Playlists = new PlaylistService(AuthSession, Secrets);
-            // DownloadService ohne Plattform-Backend: der Wiedergabe-Schritt
-            // benötigt nur die Ablauf-Methoden (Wiedergabe-Schutz,
-            // gesehene Downloads verkürzen); das tvOS-Transfer-Backend
-            // folgt mit dem Download-Schritt.
+            // Download-Verwaltung: persistente Aufträge im Manifest,
+            // Transfer über die systemseitige Hintergrund-URL-Session
+            // (suspensionstauglich — tvOS-Apps bleiben wochenlang
+            // suspendiert). Abschlüsse ohne aktiven Transfer-Aufruf
+            // (System-Neustart der App für Hintergrund-Events) meldet
+            // der Completion-Sink dem Manifest.
+            DownloadBackend = new TvosBackgroundDownloadBackend();
+            TvosBackgroundDownloadBackend.Shared = DownloadBackend;
             Downloads = new DownloadService(
                 AuthSession, Secrets, CacheDatabase, StorageLayout, NetworkMonitor,
-                new AppLogger<DownloadService>(LoggerFactory));
+                new AppLogger<DownloadService>(LoggerFactory),
+                DownloadBackend);
+            DownloadBackend.CompletionSink = (key, error, tempPath) =>
+                Downloads.CompleteExternalTransferAsync(
+                    key, error, tempPath, Settings.Load());
             ServerDiscovery = ServerDiscoveryService.CreateDefault();
         }
 
@@ -190,8 +198,11 @@ namespace VideoPlayer.TvOS
         /// <summary>Playlist-Wiedergabekontext (start/next/previous/advance-Endpunkte).</summary>
         public PlaylistService Playlists { get; }
 
-        /// <summary>Download-Manifestdienst — im Wiedergabe-Schritt nur für die Ablauf-Methoden (Wiedergabe-Schutz, gesehene Downloads verkürzen) genutzt.</summary>
+        /// <summary>Download-Manifestdienst (Aufträge, Quota, Ablauf, Abgleich) mit Hintergrund-Transfer-Backend.</summary>
         public DownloadService Downloads { get; }
+
+        /// <summary>Hintergrund-Transfer-Backend der Downloads (<see cref="NSUrlSession"/>-Hintergrund-Session — Zugriff für den App-Delegate).</summary>
+        public TvosBackgroundDownloadBackend DownloadBackend { get; }
 
         /// <summary>Netzwerk-Erkennung (mDNS + UDP-Broadcast).</summary>
         public ServerDiscoveryService ServerDiscovery { get; }

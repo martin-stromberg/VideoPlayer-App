@@ -115,11 +115,9 @@ public class TvOsAppContractTests
     /// <summary>
     /// Prüft: der Handler verdrahtet die für tvOS nicht vorgesehenen
     /// Bereiche nicht — Playlist-/Inhalts-Verwaltung, Auto-Download,
-    /// PiP und Protokollversand bleiben No-Op. Das manuelle
-    /// Download-Einreihen ist seit dem Detailseiten-Schritt lediglich
-    /// als vorbereitete Aktion verdrahtet (Hinweis statt
-    /// DownloadService-Aufruf) — echter Download-Code existiert im
-    /// Handler nicht.
+    /// PiP und Protokollversand bleiben No-Op. Seit dem Download-Schritt
+    /// ist der manuelle Download-Pfad dagegen echt verdrahtet
+    /// (DownloadService über die Komposition).
     /// </summary>
     [Fact]
     public void TvOsEffectHandler_DoesNotWireExcludedAreas()
@@ -131,15 +129,66 @@ public class TvOsAppContractTests
         Assert.DoesNotContain("RemovePlaylistEntryEffect", handler, StringComparison.Ordinal);
         Assert.DoesNotContain("AddPlaylistEntryEffect", handler, StringComparison.Ordinal);
         Assert.DoesNotContain("RunAutoDownloadsEffect", handler, StringComparison.Ordinal);
+        Assert.DoesNotContain("AutoDownloadService", handler, StringComparison.Ordinal);
         Assert.DoesNotContain("TogglePictureInPictureEffect", handler, StringComparison.Ordinal);
         Assert.DoesNotContain("SendLogProtocolEffect", handler, StringComparison.Ordinal);
         Assert.DoesNotContain("MediaElement", handler, StringComparison.Ordinal);
+    }
 
-        // Kein echter Download-Schreibpfad: EnqueueDownloadEffect läuft
-        // auf die vorbereitete Hinweis-Rückmeldung, nicht auf den
-        // DownloadService (der kommt mit dem Download-Schritt).
-        Assert.DoesNotContain("DownloadService", handler, StringComparison.Ordinal);
-        Assert.DoesNotContain("EnqueueAsync", handler, StringComparison.Ordinal);
+    /// <summary>
+    /// Prüft: der Handler verdrahtet den manuellen Download-Pfad
+    /// (Einreihen mit Serienkontext, Abbrechen, Löschen, Sammel-
+    /// Aktionen, Wiederaufnahme, Abgleich) über den DownloadService
+    /// der Komposition — inklusive des Completion-Sink-Pfads des
+    /// Hintergrund-Backends.
+    /// </summary>
+    [Fact]
+    public void TvOsEffectHandler_WiresManualDownloads()
+    {
+        var handler = TvOsFile("Services", "TvosAppEffectHandler.cs");
+
+        Assert.Contains("LoadDownloadsEffect", handler, StringComparison.Ordinal);
+        Assert.Contains("EnqueueDownloadEffect", handler, StringComparison.Ordinal);
+        Assert.Contains("CancelDownloadEffect", handler, StringComparison.Ordinal);
+        Assert.Contains("DeleteDownloadEffect", handler, StringComparison.Ordinal);
+        Assert.Contains("DeleteAllDownloadsEffect", handler, StringComparison.Ordinal);
+        Assert.Contains("DeleteFailedDownloadsEffect", handler, StringComparison.Ordinal);
+        Assert.Contains("ResumeDownloadsEffect", handler, StringComparison.Ordinal);
+        Assert.Contains("ReconcileDownloadsEffect", handler, StringComparison.Ordinal);
+        Assert.Contains("EnqueueAsync", handler, StringComparison.Ordinal);
+        Assert.Contains("ResumeInterruptedAsync", handler, StringComparison.Ordinal);
+        Assert.Contains("ReconcileAsync", handler, StringComparison.Ordinal);
+        Assert.Contains("DownloadOrigin.Manual", handler, StringComparison.Ordinal);
+        Assert.Contains("DownloadEnqueueCompletedMessage", handler, StringComparison.Ordinal);
+        Assert.Contains("DownloadsLoadedMessage", handler, StringComparison.Ordinal);
+
+        // Das Hintergrund-Backend sitzt in der Komposition und meldet
+        // systemgefuehrte Abschluesse ueber den Manifest-Pfad.
+        var composition = TvOsFile("AppComposition.cs");
+        Assert.Contains("TvosBackgroundDownloadBackend", composition, StringComparison.Ordinal);
+        Assert.Contains("CompleteExternalTransferAsync", composition, StringComparison.Ordinal);
+    }
+
+    /// <summary>Prüft: das Hintergrund-Backend und die Lebenszyklus-Verdrahtung folgen dem iOS-Muster.</summary>
+    [Fact]
+    public void TvOsDownloadBackend_UsesBackgroundUrlSession()
+    {
+        var backend = TvOsFile("Services", "TvosBackgroundDownloadBackend.cs");
+
+        Assert.Contains("IDownloadBackend", backend, StringComparison.Ordinal);
+        Assert.Contains("INSUrlSessionDownloadDelegate", backend, StringComparison.Ordinal);
+        Assert.Contains("CreateBackgroundSessionConfiguration", backend, StringComparison.Ordinal);
+        Assert.Contains("SessionSendsLaunchEvents", backend, StringComparison.Ordinal);
+        Assert.Contains("CompletionSink", backend, StringComparison.Ordinal);
+        Assert.Contains("HandleEventsForBackgroundUrlSession", backend, StringComparison.Ordinal);
+        Assert.Contains("URLSession:downloadTask:didFinishDownloadingToURL:", backend, StringComparison.Ordinal);
+        Assert.Contains("URLSession:task:didCompleteWithError:", backend, StringComparison.Ordinal);
+        Assert.Contains("URLSessionDidFinishEventsForBackgroundURLSession:", backend, StringComparison.Ordinal);
+
+        var appDelegate = TvOsFile("AppDelegate.cs");
+        Assert.Contains("application:handleEventsForBackgroundURLSession:completionHandler:", appDelegate, StringComparison.Ordinal);
+        Assert.Contains("HandleEventsForBackgroundUrlSession", appDelegate, StringComparison.Ordinal);
+        Assert.Contains("AppActivatedMessage", appDelegate, StringComparison.Ordinal);
     }
 
     /// <summary>Prüft: die Komposition verdrahtet die Kerndienste und den MVU-Host.</summary>

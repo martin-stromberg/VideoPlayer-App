@@ -617,8 +617,8 @@ namespace VideoPlayer.TvOS.Ui
                 return;
             }
 
-            // Serienkontext der Episoden-Anforderung wie in MAUI — der
-            // tvOS-Handler meldet den vorbereiteten Download als Hinweis.
+            // Serienkontext der Episoden-Anforderung wie in MAUI — das
+            // Update reicht ihn über EnqueueDownloadEffect ins Manifest.
             var message = new DownloadRequestedMessage(
                 details.MediaType, details.MediaId,
                 details.HighlightedEpisodeTitle ?? details.Title);

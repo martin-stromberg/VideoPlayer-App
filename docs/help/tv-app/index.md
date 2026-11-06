@@ -14,8 +14,15 @@ modale Browsing-Seite mit Genre-Filter („Alle"), Suchfeld
 Poster-Raster. Detailansichten für Film, Filmsammlung, Serie, Staffel
 und Episode zeigen Bildmaterial, Metadaten, Gesehen-/lokale-Datei-
 Kennzeichnung, Staffel- und Episodenauswahl sowie die Aktionen
-Abspielen (vorbereitet), Download (vorbereitet) und Favoriten-Umschaltung;
-offline greift der gespeicherte Detail-Snapshot.
+Abspielen, Herunterladen und Favoriten-Umschaltung;
+offline greift der gespeicherte Detail-Snapshot. Die Wiedergabe
+läuft im nativen Vollbildplayer mit Fortschritts-Tracking und
+Auto-Fortsetzung; Playlists sind lesend angebunden. Manuelle
+Downloads laufen suspensionstauglich über eine
+Hintergrund-URL-Session — Einplanung von der Detailseite,
+Download-Liste mit Zustand und Fortschritt, Abbrechen,
+Wiederholen und Löschen, Ablaufdatum und Quota-Obergrenze sowie
+Abgleich von Teildateien, fehlenden Dateien und Waisen.
 Kompilierbarkeit wird über einen macOS-CI-Job fortlaufend gesichert.
 
 ## Inhalt

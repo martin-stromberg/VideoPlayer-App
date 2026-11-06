@@ -1,5 +1,51 @@
 # Änderungsprotokoll
 
+## 2026-11-08 — tvOS-App: Manuelle Downloads über Hintergrund-URL-Session mit Ablauf, Abgleich und Quota
+
+- **Transfer-Backend (`TvosBackgroundDownloadBackend`):** neues
+  tvOS-Backend hinter `IDownloadBackend` — Port des iOS-`IosBackgroundDownloadBackend`;
+  der Dateitransfer läuft über eine `NSUrlSession`-Hintergrund-Session
+  (Kennung `videoplayer.downloads`, `TaskDescription` als Medien-Key),
+  sodass Downloads bei suspendierter App weiterlaufen. Abschlüsse ohne
+  aktiven `TransferAsync`-Aufruf (System-Neustart für Hintergrund-Events)
+  meldet der `CompletionSink` an `DownloadService.CompleteExternalTransferAsync`;
+  die App-Delegate-Verdrahtung `handleEventsForBackgroundURLSession`
+  reicht die System-Events weiter, `EnsureSession()` bei Start und
+  Aktivierung stellt die Zustellung ausstehender Delegate-Rückrufe
+  sicher. `HttpDownloadBackend` bleibt Fallback/Test-Referenz.
+- **Aktivierungs-Message (`AppActivatedMessage`):** neue
+  plattformneutrale Message im Update-Fluss — der tvOS-Lebenszyklus
+  (`OnActivated`) dispatcht sie bei jedem Vordergrund-Eintritt;
+  verbunden löst sie `ResumeDownloadsEffect` (Abgleich +
+  Neu-Einplanung verwaister Aufträge über `ResumeInterruptedAsync`),
+  ohne Verbindung den neuen `ReconcileDownloadsEffect` (reiner lokaler
+  Ablauf-/Abgleichslauf — Teildateien, `missing_file`-Korrektur,
+  Waisen, Ablauf) aus.
+- **Download-Einstieg:** `EnqueueDownloadEffect` ist jetzt real im
+  `TvosAppEffectHandler` verdrahtet (statt vorbereitetem Hinweis) —
+  `DownloadService.EnqueueAsync` mit `DownloadOrigin.Manual` und
+  Serienkontext der Detailseite; Quota-Überschreitung wird vor der
+  Einplanung als verständlicher Hinweis gemeldet.
+- **Download-Liste (`DownloadsPageViewController`):** neue Menüseite
+  „Downloads" statt Platzhalter — `UITableView` mit Vorschaubild
+  (`DownloadTableCell`), Zustand, Fortschrittsbalken, Größen- und
+  Ablaufdatum-Angabe sowie Fehlerhinweis; Kontingent-Belegung und
+  Restdaten-Hinweis im Kopf; Zeilenauswahl öffnet ein Aktionsmenü
+  (Abbrechen/Erneut versuchen/Löschen je Zustand), die Kopf-Aktion
+  „Fehlerhafte löschen" entfernt fehlgeschlagene und abgebrochene
+  Einträge gesammelt.
+- **Verdrahtung:** `AppComposition` injiziert das Backend in den
+  `DownloadService` und setzt den `CompletionSink`; alle manuellen
+  Download-Effekte (Laden, Einreihen, Abbrechen, Löschen einzeln/
+  gesamt/fehlgeschlagen, Restdaten-Bereinigung, Wiederaufnahme,
+  Abgleich) sind im `TvosAppEffectHandler` verdrahtet — Auto-Download
+  bleibt auf tvOS nicht verdrahtet, „nach dem Abspielen löschen" wird
+  nicht angeboten.
+- **Tests:** neue `AppActivatedMessage`-Übergangstests
+  (`AppUpdateTests_Downloads`) sowie tvOS-Contract-Tests der
+  Download-Verdrahtung und des Hintergrund-Backends
+  (`TvOsAppContractTests`).
+
 ## 2026-11-08 — tvOS-App: Playlists — lesender Zugriff und Wiedergabe
 
 - **Übersicht (`PlaylistsPageViewController`):** neue Menüseite

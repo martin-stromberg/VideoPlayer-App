@@ -322,6 +322,9 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
             case ResumeDownloadsEffect resume:
                 await ResumeDownloadsAsync(resume.Settings, cancellationToken);
                 break;
+            case ReconcileDownloadsEffect reconcile:
+                await ReconcileDownloadsAsync(reconcile.Settings, cancellationToken);
+                break;
             case RunAutoDownloadsEffect autoRun:
                 await RunAutoDownloadsAsync(autoRun, cancellationToken);
                 break;
@@ -1685,6 +1688,26 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
         catch (Exception ex)
         {
             logger.LogError(ex, "Download-Wiederaufnahme fehlgeschlagen");
+        }
+    }
+
+    /// <summary>
+    /// Reiner Ablauf-/Abgleichslauf (<see cref="ReconcileDownloadsEffect"/>):
+    /// identisch zum Abgleich-Anteil der Wiederaufnahme — ein Fehler
+    /// wird protokolliert und unterbricht den Zyklus nicht.
+    /// </summary>
+    /// <param name="settings">Aktuelle App-Einstellungen (Aufbewahrungszeit des Ablauf-Passes).</param>
+    /// <param name="cancellationToken">Bricht die Operation ab.</param>
+    /// <returns>Eine abgeschlossene Aufgabe nach dem Abgleich.</returns>
+    private async Task ReconcileDownloadsAsync(AppSettings settings, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await ReconcileWithExpiryPassAsync(settings, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Download-Abgleich fehlgeschlagen");
         }
     }
 
