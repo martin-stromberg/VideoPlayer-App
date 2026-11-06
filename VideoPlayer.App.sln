@@ -23,7 +23,6 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "VideoPlayer.TvOS", "VideoPl
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "VideoPlayer.TvOS.EsqliteStub", "VideoPlayer.TvOS.EsqliteStub\VideoPlayer.TvOS.EsqliteStub.csproj", "{57CCC1F7-1A93-4861-A9E3-27F0C63A0B35}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "VideoPlayer.TvOS.Esqlite3Stub", "VideoPlayer.TvOS.Esqlite3Stub\VideoPlayer.TvOS.Esqlite3Stub.csproj", "{C0F453A0-9FF0-4260-B71B-DF261E99D60F}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

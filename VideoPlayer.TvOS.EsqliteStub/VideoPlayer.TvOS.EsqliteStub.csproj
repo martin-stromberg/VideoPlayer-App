@@ -13,6 +13,8 @@
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <AssemblyName>SQLitePCLRaw.lib.e_sqlite3.tvos</AssemblyName>
+    <AssemblyVersion>2.1.11.2622</AssemblyVersion>
+    <FileVersion>2.1.11.2622</FileVersion>
     <Nullable>disable</Nullable>
     <ImplicitUsings>disable</ImplicitUsings>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
