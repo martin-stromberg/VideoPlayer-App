@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using Foundation;
+using Microsoft.Extensions.Logging;
 using UIKit;
 using VideoPlayer.Mvu;
 
@@ -44,6 +45,9 @@ namespace VideoPlayer.TvOS.Services
         private readonly ConcurrentDictionary<nuint, PendingTransfer> pending = new();
         private readonly ConcurrentDictionary<int, Action> systemCompletionHandlers = new();
         private NSUrlSession? session;
+
+        /// <summary>Optionaler App-Logger für Transfer-Diagnose (NSError-Details).</summary>
+        public ILogger? Logger { get; set; }
 
         /// <summary>
         /// Wird für Transfers aufgerufen, die ohne aktiven
@@ -185,6 +189,10 @@ namespace VideoPlayer.TvOS.Services
             }
 
             var key = task.TaskDescription ?? string.Empty;
+            Logger?.LogError(
+                "Hintergrund-Transfer {TaskId} ({Key}) fehlgeschlagen: {Domain} {Code} — {Description} (URL: {Url})",
+                task.TaskIdentifier, key, error.Domain, error.Code,
+                error.LocalizedDescription, task.CurrentRequest?.Url?.ToString());
             if (pending.TryRemove(task.TaskIdentifier, out var transfer))
             {
                 transfer.Cancellation.Dispose();

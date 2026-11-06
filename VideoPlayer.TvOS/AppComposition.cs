@@ -100,7 +100,10 @@ namespace VideoPlayer.TvOS
             // suspendiert). Abschlüsse ohne aktiven Transfer-Aufruf
             // (System-Neustart der App für Hintergrund-Events) meldet
             // der Completion-Sink dem Manifest.
-            DownloadBackend = new TvosBackgroundDownloadBackend();
+            DownloadBackend = new TvosBackgroundDownloadBackend
+            {
+                Logger = new AppLogger<TvosBackgroundDownloadBackend>(LoggerFactory)
+            };
             TvosBackgroundDownloadBackend.Shared = DownloadBackend;
             Downloads = new DownloadService(
                 AuthSession, Secrets, CacheDatabase, StorageLayout, NetworkMonitor,
