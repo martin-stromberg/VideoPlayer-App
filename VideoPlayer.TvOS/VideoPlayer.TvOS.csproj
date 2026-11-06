@@ -65,6 +65,7 @@
     <!-- Stub fuer die gleichnamige Managed-Assembly: batteries_v2 referenziert
          sie statisch, der Provider kommt ueber provider.internal. -->
     <ProjectReference Include="..\VideoPlayer.TvOS.EsqliteStub\VideoPlayer.TvOS.EsqliteStub.csproj" />
+    <ProjectReference Include="..\VideoPlayer.TvOS.Esqlite3Stub\VideoPlayer.TvOS.Esqlite3Stub.csproj" />
     <!-- Retaggte e_sqlite3-Archive aus SQLitePCLRaw.lib.e_sqlite3 3.53.3:
          das Plattform-Tag (LC_BUILD_VERSION/LC_VERSION_MIN) wurde von
          ios/iossimulator auf tvos/tvossimulator umgeschrieben — Inhalt
