@@ -47,7 +47,7 @@ public sealed class SourceBrowserService
         var items = new List<SourceItem>(sources.Count);
         foreach (var source in sources)
         {
-            if (source.Id <= 0)
+            if (source.Id <= 0 || source.IsMenuHidden)
             {
                 continue;
             }

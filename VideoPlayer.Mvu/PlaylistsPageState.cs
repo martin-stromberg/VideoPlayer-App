@@ -146,17 +146,23 @@ public sealed record PlaylistsPageState
         IReadOnlyList<PlaylistListItem> own,
         IReadOnlyList<PlaylistListItem> publicPlaylists)
     {
-        var items = new List<PlaylistOverviewItem>(own.Count + publicPlaylists.Count + 2);
+        // Öffentliche Playlists, die zugleich der eigene Besitz sind,
+        // erscheinen bereits unter „Meine Playlists" — dort nicht
+        // erneut aufführen. Leere Sektionen bekommen keine Überschrift.
+        var ownIds = new HashSet<long>(own.Select(p => p.PlaylistId));
+        var publicOnly = publicPlaylists.Where(p => !ownIds.Contains(p.PlaylistId)).ToList();
+
+        var items = new List<PlaylistOverviewItem>(own.Count + publicOnly.Count + 2);
         if (own.Count > 0)
         {
             items.Add(PlaylistOverviewItem.Header(OwnSectionTitle));
             items.AddRange(own.Select(PlaylistOverviewItem.Entry));
         }
 
-        if (publicPlaylists.Count > 0)
+        if (publicOnly.Count > 0)
         {
             items.Add(PlaylistOverviewItem.Header(PublicSectionTitle));
-            items.AddRange(publicPlaylists.Select(PlaylistOverviewItem.Entry));
+            items.AddRange(publicOnly.Select(PlaylistOverviewItem.Entry));
         }
 
         return items;

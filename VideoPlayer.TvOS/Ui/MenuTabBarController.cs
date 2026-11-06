@@ -18,7 +18,6 @@ namespace VideoPlayer.TvOS.Ui
             {
                 [AppPage.Home] = ("Startseite", "Weiterschauen, Favoriten und neue Inhalte."),
                 [AppPage.Sources] = ("Quellen", "Freigegebene Medienbereiche des Servers."),
-                [AppPage.Favorites] = ("Favoriten", "Ihre markierten Inhalte."),
                 [AppPage.Playlists] = ("Playlists", "Eigene und öffentliche Playlists."),
                 [AppPage.Downloads] = ("Downloads", "Lokal verfügbare Inhalte."),
                 [AppPage.Profile] = ("Profil", "Konto- und Profilinformationen."),
@@ -27,6 +26,7 @@ namespace VideoPlayer.TvOS.Ui
 
         private readonly Func<AppMessage, Task> dispatch;
         private readonly TvosPosterImageService posters;
+        private AppPage[] visiblePages = [];
 
         /// <summary>Initialisiert eine neue Instanz der <see cref="MenuTabBarController"/>-Klasse.</summary>
         /// <param name="dispatch">Rückmeldung in den MVU-Zyklus (Hauptthread).</param>
@@ -57,7 +57,12 @@ namespace VideoPlayer.TvOS.Ui
                 return;
             }
 
-            var controllers = AppRoutes.MenuPages
+            // Favoriten als eigene Seite entfällt auf tvOS — die
+            // Startseite zeigt die Favoriten bereits als Karussell.
+            visiblePages = AppRoutes.MenuPages
+                .Where(p => p != AppPage.Favorites)
+                .ToArray();
+            var controllers = visiblePages
                 .Select(CreatePageController)
                 .ToArray();
             ViewControllers = controllers;
@@ -67,7 +72,7 @@ namespace VideoPlayer.TvOS.Ui
                 var index = Array.IndexOf(controllers, e.ViewController);
                 if (index >= 0)
                 {
-                    _ = dispatch(new NavigatedMessage(AppRoutes.MenuPages[index]));
+                    _ = dispatch(new NavigatedMessage(visiblePages[index]));
                 }
             };
         }
@@ -78,7 +83,7 @@ namespace VideoPlayer.TvOS.Ui
         public bool Select(AppPage page)
         {
             EnsurePages();
-            var index = IndexOfMenuPage(page);
+            var index = Array.IndexOf(visiblePages, page);
             if (index < 0)
             {
                 return false;
@@ -127,26 +132,8 @@ namespace VideoPlayer.TvOS.Ui
             controller.TabBarItem = new UITabBarItem(
                 PageTitles[page].Title,
                 null,
-                IndexOfMenuPage(page));
+                Array.IndexOf(visiblePages, page));
             return controller;
-        }
-
-        /// <summary>Sucht die Position einer Menüseite in <see cref="AppRoutes.MenuPages"/>.</summary>
-        /// <param name="page">Die gesuchte Menüseite.</param>
-        /// <returns>Der Zeilenindex oder <c>-1</c>, wenn die Seite kein Menüeintrag ist.</returns>
-        private static int IndexOfMenuPage(AppPage page)
-        {
-            // AppRoutes.MenuPages ist IReadOnlyList<AppPage> und besitzt
-            // kein IndexOf-Mitglied.
-            for (var index = 0; index < AppRoutes.MenuPages.Count; index++)
-            {
-                if (AppRoutes.MenuPages[index] == page)
-                {
-                    return index;
-                }
-            }
-
-            return -1;
         }
     }
 }
