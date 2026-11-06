@@ -40,6 +40,21 @@ namespace VideoPlayer.TvOS.Ui
         public override void ViewDidLoad()
         {
             base.ViewDidLoad();
+            EnsurePages();
+        }
+
+        /// <summary>
+        /// Erzeugt die Seitencontroller einmalig — lazy, weil
+        /// <see cref="ViewDidLoad"/> auf tvOS bereits waehrend des nativen
+        /// Basis-Konstruktors feuern kann, also bevor <see cref="dispatch"/>
+        /// zugewiesen ist (Feldzuweisungen laufen erst nach <c>base()</c>).
+        /// </summary>
+        private void EnsurePages()
+        {
+            if (dispatch is null || ViewControllers is { Length: > 0 })
+            {
+                return;
+            }
 
             var controllers = AppRoutes.MenuPages
                 .Select(CreatePageController)
@@ -61,6 +76,7 @@ namespace VideoPlayer.TvOS.Ui
         /// <returns><c>true</c>, wenn die Seite einem Menüeintrag entspricht.</returns>
         public bool Select(AppPage page)
         {
+            EnsurePages();
             var index = IndexOfMenuPage(page);
             if (index < 0)
             {
@@ -75,6 +91,7 @@ namespace VideoPlayer.TvOS.Ui
         /// <param name="model">Das aktuelle App-Modell.</param>
         public void Render(AppModel model)
         {
+            EnsurePages();
             if (ViewControllers is null)
             {
                 return;

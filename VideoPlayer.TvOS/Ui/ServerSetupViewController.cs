@@ -152,7 +152,7 @@ namespace VideoPlayer.TvOS.Ui
             bootstrapErrorLabel = TvosControls.Error();
             var ticketSection = TvosControls.Section(
                 TvosControls.Heading("Mit Kopplungsadresse verbinden"),
-                TvosControls.Body("Die Serververwaltung (Profilseite „Geräte“) stellt eine Kopplungsadresse bereit — sie enthält die Serveradresse und koppelt das Gerät direkt."),
+                TvosControls.Body("Im Benutzerprofil unter „Gerät koppeln“ stellt der Server eine Kopplungsadresse bereit — sie enthält die Serveradresse und koppelt das Gerät direkt."),
                 ticketField, ticketButton, bootstrapStatusLabel, bootstrapErrorLabel);
 
             addressStage = TvosControls.Section(manualSection, ticketSection);
@@ -169,7 +169,7 @@ namespace VideoPlayer.TvOS.Ui
             shortCodeErrorLabel = TvosControls.Error();
             var shortCodeSection = TvosControls.Section(
                 TvosControls.Heading("Mit Kurzcode anmelden"),
-                TvosControls.Body("Kurzcode aus der Serververwaltung (Profilseite „Geräte“) eingeben — er wird gegen den verbundenen Server eingelöst, ohne Passwort."),
+                TvosControls.Body("Kurzcode aus dem Benutzerprofil („Gerät koppeln“) eingeben — er wird gegen den verbundenen Server eingelöst, ohne Passwort."),
                 shortCodeField, shortCodeButton, shortCodeStatusLabel, shortCodeErrorLabel);
 
             pairingField = TvosControls.TextField("Pairing-Code");
@@ -180,7 +180,7 @@ namespace VideoPlayer.TvOS.Ui
             pairingErrorLabel = TvosControls.Error();
             pairingSection = TvosControls.Section(
                 TvosControls.Heading("Gerät koppeln"),
-                TvosControls.Body("Der Server verlangt zuerst eine Geräte-Kopplung: Einmal-Code aus der Verwaltung deines Servers (Profilseite „Geräte“) eingeben."),
+                TvosControls.Body("Der Server verlangt zuerst eine Geräte-Kopplung: Einmal-Code aus der Administration (Seite „Geräte“ → „Pairing-Code generieren“) eingeben."),
                 pairingField, pairButton, pairingStatusLabel, pairingErrorLabel);
 
             usernameField = TvosControls.TextField("Benutzername");
