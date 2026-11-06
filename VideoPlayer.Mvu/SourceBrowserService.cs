@@ -44,10 +44,17 @@ public sealed class SourceBrowserService
             ?? throw new InvalidOperationException("Kein Server verbunden.");
 
         var sources = await client.GetSourcesAsync(cancellationToken);
+
+        // Schutz gegen falsch erkannte Versteck-Flags: ein Filter, der
+        // sämtliche Quellen entfernen würde, wird nicht angewendet —
+        // „Im Menü ausblenden" ist niemals für alle Quellen gedacht.
+        var hidden = sources.Count(s => s.IsMenuHidden);
+        var applyMenuFilter = hidden > 0 && hidden < sources.Count;
+
         var items = new List<SourceItem>(sources.Count);
         foreach (var source in sources)
         {
-            if (source.Id <= 0 || source.IsMenuHidden)
+            if (source.Id <= 0 || (applyMenuFilter && source.IsMenuHidden))
             {
                 continue;
             }

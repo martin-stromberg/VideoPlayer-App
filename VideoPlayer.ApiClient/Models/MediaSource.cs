@@ -33,7 +33,8 @@ public class MediaSource : MediaEntry
     /// (<c>hidden</c>, <c>hide…</c>, <c>…InMenu</c>-Versteckvarianten)
     /// auf <c>true</c> oder Sichtbarkeits-Flags
     /// (<c>showInMenu</c>, <c>visibleInMenu</c>, <c>inMenu</c>) auf
-    /// <c>false</c>.
+    /// <c>false</c>. Nur exakte Feldnamen — kein Contains-Match
+    /// auf unbekannte Felder.
     /// </summary>
     [System.Text.Json.Serialization.JsonIgnore]
     public bool IsMenuHidden
@@ -52,16 +53,22 @@ public class MediaSource : MediaEntry
                     continue;
                 }
 
-                var name = key.ToLowerInvariant();
                 var flag = value.ValueKind == System.Text.Json.JsonValueKind.True;
-                if (name.Contains("hidden") && flag)
+                switch (key.ToLowerInvariant())
                 {
-                    return true;
-                }
-
-                if (!flag && (name.Contains("inmenu") || name.Contains("showin") || name.Contains("visiblein")))
-                {
-                    return true;
+                    case "hidden" or "ishidden" or "hideinmenu" or "hiddeninmenu"
+                        or "menuhidden" or "hiddenfrommenu" or "hidefrommenu":
+                        if (flag)
+                        {
+                            return true;
+                        }
+                        break;
+                    case "showinmenu" or "visibleinmenu" or "inmenu" or "menuvisible":
+                        if (!flag)
+                        {
+                            return true;
+                        }
+                        break;
                 }
             }
 
