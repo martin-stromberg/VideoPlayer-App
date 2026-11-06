@@ -856,10 +856,16 @@ APP="$appMac"
 PLIST="`$APP/Info.plist"
 BUNDLE_ID=`$(/usr/libexec/PlistBuddy -c 'Print CFBundleIdentifier' "`$PLIST")
 echo "Bundle-ID: `$BUNDLE_ID"
-# Simulator-Build (EnableCodeSigning=false) hinterlaesst ungueltig signierte
-# Bundle-Dylibs — der Kernel toetet den Prozess sonst mit
-# "Code Signature Invalid". Adhoc-Tiefensignatur vor dem Installieren.
-codesign --force --deep --sign - "`$APP"
+# Simulator-Build (EnableCodeSigning=false) hinterlaesst unsignierte oder
+# ungueltig signierte Mach-O-Dateien im Bundle — u. a. .aotdata.arm64
+# (von Mono per dlopen geladen) und .dylibs. Der Kernel toetet den Prozess
+# sonst mit "Code Signature Invalid". Daher jede Mach-O-Datei einzeln
+# adhoc-signieren (--deep allein erfasst .aotdata-Dateien nicht), danach
+# das Bundle als Ganzes.
+find "`$APP" -type f | while read f; do
+  if file -b "`$f" | grep -q "Mach-O"; then codesign --force --sign - "`$f"; fi
+done
+codesign --force --sign - "`$APP"
 xcrun simctl install "$Device" "`$APP" || { xcrun simctl uninstall "$Device" "`$BUNDLE_ID" || true; xcrun simctl install "$Device" "`$APP"; }
 xcrun simctl launch "$Device" "`$BUNDLE_ID"
 sleep 5
