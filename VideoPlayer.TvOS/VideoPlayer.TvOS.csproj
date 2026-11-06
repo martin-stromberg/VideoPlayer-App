@@ -32,6 +32,13 @@
     <ApplicationVersion>1</ApplicationVersion>
     <SupportedOSPlatformVersion>15.0</SupportedOSPlatformVersion>
     <RuntimeIdentifiers>tvossimulator-x64;tvossimulator-arm64;tvos-arm64</RuntimeIdentifiers>
+    <!-- Keychain-Entitlement (SecItem in KeychainSecretStore): ohne
+         keychain-access-groups schlaegt jeder Schlüsselbund-Zugriff mit
+         errSecMissingEntitlement fehl — Token-Persistenz
+         (Pairing/Login) waere dann ohne Wirkung. Wirkt bei aktiver
+         Signierung; der adhoc-Simulatorpfad loest die Platzhalter im
+         Deployment-Skript auf. -->
+    <CodesignEntitlements>Entitlements.plist</CodesignEntitlements>
   </PropertyGroup>
   <PropertyGroup Condition="'$(IncludeTvOsTarget)' != 'true'">
     <!-- Degradierte Huelle fuer Nicht-macOS-Hosts: keine Quelldateien
