@@ -868,12 +868,12 @@ done
 # Keychain-Entitlement beim adhoc-Signieren mitschreiben: SecItem
 # scheitert ohne keychain-access-groups mit errSecMissingEntitlement
 # (Token-Persistenz fuer Pairing/Login). Adhoc-Signatur kennt kein
-# Team-Prefix — die Default-Access-Group ist die Bundle-ID selbst;
-# plutil ersetzt die `$(AppIdentifierPrefix)`$(CFBundleIdentifier)-
-# Platzhalter des Templates entsprechend.
+# Team-Prefix — die Default-Access-Group ist die Bundle-ID selbst.
+# Spiegelt VideoPlayer.TvOS/Entitlements.plist mit aufgeloestem
+# `$(AppIdentifierPrefix)`$(CFBundleIdentifier); PlistBuddy schreibt
+# die Datei frisch (plutil -replace wuerde den Index einfuegen).
 RESOLVED_ENT="/tmp/videos-tvos-entitlements.plist"
-cp "$repoDir/VideoPlayer.TvOS/Entitlements.plist" "`$RESOLVED_ENT"
-plutil -replace "keychain-access-groups.0" -string "`$BUNDLE_ID" "`$RESOLVED_ENT"
+/usr/libexec/PlistBuddy -c "Clear dict" -c "Add :keychain-access-groups array" -c "Add :keychain-access-groups:0 string `$BUNDLE_ID" "`$RESOLVED_ENT"
 codesign --force --sign - --entitlements "`$RESOLVED_ENT" "`$APP"
 xcrun simctl install "$Device" "`$APP" || { xcrun simctl uninstall "$Device" "`$BUNDLE_ID" || true; xcrun simctl install "$Device" "`$APP"; }
 xcrun simctl launch "$Device" "`$BUNDLE_ID"
