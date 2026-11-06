@@ -17,6 +17,7 @@ namespace VideoPlayer.TvOS.Ui
             new Dictionary<AppPage, (string, string)>
             {
                 [AppPage.Home] = ("Startseite", "Weiterschauen, Favoriten und neue Inhalte."),
+                [AppPage.Sources] = ("Quellen", "Freigegebene Medienbereiche des Servers."),
                 [AppPage.Favorites] = ("Favoriten", "Ihre markierten Inhalte."),
                 [AppPage.Playlists] = ("Playlists", "Eigene und öffentliche Playlists."),
                 [AppPage.Downloads] = ("Downloads", "Lokal verfügbare Inhalte."),
@@ -114,6 +115,7 @@ namespace VideoPlayer.TvOS.Ui
             UIViewController controller = page switch
             {
                 AppPage.Home => new HomePageViewController(dispatch, posters),
+                AppPage.Sources => new SourcesPageViewController(dispatch),
                 AppPage.Playlists => new PlaylistsPageViewController(dispatch, posters),
                 AppPage.Downloads => new DownloadsPageViewController(dispatch, posters),
                 AppPage.Profile => new ProfilePageViewController(dispatch),
