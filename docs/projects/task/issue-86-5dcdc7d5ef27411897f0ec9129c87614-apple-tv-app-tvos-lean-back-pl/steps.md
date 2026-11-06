@@ -12,7 +12,7 @@ Branch: `task/issue-86-5dcdc7d5ef27411897f0ec9129c87614-apple-tv-app-tvos-lean-b
 | 6 | Detailseiten für Film, Sammlung, Serie, Staffel und Episode | 4, 5 | `task/issue-86-5dcdc7d5ef27411897f0ec9129c87614-apple-tv-app-tvos-lean-back-pl-schritt-6-detailseiten` | Fertig |
 | 7 | Wiedergabe mit Fortschritts-Tracking, Auto-Fortsetzung und Spurwahl | 6 | `task/issue-86-5dcdc7d5ef27411897f0ec9129c87614-apple-tv-app-tvos-lean-back-pl-schritt-7-wiedergabe` | Fertig |
 | 8 | Playlists — lesender Zugriff und Wiedergabe | 7 | `task/issue-86-5dcdc7d5ef27411897f0ec9129c87614-apple-tv-app-tvos-lean-back-pl-schritt-8-playlists` | Fertig |
-| 9 | Manuelle Downloads über suspensionstaugliche Hintergrund-URL-Session mit Ablaufdatum, Reconcile und Quota | 6, 7 | `task/issue-86-5dcdc7d5ef27411897f0ec9129c87614-apple-tv-app-tvos-lean-back-pl-schritt-9-downloads` | Offen |
+| 9 | Manuelle Downloads über suspensionstaugliche Hintergrund-URL-Session mit Ablaufdatum, Reconcile und Quota | 6, 7 | `task/issue-86-5dcdc7d5ef27411897f0ec9129c87614-apple-tv-app-tvos-lean-back-pl-schritt-9-downloads` | In Arbeit |
 | 10 | Schlanker Einstellungsbereich | 7, 9 | `task/issue-86-5dcdc7d5ef27411897f0ec9129c87614-apple-tv-app-tvos-lean-back-pl-schritt-10-einstellungen` | Offen |
 | 11 | Signiertes Release-Paket und automatisierter Upload nach App Store Connect | 1 | `task/issue-86-5dcdc7d5ef27411897f0ec9129c87614-apple-tv-app-tvos-lean-back-pl-schritt-11-release-upload` | Offen |
 
