@@ -738,7 +738,7 @@ $unlockKeychain
 rm -rf "VideoPlayer.TvOS/bin/$config/$framework" "VideoPlayer.TvOS/obj/$config/$framework"
 dotnet $verb $projectPath -f $framework -c $config -p:RuntimeIdentifiers=$rid -p:IncludeTvOsTarget=true $signProps
 # Artefaktpfad ausgeben (Marker fuer den Aufrufer)
-OUTDIR="VideoPlayer.TvOS/bin/$config/$framework/$rid"
+OUTDIR="VideoPlayer.TvOS/bin/$config/$framework"
 if [ "$verb" = "publish" ]; then
   ART=`$(find "`$OUTDIR" -name '*.ipa' | sort | head -1)
 else
