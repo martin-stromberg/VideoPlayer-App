@@ -95,6 +95,12 @@
          PrivacyInfo.xcprivacy meldet die App-Store-Verarbeitung
          ITMS-91053. Inhalt deckungsgleich mit dem iOS-Manifest. -->
     <BundleResource Include="PrivacyInfo.xcprivacy" />
+    <!-- App-Icon + Top-Shelf-Assets (App-Store-Pflicht, sonst
+         STATE_ERROR.VALIDATION_ERROR: CFBundleIcons.CFBundlePrimaryIcon
+         bzw. TVTopShelfImage.TVTopShelfPrimaryImageWide fehlt).
+         actool erzeugt daraus die Info.plist-Keys beim Compile. -->
+    <ImageAsset Include="Assets.xcassets\**\*.json" />
+    <ImageAsset Include="Assets.xcassets\**\*.png" />
   </ItemGroup>
   <ItemGroup>
     <None Include="../LICENSE" Pack="true" PackagePath="\" />
