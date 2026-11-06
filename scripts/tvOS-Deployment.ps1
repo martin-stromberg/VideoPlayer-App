@@ -718,6 +718,10 @@ function Invoke-Build {
 set -e
 cd "$repoDir"
 $workload
+# Clean-Build: inkrementell erzeugte .aotdata-Reste verursachen
+# load_aot_module-Abbrueche beim Simulator-Launch (Ziel-TFM/-RID-
+# Ausgabepfade werden geloescht; NuGet-Cache und andere Ziele bleiben).
+rm -rf "VideoPlayer.TvOS/bin/$config/$framework" "VideoPlayer.TvOS/obj/$config/$framework"
 dotnet $verb $projectPath -f $framework -c $config -r $rid -p:IncludeTvOsTarget=true $signProps
 # Artefaktpfad ausgeben (Marker fuer den Aufrufer)
 OUTDIR="VideoPlayer.TvOS/bin/$config/$framework/$rid"
