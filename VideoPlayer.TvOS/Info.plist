@@ -33,5 +33,10 @@
         <key>NSAllowsArbitraryLoads</key>
         <true/>
     </dict>
+    <!-- App-Icon + Top-Shelf: SDK ersetzt den Platzhalter beim
+         actool-Lauf durch CFBundleIcons/TVTopShelfImage
+         (App-Store-Pflicht, Muster aus dem dotnet-tvos-Template). -->
+    <key>XSAppIconAssets</key>
+    <string>Assets.xcassets/App Icon &amp; Top Shelf Image.brandassets</string>
 </dict>
 </plist>
