@@ -80,6 +80,11 @@
       <ForceLoad>true</ForceLoad>
       <SmartLink>false</SmartLink>
     </NativeReference>
+    <!-- Privacy-Manifest in den Bundle-Root packen: die App nutzt
+         Required-Reason-APIs (ueber .NET-Laufzeit/SDK); ohne
+         PrivacyInfo.xcprivacy meldet die App-Store-Verarbeitung
+         ITMS-91053. Inhalt deckungsgleich mit dem iOS-Manifest. -->
+    <BundleResource Include="PrivacyInfo.xcprivacy" />
   </ItemGroup>
   <ItemGroup>
     <None Include="../LICENSE" Pack="true" PackagePath="\" />

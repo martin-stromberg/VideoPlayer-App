@@ -23,10 +23,14 @@ Hintergrund-URL-Session — Einplanung von der Detailseite,
 Download-Liste mit Zustand und Fortschritt, Abbrechen,
 Wiederholen und Löschen, Ablaufdatum und Quota-Obergrenze sowie
 Abgleich von Teildateien, fehlenden Dateien und Waisen.
-Kompilierbarkeit wird über einen macOS-CI-Job fortlaufend gesichert.
+Kompilierbarkeit wird über einen macOS-CI-Job fortlaufend gesichert;
+ein signierter Release-Pfad mit TestFlight-Upload ist als
+gate-geschaltete Paketierungs-Aktion vorbereitet
+(`TVOS_SIGNING_ENABLED`).
 
 ## Inhalt
 
 - [Beschreibung](beschreibung.md)
 - [Ablauf für Anwender](ablauf-anwender.md)
 - [Installation, CI-Build und Kompatibilität](installation.md)
+- [Signiertes Release-Paket und App-Store-Connect-Upload](deployment.md)

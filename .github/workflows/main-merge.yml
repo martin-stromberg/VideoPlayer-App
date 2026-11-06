@@ -157,6 +157,54 @@ jobs:
           fi
         shell: bash
 
+  # Signierter tvOS-Store-Build auf macos-latest (Release-Xcode),
+  # Pendant zu package-ios. Gleiches Gate-Konzept wie in
+  # staging-merge.yml: laeuft nur mit hinterlegten tvOS-Signatur-Secrets
+  # und TVOS_SIGNING_ENABLED=true - die Apple-Account-Artefakte
+  # (Bundle-ID, tvOS-Provisioning-Profil, Distribution-Zertifikat) sind
+  # manueller Vorlauf des Kontoinhabers; bis dahin bleibt der Workflow
+  # gruen, weil der Job nie anlaeuft. Die Buildnummer ist die
+  # Commit-Anzahl und damit gegenueber den staging-Prereleases monoton.
+  package-tvos:
+    needs: release
+    # Konvention staging-merge.yml: ohne neuen Release-Tag waere der
+    # TestFlight-Upload ein Duplikat (gleiche CFBundleVersion).
+    if: vars.TVOS_SIGNING_ENABLED == 'true' && needs.release.outputs.released == 'true'
+    runs-on: macos-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout release tag
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.release.outputs.tag }}
+          fetch-depth: 0
+
+      - name: Build, sign and upload release (tvos)
+        uses: ./.github/actions/package-tvos
+        with:
+          release-version: ${{ needs.release.outputs.version }}
+          release-tag: ${{ needs.release.outputs.tag }}
+          codesign-key: ${{ secrets.TVOS_CODESIGN_KEY }}
+          provisioning-profile: ${{ secrets.TVOS_PROVISIONING_PROFILE }}
+          api-key-id: ${{ secrets.TVOS_API_KEY_ID }}
+          api-issuer-id: ${{ secrets.TVOS_API_ISSUER_ID }}
+          api-key-p8: ${{ secrets.TVOS_API_KEY_P8 }}
+          certificate-p12-base64: ${{ secrets.TVOS_CERTIFICATE_P12_BASE64 }}
+          certificate-p12-password: ${{ secrets.TVOS_CERTIFICATE_P12_PASSWORD }}
+          provisioning-profile-base64: ${{ secrets.TVOS_PROVISIONING_PROFILE_BASE64 }}
+
+      - name: Upload tvOS artifact
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release upload '${{ needs.release.outputs.tag }}' release-tvos.ipa --clobber
+          # dSYM-Archiv des Builds mit hochladen (wenn von der Action erzeugt),
+          # damit TestFlight-Crash-Reports dieses Builds symbolisierbar sind.
+          if [ -f release-tvos-dsym.zip ]; then
+            gh release upload '${{ needs.release.outputs.tag }}' release-tvos-dsym.zip --clobber
+          fi
+        shell: bash
+
   back-merge:
     needs: [build-ios]
     runs-on: ubuntu-latest

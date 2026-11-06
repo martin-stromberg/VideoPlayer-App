@@ -144,6 +144,17 @@ statisch (`Undefined symbols for architecture arm64`). `-U`-Linkerflags
 als Ausweg wurden geprüft und verworfen — der retaggte e_sqlite3-Pfad
 ist funktionsgleich mit den übrigen Plattformen und ohne Symbollücken.
 
+## Signierter Release-Pfad
+
+Die Paketierung für App Store Connect (signierter `tvos-arm64`-Build,
+`.ipa` + dSYM-Archiv, TestFlight-Upload per iTMSTransporter) liegt in
+der Composite-Action `.github/actions/package-tvos` und ist in die
+Release-Workflows `staging-merge.yml`/`main-merge.yml` eingebunden —
+hinter der Gate-Variable `TVOS_SIGNING_ENABLED`, damit die Pipeline
+ohne eingerichtete Signierung grün bleibt. Für manuelle Builds dient
+`scripts/tvOS-Deployment.ps1`. Details:
+[deployment.md](deployment.md).
+
 ## Überprüfung
 
 - Windows (degradierter Modus): `dotnet build VideoPlayer.App.sln` —

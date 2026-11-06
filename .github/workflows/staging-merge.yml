@@ -170,6 +170,59 @@ jobs:
           fi
         shell: bash
 
+  # Signierter tvOS-Store-Build auf macos-latest (Release-Xcode),
+  # Pendant zu package-ios. Der Job bleibt deaktiviert, bis die
+  # tvOS-Signatur-Artefakte im Apple-Developer-Account eingerichtet und
+  # als Secrets hinterlegt sind (manueller Vorlauf des Kontoinhabers:
+  # Bundle-ID, tvOS-Provisioning-Profil, Distribution-Zertifikat) -
+  # Aktivierung ueber die Repository-Variable TVOS_SIGNING_ENABLED=true,
+  # ohne Codeaenderung. Laedt die .ipa nach TestFlight und legt sie
+  # zusaetzlich ans GitHub-Prerelease.
+  package-tvos:
+    needs: release
+    # Gleicher Duplikat-Schutz wie package-ios: ohne neuen Release-Tag
+    # wuerde derselbe Tag mit identischer CFBundleVersion erneut gebaut
+    # und TestFlight lehnt den doppelten Upload ab ('already complete').
+    if: vars.TVOS_SIGNING_ENABLED == 'true' && needs.release.outputs.released == 'true'
+    runs-on: macos-latest
+    timeout-minutes: 45
+    steps:
+      # fetch-depth 0 ist Pflicht: die Buildnummer (CFBundleVersion)
+      # ist die Anzahl der Commits (git rev-list --count) - ein
+      # Shallow-Checkout wuerde eine zu kleine, kollidierende Nummer
+      # erzeugen.
+      - name: Checkout release tag
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.release.outputs.tag }}
+          fetch-depth: 0
+
+      - name: Build, sign and upload release candidate (tvos)
+        uses: ./.github/actions/package-tvos
+        with:
+          release-version: ${{ needs.release.outputs.version }}
+          release-tag: ${{ needs.release.outputs.tag }}
+          codesign-key: ${{ secrets.TVOS_CODESIGN_KEY }}
+          provisioning-profile: ${{ secrets.TVOS_PROVISIONING_PROFILE }}
+          api-key-id: ${{ secrets.TVOS_API_KEY_ID }}
+          api-issuer-id: ${{ secrets.TVOS_API_ISSUER_ID }}
+          api-key-p8: ${{ secrets.TVOS_API_KEY_P8 }}
+          certificate-p12-base64: ${{ secrets.TVOS_CERTIFICATE_P12_BASE64 }}
+          certificate-p12-password: ${{ secrets.TVOS_CERTIFICATE_P12_PASSWORD }}
+          provisioning-profile-base64: ${{ secrets.TVOS_PROVISIONING_PROFILE_BASE64 }}
+
+      - name: Upload tvOS artifact
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release upload '${{ needs.release.outputs.tag }}' release-tvos.ipa --clobber
+          # dSYM-Archiv des Builds mit hochladen (wenn von der Action erzeugt),
+          # damit TestFlight-Crash-Reports dieses Builds symbolisierbar sind.
+          if [ -f release-tvos-dsym.zip ]; then
+            gh release upload '${{ needs.release.outputs.tag }}' release-tvos-dsym.zip --clobber
+          fi
+        shell: bash
+
   draft-pr:
     needs: [build-ios]
     runs-on: ubuntu-latest

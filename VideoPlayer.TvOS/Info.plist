@@ -20,6 +20,12 @@
     <array>
         <string>_http._tcp</string>
     </array>
+    <!-- Die App verwendet keine nicht-freigestellte Verschluesselung —
+         deckungsgleich mit der iOS-Info.plist; ohne den Schluessel
+         verlangt App Store Connect eine Export-Compliance-Angabe pro
+         Build. -->
+    <key>ITSAppUsesNonExemptEncryption</key>
+    <false/>
     <!-- Lokale Medienwiedergabe und unverschluesselte lokale
          Server-Verbindungen (LAN), analog zur iOS-App. -->
     <key>NSAppTransportSecurity</key>

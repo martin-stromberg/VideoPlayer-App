@@ -230,5 +230,11 @@ Geräte-Tokens, `Library/Caches`-Verzeichnisse als Ablagewurzeln und
   automatisches Löschen nach dem Abspielen auf tvOS. Playlists
   sind auf tvOS ausschließlich lesend verfügbar; jegliche
   Playlist-Verwaltung bleibt der Hauptanwendung vorbehalten.
-- Eine Veröffentlichung (App Store / TestFlight) ist noch nicht
-  eingerichtet; die dafür nötigen Signatur-Artefakte liegen nicht vor.
+- Ein signierter Release-Pfad (Paketierungs-Action `package-tvos`,
+  TestFlight-Upload, lokales Skript `scripts/tvOS-Deployment.ps1`) ist
+  eingerichtet, aber hinter der Repository-Variable
+  `TVOS_SIGNING_ENABLED` deaktiviert gehalten: die Signatur-Artefakte
+  (Bundle-ID, tvOS-Provisioning-Profil, Distribution-Zertifikat) sowie
+  die App-Icon-/Top-Shelf-Assets sind manueller Vorlauf im
+  Apple-Developer-Account (siehe
+  [deployment.md](deployment.md)).
