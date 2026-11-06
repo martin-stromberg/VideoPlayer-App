@@ -865,16 +865,14 @@ echo "Bundle-ID: `$BUNDLE_ID"
 find "`$APP" -type f | while read f; do
   if file -b "`$f" | grep -q "Mach-O"; then codesign --force --sign - "`$f"; fi
 done
-# Keychain-Entitlement beim adhoc-Signieren mitschreiben: SecItem
-# scheitert ohne keychain-access-groups mit errSecMissingEntitlement
-# (Token-Persistenz fuer Pairing/Login). Adhoc-Signatur kennt kein
-# Team-Prefix — die Default-Access-Group ist die Bundle-ID selbst.
-# Spiegelt VideoPlayer.TvOS/Entitlements.plist mit aufgeloestem
-# `$(AppIdentifierPrefix)`$(CFBundleIdentifier); PlistBuddy schreibt
-# die Datei frisch (plutil -replace wuerde den Index einfuegen).
-RESOLVED_ENT="/tmp/videos-tvos-entitlements.plist"
-/usr/libexec/PlistBuddy -c "Clear dict" -c "Add :keychain-access-groups array" -c "Add :keychain-access-groups:0 string `$BUNDLE_ID" "`$RESOLVED_ENT"
-codesign --force --sign - --entitlements "`$RESOLVED_ENT" "`$APP"
+# KEINE Entitlements hier: keychain-access-groups ist ein restricted
+# Entitlement und wird von der Simulator-Security-Policy nur mit
+# gueltigem Provisioning-Profil gewaehrt — adhoc damit zu signieren
+# laesst den Launch mit "Security policy issue" fehlschlagen. Auf dem
+# Simulator faengt KeychainSecretStore den fehlenden Zugriff per
+# Datei-Fallback ab; echte Signierung nutzt CodesignEntitlements aus
+# dem Projekt.
+codesign --force --sign - "`$APP"
 xcrun simctl install "$Device" "`$APP" || { xcrun simctl uninstall "$Device" "`$BUNDLE_ID" || true; xcrun simctl install "$Device" "`$APP"; }
 xcrun simctl launch "$Device" "`$BUNDLE_ID"
 sleep 5

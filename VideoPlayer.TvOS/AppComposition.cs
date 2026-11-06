@@ -34,7 +34,8 @@ namespace VideoPlayer.TvOS
 
             Secrets = new AppSecretsService(
                 SettingsStore,
-                new KeychainSecretStore(new AppLogger<KeychainSecretStore>(LoggerFactory)),
+                new KeychainSecretStore(
+                    new AppLogger<KeychainSecretStore>(LoggerFactory), StorageLayout),
                 Profile);
 
             BackupDatabase = new BackupDatabase(
