@@ -90,8 +90,8 @@ $framework = "net10.0-tvos"
 # und dem package-tvos-Default (.github/actions/package-tvos).
 $workloadVersion = "26.5.10318"
 
-$isWindows = [System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform([System.Runtime.InteropServices.OSPlatform]::Windows)
-$isMacOS = [System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform([System.Runtime.InteropServices.OSPlatform]::OSX)
+# $IsWindows/$IsMacOS werden von pwsh automatisch bereitgestellt —
+# keine manuelle Zuweisung (schreibgeschuetzte Automatics → Fehler).
 
 if (-not $RemoteRepoPath) { $RemoteRepoPath = '$HOME/VideoPlayer-App' }
 
@@ -714,10 +714,24 @@ function Invoke-Build {
         Write-Host "Baue tvOS-App ohne Codesigning ($config/$rid) ..." -ForegroundColor Cyan
     }
 
+    # Signierte Builds brauchen Zugriff auf den privaten Schluessel —
+    # in SSH-Sessions ist die Login-Keychain gesperrt
+    # (errSecInternalComponent). Mit gesetztem Mac-Passwort
+    # (VIDEOPLAYER_TVOS_MAC_SERVER_PASSWORD, Fallback:
+    # VIDEOPLAYER_IOS_MAC_SERVER_PASSWORD) wird sie vorab entsperrt
+    # und die Auto-Sperre deaktiviert — Base64 umgeht Quoting-Probleme.
+    $unlockKeychain = ""
+    $macPw = if ($env:VIDEOPLAYER_TVOS_MAC_SERVER_PASSWORD) { $env:VIDEOPLAYER_TVOS_MAC_SERVER_PASSWORD } else { $env:VIDEOPLAYER_IOS_MAC_SERVER_PASSWORD }
+    if ($hasCodesigning -and $macPw) {
+        $pwB64 = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($macPw))
+        $unlockKeychain = "security unlock-keychain -p `"`$(echo $pwB64 | base64 -d)`" `"`$HOME/Library/Keychains/login.keychain-db`" 2>/dev/null || true`nsecurity set-keychain-settings -u `"`$HOME/Library/Keychains/login.keychain-db`" 2>/dev/null || true"
+    }
+
     $buildScript = @"
 set -e
 cd "$repoDir"
 $workload
+$unlockKeychain
 # Clean-Build: inkrementell erzeugte .aotdata-Reste verursachen
 # load_aot_module-Abbrueche beim Simulator-Launch (Ziel-TFM/-RID-
 # Ausgabepfade werden geloescht; NuGet-Cache und andere Ziele bleiben).
