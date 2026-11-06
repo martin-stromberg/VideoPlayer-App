@@ -63,7 +63,11 @@ namespace VideoPlayer.TvOS.Ui
                 collectionView.LeadingAnchor.ConstraintEqualTo(LeadingAnchor),
                 collectionView.TrailingAnchor.ConstraintEqualTo(TrailingAnchor),
                 collectionView.TopAnchor.ConstraintEqualTo(TopAnchor),
-                collectionView.BottomAnchor.ConstraintEqualTo(BottomAnchor)
+                collectionView.BottomAnchor.ConstraintEqualTo(BottomAnchor),
+                // Feste Höhe: UICollectionView hat keine intrinsische
+                // Größe — in der StackView kollabiert die Reihe sonst auf
+                // 0pt und die Zellen bleiben unsichtbar.
+                collectionView.HeightAnchor.ConstraintEqualTo(itemSize.Height + 2 * FocusMargin)
             ]);
         }
 
