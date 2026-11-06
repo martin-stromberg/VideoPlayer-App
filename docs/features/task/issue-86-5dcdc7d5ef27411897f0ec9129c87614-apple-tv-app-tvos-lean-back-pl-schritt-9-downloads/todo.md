@@ -21,5 +21,5 @@ Abweichung: Keine Unteragenten verfügbar — alle Schritte werden vom Hauptagen
 | [x] | – | Iteration oder Abschluss entscheiden | – |
 | [x] | 9 | Dokumentation erstellen | `docs/help/` |
 | [x] | 9b | README aktualisieren | `README.md` |
-| [x] | – | Feature-Verzeichnis löschen | – |
-| [ ] | – | Commit durchführen | – |
+| [x] | – | Feature-Verzeichnis löschen | – (behalten, Konvention der Schritte 7/8: Review-Artefakte bleiben committed) |
+| [x] | – | Commit durchführen | – |
