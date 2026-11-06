@@ -186,7 +186,8 @@ public class TvOsAppContractTests
         Assert.Contains("URLSessionDidFinishEventsForBackgroundURLSession:", backend, StringComparison.Ordinal);
 
         var appDelegate = TvOsFile("AppDelegate.cs");
-        Assert.Contains("override void HandleEventsForBackgroundUrlSession", appDelegate, StringComparison.Ordinal);
+        Assert.Contains("application:handleEventsForBackgroundURLSession:completionHandler:", appDelegate, StringComparison.Ordinal);
+        Assert.Contains("HandleEventsForBackgroundUrlSession", appDelegate, StringComparison.Ordinal);
         Assert.Contains("AppActivatedMessage", appDelegate, StringComparison.Ordinal);
     }
 

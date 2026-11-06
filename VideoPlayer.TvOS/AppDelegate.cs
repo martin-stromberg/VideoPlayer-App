@@ -69,13 +69,14 @@ namespace VideoPlayer.TvOS
         /// tvOS startet die App für abgeschlossene
         /// Hintergrund-Session-Events neu — der Aufruf wird an das
         /// Download-Backend weitergereicht (Pendant zum iOS-Delegate
-        /// der MAUI-App; der Export sitzt im Basistyp
-        /// <see cref="UIApplicationDelegate"/>).
+        /// der MAUI-App; das Binding trägt den Selector nicht als
+        /// Basistyp-Member — Registrierung über <see cref="ExportAttribute"/>).
         /// </summary>
         /// <param name="application">Die laufende Anwendung.</param>
         /// <param name="sessionIdentifier">Kennung der Hintergrund-Session.</param>
         /// <param name="completionHandler">Der aufzurufende System-Handler.</param>
-        public override void HandleEventsForBackgroundUrlSession(
+        [Export("application:handleEventsForBackgroundURLSession:completionHandler:")]
+        public void HandleEventsForBackgroundUrlSession(
             UIApplication application, string sessionIdentifier, Action completionHandler)
         {
             if (TvosBackgroundDownloadBackend.Shared is { } backend)
