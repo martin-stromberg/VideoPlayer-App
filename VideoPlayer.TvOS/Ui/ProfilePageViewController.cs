@@ -17,6 +17,7 @@ namespace VideoPlayer.TvOS.Ui
         private UILabel? serverLabel;
         private UILabel? statusLabel;
         private UIButton? logoutButton;
+        private AppModel? lastModel;
 
         /// <summary>Initialisiert eine neue Instanz der <see cref="ProfilePageViewController"/>-Klasse.</summary>
         /// <param name="dispatch">Rückmeldung in den MVU-Zyklus (Hauptthread).</param>
@@ -57,10 +58,29 @@ namespace VideoPlayer.TvOS.Ui
                 content.TopAnchor.ConstraintEqualTo(View.TopAnchor, 160),
                 content.WidthAnchor.ConstraintEqualTo(1100)
             ]);
+
+            if (lastModel is not null)
+            {
+                ApplyRender(lastModel);
+            }
         }
 
         /// <inheritdoc/>
         public void Render(AppModel model)
+        {
+            lastModel = model;
+            if (!IsViewLoaded)
+            {
+                // Unsichtbare Tabs laden ihre Ansicht nicht
+                // vorsorglich — der Stand wird beim ersten ViewDidLoad
+                // nachgezogen (Muster: HomePageViewController).
+                return;
+            }
+
+            ApplyRender(model);
+        }
+
+        private void ApplyRender(AppModel model)
         {
             serverLabel!.Text = model.ActiveServerAddress is null
                 ? "Es ist kein Server eingerichtet."
