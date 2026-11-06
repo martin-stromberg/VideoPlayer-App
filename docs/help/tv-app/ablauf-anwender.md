@@ -45,8 +45,8 @@ Verfügung.
 Bei bekanntem Server und gültigen Zugangsdaten startet die App ohne
 Eingriff in den verbundenen Zustand. „Server wechseln" (Einstellungen)
 öffnet die Serververwaltung erneut — die Menü-Taste der Fernbedienung
-oder „Zurück zum Menü" kehrt zurück. „Abmelden" (Profil) beendet die
-Sitzung und öffnet die Anmeldemaske. Ist der Server nicht erreichbar
+oder „Zurück zum Menü" kehrt zurück. „Abmelden" (Profil oder
+Einstellungen) beendet die Sitzung und öffnet die Anmeldemaske. Ist der Server nicht erreichbar
 und liegen lokale Daten vor, startet die App offline; sonst erscheint
 die Serverauswahl.
 
@@ -153,6 +153,22 @@ funktioniert ohne Serververbindung; vom System geräumte Dateien
 erscheinen nach dem automatischen Abgleich als fehlgeschlagene
 Einträge und können erneut eingeplant werden. Fertige Downloads
 stehen der Wiedergabe auch offline als Quelle zur Verfügung.
+
+### 10. Einstellungen anpassen
+
+Der Menübereich „Einstellungen" bündelt die wenigen, auf dem TV
+sinnvollen Werte. Unter „Downloads" stellst du die Aufbewahrungszeit
+für Downloads (in Tagen) und das Speicherplatzkontingent (in GB) ein —
+wähle den Eintrag und bestätige den gewünschten Wert in der
+Auswahlliste; beide wirken auf Ablaufdatum und Obergrenze der
+Downloads. Unter „Wiedergabe" schaltest du die „Auto-Fortsetzung" ein
+oder aus (automatischer Übergang zur nächsten Episode bzw. zum
+nächsten Playlist-Eintrag am Titelende) und legst das
+„Angesehen"-Endfenster fest — ab wie vielen Sekunden bzw. Minuten vor
+dem Ende ein Titel als gesehen gilt. Alle Werte bleiben über
+Neustarts der App erhalten. Der Abschnitt „Konto" zeigt den
+angemeldeten Benutzer und bietet „Abmelden"; im Abschnitt „Server"
+stehen Adresse und Verbindungszustand sowie „Server wechseln".
 
 ## Barrierefreiheit
 

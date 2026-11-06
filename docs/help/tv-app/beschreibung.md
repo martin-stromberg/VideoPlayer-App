@@ -182,6 +182,21 @@ Suspend-Zustand. Heruntergeladene Dateien stehen der Wiedergabe als
 bevorzugte Quelle zur Verfügung; ein automatisches Löschen nach dem
 Abspielen wird auf tvOS nicht angeboten.
 
+Der Einstellungsbereich (`SettingsPageViewController`) ist bewusst
+schlank und fernbedienungstauglich gehalten: die vier freigegebenen
+Werte — Aufbewahrungszeit für Downloads und Speicherplatzkontingent
+(Abschnitt „Downloads") sowie Auto-Fortsetzung und das
+„angesehen"-Endfenster (Abschnitt „Wiedergabe") — werden über die
+plattformneutralen Einstellungsdienste verwaltet; numerische Werte
+stellt eine Auswahlliste mit Vorgabewerten innerhalb der
+Normalisierungs-Schranken ein, der Schalter ist ein Ein/Aus-Eintrag.
+Ergänzend zeigt der Abschnitt „Konto" den angemeldeten Benutzer und
+bietet „Abmelden" über den bestehenden Abmeldefluss; der
+Serverabschnitt führt die Adresse, den Verbindungszustand und „Server
+wechseln". Auto-Download und Vorlauf, „nach dem Abspielen löschen",
+Nur-WLAN-Downloads und der Protokollversand werden auf tvOS bewusst
+nicht exponiert.
+
 Plattform-Anschlüsse: `NSUserDefaults` für nicht-geheime Einstellungen,
 Schlüsselbund (`SecKeyChain`, Generic Password) für Zugangsdaten und
 Geräte-Tokens, `Library/Caches`-Verzeichnisse als Ablagewurzeln und
@@ -212,9 +227,7 @@ Geräte-Tokens, `Library/Caches`-Verzeichnisse als Ablagewurzeln und
   werden — der Abgleich meldet solche Einträge dann als
   fehlgeschlagen („Datei nicht mehr vorhanden") und erlaubt die
   Neu-Einplanung. Es gibt keinen Auto-Download-Vorlauf und kein
-  automatisches Löschen nach dem Abspielen auf tvOS. Weitere
-  Einstellungsbereiche folgen in späteren Entwicklungsschritten —
-  betroffene Menüseiten zeigen derzeit Platzhaltertexte. Playlists
+  automatisches Löschen nach dem Abspielen auf tvOS. Playlists
   sind auf tvOS ausschließlich lesend verfügbar; jegliche
   Playlist-Verwaltung bleibt der Hauptanwendung vorbehalten.
 - Eine Veröffentlichung (App Store / TestFlight) ist noch nicht
