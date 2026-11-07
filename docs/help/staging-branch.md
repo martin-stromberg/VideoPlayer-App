@@ -40,3 +40,14 @@ Der Workflow `pr-checks.yml` erzwingt, dass PRs gegen `main` ausschließlich von
 ## Release-Builds
 
 Die Workflows `.github/workflows/staging-merge.yml` und `.github/workflows/main-merge.yml` erzeugen Release-Builds für Android, iOS und Windows. Für iOS sind ein gültiges Apple-Entwicklerzertifikat, Provisioning-Profile und ggf. weitere Geheimnisse erforderlich.
+
+Neben `release-ios.ipa` lädt der iOS-Build das Archiv
+`release-ios-dsym.zip` mit den Symbol-Bundles (`*.dSYM`) des Builds
+ans GitHub-Release — die `package-ios`-Action sammelt sie aus
+`VideoPlayer.Maui/bin/Release` und zippt sie (kein Fund: Warnung statt
+Fehlschlag, der Upload ist existenz-guarded). TestFlight-/Store-
+Crash-Reports eines Builds sind damit nachträglich symbolisierbar;
+das Archiv ist wie die `.ipa` an die Buildnummer des Releases
+gekoppelt. Beim lokalen Build über `scripts/iOS-Deployment.ps1`
+legt die Funktion `Export-DsymArchive` das Symbolarchiv als
+`<ipa-name>-dsym.zip` neben der `.ipa` ab.

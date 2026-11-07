@@ -1,0 +1,35 @@
+#!/usr/bin/env sh
+set -eu
+
+repo_root="$(git rev-parse --show-toplevel)"
+
+while read -r local_ref local_sha remote_ref remote_sha; do
+  case "$remote_ref" in
+    refs/heads/main|refs/heads/staging)
+      branch_name="${remote_ref#refs/heads/}"
+      echo "Direct pushes to '$branch_name' are blocked. Update this branch via pull request." >&2
+      exit 1
+      ;;
+  esac
+done
+
+# --- Format Check (ganzes Repo, blockierend — spiegelt die CI-Prüfung) ---
+if command -v dotnet >/dev/null 2>&1; then
+  solution_file="$(find "$repo_root" -maxdepth 1 -type f \( -name '*.sln' -o -name '*.slnx' \) | head -n 1 || true)"
+  if [ -n "$solution_file" ]; then
+    echo "Running dotnet format check..."
+    dotnet format whitespace "$solution_file" --verify-no-changes --no-restore
+  fi
+fi
+
+# --- NotImplementedException/Stub Check (ganzes Repo, blockierend) ---
+echo "Running stub implementation check..."
+python "$repo_root/.githooks/no-notimplemented-check.py" --all --strict
+
+# --- Razor Usage Check (ganzes Repo, blockierend) ---
+echo "Running Razor usage check..."
+python "$repo_root/.githooks/razor-usage-check.py" --all --strict
+
+# --- Enum Coverage Check (ganzes Repo, blockierend) ---
+echo "Running enum coverage check..."
+python "$repo_root/.githooks/enum-coverage-check.py" --all --strict

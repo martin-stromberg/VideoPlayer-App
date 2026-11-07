@@ -1,0 +1,468 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:storage="clr-namespace:VideoPlayer.Storage;assembly=VideoPlayer.Storage"
+             xmlns:discovery="clr-namespace:VideoPlayer.ApiClient.Discovery;assembly=VideoPlayer.ApiClient"
+             x:Class="VideoPlayer.Maui.Pages.ServerSetupPage"
+             Title="Server">
+    <Grid RowDefinitions="Auto,*,Auto"
+          Padding="24"
+          RowSpacing="18">
+
+        <!-- Kopfbereich: Kicker-Badge, Titel, Hinweis, Aktiver-Server-Karte
+             mit Status-Badge (Muster: HomePage Kicker/Banner-Karten). -->
+        <VerticalStackLayout Spacing="10">
+            <Border Style="{StaticResource KickerChip}">
+                <Label Text="SERVERVERBINDUNG"
+                       FontSize="11"
+                       FontFamily="InterSemiBold"
+                       CharacterSpacing="1.6"
+                       TextColor="{StaticResource VpText}" />
+            </Border>
+            <Label Text="VideoPlayer-Server"
+                   Style="{StaticResource PageTitle}" />
+            <Label Text="Die App verbindet sich mit einem VideoPlayer-Server im eigenen Netzwerk."
+                   TextColor="{StaticResource VpTextMuted}" />
+
+            <!-- Aktiver Server als eigene Karte inklusive Status-Badge:
+                 Pill-Form (999) mit farbigem Punkt und Text aus dem
+                 Model (ServerHealth/ServerHealthText). -->
+            <Border x:Name="ActiveServerSection"
+                    AutomationId="ActiveServerCard"
+                    IsVisible="false"
+                    Margin="0,4,0,0"
+                    Style="{StaticResource Banner}"
+                    Padding="16,12">
+                <Grid ColumnDefinitions="*,Auto"
+                      RowDefinitions="Auto,Auto"
+                      ColumnSpacing="12">
+                    <Label Text="Aktiver Server"
+                           Style="{StaticResource Caption}" />
+                    <Label Grid.Row="1"
+                           x:Name="ActiveServerLabel"
+                           AutomationId="ActiveServerLabel"
+                           FontSize="16"
+                           FontFamily="InterSemiBold" />
+                    <Border Grid.Column="1"
+                            Grid.RowSpan="2"
+                            VerticalOptions="Center"
+                            StrokeShape="RoundRectangle 999"
+                            Stroke="{StaticResource VpBorder}"
+                            BackgroundColor="{StaticResource VpSurfaceLow}"
+                            Padding="10,4">
+                        <HorizontalStackLayout Spacing="6">
+                            <ActivityIndicator x:Name="ServerHealthIndicator"
+                                               IsRunning="false"
+                                               IsVisible="false"
+                                               HeightRequest="18"
+                                               WidthRequest="18" />
+                            <BoxView x:Name="ServerHealthDot"
+                                     WidthRequest="8"
+                                     HeightRequest="8"
+                                     CornerRadius="4"
+                                     VerticalOptions="Center"
+                                     Color="{StaticResource VpTextMuted}">
+                                <!-- Farbe folgt dem Model-Zustand (erreichbar
+                                     blau, nicht erreichbar rot, sonst gedimmt);
+                                     die Datenquelle ist der MvuHost. -->
+                                <BoxView.Triggers>
+                                    <DataTrigger TargetType="BoxView"
+                                                 Binding="{Binding Model.ServerHealth}"
+                                                 Value="Reachable">
+                                        <Setter Property="Color" Value="{StaticResource VpSecondary}" />
+                                    </DataTrigger>
+                                    <DataTrigger TargetType="BoxView"
+                                                 Binding="{Binding Model.ServerHealth}"
+                                                 Value="Unreachable">
+                                        <Setter Property="Color" Value="{StaticResource VpDanger}" />
+                                    </DataTrigger>
+                                    <DataTrigger TargetType="BoxView"
+                                                 Binding="{Binding Model.ServerHealth}"
+                                                 Value="Checking">
+                                        <Setter Property="Color" Value="{StaticResource VpTextMuted}" />
+                                    </DataTrigger>
+                                    <DataTrigger TargetType="BoxView"
+                                                 Binding="{Binding Model.ServerHealth}"
+                                                 Value="Unknown">
+                                        <Setter Property="Color" Value="{StaticResource VpTextMuted}" />
+                                    </DataTrigger>
+                                </BoxView.Triggers>
+                            </BoxView>
+                            <Label x:Name="ServerHealthLabel"
+                                   AutomationId="ServerHealthLabel"
+                                   FontSize="12">
+                                <Label.Triggers>
+                                    <DataTrigger TargetType="Label"
+                                                 Binding="{Binding Model.ServerHealth}"
+                                                 Value="Unreachable">
+                                        <Setter Property="TextColor" Value="{StaticResource VpDanger}" />
+                                    </DataTrigger>
+                                    <DataTrigger TargetType="Label"
+                                                 Binding="{Binding Model.ServerHealth}"
+                                                 Value="Reachable">
+                                        <Setter Property="TextColor" Value="{StaticResource VpSecondarySoft}" />
+                                    </DataTrigger>
+                                </Label.Triggers>
+                            </Label>
+                        </HorizontalStackLayout>
+                    </Border>
+                </Grid>
+            </Border>
+        </VerticalStackLayout>
+
+        <!-- Listenbereich: bekannte und gefundene Server als Karten;
+             scrollt intern, damit Kopf und Fuß sichtbar bleiben. -->
+        <ScrollView Grid.Row="1">
+            <VerticalStackLayout Spacing="18">
+
+                <VerticalStackLayout Spacing="8">
+                    <Label x:Name="KnownServersHeader"
+                           Text="Bekannte Server"
+                           Style="{StaticResource SectionTitle}"
+                           IsVisible="false" />
+                    <CollectionView x:Name="KnownServersView"
+                                    AutomationId="KnownServersView"
+                                    SelectionMode="Single"
+                                    SelectionChanged="OnKnownSelectionChanged">
+                        <CollectionView.ItemTemplate>
+                            <DataTemplate x:DataType="storage:KnownServer">
+                                <Border Style="{StaticResource Card}"
+                                        Padding="14,12"
+                                        Margin="0,0,0,10">
+                                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
+                                        <VerticalStackLayout Spacing="3">
+                                            <Label Text="{Binding NameOrAddress}"
+                                                   FontFamily="InterSemiBold" />
+                                            <Label Text="{Binding Address}"
+                                                   Style="{StaticResource Caption}" />
+                                            <Label Text="{Binding LastUsedAtUtc, StringFormat='Zuletzt verwendet: {0:dd.MM.yyyy}'}"
+                                                   FontSize="11"
+                                                   TextColor="{StaticResource VpTextMuted}" />
+                                        </VerticalStackLayout>
+                                        <Label Grid.Column="1"
+                                               Text="Auswählen"
+                                               FontSize="12"
+                                               FontFamily="InterSemiBold"
+                                               TextColor="{StaticResource VpSecondarySoft}"
+                                               VerticalOptions="Center" />
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </CollectionView.ItemTemplate>
+                    </CollectionView>
+                </VerticalStackLayout>
+
+                <VerticalStackLayout Spacing="8">
+                    <Label Text="Im Netzwerk suchen"
+                           Style="{StaticResource SectionTitle}" />
+                    <Label Text="Die App kann VideoPlayer-Server im eigenen Netzwerk automatisch finden."
+                           Style="{StaticResource Caption}"
+                           FontSize="13" />
+                    <Button x:Name="DiscoverButton"
+                            AutomationId="DiscoverButton"
+                            Text="Server im Netzwerk suchen"
+                            Style="{StaticResource SecondaryButton}"
+                            Clicked="OnDiscoverClicked"
+                            HorizontalOptions="Start" />
+                    <HorizontalStackLayout Spacing="8">
+                        <ActivityIndicator x:Name="DiscoveryIndicator"
+                                           IsRunning="false"
+                                           IsVisible="false" />
+                        <Label x:Name="DiscoveryRunningLabel"
+                               AutomationId="DiscoveryRunningLabel"
+                               Text="Suche läuft …"
+                               Style="{StaticResource Caption}"
+                               IsVisible="false"
+                               VerticalOptions="Center" />
+                    </HorizontalStackLayout>
+                    <Label x:Name="DiscoveryEmptyLabel"
+                           AutomationId="DiscoveryEmptyLabel"
+                           Text="Kein Server gefunden. Bitte die Adresse manuell eingeben."
+                           IsVisible="false" />
+                    <CollectionView x:Name="DiscoveredServersView"
+                                    AutomationId="DiscoveredServersView"
+                                    SelectionMode="Single"
+                                    SelectionChanged="OnDiscoveredSelectionChanged">
+                        <CollectionView.ItemTemplate>
+                            <DataTemplate x:DataType="discovery:DiscoveredServer">
+                                <Border Style="{StaticResource Card}"
+                                        Padding="14,12"
+                                        Margin="0,0,0,10">
+                                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
+                                        <VerticalStackLayout Spacing="3">
+                                            <Label Text="{Binding NameOrAddress}"
+                                                   FontFamily="InterSemiBold" />
+                                            <Label Text="{Binding Address}"
+                                                   Style="{StaticResource Caption}" />
+                                            <Label Text="Im Netzwerk gefunden"
+                                                   FontSize="11"
+                                                   TextColor="{StaticResource VpSecondarySoft}" />
+                                        </VerticalStackLayout>
+                                        <Label Grid.Column="1"
+                                               Text="Auswählen"
+                                               FontSize="12"
+                                               FontFamily="InterSemiBold"
+                                               TextColor="{StaticResource VpSecondarySoft}"
+                                               VerticalOptions="Center" />
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </CollectionView.ItemTemplate>
+                    </CollectionView>
+                </VerticalStackLayout>
+            </VerticalStackLayout>
+        </ScrollView>
+
+        <!-- Fußbereich: zweistufiger Verbindungsfluss; scrollt bei
+             kleinen Fenstern. Stufe 1 (AddressStage) wählt den Server —
+             zwei Kacheln nebeneinander: QR-Code (die Ticket-Adresse
+             enthält den Server selbst) oder manuelle Eingabe. Nach
+             erfolgreichem Servercheck erscheint Stufe 2 (AuthStage)
+             mit zwei Möglichkeiten: Kurzcode oder Zugangsdaten. -->
+        <ScrollView Grid.Row="2">
+            <VerticalStackLayout Spacing="14">
+
+                <!-- Stufe 1: zwei Kacheln nebeneinander. -->
+                <Grid x:Name="AddressStage"
+                      AutomationId="AddressStage"
+                      ColumnDefinitions="*,*"
+                      ColumnSpacing="14">
+
+                    <!-- Kachel QR-Code: Scan auf Mobilgeräten, Ticket-
+                         Adresse manuell auf allen Plattformen. -->
+                    <Border Grid.Column="0"
+                            AutomationId="BootstrapSection"
+                            Style="{StaticResource Card}"
+                            Padding="18,14">
+                        <VerticalStackLayout Spacing="10">
+                            <Label Text="Mit QR-Code verbinden"
+                                   Style="{StaticResource SectionTitle}" />
+                            <Label Text="Die Serververwaltung (Profilseite „Geräte“) zeigt einen QR-Code — er enthält die Serveradresse und koppelt das Gerät direkt."
+                                   Style="{StaticResource Caption}"
+                                   FontSize="13" />
+                            <Button x:Name="QrScanButton"
+                                    AutomationId="QrScanButton"
+                                    Text="QR-Code scannen"
+                                    Style="{StaticResource SecondaryButton}"
+                                    Clicked="OnQrScanClicked"
+                                    IsVisible="false"
+                                    HorizontalOptions="Start" />
+                            <Border Style="{StaticResource InputFrame}">
+                                <Entry x:Name="BootstrapTicketEntry"
+                                       AutomationId="BootstrapTicketEntry"
+                                       Placeholder="Ticket-Adresse"
+                                       Keyboard="Text"
+                                       IsSpellCheckEnabled="False"
+                                       IsTextPredictionEnabled="False" />
+                            </Border>
+                            <HorizontalStackLayout Spacing="12">
+                                <Button x:Name="BootstrapButton"
+                                        AutomationId="BootstrapButton"
+                                        Text="Ticket einlösen"
+                                        Clicked="OnBootstrapClicked" />
+                                <ActivityIndicator x:Name="BootstrapIndicator"
+                                                   IsRunning="false"
+                                                   IsVisible="false"
+                                                   VerticalOptions="Center" />
+                                <Label x:Name="BootstrapRunningLabel"
+                                       AutomationId="BootstrapRunningLabel"
+                                       Text="Kopplung läuft …"
+                                       Style="{StaticResource Caption}"
+                                       IsVisible="false"
+                                       VerticalOptions="Center" />
+                            </HorizontalStackLayout>
+                            <Label x:Name="BootstrapErrorLabel"
+                                   AutomationId="BootstrapErrorLabel"
+                                   Style="{StaticResource ErrorText}"
+                                   IsVisible="false" />
+                        </VerticalStackLayout>
+                    </Border>
+
+                    <!-- Kachel manuelle Adresse. -->
+                    <Border Grid.Column="1"
+                            AutomationId="ConnectCard"
+                            Style="{StaticResource Card}"
+                            Padding="18,14">
+                        <VerticalStackLayout Spacing="10">
+                            <Label Text="Adresse selbst eingeben"
+                                   Style="{StaticResource SectionTitle}" />
+                            <Label Text="Adresse des Servers manuell eingeben"
+                                   Style="{StaticResource Caption}"
+                                   FontSize="13" />
+                            <Border Style="{StaticResource InputFrame}">
+                                <Entry x:Name="AddressEntry"
+                                       AutomationId="AddressEntry"
+                                       Placeholder="http://server/videoplayer/"
+                                       Keyboard="Url" />
+                            </Border>
+                            <HorizontalStackLayout Spacing="12">
+                                <Button x:Name="ConnectButton"
+                                        AutomationId="ConnectButton"
+                                        Text="Verbinden"
+                                        Clicked="OnConnectClicked" />
+                                <ActivityIndicator x:Name="CheckIndicator"
+                                                   IsRunning="false"
+                                                   IsVisible="false"
+                                                   VerticalOptions="Center" />
+                                <Label x:Name="CheckStatusLabel"
+                                       AutomationId="CheckStatusLabel"
+                                       Style="{StaticResource Caption}"
+                                       IsVisible="false"
+                                       VerticalOptions="Center" />
+                            </HorizontalStackLayout>
+                            <Label x:Name="ErrorLabel"
+                                   AutomationId="ErrorLabel"
+                                   Style="{StaticResource ErrorText}"
+                                   IsVisible="false" />
+                        </VerticalStackLayout>
+                    </Border>
+                </Grid>
+
+                <!-- Stufe 2: nach erfolgreichem Servercheck — zwei
+                     Optionen nebeneinander statt der Anmeldeseite. -->
+                <Grid x:Name="AuthStage"
+                      AutomationId="AuthStage"
+                      IsVisible="false"
+                      ColumnDefinitions="*,*"
+                      ColumnSpacing="14">
+
+                    <!-- Kachel Kurzcode: wird gegen den verbundenen
+                         Server eingelöst — Anmeldung und Geräte-Kopplung
+                         in einem Schritt. -->
+                    <Border Grid.Column="0"
+                            AutomationId="ShortCodeSection"
+                            Style="{StaticResource Card}"
+                            Padding="18,14">
+                        <VerticalStackLayout Spacing="10">
+                            <Label Text="Mit Kurzcode anmelden"
+                                   Style="{StaticResource SectionTitle}" />
+                            <Label Text="Kurzcode aus der Serververwaltung (Profilseite „Geräte“) eingeben — er wird gegen den verbundenen Server eingelöst, ohne Passwort."
+                                   Style="{StaticResource Caption}"
+                                   FontSize="13" />
+                            <Border Style="{StaticResource InputFrame}">
+                                <Entry x:Name="SetupShortCodeEntry"
+                                       AutomationId="SetupShortCodeEntry"
+                                       Placeholder="Kurzcode"
+                                       Keyboard="Text"
+                                       IsSpellCheckEnabled="False"
+                                       IsTextPredictionEnabled="False" />
+                            </Border>
+                            <HorizontalStackLayout Spacing="12">
+                                <Button x:Name="SetupShortCodeButton"
+                                        AutomationId="SetupShortCodeButton"
+                                        Text="Kurzcode einlösen"
+                                        Clicked="OnShortCodeClicked" />
+                                <ActivityIndicator x:Name="ShortCodeIndicator"
+                                                   IsRunning="false"
+                                                   IsVisible="false"
+                                                   VerticalOptions="Center" />
+                                <Label x:Name="ShortCodeRunningLabel"
+                                       AutomationId="ShortCodeRunningLabel"
+                                       Text="Kopplung läuft …"
+                                       Style="{StaticResource Caption}"
+                                       IsVisible="false"
+                                       VerticalOptions="Center" />
+                            </HorizontalStackLayout>
+                            <Label x:Name="ShortCodeErrorLabel"
+                                   AutomationId="ShortCodeErrorLabel"
+                                   Style="{StaticResource ErrorText}"
+                                   IsVisible="false" />
+                        </VerticalStackLayout>
+                    </Border>
+
+                    <!-- Kachel Zugangsdaten: Anmeldung mit Benutzername
+                         und Passwort; verlangt der Server ein Geräte-
+                         Pairing, muss zuerst der Einmal-Code eingelöst
+                         werden (PairingSection). -->
+                    <Border Grid.Column="1"
+                            AutomationId="CredentialsSection"
+                            Style="{StaticResource Card}"
+                            Padding="18,14">
+                        <VerticalStackLayout Spacing="10">
+                            <Label Text="Mit Zugangsdaten anmelden"
+                                   Style="{StaticResource SectionTitle}" />
+
+                            <VerticalStackLayout x:Name="PairingSection"
+                                                 AutomationId="PairingSection"
+                                                 IsVisible="false"
+                                                 Spacing="10">
+                                <Label Text="Gerät koppeln"
+                                       FontSize="14"
+                                       FontFamily="InterSemiBold" />
+                                <Label Text="Der Server verlangt zuerst eine Geräte-Kopplung: Einmal-Code aus der Verwaltung deines Servers (Profilseite „Geräte“) eingeben."
+                                       Style="{StaticResource Caption}"
+                                       FontSize="13" />
+                                <!-- Kein MaxLength: die Codelänge ist serverseitig
+                                     konfigurierbar (Pairing:CodeLength) — ein hartes
+                                     Limit würde längere Codes still abschneiden. -->
+                                <Border Style="{StaticResource InputFrame}">
+                                    <Entry x:Name="PairingCodeEntry"
+                                           AutomationId="PairingCodeEntry"
+                                           Placeholder="Pairing-Code"
+                                           Keyboard="Text"
+                                           IsSpellCheckEnabled="False"
+                                           IsTextPredictionEnabled="False" />
+                                </Border>
+                                <HorizontalStackLayout Spacing="12">
+                                    <Button x:Name="PairButton"
+                                            AutomationId="PairButton"
+                                            Text="Koppeln"
+                                            Style="{StaticResource SecondaryButton}"
+                                            Clicked="OnPairClicked" />
+                                    <ActivityIndicator x:Name="PairingIndicator"
+                                                       IsRunning="false"
+                                                       IsVisible="false"
+                                                       VerticalOptions="Center" />
+                                    <Label x:Name="PairingRunningLabel"
+                                           AutomationId="PairingRunningLabel"
+                                           Text="Kopplung läuft …"
+                                           Style="{StaticResource Caption}"
+                                           IsVisible="false"
+                                           VerticalOptions="Center" />
+                                </HorizontalStackLayout>
+                                <Label x:Name="PairingErrorLabel"
+                                       AutomationId="PairingErrorLabel"
+                                       Style="{StaticResource ErrorText}"
+                                       IsVisible="false" />
+                            </VerticalStackLayout>
+
+                            <VerticalStackLayout x:Name="CredentialsBlock"
+                                                 AutomationId="CredentialsBlock"
+                                                 Spacing="10">
+                                <Label Text="Mit den Zugangsdaten des VideoPlayer-Servers anmelden."
+                                       Style="{StaticResource Caption}"
+                                       FontSize="13" />
+                                <Border Style="{StaticResource InputFrame}">
+                                    <Entry x:Name="LoginUsernameEntry"
+                                           AutomationId="LoginUsernameEntry"
+                                           Placeholder="E-Mail-Adresse"
+                                           Keyboard="Email" />
+                                </Border>
+                                <Border Style="{StaticResource InputFrame}">
+                                    <Entry x:Name="LoginPasswordEntry"
+                                           AutomationId="LoginPasswordEntry"
+                                           Placeholder="Passwort"
+                                           IsPassword="True" />
+                                </Border>
+                                <HorizontalStackLayout Spacing="12">
+                                    <Button x:Name="LoginButton"
+                                            AutomationId="LoginButton"
+                                            Text="Anmelden"
+                                            Clicked="OnSetupLoginClicked" />
+                                    <ActivityIndicator x:Name="LoginIndicator"
+                                                       IsRunning="false"
+                                                       IsVisible="false"
+                                                       VerticalOptions="Center" />
+                                </HorizontalStackLayout>
+                                <Label x:Name="LoginErrorLabel"
+                                       AutomationId="LoginErrorLabel"
+                                       Style="{StaticResource ErrorText}"
+                                       IsVisible="false" />
+                            </VerticalStackLayout>
+                        </VerticalStackLayout>
+                    </Border>
+                </Grid>
+            </VerticalStackLayout>
+        </ScrollView>
+    </Grid>
+</ContentPage>

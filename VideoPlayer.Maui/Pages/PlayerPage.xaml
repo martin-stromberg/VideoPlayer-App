@@ -1,0 +1,148 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:mct="http://schemas.microsoft.com/dotnet/2022/maui/toolkit"
+             xmlns:mvu="clr-namespace:VideoPlayer.Mvu;assembly=VideoPlayer.Mvu"
+             x:Class="VideoPlayer.Maui.Pages.PlayerPage"
+             Title="Wiedergabe"
+             x:DataType="mvu:MvuHost">
+
+    <!-- Zweizeiliges Grundlayout: Die Titelleiste belegt eine eigene
+         Zeile am oberen Fensterrand, die Videofläche füllt den
+         restlichen Raum und grenzt mit ihrem oberen Rand an den
+         unteren Rand der Leiste (Issue #75). Die Leiste lag zuvor als
+         eingabedurchlässiges Overlay auf dem Video und wurde unter iOS
+         per Margin nach unten versetzt, weil sie die eingeblendete
+         native Top-Leiste des AVPlayerViewController überdeckte —
+         dieser Konflikt entfällt mit der eigenen Zeile vollständig. -->
+    <Grid x:Name="PlayerRoot" BackgroundColor="{StaticResource VpBgDeep}"
+          RowDefinitions="Auto,*">
+
+        <!-- Titelleiste: Titel, Playlist-Kontext, „angesehen"-Hinweis und
+             rechtsbündig die Playlist-Navigation als Symbol-Schaltflächen
+             (Issue #78 — zuvor lag sie als Overlay auf der Videofläche).
+             Im Mini-Player blendet UpdateUi die Leiste aus — die
+             Auto-Zeile kollabiert dann und die Videofläche füllt die
+             gesamte Seite. -->
+        <VerticalStackLayout x:Name="TitleChrome"
+                             Grid.Row="0"
+                             Spacing="0">
+            <Border Padding="14">
+                <!-- Scrim-Verlauf statt Vollfläche: dunkel oben,
+                     auslaufend nach unten. -->
+                <Border.Background>
+                    <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                        <GradientStop Color="{StaticResource VpScrimStart}" Offset="0.0" />
+                        <GradientStop Color="{StaticResource VpScrimEnd}" Offset="1.0" />
+                    </LinearGradientBrush>
+                </Border.Background>
+                <Grid ColumnDefinitions="*,Auto,Auto"
+                      ColumnSpacing="8">
+                    <VerticalStackLayout Grid.Column="0"
+                                       Spacing="2">
+                        <Label x:Name="TitleLabel"
+                               FontSize="16"
+                               FontFamily="InterSemiBold"
+                               TextColor="{StaticResource VpText}"
+                               VerticalOptions="Center"
+                               LineBreakMode="TailTruncation" />
+                        <Label x:Name="PlaylistContextLabel"
+                               FontSize="12"
+                               TextColor="{StaticResource VpSecondary}"
+                               VerticalOptions="Center"
+                               LineBreakMode="TailTruncation"
+                               IsVisible="False" />
+                    </VerticalStackLayout>
+                    <Label x:Name="WatchedBadge"
+                           Grid.Column="1"
+                           Text="Angesehen"
+                           FontSize="12"
+                           TextColor="{StaticResource VpSecondary}"
+                           VerticalOptions="Center"
+                           IsVisible="False" />
+                    <!-- Playlist-Navigation (nur bei Playlist-Wiedergabe
+                         sichtbar): rechte Spalte der Titelleiste. Als
+                         Element der eigenen Leistenzeile überlappt sie die
+                         Videofläche nicht mehr — der frühere iOS-Versatz
+                         unter die native Top-Leiste des
+                         AVPlayerViewController entfällt damit. -->
+                    <HorizontalStackLayout x:Name="PlaylistNavigationBar"
+                                           Grid.Column="2"
+                                           Spacing="10"
+                                           VerticalOptions="Center"
+                                           IsVisible="False">
+                        <Button x:Name="PreviousButton"
+                                AutomationId="PlayerPreviousButton"
+                                Text="&#xe045;"
+                                Style="{StaticResource IconButton}"
+                                FontFamily="MaterialIcons"
+                                FontSize="18"
+                                WidthRequest="44"
+                                HeightRequest="44"
+                                Clicked="OnPreviousClicked" />
+                        <Button x:Name="NextButton"
+                                AutomationId="PlayerNextButton"
+                                Text="&#xe044;"
+                                Style="{StaticResource IconButton}"
+                                FontFamily="MaterialIcons"
+                                FontSize="18"
+                                WidthRequest="44"
+                                HeightRequest="44"
+                                Clicked="OnNextClicked" />
+                    </HorizontalStackLayout>
+                </Grid>
+            </Border>
+        </VerticalStackLayout>
+
+        <!-- Videofläche unterhalb der Titelleiste: das MediaElement füllt
+             die Zeile; die übrigen Elemente liegen als Overlay darüber. -->
+        <Grid x:Name="VideoSurface" Grid.Row="1">
+
+            <!-- Video -->
+            <mct:MediaElement x:Name="VideoElement"
+                              ShouldAutoPlay="True"
+                              ShouldShowPlaybackControls="True"
+                              ShouldKeepScreenOn="True"
+                              MediaOpened="OnMediaOpened"
+                              MediaEnded="OnMediaEnded"
+                              MediaFailed="OnMediaFailed"
+                              StateChanged="OnMediaStateChanged" />
+
+            <!-- Lade-/Puffer-Anzeige (Quellauflösung oder Zwischenpufferung) -->
+            <ActivityIndicator x:Name="LoadingIndicator"
+                               IsRunning="{Binding Model.Player.IsResolving}"
+                               IsVisible="{Binding Model.Player.IsResolving}"
+                               Color="{StaticResource VpPrimary}"
+                               HeightRequest="48"
+                               WidthRequest="48" />
+
+            <!-- Mini-Player-Schalter liegt als eigenes Element über der
+                 Videofläche oben rechts. -->
+            <Button x:Name="PipButton"
+                    Text="Mini-Player"
+                    Style="{StaticResource SecondaryButton}"
+                    FontSize="12"
+                    HeightRequest="38"
+                    Margin="0,18,16,0"
+                    HorizontalOptions="End"
+                    VerticalOptions="Start"
+                    IsVisible="False"
+                    Clicked="OnPipClicked" />
+
+            <!-- Fehlerhinweis (Quelle nicht verfügbar / Wiedergabefehler) -->
+            <Border x:Name="ErrorPanel"
+                    VerticalOptions="End"
+                    Margin="16"
+                    Padding="14,10"
+                    StrokeShape="RoundRectangle 12"
+                    BackgroundColor="{StaticResource VpOverlay}"
+                    IsVisible="False">
+                <Label x:Name="ErrorLabel"
+                       Style="{StaticResource ErrorText}" />
+            </Border>
+
+        </Grid>
+
+    </Grid>
+
+</ContentPage>

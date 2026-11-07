@@ -1,0 +1,14 @@
+  Wiederherzustellende Projekte werden ermittelt...
+  Alle Projekte sind für die Wiederherstellung auf dem neuesten Stand.
+  VideoWebPlayer.Client -> D:\Repositories\softwareschmiede\cebc7d86-f708-4dc6-87e7-f5bccf5f678a\VideoWebPlayer.Client\bin\Release\net10.0\VideoWebPlayer.Client.dll
+  VideoPlayer.ApiClient -> D:\Repositories\softwareschmiede\cebc7d86-f708-4dc6-87e7-f5bccf5f678a\VideoPlayer.ApiClient\bin\Release\net10.0\VideoPlayer.ApiClient.dll
+  VideoPlayer.Storage -> D:\Repositories\softwareschmiede\cebc7d86-f708-4dc6-87e7-f5bccf5f678a\VideoPlayer.Storage\bin\Release\net10.0\VideoPlayer.Storage.dll
+  VideoPlayer.Mvu -> D:\Repositories\softwareschmiede\cebc7d86-f708-4dc6-87e7-f5bccf5f678a\VideoPlayer.Mvu\bin\Release\net10.0\VideoPlayer.Mvu.dll
+  VideoWebPlayer.Maui.Tests -> D:\Repositories\softwareschmiede\cebc7d86-f708-4dc6-87e7-f5bccf5f678a\VideoWebPlayer.Maui.Tests\bin\Release\net10.0\VideoWebPlayer.Maui.Tests.dll
+Testlauf für "D:\Repositories\softwareschmiede\cebc7d86-f708-4dc6-87e7-f5bccf5f678a\VideoWebPlayer.Maui.Tests\bin\Release\net10.0\VideoWebPlayer.Maui.Tests.dll" (.NETCoreApp,Version=v10.0)
+Insgesamt 1 Testdateien stimmten mit dem angegebenen Muster überein.
+
+Bestanden!   : Fehler:     0, erfolgreich:   160, übersprungen:     0, gesamt:   160, Dauer: 147 ms - VideoWebPlayer.Maui.Tests.dll (net10.0)
+
+Anlagen:
+  D:\Repositories\softwareschmiede\cebc7d86-f708-4dc6-87e7-f5bccf5f678a\VideoWebPlayer.Maui.Tests\TestResults\43e36628-e478-4fc0-885b-ff497b82664d\coverage.cobertura.xml

@@ -1,0 +1,188 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:controls="clr-namespace:VideoPlayer.Maui.Controls"
+             xmlns:mvu="clr-namespace:VideoPlayer.Mvu;assembly=VideoPlayer.Mvu"
+             x:Class="VideoPlayer.Maui.Pages.HomePage"
+             Title="Startseite"
+             x:DataType="mvu:MvuHost">
+    <RefreshView x:Name="HomeRefresh" IsRefreshing="{Binding Model.IsSyncRunning, Mode=OneWay}"
+                 AutomationId="HomeRefresh">
+    <ScrollView>
+        <VerticalStackLayout Padding="0,10,0,20" Spacing="24">
+            <!-- Hero-Kopfbereich (Web-Vorbild .home-hero): servergeneriertes
+                 Hintergrundbild (api/pictures/hero-background) unter
+                 geschichteten Dunkelgradienten; unten links Kicker-Chip,
+                 Titel und Beschreibung. Ein-/ausblendbar über die
+                 Einstellung „Kopfbereich anzeigen" (Model.ShowHomeHero);
+                 die Höhe folgt der Seitenbreite (Code-Behind:
+                 clamp-Äquivalent zu clamp(260px, 42vw, 520px)). -->
+            <Grid x:Name="HeroSection"
+                  AutomationId="HeroSection"
+                  IsVisible="{Binding Model.ShowHomeHero}"
+                  HeightRequest="320">
+
+                <!-- Bildebene: cover-Anzeige (Gegenstück zu
+                     background-size: cover); ohne geladenes Bild bleibt
+                     die Ebene leer und die Gradienten liegen über dem
+                     Seitenhintergrund (Web-Fallback). -->
+                <Image x:Name="HeroImage"
+                       AutomationId="HeroImage"
+                       Aspect="AspectFill"
+                       HorizontalOptions="Fill"
+                       VerticalOptions="Fill" />
+
+                <!-- Seitlicher Dunkelgradient (Web: 90deg,
+                     rgba(19,19,19,.98 → .76 → .18)). -->
+                <Border AutomationId="HeroSideGradient">
+                    <Border.Background>
+                        <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
+                            <GradientStop Color="{StaticResource VpHeroSideStrong}" Offset="0.0" />
+                            <GradientStop Color="{StaticResource VpHeroSideMid}" Offset="0.45" />
+                            <GradientStop Color="{StaticResource VpHeroSideSoft}" Offset="1.0" />
+                        </LinearGradientBrush>
+                    </Border.Background>
+                </Border>
+
+                <!-- Radiale Akzente (Web: rgba(229,9,20,.3) /
+                     rgba(0,168,232,.22)). -->
+                <Border AutomationId="HeroAccentPrimary">
+                    <Border.Background>
+                        <RadialGradientBrush Center="0.85,0.15" Radius="0.7">
+                            <GradientStop Color="{StaticResource VpHeroAccentPrimary}" Offset="0.0" />
+                            <GradientStop Color="{StaticResource VpHeroFadeClear}" Offset="1.0" />
+                        </RadialGradientBrush>
+                    </Border.Background>
+                </Border>
+                <Border AutomationId="HeroAccentSecondary">
+                    <Border.Background>
+                        <RadialGradientBrush Center="0.15,0.9" Radius="0.7">
+                            <GradientStop Color="{StaticResource VpHeroAccentSecondary}" Offset="0.0" />
+                            <GradientStop Color="{StaticResource VpHeroFadeClear}" Offset="1.0" />
+                        </RadialGradientBrush>
+                    </Border.Background>
+                </Border>
+
+                <!-- Bottom-Fade in den Seitenhintergrund (Web: 0deg zu
+                     vp-bg). -->
+                <Border AutomationId="HeroBottomFade">
+                    <Border.Background>
+                        <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                            <GradientStop Color="{StaticResource VpHeroFadeClear}" Offset="0.0" />
+                            <GradientStop Color="{StaticResource VpBg}" Offset="1.0" />
+                        </LinearGradientBrush>
+                    </Border.Background>
+                </Border>
+
+                <!-- Trennlinie am unteren Rand (Web: border-bottom
+                     vp-border). -->
+                <BoxView Color="{StaticResource VpBorder}"
+                         HeightRequest="1"
+                         VerticalOptions="End" />
+
+                <!-- Inhalt: Kicker-Chip, Titel, Beschreibung. -->
+                <VerticalStackLayout VerticalOptions="End"
+                                     Padding="24,0,24,28"
+                                     Spacing="10"
+                                     MaximumWidthRequest="820">
+                    <Border Style="{StaticResource KickerChip}">
+                        <Label x:Name="HeroKicker"
+                               AutomationId="HeroKicker"
+                               Text="PRIVATE MEDIA LIBRARY"
+                               FontSize="11"
+                               FontFamily="InterSemiBold"
+                               CharacterSpacing="1.6"
+                               TextColor="{StaticResource VpText}" />
+                    </Border>
+                    <Label x:Name="HeroTitle"
+                           AutomationId="HeroTitle"
+                           Text="{Binding Model.HeroTitle}"
+                           FontSize="34"
+                           FontAttributes="Bold"
+                           TextColor="{StaticResource VpText}" />
+                    <Label x:Name="HeroDescription"
+                           AutomationId="HeroDescription"
+                           Text="Filme, Serien, Favoriten und angefangene Wiedergaben — alles an einem Ort."
+                           FontSize="14"
+                           TextColor="{StaticResource VpTextMuted}" />
+                </VerticalStackLayout>
+            </Grid>
+
+            <!-- Hinweis bei fehlender Verbindung: die gecachten Inhalte
+                 bleiben trotzdem sichtbar. -->
+            <Border x:Name="OfflineBanner"
+                    Margin="24,0"
+                    Style="{StaticResource Banner}"
+                    IsVisible="False">
+                <Label Text="Offline-Modus – zwischengespeicherte Inhalte werden angezeigt. Neue Inhalte, Quellen und Profildaten sind nicht verfügbar."
+                       TextColor="{StaticResource VpText}"
+                       FontFamily="InterMedium" />
+            </Border>
+
+            <!-- Hinweis der Ablage-Wiederherstellung: beschädigte lokale
+                 Daten wurden neu initialisiert. -->
+            <Border x:Name="StorageNoticeBanner"
+                    Margin="24,0"
+                    Style="{StaticResource Banner}"
+                    IsVisible="False">
+                <Label x:Name="StorageNoticeLabel"
+                       Text="{Binding Model.StorageNotice}"
+                       TextColor="{StaticResource VpText}"
+                       FontFamily="InterMedium" />
+            </Border>
+
+            <!-- Leerer Zustand: noch keine gecachten oder synchronisierten Inhalte. -->
+            <Label Text="Noch keine Inhalte vorhanden. Sobald ein Server verbunden ist, erscheinen hier deine Medien."
+                   Style="{StaticResource Caption}"
+                   FontSize="14"
+                   Padding="24,0"
+                   IsVisible="False">
+                <Label.Triggers>
+                    <DataTrigger TargetType="Label"
+                                 Binding="{Binding Model.HasHomeContent}"
+                                 Value="False">
+                        <Setter Property="IsVisible" Value="True" />
+                    </DataTrigger>
+                </Label.Triggers>
+            </Label>
+
+            <!-- Weiterschauen-Einträge zeigen querformatige
+                 Vorschaubilder (16:9-Stills der Videos) — die Karten
+                 folgen dem Querformat statt dem Posterformat 2:3. -->
+            <controls:MediaCarousel Title="Weiterschauen"
+                                    AutomationId="ContinueWatchingCarousel"
+                                    ItemWidth="256"
+                                    ItemHeight="144"
+                                    Items="{Binding Model.ContinueWatching}"
+                                    ItemTapped="OnContinueWatchingItemTapped"
+                                    LongPressEnabled="True"
+                                    ItemLongPressed="OnContinueWatchingItemLongPressed" />
+            <controls:MediaCarousel Title="Favoriten"
+                                    Items="{Binding Model.Favorites}"
+                                    ItemTapped="OnMediaItemTapped" />
+            <controls:MediaCarousel Title="Neu im Programm"
+                                    AutomationId="RecentCarousel"
+                                    Items="{Binding Model.RecentEntries}"
+                                    ItemTapped="OnMediaItemTapped" />
+
+            <VerticalStackLayout AutomationId="SeasonalGenres"
+                                 Spacing="24"
+                                 BindableLayout.ItemsSource="{Binding Model.SeasonalGenres}">
+                <BindableLayout.ItemTemplate>
+                    <DataTemplate x:DataType="mvu:HomeSeasonalSection">
+                        <controls:MediaCarousel Title="{Binding Name}"
+                                                AutomationId="{Binding AutomationId}"
+                                                Items="{Binding Items}"
+                                                ItemTapped="OnMediaItemTapped" />
+                    </DataTemplate>
+                </BindableLayout.ItemTemplate>
+            </VerticalStackLayout>
+
+            <Label x:Name="ServerStatusLabel"
+                   Text="{Binding Model.ServerHealthText}"
+                   Style="{StaticResource Caption}"
+                   Padding="24,0" />
+        </VerticalStackLayout>
+    </ScrollView>
+    </RefreshView>
+</ContentPage>

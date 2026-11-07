@@ -1,0 +1,158 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:controls="clr-namespace:VideoPlayer.Maui.Controls"
+             xmlns:mvu="clr-namespace:VideoPlayer.Mvu;assembly=VideoPlayer.Mvu"
+             x:Class="VideoPlayer.Maui.Pages.SourceOverviewPage"
+             x:Name="SourceOverviewRoot"
+             x:DataType="mvu:MvuHost">
+
+    <Grid Padding="16"
+          RowDefinitions="Auto,Auto,Auto,Auto,*"
+          RowSpacing="12">
+
+        <!-- Suchfeld in gefülltem Eingaberahmen: Abschicken über
+             Return/Suchen-Taste -->
+        <Border Grid.Row="0" Style="{StaticResource InputFrame}">
+            <SearchBar x:Name="MediaSearchBar"
+                       AutomationId="MediaSearchBar"
+                       Placeholder="Suchen"
+                       SearchButtonPressed="OnSearchButtonPressed" />
+        </Border>
+
+        <!-- Genre-Leiste: horizontal, „Alle" als erster Eintrag —
+             Auswahl als getönte Pill statt Vollfläche. Nur sichtbar,
+             wenn die Quelle reale Genres liefert (ShowGenreFilter) —
+             eine „Alle"-nur-Zeile wäre funktionslos. ScrollView +
+             BindableLayout statt CollectionView (Muster: MediaCarousel):
+             die Zeile misst ihre Höhe aus dem Chip-Inhalt — eine
+             CollectionView dehnt sich unter iOS auf die Resthöhe aus
+             und verdeckt das Medien-Raster. -->
+        <ScrollView x:Name="GenresCollection"
+                    AutomationId="GenresCollection"
+                    Grid.Row="1"
+                    Orientation="Horizontal"
+                    HorizontalScrollBarVisibility="Never"
+                    IsVisible="{Binding Model.SourceBrowser.ShowGenreFilter}">
+            <HorizontalStackLayout BindableLayout.ItemsSource="{Binding Model.SourceBrowser.Genres}"
+                                   Spacing="8">
+                <BindableLayout.ItemTemplate>
+                    <DataTemplate x:DataType="mvu:SourceGenreItem">
+                        <Border Style="{StaticResource Chip}">
+                            <Border.GestureRecognizers>
+                                <TapGestureRecognizer Tapped="OnGenreTapped" />
+                            </Border.GestureRecognizers>
+                            <Border.Triggers>
+                                <DataTrigger TargetType="Border"
+                                             Binding="{Binding IsSelected}"
+                                             Value="True">
+                                    <Setter Property="BackgroundColor" Value="{StaticResource VpPrimaryTint}" />
+                                    <Setter Property="Stroke" Value="Transparent" />
+                                </DataTrigger>
+                            </Border.Triggers>
+                            <Label Text="{Binding Name}"
+                                   FontSize="13"
+                                   TextColor="{StaticResource VpTextMuted}">
+                                <Label.Triggers>
+                                    <DataTrigger TargetType="Label"
+                                                 Binding="{Binding IsSelected}"
+                                                 Value="True">
+                                        <Setter Property="TextColor" Value="{StaticResource VpPrimarySoft}" />
+                                        <Setter Property="FontFamily" Value="InterSemiBold" />
+                                    </DataTrigger>
+                                </Label.Triggers>
+                            </Label>
+                        </Border>
+                    </DataTemplate>
+                </BindableLayout.ItemTemplate>
+            </HorizontalStackLayout>
+        </ScrollView>
+
+        <ActivityIndicator x:Name="InitialLoadingIndicator"
+                           Grid.Row="2"
+                           IsRunning="{Binding Model.SourceBrowser.IsLoading}"
+                           IsVisible="{Binding Model.SourceBrowser.IsLoading}"
+                           Color="{StaticResource VpPrimary}" />
+
+        <!-- Fehler beim Erstladen: Meldung + erneut versuchen -->
+        <VerticalStackLayout x:Name="ErrorPanel"
+                             Grid.Row="2"
+                             Spacing="10"
+                             IsVisible="False">
+            <Label x:Name="ErrorLabel" Style="{StaticResource ErrorText}" />
+            <Button Text="Erneut versuchen"
+                    Style="{StaticResource SecondaryButton}"
+                    Clicked="OnRetryClicked"
+                    HorizontalOptions="Start" />
+        </VerticalStackLayout>
+
+        <Label x:Name="EmptyLabel"
+               Grid.Row="2"
+               Text="Keine Einträge gefunden."
+               Style="{StaticResource Caption}"
+               FontSize="14"
+               IsVisible="False" />
+
+        <!-- Medien-Raster mit seitenweisem Nachladen: Posterkarten mit
+             Rundung und Schatten, Titel darunter. Die ItemsSource kommt
+             aus dem Code-Behind (stabile Liste, die SourceItemListSync
+             granular abgleicht) — ein Binding auf
+             Model.SourceBrowser.Items würde bei jeder Folgeseite die
+             Referenz tauschen und die Ansicht an den Anfang setzen. -->
+        <CollectionView x:Name="ItemsCollection"
+                        AutomationId="ItemsCollection"
+                        Grid.Row="4"
+                        SelectionMode="Single"
+                        SelectionChanged="OnMediaItemSelected"
+                        RemainingItemsThreshold="6"
+                        RemainingItemsThresholdReached="OnRemainingItemsThresholdReached">
+            <CollectionView.ItemsLayout>
+                <GridItemsLayout Orientation="Vertical" Span="3" VerticalItemSpacing="14" HorizontalItemSpacing="14" />
+            </CollectionView.ItemsLayout>
+            <CollectionView.ItemTemplate>
+                <DataTemplate x:DataType="mvu:SourceMediaItem">
+                    <VerticalStackLayout Spacing="7">
+                        <Border Padding="0"
+                                Stroke="{StaticResource VpBorder}"
+                                StrokeThickness="1"
+                                HeightRequest="210"
+                                BackgroundColor="{StaticResource VpSurface}"
+                                StrokeShape="RoundRectangle 12">
+                            <Border.Shadow>
+                                <Shadow Brush="{StaticResource VpShadowBrush}" Offset="0,4" Radius="10" Opacity="0.3" />
+                            </Border.Shadow>
+                            <controls:CachedPosterImage PictureId="{Binding PosterPictureId}"
+                                                        Aspect="AspectFill" />
+                        </Border>
+                        <Label Text="{Binding Title}"
+                               FontSize="13"
+                               FontFamily="InterMedium"
+                               TextColor="{StaticResource VpText}"
+                               LineBreakMode="TailTruncation"
+                               MaxLines="2" />
+                    </VerticalStackLayout>
+                </DataTemplate>
+            </CollectionView.ItemTemplate>
+            <CollectionView.Footer>
+                <Grid Padding="0,8">
+                    <!-- Fehler beim Nachladen einer Folgeseite -->
+                    <HorizontalStackLayout x:Name="FooterErrorPanel"
+                                           Spacing="10"
+                                           IsVisible="False">
+                        <Label Text="Fehler beim Laden weiterer Einträge"
+                               Style="{StaticResource ErrorText}"
+                               VerticalOptions="Center" />
+                        <Button Text="Erneut versuchen"
+                                Style="{StaticResource SecondaryButton}"
+                                Clicked="OnRetryClicked" />
+                    </HorizontalStackLayout>
+                    <ActivityIndicator x:Name="FooterLoadingIndicator"
+                                       IsRunning="{Binding Model.SourceBrowser.IsLoadingMore}"
+                                       IsVisible="{Binding Model.SourceBrowser.IsLoadingMore}"
+                                       Color="{StaticResource VpPrimary}" />
+                </Grid>
+            </CollectionView.Footer>
+        </CollectionView>
+    </Grid>
+
+</ContentPage>

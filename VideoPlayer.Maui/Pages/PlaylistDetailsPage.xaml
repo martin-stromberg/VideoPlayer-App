@@ -1,0 +1,216 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:controls="clr-namespace:VideoPlayer.Maui.Controls"
+             xmlns:mvu="clr-namespace:VideoPlayer.Mvu;assembly=VideoPlayer.Mvu"
+             x:Class="VideoPlayer.Maui.Pages.PlaylistDetailsPage"
+             x:Name="RootPage"
+             x:DataType="mvu:MvuHost">
+
+    <Grid Padding="16"
+          RowDefinitions="Auto,Auto,Auto,Auto,*"
+          RowSpacing="12">
+
+        <!-- Kopfbereich: Cover, Name, Beschreibung, Sortiermodus und
+             Eintragszahl der geöffneten Playlist. -->
+        <Grid Grid.Row="0"
+              ColumnDefinitions="96,*"
+              ColumnSpacing="16">
+            <Border Grid.Column="0"
+                    WidthRequest="96"
+                    HeightRequest="96"
+                    Padding="0"
+                    StrokeThickness="0"
+                    BackgroundColor="{StaticResource VpSurfaceLow}"
+                    StrokeShape="RoundRectangle 12">
+                <Grid>
+                    <Label Text="{Binding Model.PlaylistDetails.Name}"
+                           TextColor="{StaticResource VpText}"
+                           FontSize="11"
+                           Padding="6"
+                           HorizontalTextAlignment="Center"
+                           VerticalOptions="Center"
+                           MaxLines="4"
+                           LineBreakMode="WordWrap" />
+                    <controls:CachedPlaylistCoverImage PlaylistId="{Binding Model.PlaylistDetails.CoverPlaylistId}"
+                                                       Aspect="AspectFill"
+                                                       IsVisible="{Binding Model.PlaylistDetails.HasCover}" />
+                </Grid>
+            </Border>
+            <VerticalStackLayout Grid.Column="1"
+                                 Spacing="6"
+                                 VerticalOptions="Center">
+                <Label Text="{Binding Model.PlaylistDetails.Name}"
+                       FontSize="20"
+                       FontFamily="InterSemiBold"
+                       TextColor="{StaticResource VpText}"
+                       MaxLines="2"
+                       LineBreakMode="TailTruncation" />
+                <Label Text="{Binding Model.PlaylistDetails.Description}"
+                       Style="{StaticResource Caption}"
+                       FontSize="13"
+                       MaxLines="3"
+                       LineBreakMode="TailTruncation"
+                       IsVisible="{Binding Model.PlaylistDetails.HasDescription}" />
+                <Label Text="{Binding Model.PlaylistDetails.SummaryText}"
+                       Style="{StaticResource Caption}" />
+                <Label Text="{Binding Model.PlaylistDetails.GenreText}"
+                       AutomationId="PlaylistGenreTextLabel"
+                       Style="{StaticResource Caption}"
+                       IsVisible="{Binding Model.PlaylistDetails.HasGenreText}" />
+                <HorizontalStackLayout Spacing="10">
+                    <Button x:Name="PlayButton"
+                            AutomationId="PlaylistDetailsPlayButton"
+                            Text="Abspielen"
+                            Clicked="OnPlayClicked"
+                            IsVisible="{Binding Model.PlaylistDetails.HasItems}" />
+                    <Button x:Name="ManageButton"
+                            AutomationId="PlaylistManageButton"
+                            Text="Verwalten"
+                            Style="{StaticResource SecondaryButton}"
+                            Clicked="OnManageClicked"
+                            IsVisible="{Binding Model.PlaylistDetails.CanManage}" />
+                </HorizontalStackLayout>
+                <Label x:Name="ManageNoticeLabel"
+                       AutomationId="PlaylistManageNoticeLabel"
+                       Style="{StaticResource Caption}"
+                       FontSize="12"
+                       IsVisible="False" />
+            </VerticalStackLayout>
+        </Grid>
+
+        <ActivityIndicator x:Name="InitialLoadingIndicator"
+                           AutomationId="PlaylistDetailsLoadingIndicator"
+                           Grid.Row="1"
+                           IsRunning="{Binding Model.PlaylistDetails.IsLoading}"
+                           IsVisible="{Binding Model.PlaylistDetails.IsLoading}"
+                           Color="{StaticResource VpPrimary}" />
+
+        <!-- Fehler beim Erstladen: Meldung + erneut versuchen -->
+        <VerticalStackLayout x:Name="ErrorPanel"
+                             Grid.Row="1"
+                             Spacing="10"
+                             IsVisible="False">
+            <Label x:Name="ErrorLabel"
+                   AutomationId="PlaylistDetailsErrorLabel"
+                   Style="{StaticResource ErrorText}" />
+            <Button x:Name="RetryButton"
+                    AutomationId="PlaylistEntriesRetryButton"
+                    Text="Erneut versuchen"
+                    Style="{StaticResource SecondaryButton}"
+                    Clicked="OnRetryClicked"
+                    HorizontalOptions="Start" />
+        </VerticalStackLayout>
+
+        <Label x:Name="EmptyLabel"
+               AutomationId="PlaylistDetailsEmptyLabel"
+               Grid.Row="1"
+               Text="Diese Playlist enthält keine Einträge."
+               Style="{StaticResource Caption}"
+               FontSize="14"
+               IsVisible="False" />
+
+        <!-- Eintragsliste in Server-Reihenfolge mit seitenweisem
+             Nachladen: Posterkarte, Titel, Kontext und Medientyp. -->
+        <CollectionView x:Name="EntriesCollection"
+                        AutomationId="PlaylistEntriesCollection"
+                        Grid.Row="4"
+                        ItemsSource="{Binding Model.PlaylistDetails.Entries}"
+                        SelectionMode="Single"
+                        SelectionChanged="OnEntrySelected"
+                        RemainingItemsThreshold="4"
+                        RemainingItemsThresholdReached="OnRemainingItemsThresholdReached">
+            <CollectionView.ItemTemplate>
+                <DataTemplate x:DataType="mvu:PlaylistEntryItem">
+                    <Border Style="{StaticResource Card}"
+                            Padding="12"
+                            Margin="0,0,0,12">
+                        <Grid ColumnDefinitions="64,*,Auto"
+                              ColumnSpacing="16">
+                            <Border Grid.Column="0"
+                                    WidthRequest="64"
+                                    HeightRequest="96"
+                                    Padding="0"
+                                    StrokeThickness="0"
+                                    BackgroundColor="{StaticResource VpSurfaceLow}"
+                                    StrokeShape="RoundRectangle 8">
+                                <Grid>
+                                    <Label Text="{Binding Title}"
+                                           TextColor="{StaticResource VpText}"
+                                           FontSize="10"
+                                           Padding="5"
+                                           HorizontalTextAlignment="Center"
+                                           VerticalOptions="Center"
+                                           MaxLines="5"
+                                           LineBreakMode="WordWrap" />
+                                    <controls:CachedPosterImage PictureId="{Binding ResolvedPictureId}"
+                                                                Aspect="AspectFill"
+                                                                IsVisible="{Binding HasPoster}" />
+                                </Grid>
+                            </Border>
+                            <VerticalStackLayout Grid.Column="1"
+                                                 Spacing="5"
+                                                 VerticalOptions="Center">
+                                <Label Text="{Binding Title}"
+                                       FontSize="16"
+                                       FontFamily="InterSemiBold"
+                                       TextColor="{StaticResource VpText}"
+                                       MaxLines="2"
+                                       LineBreakMode="TailTruncation" />
+                                <Label Text="{Binding Subtitle}"
+                                       Style="{StaticResource Caption}" />
+                                <Label Text="{Binding MediaTypeText}"
+                                       Style="{StaticResource Caption}"
+                                       IsVisible="{Binding HasParentTitle}" />
+                            </VerticalStackLayout>
+                            <!-- Kontextschalter des Eintrags (eindeutige
+                                 AutomationId je Eintrag — die UIA-Sicht
+                                 der CollectionView-Elemente ist lückenhaft,
+                                 die Schalter adressiert die DevApi). -->
+                            <Button Grid.Column="2"
+                                    Text="⋮"
+                                    FontSize="20"
+                                    AutomationId="{Binding EntryMenuAutomationId}"
+                                    BindingContext="{Binding .}"
+                                    Clicked="OnEntryMenuClicked"
+                                    VerticalOptions="Start"
+                                    WidthRequest="44"
+                                    IsVisible="{Binding Source={x:Reference RootPage}, Path=BindingContext.Model.PlaylistDetails.CanManage}" />
+                        </Grid>
+                    </Border>
+                </DataTemplate>
+            </CollectionView.ItemTemplate>
+            <CollectionView.Footer>
+                <Grid Padding="0,8">
+                    <!-- Fehler beim Nachladen einer Folgeseite -->
+                    <HorizontalStackLayout x:Name="FooterErrorPanel"
+                                           Spacing="10"
+                                           IsVisible="False">
+                        <Label Text="Fehler beim Laden weiterer Einträge"
+                               Style="{StaticResource ErrorText}"
+                               VerticalOptions="Center" />
+                        <Button Text="Erneut versuchen"
+                                Style="{StaticResource SecondaryButton}"
+                                Clicked="OnRetryClicked" />
+                    </HorizontalStackLayout>
+                    <ActivityIndicator x:Name="FooterLoadingIndicator"
+                                       AutomationId="PlaylistEntriesLoadingMoreIndicator"
+                                       IsRunning="{Binding Model.PlaylistDetails.IsLoadingMore}"
+                                       IsVisible="{Binding Model.PlaylistDetails.IsLoadingMore}"
+                                       Color="{StaticResource VpPrimary}" />
+                </Grid>
+            </CollectionView.Footer>
+        </CollectionView>
+
+        <!-- Dialog-Panels der Playlist-Verwaltung (überlagern den Inhalt) -->
+        <controls:PlaylistFormPanel x:Name="PlaylistFormPanel"
+                                    Grid.Row="0"
+                                    Grid.RowSpan="5"
+                                    Margin="-16" />
+        <controls:PlaylistGenreEditorPanel x:Name="PlaylistGenreEditorPanel"
+                                           Grid.Row="0"
+                                           Grid.RowSpan="5"
+                                           Margin="-16" />
+    </Grid>
+
+</ContentPage>

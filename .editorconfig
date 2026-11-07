@@ -1,0 +1,9 @@
+root = true
+
+# CS1591 (fehlender XML-Kommentar) gilt für alle Quelldateien — erzwungen
+# über <WarningsAsErrors>CS1591</WarningsAsErrors> in den .csproj-Dateien.
+# Ausnahme: vom Build generierter Zwischencode unter obj/ (z. B. MAUI
+# XAML-SourceGen *.sg.cs) kann keine XML-Dokumentation tragen; die
+# Unterdrückung ist bewusst auf dieses Verzeichnis beschränkt.
+[**/obj/**]
+dotnet_diagnostic.CS1591.severity = none

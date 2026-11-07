@@ -1,0 +1,1164 @@
+diff --git a/README.md b/README.md
+index 38a88cc..5cc7fb6 100644
+--- a/README.md
++++ b/README.md
+@@ -39,6 +39,7 @@ VideoWebPlayer ist eine selbst gehostete ASP.NET-Core-/Blazor-Anwendung für die
+   der Fortschritt eines Betrachters landet in dessen eigener Weiterschauen-Liste.
+ - Einzelne Serien und Filmsammlungen für andere Anwender freischalten, ohne die gesamte Quelle freizugeben.
+ - Browserbasierte Oberfläche für Bibliothek, Wiedergabe und Administration.
++- Saisonale Genre-Listen auf der Startseite: Webansicht und mobile App nutzen gemeinsam `GET /api/home/seasonal-genres`; der authentifizierte Vertrag liefert nur aktive, nichtleere und für den Benutzer freigegebene Sektionen samt UTC-Ablaufzeitpunkt. Die Webansicht blendet Sektionen am Saisonende auch ohne Seitenwechsel aus. Vor dem Ausrollen einer App-Version mit Saisonlisten muss dieser Serverstand bereitgestellt sein. Details: [API-Vertrag](./docs/api/seasonal-genres.md) und [Anwenderhilfe](./docs/help/saisonale-startseitenlisten.md).
+ - Automatische Erfassung und Übersicht von Schauspielern inklusive Such- und Filtermöglichkeiten.
+ - Backups, strukturierte Programmupdates, Benutzer, Genres und Sicherheitseinstellungen verwalten.
+ - Backup-Dateien chunked hochladen — auch sehr große Archive über 6 GB — mit Fortschrittsanzeige und Wiederaufnahme nach Unterbrechungen.
+diff --git a/VideoWebPlayer.Client/Models/DtoSeasonalGenre.cs b/VideoWebPlayer.Client/Models/DtoSeasonalGenre.cs
+new file mode 100644
+index 0000000..e9a13c4
+--- /dev/null
++++ b/VideoWebPlayer.Client/Models/DtoSeasonalGenre.cs
+@@ -0,0 +1,14 @@
++namespace VideoWebPlayer.Client.Models;
++
++/// <summary>A nonempty seasonal home section selected by the server.</summary>
++public sealed class DtoSeasonalGenre
++{
++    /// <summary>Gets or sets the stable genre identifier.</summary>
++    public long GenreId { get; set; }
++    /// <summary>Gets or sets the section heading.</summary>
++    public string Name { get; set; } = string.Empty;
++    /// <summary>Gets or sets the exclusive UTC expiry supplied by the server.</summary>
++    public DateTime ExpiresAt { get; set; }
++    /// <summary>Gets or sets the ordered media cards.</summary>
++    public List<DtoMediaEntry> Entries { get; set; } = [];
++}
+diff --git a/VideoWebPlayer.Client/VideoWebPlayerClient.SeasonalGenres.cs b/VideoWebPlayer.Client/VideoWebPlayerClient.SeasonalGenres.cs
+new file mode 100644
+index 0000000..c5b1018
+--- /dev/null
++++ b/VideoWebPlayer.Client/VideoWebPlayerClient.SeasonalGenres.cs
+@@ -0,0 +1,12 @@
++using VideoWebPlayer.Client.Models;
++
++namespace VideoWebPlayer.Client;
++
++public partial class VideoWebPlayerClient
++{
++    /// <summary>Loads the authenticated user's active, nonempty seasonal home sections.</summary>
++    /// <param name="cancellationToken">Cancels the request.</param>
++    /// <returns>The ordered sections, including their server-defined expiry.</returns>
++    public virtual Task<List<DtoSeasonalGenre>> GetSeasonalGenresAsync(CancellationToken cancellationToken = default)
++        => HttpGetAsync<List<DtoSeasonalGenre>>("api/home/seasonal-genres", cancellationToken);
++}
+diff --git a/VideoWebPlayer.Tests/SeasonalGenresE2ETests.cs b/VideoWebPlayer.Tests/SeasonalGenresE2ETests.cs
+new file mode 100644
+index 0000000..ecc03df
+--- /dev/null
++++ b/VideoWebPlayer.Tests/SeasonalGenresE2ETests.cs
+@@ -0,0 +1,242 @@
++using System.Collections.Concurrent;
++using System.Net;
++using System.Security.Claims;
++using Microsoft.AspNetCore.Builder;
++using Microsoft.AspNetCore.Hosting;
++using Microsoft.AspNetCore.Hosting.Server;
++using Microsoft.AspNetCore.Hosting.Server.Features;
++using Microsoft.AspNetCore.HttpsPolicy;
++using Microsoft.AspNetCore.Identity;
++using Microsoft.AspNetCore.Mvc.Testing;
++using Microsoft.EntityFrameworkCore;
++using Microsoft.Extensions.DependencyInjection;
++using Microsoft.Playwright;
++using VideoWebPlayer.Client;
++using VideoWebPlayer.Data;
++using Xunit;
++using static Microsoft.Playwright.Assertions;
++
++namespace VideoWebPlayer.Tests;
++
++/// <summary>Exercises the real seasonal API, authenticated web home, navigation and expiry.</summary>
++[Trait("Category", "E2E")]
++public sealed class SeasonalGenresE2ETests : IAsyncLifetime
++{
++    private const string Email = "seasonal@example.com";
++    private const string Password = "P@ssw0rd123!";
++    private readonly string dbPath = Path.Combine(Path.GetTempPath(), $"vwp-seasonal-{Guid.NewGuid()}.db");
++    private readonly SeasonalClock clock = new();
++    private readonly SeasonalRequests requests = new();
++    private WebApplicationFactory<global::Program> factory = null!;
++    private IPlaywright playwright = null!;
++    private IBrowser browser = null!;
++    private IBrowserContext context = null!;
++    private IPage page = null!;
++    private string url = null!;
++    private string userId = null!;
++    private long genreId;
++    private long filmId;
++    private long singleId;
++    private long collectionId;
++    private long showId;
++
++    public async ValueTask InitializeAsync()
++    {
++        var jwtKey = Convert.ToBase64String(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32));
++        factory = new WebApplicationFactory<global::Program>().WithWebHostBuilder(builder =>
++        {
++            builder.UseEnvironment("Testing").UseUrls("http://127.0.0.1:0").UseStaticWebAssets();
++            builder.UseSetting("ConnectionStrings:DefaultConnection", $"Data Source={dbPath}");
++            builder.UseSetting("Jwt:Key", jwtKey);
++            builder.UseSetting("Jwt:ApiToken", "seasonal-test-api-token");
++            builder.UseSetting("Jwt:ApiToken:Maui", "seasonal-test-api-token");
++            builder.ConfigureServices(services =>
++            {
++                services.AddSingleton<TimeProvider>(clock);
++                services.AddSingleton<IStartupFilter>(requests);
++                services.Configure<HttpsRedirectionOptions>(options => options.HttpsPort = null);
++            });
++        });
++        factory.UseKestrel();
++        factory.StartServer();
++        url = factory.Services.GetRequiredService<IServer>().Features.Get<IServerAddressesFeature>()!.Addresses.First().TrimEnd('/');
++        await SeedAsync();
++        playwright = await Playwright.CreateAsync();
++        // A missing browser is a failed test, never a silent successful skip.
++        browser = await playwright.Chromium.LaunchAsync(new() { Headless = true });
++        context = await browser.NewContextAsync();
++        page = await context.NewPageAsync();
++        page.SetDefaultTimeout(30_000);
++    }
++
++    public async ValueTask DisposeAsync()
++    {
++        if (context is not null) await context.DisposeAsync();
++        if (browser is not null) await browser.DisposeAsync();
++        playwright?.Dispose();
++        if (factory is not null) await factory.DisposeAsync();
++        try { File.Delete(dbPath); } catch (IOException) { }
++    }
++
++    [Fact]
++    public async Task Login_ShowsOnlyActiveAuthorizedSectionsInOrder_WithWatchedMark()
++    {
++        await LoginAsync();
++        var sections = page.Locator("section:has(> h3[id^='genre-'])");
++        await Expect(sections).ToHaveCountAsync(2);
++        await Expect(sections.Locator("h3")).ToHaveTextAsync(["Halloween", "Autumn"]);
++        await Expect(page.GetByText("Secret Film", new() { Exact = true })).ToHaveCountAsync(0);
++        await Expect(page.GetByRole(AriaRole.Heading, new() { Name = "Inactive", Exact = true })).ToHaveCountAsync(0);
++        await Expect(page.GetByRole(AriaRole.Heading, new() { Name = "Empty", Exact = true })).ToHaveCountAsync(0);
++        var film = page.Locator($"#genre-{genreId}").Locator("..").Locator($"a[href='/movie/{filmId}']");
++        await Expect(film).ToBeVisibleAsync();
++        await Expect(film.Locator(".watched-indicator")).ToBeVisibleAsync();
++    }
++
++    [Fact]
++    public async Task SeasonalCards_OpenMatchingMovieCollectionShowAndSingletonTargets()
++    {
++        await LoginAsync();
++        foreach (var target in new[] { $"/movie/{filmId}", $"/moviecollection/{collectionId}", $"/tvshow/{showId}", $"/movie/{singleId}" })
++        {
++            await page.Locator($"#genre-{genreId}").Locator("..").Locator($"a[href='{target}']").ClickAsync();
++            await page.WaitForURLAsync(u => new Uri(u).AbsolutePath == target);
++            await Expect(page.Locator("h1,h2").First).ToBeVisibleAsync();
++            await page.GotoAsync(url + "/");
++            await Expect(page.Locator($"#genre-{genreId}")).ToBeVisibleAsync();
++        }
++    }
++
++    [Fact]
++    public async Task WebUsesAuthenticatedHttpContract_AndAnonymousApiIsUnauthorized()
++    {
++        using var http = new HttpClient { BaseAddress = new Uri(url) };
++        using var unauthorized = await http.GetAsync("/api/home/seasonal-genres", TestContext.Current.CancellationToken);
++        Assert.Equal(HttpStatusCode.Unauthorized, unauthorized.StatusCode);
++        await LoginAsync();
++        Assert.Contains(requests.SuccessfulUsers, x => x == userId);
++        var client = new VideoWebPlayerClient(http, Microsoft.Extensions.Logging.Abstractions.NullLogger<VideoWebPlayerClient>.Instance);
++        http.DefaultRequestHeaders.Add("X-API-Key", "seasonal-test-api-token");
++        await client.AuthenticateAsync(Email, Password);
++        var sections = await client.GetSeasonalGenresAsync(TestContext.Current.CancellationToken);
++        Assert.Equal(2, sections.Count);
++        Assert.Equal(new DateTime(2026, 11, 1, 0, 0, 0, DateTimeKind.Utc), sections[0].ExpiresAt);
++        Assert.Contains(sections[0].Entries, x => x is DtoMovieCollection && x.Id == collectionId);
++        Assert.DoesNotContain(sections.SelectMany(x => x.Entries), x => x.Name == "Secret Film");
++        clock.SetUtc(new(2026, 11, 1, 0, 0, 0, TimeSpan.Zero));
++        Assert.Empty(await client.GetSeasonalGenresAsync(TestContext.Current.CancellationToken));
++    }
++
++    [Fact]
++    public async Task OpenHome_RemovesExpiredSectionsWithoutNavigation_AndReloadStaysEmpty()
++    {
++        await LoginAsync();
++        clock.SetUtc(new(2026, 10, 31, 23, 59, 59, TimeSpan.Zero));
++        await Expect(page.Locator($"#genre-{genreId}")).ToBeVisibleAsync();
++        clock.SetUtc(new(2026, 11, 1, 0, 0, 0, TimeSpan.Zero));
++        await Expect(page.Locator("h3[id^='genre-']")).ToHaveCountAsync(0);
++        await page.ReloadAsync();
++        await Expect(page.Locator("h3[id^='genre-']")).ToHaveCountAsync(0);
++    }
++
++    private async Task LoginAsync()
++    {
++        await page.GotoAsync(url + "/Account/Login?ReturnUrl=%2F");
++        await page.FillAsync("#email", Email);
++        await page.FillAsync("#password", Password);
++        await page.GetByRole(AriaRole.Button, new() { Name = "Log in", Exact = true }).ClickAsync();
++        await Expect(page.Locator($"#genre-{genreId}")).ToBeVisibleAsync();
++        // The first paint may be prerendered; wait for an interactive circuit before timer/navigation assertions.
++        await page.WaitForFunctionAsync("() => document.querySelector('blazor-error-ui') === null && typeof Blazor !== 'undefined'");
++        await page.WaitForTimeoutAsync(1000);
++    }
++
++    private async Task SeedAsync()
++    {
++        using var scope = factory.Services.CreateScope();
++        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
++        await db.Database.EnsureCreatedAsync(TestContext.Current.CancellationToken);
++        var users = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
++        var user = new ApplicationUser { UserName = Email, Email = Email, EmailConfirmed = true };
++        var created = await users.CreateAsync(user, Password);
++        Assert.True(created.Succeeded, string.Join(", ", created.Errors.Select(x => x.Description)));
++        userId = user.Id;
++        var allowed = new MediaSource { Name = "Allowed", Path = "/test", Host = "127.0.0.1", Port = 22 };
++        var denied = new MediaSource { Name = "Denied", Path = "/secret", Host = "127.0.0.1", Port = 22 };
++        db.AddRange(allowed, denied);
++        await db.SaveChangesAsync(TestContext.Current.CancellationToken);
++        db.MediaSourceUsers.Add(new MediaSourceUser { UserId = user.Id, MediaSourceId = allowed.Id });
++        var halloween = new Genre { Name = "Halloween", MediaSourceId = allowed.Id, StartDate = new(2025, 10, 25), EndDate = new(2025, 10, 31) };
++        var autumn = new Genre { Name = "Autumn", MediaSourceId = allowed.Id, StartDate = halloween.StartDate, EndDate = halloween.EndDate };
++        var empty = new Genre { Name = "Empty", MediaSourceId = allowed.Id, StartDate = halloween.StartDate, EndDate = halloween.EndDate };
++        var inactive = new Genre { Name = "Inactive", MediaSourceId = allowed.Id, StartDate = new(2025, 12, 1), EndDate = new(2025, 12, 31) };
++        var multi = new MovieCollection { Name = "Season Collection", MediaSourceId = allowed.Id };
++        var singleton = new MovieCollection { Name = "Singleton collection", MediaSourceId = allowed.Id };
++        db.AddRange(halloween, autumn, empty, inactive, multi, singleton);
++        await db.SaveChangesAsync(TestContext.Current.CancellationToken);
++        genreId = halloween.Id;
++        collectionId = multi.Id;
++        var film = new Movie { Name = "Season Film", MediaSourceId = allowed.Id };
++        var single = new Movie { Name = "Singleton Film", MediaSourceId = allowed.Id, MovieCollectionId = singleton.Id };
++        var member1 = new Movie { Name = "Part One", MediaSourceId = allowed.Id, MovieCollectionId = multi.Id };
++        var member2 = new Movie { Name = "Part Two", MediaSourceId = allowed.Id, MovieCollectionId = multi.Id };
++        var secret = new Movie { Name = "Secret Film", MediaSourceId = denied.Id };
++        var show = new TVShow { Name = "Season Show", MediaSourceId = allowed.Id };
++        db.AddRange(film, single, member1, member2, secret, show);
++        await db.SaveChangesAsync(TestContext.Current.CancellationToken);
++        filmId = film.Id;
++        singleId = single.Id;
++        showId = show.Id;
++        foreach (var movie in new[] { film, single, member1, member2, secret })
++            db.MovieGenres.Add(new MovieGenre { GenreId = halloween.Id, MovieId = movie.Id });
++        db.MovieGenres.Add(new MovieGenre { GenreId = autumn.Id, MovieId = film.Id });
++        db.TVShowGenres.Add(new TVShowGenre { GenreId = halloween.Id, TVShowId = show.Id });
++        db.WatchedEntries.Add(new WatchedEntry { UserId = user.Id, MovieId = film.Id, WatchedAt = new(2026, 10, 25) });
++        await db.SaveChangesAsync(TestContext.Current.CancellationToken);
++    }
++
++    private sealed class SeasonalRequests : IStartupFilter
++    {
++        public ConcurrentBag<string> SuccessfulUsers { get; } = [];
++        public Action<IApplicationBuilder> Configure(Action<IApplicationBuilder> next) => app =>
++        {
++            app.Use(async (context, continuation) =>
++            {
++                await continuation();
++                if (context.Request.Path == "/api/home/seasonal-genres" && context.Response.StatusCode == 200)
++                    SuccessfulUsers.Add(context.User.FindFirstValue(ClaimTypes.NameIdentifier) ?? string.Empty);
++            });
++            next(app);
++        };
++    }
++
++    private sealed class SeasonalClock : TimeProvider
++    {
++        private DateTimeOffset now = new(2026, 10, 31, 12, 0, 0, TimeSpan.Zero);
++        private readonly List<SeasonalTimer> timers = [];
++        public override DateTimeOffset GetUtcNow() { lock (timers) return now; }
++        public void SetUtc(DateTimeOffset value)
++        {
++            SeasonalTimer[] copy;
++            lock (timers) { now = value; copy = timers.ToArray(); }
++            foreach (var timer in copy) timer.FireIfDue(value);
++        }
++        public override ITimer CreateTimer(TimerCallback callback, object? state, TimeSpan dueTime, TimeSpan period)
++        {
++            lock (timers)
++            {
++                var timer = new SeasonalTimer(callback, state, now + dueTime);
++                timers.Add(timer);
++                return timer;
++            }
++        }
++        private sealed class SeasonalTimer(TimerCallback callback, object? state, DateTimeOffset due) : ITimer
++        {
++            private bool disposed;
++            public void FireIfDue(DateTimeOffset now) { if (!disposed && now >= due) { disposed = true; callback(state); } }
++            public bool Change(TimeSpan dueTime, TimeSpan period) => throw new NotSupportedException();
++            public void Dispose() => disposed = true;
++            public ValueTask DisposeAsync() { Dispose(); return ValueTask.CompletedTask; }
++        }
++    }
++}
+diff --git a/VideoWebPlayer.Tests/SeasonalHomeServiceTests.cs b/VideoWebPlayer.Tests/SeasonalHomeServiceTests.cs
+new file mode 100644
+index 0000000..07fa756
+--- /dev/null
++++ b/VideoWebPlayer.Tests/SeasonalHomeServiceTests.cs
+@@ -0,0 +1,95 @@
++using Microsoft.Data.Sqlite;
++using Microsoft.EntityFrameworkCore;
++using System.Text.Json;
++using VideoWebPlayer.Data;
++using VideoWebPlayer.Events;
++using VideoWebPlayer.Services;
++using VideoWebPlayer.Tests.Helpers;
++using Xunit;
++
++namespace VideoWebPlayer.Tests;
++
++public sealed class SeasonalHomeServiceTests
++{
++    [Theory]
++    [InlineData("2026-10-01", false)]
++    [InlineData("2026-10-24", false)]
++    [InlineData("2026-10-25", true)]
++    [InlineData("2026-10-31", true)]
++    [InlineData("2026-11-01", false)]
++    [InlineData("2027-10-25", true)]
++    public void Window_UsesInclusiveUtcDaysAndAnnualRecurrence(string now, bool active)
++    {
++        var expiry = SeasonalGenreWindow.GetExpiry(new(2025, 10, 25), new(2025, 10, 31), DateTime.Parse(now));
++        Assert.Equal(active, expiry.HasValue);
++        if (active)
++        {
++            Assert.Equal(new DateTime(DateTime.Parse(now).Year, 11, 1, 0, 0, 0, DateTimeKind.Utc), expiry);
++            Assert.Equal(DateTimeKind.Utc, expiry!.Value.Kind);
++        }
++    }
++
++    [Fact]
++    public void Window_HandlesYearCrossingMissingAndInvalidBoundaries()
++    {
++        Assert.Equal(new DateTime(2027, 1, 7, 0, 0, 0, DateTimeKind.Utc),
++            SeasonalGenreWindow.GetExpiry(new(2025, 12, 20), new(2026, 1, 6), new(2027, 1, 1)));
++        Assert.Null(SeasonalGenreWindow.GetExpiry(null, new(2026, 10, 31), new(2026, 10, 25)));
++        Assert.Null(SeasonalGenreWindow.GetExpiry(new(2026, 10, 31), null, new(2026, 10, 25)));
++        Assert.Null(SeasonalGenreWindow.GetExpiry(new(2026, 11, 1), new(2026, 10, 31), new(2026, 10, 25)));
++    }
++
++    [Fact]
++    public async Task Service_FiltersSourcesEmptyGenresAndMapsGroupedSortedWatchedMedia()
++    {
++        await using var connection = new SqliteConnection("Data Source=:memory:");
++        await connection.OpenAsync(TestContext.Current.CancellationToken);
++        var options = new DbContextOptionsBuilder<ApplicationDbContext>().UseSqlite(connection).Options;
++        await using var db = new ApplicationDbContext(options, new EventManager());
++        await db.Database.EnsureCreatedAsync(TestContext.Current.CancellationToken);
++        var user = new ApplicationUser { Id = "season-user", UserName = "season-user" };
++        var allowed = new MediaSource { Name = "Allowed" };
++        var denied = new MediaSource { Name = "Denied" };
++        db.AddRange(user, allowed, denied);
++        await db.SaveChangesAsync(TestContext.Current.CancellationToken);
++        db.MediaSourceUsers.Add(new MediaSourceUser { UserId = user.Id, MediaSourceId = allowed.Id });
++        var genre = new Genre { Name = "Halloween", MediaSourceId = allowed.Id, StartDate = new(2025, 10, 25), EndDate = new(2025, 10, 31) };
++        var empty = new Genre { Name = "Empty", MediaSourceId = allowed.Id, StartDate = genre.StartDate, EndDate = genre.EndDate };
++        var inactive = new Genre { Name = "Inactive", MediaSourceId = allowed.Id, StartDate = new(2025, 12, 1), EndDate = new(2025, 12, 31) };
++        var multi = new MovieCollection { Name = "Collection", MediaSourceId = allowed.Id, ReleaseDate = new(2020, 1, 1) };
++        var singleton = new MovieCollection { Name = "Singleton", MediaSourceId = allowed.Id };
++        db.AddRange(genre, empty, inactive, multi, singleton);
++        await db.SaveChangesAsync(TestContext.Current.CancellationToken);
++        var film = new Movie { Name = "Watched", MediaSourceId = allowed.Id, ReleaseDate = new(2024, 1, 1) };
++        var member1 = new Movie { Name = "Member1", MediaSourceId = allowed.Id, MovieCollectionId = multi.Id };
++        var member2 = new Movie { Name = "Member2", MediaSourceId = allowed.Id, MovieCollectionId = multi.Id };
++        var single = new Movie { Name = "Only film", MediaSourceId = allowed.Id, MovieCollectionId = singleton.Id };
++        var hidden = new Movie { Name = "Secret", MediaSourceId = denied.Id };
++        var show = new TVShow { Name = "Show", MediaSourceId = allowed.Id, EndedAt = new(2026, 1, 1) };
++        db.AddRange(film, member1, member2, single, hidden, show);
++        await db.SaveChangesAsync(TestContext.Current.CancellationToken);
++        foreach (var movie in new[] { film, member1, member2, single, hidden })
++            db.MovieGenres.Add(new MovieGenre { GenreId = genre.Id, MovieId = movie.Id });
++        db.TVShowGenres.Add(new TVShowGenre { GenreId = genre.Id, TVShowId = show.Id });
++        db.WatchedEntries.Add(new WatchedEntry { UserId = user.Id, MovieId = film.Id, WatchedAt = new(2026, 10, 25) });
++        await db.SaveChangesAsync(TestContext.Current.CancellationToken);
++        db.ChangeTracker.Clear();
++        var clock = new ManualTimeProvider(new DateTimeOffset(2026, 10, 31, 23, 59, 59, TimeSpan.Zero));
++        var service = new SeasonalHomeService(db, clock, new WatchedStatusService(db));
++        var section = Assert.Single(await service.GetAsync(user.Id, TestContext.Current.CancellationToken));
++        Assert.Equal(genre.Id, section.GenreId);
++        Assert.Equal(new DateTime(2026, 11, 1, 0, 0, 0, DateTimeKind.Utc), section.ExpiresAt);
++        Assert.Equal(new[] { "Show", "Watched", "Collection", "Only film" }, section.Entries.Select(e => e.Name));
++        Assert.IsType<DtoTVShow>(section.Entries[0]);
++        Assert.NotNull(Assert.IsType<DtoMovie>(section.Entries[1]).WatchedAt);
++        Assert.IsType<DtoMovieCollection>(section.Entries[2]);
++        Assert.IsType<DtoMovie>(section.Entries[3]);
++        var json = JsonSerializer.Serialize(section, new JsonSerializerOptions(JsonSerializerDefaults.Web));
++        Assert.Contains("\"expiresAt\":\"2026-11-01T00:00:00Z\"", json);
++        Assert.Contains("\"$type\":\"movieCollection\"", json);
++        Assert.DoesNotContain("Secret", json);
++        Assert.Empty(await service.GetAsync("other-user", TestContext.Current.CancellationToken));
++        clock.Advance(TimeSpan.FromSeconds(1));
++        Assert.Empty(await service.GetAsync(user.Id, TestContext.Current.CancellationToken));
++    }
++}
+diff --git a/VideoWebPlayer/Components/Pages/Movies/MovieCollectionDetails.razor b/VideoWebPlayer/Components/Pages/Movies/MovieCollectionDetails.razor
+index 74a629f..a442bbb 100644
+--- a/VideoWebPlayer/Components/Pages/Movies/MovieCollectionDetails.razor
++++ b/VideoWebPlayer/Components/Pages/Movies/MovieCollectionDetails.razor
+@@ -1,6 +1,7 @@
+ ﻿@using VideoWebPlayer.Client.Models
+ @using VideoWebPlayer.Components.Shared.Media
+ @page "/moviecollection/{Id:long}"
++@page "/movie/{StandaloneMovieId:long}"
+ @using Microsoft.AspNetCore.Components.Web
+ @using Microsoft.AspNetCore.Components.Authorization
+ @inject AuthenticationStateProvider AuthStateProvider
+@@ -23,7 +24,7 @@ else if (selectedMovie != null)
+         <button class="favorite-btn" @onclick="() => ToggleFavorite(selectedMovie)" title="Film als Favorit markieren">
+             @((IsMovieFavorite) ? "★" : "☆")
+         </button>
+-        @if (collection?.Movies?.Length == 1)
++        @if (collection?.Movies?.Length == 1 && collection.Id > 0)
+         {
+             <UnlockButton Entry="collection" IsUnlocked="IsCollectionUnlocked" IsUnlockedChanged="OnCollectionUnlockedChanged" />
+         }
+@@ -163,6 +164,7 @@ else
+ 
+ @code {
+     [Parameter] public long Id { get; set; }
++    [Parameter] public long? StandaloneMovieId { get; set; }
+     [SupplyParameterFromQuery(Name = "movie")] public long? MovieId { get; set; }
+     [Parameter][SupplyParameterFromQuery(Name = "position")] public long? Position { get; set; }
+ 
+@@ -204,7 +206,8 @@ else
+ 
+         try
+         {
+-            collection = await Client.RequestMovieCollectionAsync(Id) as DtoMovieCollection;
++            collection = await LoadCollectionAsync();
++            if (StandaloneMovieId.HasValue) MovieId = StandaloneMovieId;
+             genreOptions = await Client.RequestGenreOptionsAsync();
+         }
+         catch (InvalidOperationException ex) when (ex.Message.Contains("Could not resolve user from principal", StringComparison.Ordinal))
+@@ -475,10 +478,22 @@ else
+         isDirty = false;
+     }
+ 
++    private async Task<DtoMovieCollection?> LoadCollectionAsync()
++    {
++        if (!StandaloneMovieId.HasValue)
++            return await Client.RequestMovieCollectionAsync(Id) as DtoMovieCollection;
++        var movie = await Client.RequestMovieAsync(StandaloneMovieId.Value);
++        if (movie is null) return null;
++        if (movie.Collection is { } parent)
++            return await Client.RequestMovieCollectionAsync(parent.Id) as DtoMovieCollection;
++        // A stand-alone film uses the existing movie detail/player without inventing a persisted collection.
++        return new DtoMovieCollection { Name = movie.Name, Movies = [movie], IsUnlocked = movie.IsUnlocked };
++    }
++
+     private async Task ReloadCollectionAsync()
+     {
+         var movieId = selectedMovie?.Id;
+-        collection = await Client.RequestMovieCollectionAsync(Id) as DtoMovieCollection;
++        collection = await LoadCollectionAsync();
+         if (collection is null)
+             return;
+ 
+diff --git a/VideoWebPlayer/Components/Shared/Home/SeasonalGenreList.razor b/VideoWebPlayer/Components/Shared/Home/SeasonalGenreList.razor
+index 1b86ee9..10451d4 100644
+--- a/VideoWebPlayer/Components/Shared/Home/SeasonalGenreList.razor
++++ b/VideoWebPlayer/Components/Shared/Home/SeasonalGenreList.razor
+@@ -1,124 +1,96 @@
+-@using Microsoft.EntityFrameworkCore
+-@using VideoWebPlayer.Data
+-@using VideoWebPlayer.Services
+-@inject ApplicationDbContext DbContext
+-@inject IGenreService GenreService
++@using VideoWebPlayer.Client.Models
++@rendermode InteractiveServer
++@implements IDisposable
+ @inject VideoWebPlayer.Client.VideoWebPlayerClient Client
+-@inject AuthenticationStateProvider AuthStateProvider;
++@inject AuthenticationStateProvider AuthStateProvider
++@inject TimeProvider Clock
++@inject ILogger<SeasonalGenreList> Logger
+ 
+ <div>
+-    @if (activeGenres.Any())
++    @foreach (var genre in sections)
+     {
+-        @foreach (var genre in activeGenres)
+-        {
+-            var entries = new List<MediaBaseEntry>();
+-            if (mediaEntriesByGenre.TryGetValue(genre.Id, out var list))
+-                entries = list;
+-
+-            if (entries.Any())
+-            {
+-                <section class="media-section" aria-labelledby="@($"genre-{genre.Id}")">
+-                    <h3 id="@($"genre-{genre.Id}")">@genre.Name</h3>
+-                    <MediaBaseEntryList Entries="entries" AuthorizationToken="@authToken" WatchedAtByEntryKey="watchedAtByEntryKey" />
+-                </section>
+-            }
+-        }
++        <section class="media-section" aria-labelledby="@($"genre-{genre.GenreId}")" @key="genre.GenreId">
++            <h3 id="@($"genre-{genre.GenreId}")">@genre.Name</h3>
++            <div class="seasonal-genre-list">
++                @foreach (var entry in genre.Entries)
++                {
++                    <MediaBox Title="@entry.Name" ImageUrl="@GetImageUrl(entry)"
++                              LinkUrl="@GetLinkUrl(entry)" WatchedAt="@entry.WatchedAt" />
++                }
++            </div>
++        </section>
+     }
+ </div>
+ 
+ @code {
+-    private string? userId;
++    private List<DtoSeasonalGenre> sections = [];
+     private string? authToken;
+-    private List<Genre> activeGenres = new();
+-    private Dictionary<long, List<MediaBaseEntry>> mediaEntriesByGenre = new();
+-    private Dictionary<string, DateTime> watchedAtByEntryKey = new();
++    private ITimer? expiryTimer;
++    private bool disposed;
+ 
+     protected override async Task OnInitializedAsync()
+     {
+-        activeGenres = await GenreService.GetSeasonalGenresAsync();
+-
+         var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+-        userId = authState.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+-        authToken = Client.AuthorizationToken;
+-
+-        // Für jedes Genre die zugehörigen Filme und Serien laden
+-        foreach (var genre in activeGenres)
++        await Client.EnsureAuthorizationTokenAsync(authState.User);
++        try
+         {
+-            var entries = new List<MediaBaseEntry>();
+-
+-            // Filme laden
+-            var movieIds = await DbContext.MovieGenres
+-                .Where(mg => mg.GenreId == genre.Id)
+-                .Select(mg => mg.MovieId)
+-                .ToListAsync();
+-
+-            var movies = await DbContext.Movies
+-                .Where(m => movieIds.Contains(m.Id) &&
+-                            DbContext.MediaSourceUsers.Any(msu => msu.MediaSourceId == m.MediaSourceId && msu.UserId == userId))
+-                .Include(m => m.MovieCollection)
+-                .ToListAsync();
+-
+-            // Sammlungen nur einmal aufnehmen
+-            var collectionIds = movies
+-                .Where(m => m.MovieCollectionId != null)
+-                .Select(m => m.MovieCollectionId.Value)
+-                .Distinct()
+-                .ToList();
++            sections = await Client.GetSeasonalGenresAsync();
++            authToken = Client.AuthorizationToken;
++            RemoveExpiredAndSchedule();
++        }
++        catch (HttpRequestException ex)
++        {
++            Logger.LogWarning(ex, "Could not load seasonal home sections.");
++        }
++    }
+ 
+-            var collections = await DbContext.MovieCollections.Include(c => c.Movies)
+-                .Where(mc => collectionIds.Contains(mc.Id) &&
+-                             DbContext.MediaSourceUsers.Any(msu => msu.MediaSourceId == mc.MediaSourceId && msu.UserId == userId))
+-                .ToListAsync();
++    private void RemoveExpiredAndSchedule()
++    {
++        expiryTimer?.Dispose();
++        expiryTimer = null;
++        var now = Clock.GetUtcNow().UtcDateTime;
++        sections.RemoveAll(x => x.ExpiresAt <= now || x.Entries.Count == 0);
++        if (!disposed && sections.Count > 0)
++        {
++            var delay = sections.Min(x => x.ExpiresAt) - now;
++            // System timers support at most about 49 days; longer seasons are rechecked daily.
++            if (delay > TimeSpan.FromDays(1)) delay = TimeSpan.FromDays(1);
++            expiryTimer = Clock.CreateTimer(_ => _ = ExpireAsync(), null, delay, Timeout.InfiniteTimeSpan);
++        }
++    }
+ 
+-            entries.AddRange(collections.Select(c =>
++    private async Task ExpireAsync()
++    {
++        if (disposed) return;
++        try
++        {
++            await InvokeAsync(() =>
+             {
+-                if (c.Movies.Count == 1)
+-                    return c.Movies.First() as MediaBaseEntry;
+-                return c;
+-            }));
+-
+-            // Einzelne Filme ohne Sammlung
+-            var singleMovies = movies
+-                .Where(m => m.MovieCollectionId == null)
+-                .ToList();
+-
+-            entries.AddRange(singleMovies);
+-
+-            // Serien wie gehabt
+-            var showIds = await DbContext.TVShowGenres
+-                .Where(tg => tg.GenreId == genre.Id)
+-                .Select(tg => tg.TVShowId)
+-                .ToListAsync();
+-
+-            var shows = await DbContext.TVShows
+-                .Where(s => showIds.Contains(s.Id) &&
+-                            DbContext.MediaSourceUsers.Any(msu => msu.MediaSourceId == s.MediaSourceId && msu.UserId == userId))
+-                .ToListAsync();
+-
+-            entries.AddRange(shows);
+-
+-            mediaEntriesByGenre[genre.Id] = entries
+-                .OrderByDescending(e => e.EndedAt)
+-                .ThenByDescending(e => e.ReleaseDate)
+-                .ThenByDescending(e => e.PremieredAt)
+-                .ThenByDescending(e => e.CreatedAt)
+-                .ThenBy(e => e.Name)
+-                .ToList();
++                if (disposed) return;
++                RemoveExpiredAndSchedule();
++                StateHasChanged();
++            });
+         }
++        catch (ObjectDisposedException) when (disposed) { }
++    }
+ 
+-        if (!string.IsNullOrWhiteSpace(userId))
+-        {
+-            var movieIds = mediaEntriesByGenre.Values
+-                .SelectMany(x => x)
+-                .OfType<Movie>()
+-                .Select(x => x.Id)
+-                .Distinct()
+-                .ToArray();
++    private string GetImageUrl(DtoMediaEntry entry)
++    {
++        var picture = entry.PosterPictureId ?? entry.BannerPictureId ?? entry.FanartPictureId;
++        return picture.HasValue ? $"/api/pictures/{picture}?access_token={authToken}" : "/images/placeholder.png";
++    }
+ 
+-            watchedAtByEntryKey = await DbContext.WatchedEntries
+-                .AsNoTracking()
+-                .Where(x => x.UserId == userId && x.MovieId.HasValue && movieIds.Contains(x.MovieId.Value))
+-                .ToDictionaryAsync(x => $"{nameof(Movie)}:{x.MovieId!.Value}", x => x.WatchedAt);
+-        }
++    private static string GetLinkUrl(DtoMediaEntry entry) => entry switch
++    {
++        DtoMovie => $"/movie/{entry.Id}",
++        DtoMovieCollection => $"/moviecollection/{entry.Id}",
++        DtoTVShow => $"/tvshow/{entry.Id}",
++        _ => throw new InvalidOperationException("Unsupported seasonal media type.")
++    };
++
++    public void Dispose()
++    {
++        disposed = true;
++        expiryTimer?.Dispose();
+     }
+ }
+diff --git a/VideoWebPlayer/Controllers/HomeController.cs b/VideoWebPlayer/Controllers/HomeController.cs
+new file mode 100644
+index 0000000..e9212b4
+--- /dev/null
++++ b/VideoWebPlayer/Controllers/HomeController.cs
+@@ -0,0 +1,31 @@
++using Microsoft.AspNetCore.Mvc;
++using VideoWebPlayer.Client.Models;
++using VideoWebPlayer.Services;
++using VideoWebPlayer.Services.Authentication;
++
++namespace VideoWebPlayer.Controllers;
++
++/// <summary>Exposes server-selected home sections to authenticated clients.</summary>
++[ApiController]
++[Route("api/home")]
++[BearerTokenCheck]
++public sealed class HomeController(SeasonalHomeService seasonalHome, IAuthService authService, ILogger<HomeController> logger)
++    : ApiBaseController(authService, logger)
++{
++    /// <summary>Returns active seasonal genres with authorized media and server expiry.</summary>
++    /// <param name="cancellationToken">Cancels the request.</param>
++    /// <returns>Nonempty sections, or an empty array when no season is active.</returns>
++    [HttpGet("seasonal-genres")]
++    public async Task<ActionResult<List<DtoSeasonalGenre>>> GetSeasonalGenres(CancellationToken cancellationToken)
++    {
++        try
++        {
++            CheckLoggedIn();
++            return Ok(await seasonalHome.GetAsync(CurrentUser!.Id, cancellationToken));
++        }
++        catch (UnauthorizedAccessException)
++        {
++            return Unauthorized();
++        }
++    }
++}
+diff --git a/VideoWebPlayer/Extensions/ServiceCollectionExtensions.cs b/VideoWebPlayer/Extensions/ServiceCollectionExtensions.cs
+index 0edd431..65e74f5 100644
+--- a/VideoWebPlayer/Extensions/ServiceCollectionExtensions.cs
++++ b/VideoWebPlayer/Extensions/ServiceCollectionExtensions.cs
+@@ -267,6 +267,7 @@ public static class ServiceCollectionExtensions
+         services.AddScoped<VideoWebPlayer.Services.PlaylistCover.PlaylistCoverImageGenerator>();
+         services.AddScoped<IUnlockedMediaService, UnlockedMediaService>();
+         services.AddScoped<IGenreService, GenreService>();
++        services.AddScoped<SeasonalHomeService>();
+         services.AddScoped<SftpMediaSourceReader>();
+         services.AddScoped<LocalMediaSourceReader>();
+         services.AddScoped<IMediaSourceReader, MediaSourceReaderDispatcher>();
+diff --git a/VideoWebPlayer/Services/GenreService.cs b/VideoWebPlayer/Services/GenreService.cs
+index f2b6ee1..deac535 100644
+--- a/VideoWebPlayer/Services/GenreService.cs
++++ b/VideoWebPlayer/Services/GenreService.cs
+@@ -14,14 +14,17 @@ namespace VideoWebPlayer.Services;
+ public sealed class GenreService : IGenreService
+ {
+     private readonly ApplicationDbContext _db;
++    private readonly TimeProvider _clock;
+ 
+     /// <summary>
+     /// Initializes a new instance of the <see cref="GenreService"/> class.
+     /// </summary>
+     /// <param name="db">Database context.</param>
+-    public GenreService(ApplicationDbContext db)
++    /// <param name="clock">The server clock.</param>
++    public GenreService(ApplicationDbContext db, TimeProvider? clock = null)
+     {
+         _db = db;
++        _clock = clock ?? TimeProvider.System;
+     }
+ 
+     /// <inheritdoc />
+@@ -38,31 +41,8 @@ public sealed class GenreService : IGenreService
+     /// <inheritdoc />
+     public async Task<List<Genre>> GetSeasonalGenresAsync(CancellationToken cancellationToken = default)
+     {
+-        var now = DateTime.UtcNow.Date;
+-        var genres = await _db.Genres
+-            .AsNoTracking()
+-            .ToListAsync(cancellationToken);
+-
+-        var active = new List<Genre>();
+-
+-        foreach (var genre in genres)
+-        {
+-            if (genre.StartDate == null || genre.EndDate == null)
+-                continue;
+-
+-            var start = genre.StartDate.Value;
+-            var end = genre.EndDate.Value;
+-
+-            while (end < now)
+-            {
+-                start = start.AddYears(1);
+-                end = end.AddYears(1);
+-            }
+-
+-            if (start <= now && end >= now)
+-                active.Add(genre);
+-        }
+-
+-        return active;
++        var now = _clock.GetUtcNow().UtcDateTime;
++        var genres = await _db.Genres.AsNoTracking().ToListAsync(cancellationToken);
++        return genres.Where(g => SeasonalGenreWindow.GetExpiry(g.StartDate, g.EndDate, now).HasValue).ToList();
+     }
+ }
+diff --git a/VideoWebPlayer/Services/SeasonalGenreWindow.cs b/VideoWebPlayer/Services/SeasonalGenreWindow.cs
+new file mode 100644
+index 0000000..6d5b5fe
+--- /dev/null
++++ b/VideoWebPlayer/Services/SeasonalGenreWindow.cs
+@@ -0,0 +1,30 @@
++namespace VideoWebPlayer.Services;
++
++/// <summary>Evaluates annually recurring, inclusive UTC date windows.</summary>
++public static class SeasonalGenreWindow
++{
++    /// <summary>Gets the exclusive expiry of the currently active window.</summary>
++    /// <param name="startDate">The configured inclusive first day.</param>
++    /// <param name="endDate">The configured inclusive last day.</param>
++    /// <param name="nowUtc">The server's current UTC date/time.</param>
++    /// <returns>The exclusive UTC expiry, or null for an inactive or invalid window.</returns>
++    public static DateTime? GetExpiry(DateTime? startDate, DateTime? endDate, DateTime nowUtc)
++    {
++        if (startDate is null || endDate is null)
++            return null;
++        var start = startDate.Value.Date;
++        var end = endDate.Value.Date;
++        if (end < start)
++            return null;
++        while (end < nowUtc.Date)
++        {
++            if (end.Year == 9999 || start.Year == 9999)
++                return null;
++            start = start.AddYears(1);
++            end = end.AddYears(1);
++        }
++        if (start > nowUtc.Date || end == DateTime.MaxValue.Date)
++            return null;
++        return DateTime.SpecifyKind(end.AddDays(1), DateTimeKind.Utc);
++    }
++}
+diff --git a/VideoWebPlayer/Services/SeasonalHomeService.cs b/VideoWebPlayer/Services/SeasonalHomeService.cs
+new file mode 100644
+index 0000000..298843a
+--- /dev/null
++++ b/VideoWebPlayer/Services/SeasonalHomeService.cs
+@@ -0,0 +1,80 @@
++using Microsoft.EntityFrameworkCore;
++using VideoWebPlayer.Client.Models;
++using VideoWebPlayer.Data;
++
++namespace VideoWebPlayer.Services;
++
++/// <summary>Builds authorized seasonal cards for both web and mobile clients.</summary>
++public sealed class SeasonalHomeService(ApplicationDbContext db, TimeProvider clock, WatchedStatusService watchedStatus)
++{
++    /// <summary>Loads nonempty active sections without exposing other users' sources.</summary>
++    /// <param name="userId">The authenticated user identifier.</param>
++    /// <param name="cancellationToken">Cancels database access.</param>
++    /// <returns>Ordered genre sections with exclusive UTC expiry.</returns>
++    public async Task<List<DtoSeasonalGenre>> GetAsync(string userId, CancellationToken cancellationToken = default)
++    {
++        ArgumentException.ThrowIfNullOrWhiteSpace(userId);
++        var now = clock.GetUtcNow().UtcDateTime;
++        var sources = await db.MediaSourceUsers.AsNoTracking().Where(x => x.UserId == userId)
++            .Select(x => x.MediaSourceId).ToArrayAsync(cancellationToken);
++        var genres = await db.Genres.AsNoTracking().OrderBy(x => x.Id).ToListAsync(cancellationToken);
++        var result = new List<DtoSeasonalGenre>();
++        foreach (var genre in genres)
++        {
++            var expiry = SeasonalGenreWindow.GetExpiry(genre.StartDate, genre.EndDate, now);
++            if (expiry is null)
++                continue;
++            var movies = await db.Movies.AsNoTracking()
++                .Where(m => sources.Contains(m.MediaSourceId) && db.MovieGenres.Any(g => g.GenreId == genre.Id && g.MovieId == m.Id))
++                .Include(m => m.MovieCollection).ToListAsync(cancellationToken);
++            var collectionIds = movies.Where(m => m.MovieCollectionId.HasValue).Select(m => m.MovieCollectionId!.Value).Distinct().ToArray();
++            var collections = await db.MovieCollections.AsNoTracking()
++                .Where(c => collectionIds.Contains(c.Id) && sources.Contains(c.MediaSourceId))
++                .Include(c => c.Movies.Where(m => sources.Contains(m.MediaSourceId))).ToListAsync(cancellationToken);
++            var entries = new List<MediaBaseEntry>();
++            entries.AddRange(collections.Select(c => c.Movies.Count == 1 ? (MediaBaseEntry)c.Movies.First() : c));
++            entries.AddRange(movies.Where(m => m.MovieCollectionId is null));
++            entries.AddRange(await db.TVShows.AsNoTracking()
++                .Where(s => sources.Contains(s.MediaSourceId) && db.TVShowGenres.Any(g => g.GenreId == genre.Id && g.TVShowId == s.Id))
++                .ToListAsync(cancellationToken));
++            if (entries.Count == 0)
++                continue;
++            result.Add(new DtoSeasonalGenre
++            {
++                GenreId = genre.Id,
++                Name = genre.Name,
++                ExpiresAt = expiry.Value,
++                Entries = entries.OrderByDescending(e => e.EndedAt).ThenByDescending(e => e.ReleaseDate)
++                    .ThenByDescending(e => e.PremieredAt).ThenByDescending(e => e.CreatedAt).ThenBy(e => e.Name)
++                    .Select(e => Map(e, sources)).ToList()
++            });
++        }
++        await watchedStatus.EnrichAsync(userId, result.SelectMany(x => x.Entries), cancellationToken);
++        return result;
++    }
++
++    private static DtoMediaEntry Map(MediaBaseEntry entry, long[] sources)
++    {
++        DtoMediaEntry dto = entry switch
++        {
++            Movie movie => new DtoMovie
++            {
++                Collection = movie.MovieCollection is { } collection && sources.Contains(collection.MediaSourceId)
++                    ? (DtoMovieCollection)Map(collection, sources) : null
++            },
++            MovieCollection => new DtoMovieCollection(),
++            TVShow => new DtoTVShow(),
++            _ => throw new InvalidOperationException("Unsupported seasonal media type.")
++        };
++        dto.Id = entry.Id;
++        dto.Name = entry.Name;
++        dto.MediaSourceId = entry.MediaSourceId;
++        dto.ReleaseDate = entry.ReleaseDate;
++        dto.PremieredAt = entry.PremieredAt;
++        dto.EndedAt = entry.EndedAt;
++        dto.PosterPictureId = entry.PosterPictureId;
++        dto.BannerPictureId = entry.BannerPictureId;
++        dto.FanartPictureId = entry.FanartPictureId;
++        return dto;
++    }
++}
+diff --git a/docs/RELEASE_NOTES.md b/docs/RELEASE_NOTES.md
+index 6be3892..871a815 100644
+--- a/docs/RELEASE_NOTES.md
++++ b/docs/RELEASE_NOTES.md
+@@ -2,6 +2,7 @@
+ 
+ ## Important Notes Before Update
+ 
++- Seasonal home lists API: deploy this server release before rolling out a mobile app version that requests `GET /api/home/seasonal-genres`. The web home page also uses this authenticated endpoint.
+ - TV-Sender clip groups: placeholder clips can now be managed in named groups (new tables `ProgramClipGroups`, `ProgramClipGroupItems`, `ProgramRuleClipGroups`) — the new „Clip-Gruppen" tab on the TV-Sender administration page creates, renames and deletes groups and assigns or removes member clips (unclassified video files only, i.e. files without a movie/episode link; a file classified later drops out of rotation automatically). In the rule editor a non-filler rule with a slot duration selects any number of groups plus a per-rule grace period „Karenzzeit" (new non-nullable column `ProgramRules.PlaceholderGrace`, default 15 minutes): once the time left until the period end drops below the grace, no further title starts and the rest is shared evenly across clips of the assigned groups — before the first title, between titles and after the last, round-robin over the groups (the last clip may overshoot the period end; clips never reach into occupied or reserved higher-priority windows). A reserved system group „Trailer“ — seeded with Id 1 by migration `AddProgramClipGroups` (applied automatically), not editable and its name reserved for user groups too — supplies trailers whose movie airs within `ProgramSchedule:TrailerLeadDays`, so a trailer clip slot shows its movie in the program guide. Rules without any clip group behave exactly as before. Backups from older versions restore fine: the new tables and the column are optional during restore, and a missing `PlaceholderGrace` column is injected with the 15-minute default. See `docs/help/tv-sender.md`.
+ - TV-Sender release switch: the automated TV channel is now off by default and must be explicitly released by an administrator via „Einrichtung → Allgemein → Automatisierten TV-Sender freischalten" (new column `Setups.TvSenderEnabled`, migration `AddSetupTvSenderEnabled`, applied automatically; restores default to `false`). While unreleased, the „Live-TV" navigation entry is hidden, `/live-tv` and `/admin/tv-sender` show a hint, `/api/program-guide/*` and `/api/live-stream/*` answer 404, and the schedule/segmentation/duration-probe workers idle. **Update note:** previously installed instances keep the sender *disabled* until released — enable it once under „Allgemein". Also in this change: genre-rule strand order is now a deterministic hash mix per rule instead of alphabetical (no more permanent „A"-show lead), and the Live-TV „Die nächsten Stunden" list keeps refreshing even when the now/next endpoint is down (poll starts only on the interactive instance — no prerender timer leak). See `docs/help/tv-sender.md`.
+ - TV-Sender rule features: genre rules with several series now interleave the shows inside their window instead of stripping one series per day — each show keeps its slot position across days and continues its own episode order, with an independent persisted continuation cursor per series (new nullable column `ProgramRuleCursors.StrandKey`, migration `AddProgramRuleCursorStrandKey`, applied automatically; backups from older versions restore fine because the column is optional during restore and restores to `null` = single rule cursor as before). Two new recurrence modes join the rule editor — „Werktags (Mo–Fr)" and „Wochenende (Sa+So)" — and the rule editor opens as an overlay panel above the rule list again, closable via the dimmed background like the other dialogs. See `docs/help/tv-sender.md`.
+@@ -25,6 +26,7 @@
+ 
+ ## What's New
+ 
++- Seasonal home genre lists: the web home page now loads active, non-empty sections through the authenticated `GET /api/home/seasonal-genres` API also used by the mobile app. The response includes only media visible to the signed-in user and an exclusive UTC `expiresAt` for each season; the web page removes expired sections automatically while it remains open. Deploy this server before the companion app update. See [API documentation](api/seasonal-genres.md) and [user help](help/saisonale-startseitenlisten.md).
+ - TV-Sender: missing ffmpeg/ffprobe binaries can now be installed directly from the TV-Sender settings — the „ffprobe wurde nicht gefunden" warning in the „Laufzeitermittlung" tab and the „ffmpeg wurde nicht gefunden" warning on the segmentation card each carry a download button. A confirmation dialog first notes the GPL licence of the usual static ffmpeg builds; the download then fetches the static package matching the runtime platform (win-x64/linux-x64), extracts `ffmpeg` and `ffprobe` into `tools/ffmpeg/` next to the application — the convention directory both locators already search, which survives update overlays — and shows progress and understandable errors on the way. After the download the locators resolve the binaries without a restart, so the paused duration probe and live stream pick up on their next worker cycle. The action is administrator-only, enforced server-side, and a running download blocks further starts. The alternative paths `MediaProbe:FfprobePath`/`MediaProbe:FfmpegPath`, `tools/ffmpeg/` and `PATH` stay unchanged, and the download sources can be overridden via the new optional `MediaProbe:DownloadSources` configuration (defaults point to the static builds linked from ffmpeg.org). Implemented with the new `SharpCompress` package (MIT licence). See `docs/help/tv-sender.md`.
+ - TV-Sender live stream, fixed: expired HLS `.ts` segments could not be deleted under Windows while a viewer was still downloading them — the `FileShare.Read` handle opened internally by `PhysicalFile` blocked the delete, which could interrupt ffmpeg's rolling-window cleanup and the segment retention sweep. Segment delivery now opens the file allowing parallel writes and deletion (`FileShare.ReadWrite | FileShare.Delete`): an in-flight download runs to completion even after the file is already gone. Segment answers deliberately no longer carry `Last-Modified`/`ETag` validators — the segment names are unique and timestamped and their content never changes, so conditional requests never applied anyway (Issue #265). See `docs/help/tv-sender.md`.
+ - TV-Sender: the internal, token-secured media-stream endpoint `GET /api/internal/media-stream/{token}` now follows the global release switch `TvSenderEnabled` like every other TV-channel endpoint — while the feature is unreleased it answers 404 (checked before the token is resolved, so the feature stays indistinguishable from „does not exist"), even for requests carrying a still-valid token. The endpoint serves the ffprobe HTTP path of the duration probe and the ffmpeg input of the live-stream segmenter; with the feature switched off, new requests — among them the follow-up/range requests of a probing ffprobe and new connections — answer 404, and when the endpoint answers an ffmpeg call with 404 that exit is recorded as an HTTP transport failure, so the next segmenter start on the same slot falls back to `pipe:0` input — consistent with all other gates. See `docs/help/tv-sender.md`.
+@@ -117,6 +119,7 @@
+ 
+ ## Wichtige Hinweise vor dem Update
+ 
++- Saisonlisten-API: Diesen Serverstand bereitstellen, bevor eine mobile App-Version ausgerollt wird, die `GET /api/home/seasonal-genres` abruft. Auch die Webstartseite verwendet diesen authentifizierten Endpunkt.
+ - TV-Sender-Clip-Gruppen: Platzhalter-Clips lassen sich jetzt in benannten Gruppen verwalten (neue Tabellen `ProgramClipGroups`, `ProgramClipGroupItems`, `ProgramRuleClipGroups`) — der neue Tab „Clip-Gruppen" auf der TV-Sender-Verwaltungsseite legt Gruppen an, benennt sie um, löscht sie und ordnet Mitglieds-Clips zu bzw. entfernt sie (ausschließlich uneingeordnete Videodateien — ohne Film-/Episoden-Bezug; eine später eingeordnete Datei fällt automatisch aus der Rotation). Im Regel-Editor wählt eine Regel, deren Regelart nicht „Platzhalter/Füller" ist und die eine Sendeplatz-Länge trägt, beliebig viele Gruppen sowie eine regel-eigene Karenzzeit (neue non-nullable Spalte `ProgramRules.PlaceholderGrace`, Standard 15 Minuten): Bleibt bis zum Periodenende weniger als die Karenzzeit frei, startet kein weiterer Titel und die Restzeit wird gleichmäßig auf Clips der zugeordneten Gruppen verteilt — vor dem ersten Titel, zwischen den Titeln und nach dem letzten, im Wechsel über die Gruppen (der letzte Clip darf über das Periodenende ragen; in belegte oder reservierte Fenster höherpriorer Regeln ragen Clips nie). Die reservierte System-Gruppe „Trailer" — per Migration `AddProgramClipGroups` mit Id 1 angelegt (wird automatisch angewendet), nicht bearbeitbar, ihr Name auch für eigene Gruppen reserviert — liefert Trailer, deren Film innerhalb des Vorlaufs `ProgramSchedule:TrailerLeadDays` läuft; ein Trailer-Clip-Sendeplatz zeigt seinen Film in der Programmauskunft. Regeln ohne Clip-Gruppe verhalten sich exakt wie bisher. Backups älterer Versionen bleiben wiederherstellbar: Die neuen Tabellen und die Spalte sind beim Restore optional, und eine fehlende `PlaceholderGrace`-Spalte wird mit dem 15-Minuten-Standard ergänzt. Siehe `docs/help/tv-sender.md`.
+ - TV-Sender-Freischaltung: Der automatisierte TV-Sender ist jetzt standardmäßig ausgeschaltet und muss von einem Administrator über „Einrichtung → Allgemein → Automatisierten TV-Sender freischalten" ausdrücklich freigegeben werden (neue Spalte `Setups.TvSenderEnabled`, Migration `AddSetupTvSenderEnabled`, wird automatisch angewendet; beim Restore Standard `false`). Solange nicht freigegeben, ist der „Live-TV"-Navigationseintrag ausgeblendet, `/live-tv` und `/admin/tv-sender` zeigen einen Hinweis, `/api/program-guide/*` und `/api/live-stream/*` antworten 404, und die Sendeplan-/Segmentierungs-/Laufzeit-Worker ruhen. **Update-Hinweis:** Bestandsinstallationen behalten den Sender *deaktiviert*, bis er freigegeben wird — einmalig unter „Allgemein" aktivieren. Ebenfalls in dieser Änderung: Die Strangreihenfolge von Genre-Regeln ist jetzt ein deterministischer Hash-Mix je Regel statt alphabetisch (keine permanente „A"-Serie mehr vorn), und die Live-TV-Liste „Die nächsten Stunden" aktualisiert sich weiter, auch wenn der now/next-Endpunkt ausfällt (der Poll startet erst auf der interaktiven Instanz — kein Prerender-Timer-Leck). Siehe `docs/help/tv-sender.md`.
+ - TV-Sender-Regelfunktionen: Genre-Regeln mit mehreren Serien verschachteln die Sendungen jetzt innerhalb ihres Fensters, statt pro Tag eine Serie herauszustreichen — jede Sendung behält ihre Slot-Position über Tage hinweg und setzt ihre eigene Episodenreihenfolge mit einem eigenen persistierten Fortsetzungscursor je Serie fort (neue nullable Spalte `ProgramRuleCursors.StrandKey`, Migration `AddProgramRuleCursorStrandKey`, wird automatisch angewendet; Backups älterer Versionen bleiben wiederherstellbar, weil die Spalte beim Restore optional ist und zu `null` = ein Regel-Cursor wie bisher restauriert). Zwei neue Wiederholungsmodi kommen in den Regel-Editor — „Werktags (Mo–Fr)" und „Wochenende (Sa+So)" — und der Regel-Editor öffnet wieder als Overlay-Panel über der Regelliste, über den abgedunkelten Hintergrund schließbar wie die anderen Dialoge. Siehe `docs/help/tv-sender.md`.
+@@ -140,6 +143,7 @@
+ 
+ ## Neuerungen
+ 
++- Saisonale Genre-Listen auf der Startseite: Die Webansicht lädt aktive, nichtleere Sektionen jetzt über den authentifizierten Endpunkt `GET /api/home/seasonal-genres`, den auch die mobile App verwendet. Die Antwort enthält nur Medien, die für den angemeldeten Benutzer sichtbar sind, sowie je Saison einen exklusiven UTC-Ablaufzeitpunkt (`expiresAt`). Die Webansicht entfernt abgelaufene Sektionen automatisch, auch wenn die Startseite geöffnet bleibt. Diesen Server vor der zugehörigen App-Aktualisierung bereitstellen. Siehe [API-Dokumentation](api/seasonal-genres.md) und [Anwenderhilfe](help/saisonale-startseitenlisten.md).
+ - TV-Sender: Fehlende ffmpeg/ffprobe-Binaries lassen sich jetzt direkt aus den TV-Sender-Einstellungen nachinstallieren — der Hinweis „ffprobe wurde nicht gefunden" im Tab „Laufzeitermittlung" und der Hinweis „ffmpeg wurde nicht gefunden" auf der Segmentierungs-Karte tragen je eine Download-Schaltfläche. Ein Bestätigungsdialog weist zunächst auf die GPL-Lizenz der üblichen statischen ffmpeg-Builds hin; der Download lädt dann das zur Laufzeitplattform passende statische Paket (win-x64/linux-x64), legt `ffmpeg` und `ffprobe` nach `tools/ffmpeg/` neben der Anwendung ab — dem Konventionsverzeichnis beider Locators, das Update-Overlays übersteht — und zeigt unterwegs Fortschritt und verständliche Fehler. Nach dem Download finden die Locators die Binaries ohne Neustart, sodass die pausierte Laufzeitermittlung und der Live-Stream im nächsten Worker-Takt anlaufen. Die Aktion ist nur für Administratoren, serverseitig erzwungen; ein laufender Download sperrt weitere Starts. Die Alternativpfade `MediaProbe:FfprobePath`/`MediaProbe:FfmpegPath`, `tools/ffmpeg/` und `PATH` bleiben unverändert; die Download-Quellen sind über die neue optionale Konfiguration `MediaProbe:DownloadSources` überschreibbar (Defaults: die von ffmpeg.org verlinkten statischen Builds). Umgesetzt mit dem neuen Paket `SharpCompress` (MIT-Lizenz). Siehe `docs/help/tv-sender.md`.
+ - TV-Sender-Livestream, behoben: Abgelaufene HLS-`.ts`-Segmente ließen sich unter Windows nicht löschen, solange ein Zuschauer sie noch lud — das intern von `PhysicalFile` geöffnete `FileShare.Read`-Handle blockierte das Löschen, was die Aufräumung des rollierenden Fensters durch `ffmpeg` und die Segment-Aufbewahrung abbrechen konnte. Die Segment-Auslieferung öffnet die Datei jetzt so, dass paralleles Schreiben und Löschen erlaubt ist (`FileShare.ReadWrite | FileShare.Delete`): Ein laufender Download läuft vollständig zu Ende, auch wenn die Datei bereits weg ist. Segment-Antworten tragen bewusst keine `Last-Modified`-/`ETag`-Prüfmarken mehr — die Segmentnamen sind eindeutig und zeitgestempelt, ihr Inhalt ändert sich nie, sodass bedingte Abrufe ohnehin nie griffen (Issue #265). Siehe `docs/help/tv-sender.md`.
+ - TV-Sender: Der interne, token-gesicherte Media-Stream-Endpunkt `GET /api/internal/media-stream/{token}` folgt jetzt dem globalen Freischalteschalter `TvSenderEnabled` wie alle übrigen TV-Sender-Endpunkte — solange das Feature nicht freigegeben ist, antwortet er 404 (geprüft vor der Token-Auflösung, sodass das Feature von „existiert nicht" ununterscheidbar bleibt), selbst für Anfragen mit noch gültigem Token. Der Endpunkt bedient den ffprobe-HTTP-Pfad der Laufzeitermittlung und die ffmpeg-Eingabe des Live-Stream-Segmentierers; ist das Feature abgeschaltet, erhalten neue Anfragen — darunter Folge-/Range-Requests eines laufenden ffprobe-Aufrufs sowie Neuverbindungen — 404; antwortet der Endpunkt einem ffmpeg-Aufruf mit 404, wird der Exit als HTTP-Transportfehler verbucht und der nächste Segmentierer-Start auf demselben Slot fällt auf `pipe:0`-Eingabe zurück — konsistent zu allen übrigen Gates. Siehe `docs/help/tv-sender.md`.
+diff --git a/docs/api/seasonal-genres.md b/docs/api/seasonal-genres.md
+new file mode 100644
+index 0000000..97fe5d0
+--- /dev/null
++++ b/docs/api/seasonal-genres.md
+@@ -0,0 +1,61 @@
++# Saisonale Startseitenlisten
++
++`GET /api/home/seasonal-genres` benötigt einen gültigen Benutzer-Bearer-Token.
++Web und mobile App verwenden denselben Vertrag; nicht angemeldete Aufrufe erhalten 401.
++
++Die Antwort ist ein Array geordneter Sektionen:
++
++```json
++[
++  {
++    "genreId": 42,
++    "name": "Halloween",
++    "expiresAt": "2026-11-01T00:00:00Z",
++    "entries": [
++      { "$type": "movie", "id": 123, "name": "Beispielfilm", "mediaSourceId": 1, "posterPictureId": 456 }
++    ]
++  }
++]
++```
++
++`entries` verwendet `DtoMediaEntry` einschließlich der vorhandenen Diskriminatoren
++`movie`, `movieCollection` und `show`. Weitere Felder entsprechen den vorhandenen
++Medien-DTOs, insbesondere Bildkennungen und benutzerspezifisches `watchedAt`.
++Nur Medien aus Quellen, die dem Benutzer freigegeben sind, werden geliefert.
++Sammlungen werden dedupliziert, eine Sammlung mit einem Film erscheint als Film.
++Die Sortierung bleibt `EndedAt`, `ReleaseDate`, `PremieredAt`, `CreatedAt` absteigend,
++danach Name aufsteigend. Die Sektionen folgen der Genre-ID-Reihenfolge.
++
++Der Server berechnet aktive, jährlich wiederkehrende Saisonfenster anhand von
++UTC-Tagen mit inklusivem Start und Ende. Fehlende oder ungültige Grenzen sowie
++Genres ohne Medien liefern keine Sektion. `expiresAt` ist die **exklusive** Grenze
++00:00 UTC des Folgetags des letzten Saisontags. Clients berechnen keine Saison,
++sondern zeigen eine Sektion ausschließlich vor diesem gelieferten Zeitpunkt.
++Eine erfolgreiche leere Antwort ist `200 []`; HTTP-/Transportfehler dürfen nicht
++als leere Antwort behandelt werden. Ein Offline-Cache darf Sichtbarkeit nicht
++über `expiresAt` hinaus verlängern.
++
++Die Webkomponente `SeasonalGenreList` verwendet den authentifizierten internen
++HTTP-Client und entfernt abgelaufene Sektionen per Timer, ohne Seitenwechsel.
++Die Filmkartenroute `/movie/{id}` nutzt die vorhandene Filmdetailansicht; sie
++unterstützt auch Filme ohne Sammlung.
++
++## Nachweis
++
++`SeasonalHomeServiceTests` prüft UTC-Grenzen, Wiederholung, Jahreswechsel,
++SQLite-Quellenfilterung, Gruppierung, Sortierung, Polymorphie und Gesehen-Status.
++`SeasonalGenresE2ETests` startet Kestrel und SQLite mit Testbenutzer und prüft mit
++Chromium die Anmeldung, Inhalte, HTTP-Aufrufe, Mediennavigation und Ablauf.
++
++```powershell
++dotnet test VideoWebPlayer.Tests/VideoWebPlayer.Tests.csproj --filter "FullyQualifiedName~SeasonalHomeServiceTests|FullyQualifiedName~SeasonalGenresE2ETests"
++```
++
++Playwright-Browser müssen vorher mit dem generierten `playwright.ps1 install chromium`
++installiert werden; ein fehlender Browser lässt die neuen Tests fehlschlagen.
++
++## Bereitstellung
++
++Den Server mit diesem Endpunkt zuerst bereitstellen, bevor eine mobile App
++ausgerollt wird, die `GET /api/home/seasonal-genres` abruft. Die Webansicht
++verwendet ebenfalls denselben authentifizierten Endpunkt.
+diff --git a/docs/help/index.md b/docs/help/index.md
+index 3c1e7f6..782033f 100644
+--- a/docs/help/index.md
++++ b/docs/help/index.md
+@@ -11,6 +11,7 @@
+ - [Gesehen-Kennzeichen](gesehen-status.md) — Benutzerbezogene Markierung bereits gesehener Filme und Episoden
+ - [Medienmetadaten bearbeiten](medien-editiermodus.md) — Administrativer Editiermodus für Serien, Staffeln, Episoden, Filme und Filmsammlungen
+ - [Startseite – Hero-Hintergrund](startseite-hero-hintergrund.md) — Zusammengesetztes Hintergrundbild aus der „Weiterschauen"-Liste
++- [Saisonale Startseitenlisten](saisonale-startseitenlisten.md) — Zeitlich begrenzte Genre-Listen und deren Anzeige auf der Startseite
+ - [Weiterschauen](weiterschauen/index.md) — Speichern und Fortsetzen von Serien und Filmen an der zuletzt angesehenen Position
+ 
+ ## Systemverwaltung (Administratoren)
+@@ -25,4 +26,6 @@
+ 
+ ## Projekt und Entwicklung
+ 
++- [API: Saisonale Startseitenlisten](../api/seasonal-genres.md) — Authentifizierter Endpunkt, Medienantwort und Saisonablauf
++
+ - [Aktuelle Projektstruktur](projektstruktur.md) — Verbleibende Solution-Projekte und Hinweise zur Webanwendung
+diff --git a/docs/help/saisonale-startseitenlisten.md b/docs/help/saisonale-startseitenlisten.md
+new file mode 100644
+index 0000000..e4f8e84
+--- /dev/null
++++ b/docs/help/saisonale-startseitenlisten.md
+@@ -0,0 +1,17 @@
++# Saisonale Startseitenlisten
++
++Auf der Startseite erscheinen saisonale Genre-Listen, wenn der Server das
++Genre aktuell als aktiv führt und passende Medien für dein Benutzerkonto
++verfügbar sind. Die Saisonzeiträume werden zentral auf dem Server gepflegt.
++
++Die Listen enthalten Filme, Filmsammlungen und Serien. Sammlungen mit genau
++einem Film werden als Filmkarte gezeigt. Leere Genres werden nicht angezeigt.
++Mit einem Klick auf eine Karte öffnest du wie gewohnt die passende
++Detailansicht.
++
++Die Sektionen enden zum serverseitig berechneten Saisonende. Eine noch offene
++Startseite entfernt abgelaufene Sektionen automatisch. Im gemeinsamen Vertrag
++für Web und mobile App ist diese Ablaufgrenze als UTC-Zeitpunkt festgelegt.
++
++Die technische Beschreibung steht in der
++[API-Dokumentation zu saisonalen Startseitenlisten](../api/seasonal-genres.md).
+diff --git a/docs/projects/saisonlisten/acceptance-schritt-1.md b/docs/projects/saisonlisten/acceptance-schritt-1.md
+new file mode 100644
+index 0000000..8b4d68a
+--- /dev/null
++++ b/docs/projects/saisonlisten/acceptance-schritt-1.md
+@@ -0,0 +1,25 @@
++# Unabhängige Backend-Abnahme – Schritt 1 API und Web
++
++## Ergebnis
++
++**Status:** Erfüllt
++
++Geprüfter Implementierungsstand: `1bb12a42ffeadab62702117fcdc9eb9955e7fd48`, Basis `eae60a6003ac0619958331351d21c5d983cb175f`.
++Prüfer: Codex review_code, unabhängig vom Implementierungsagenten. Eigener Klon `.work/seasonal-server-review`, Branch `review/saisonlisten`. Der Implementierungscheckout und das ursprüngliche Serverrepository wurden nicht verändert.
++
++## Abweichungen
++
++Keine.
++
++## Hinweise
++
++- Tatsächlichen Diff von API, Service, Zeitfenster, DTO/Client, Webkomponente und ergänzter Filmroute geprüft. Serverseitige Quellenprüfung umfasst Filme, Sammlungen, Sammlungsmitglieder und Serien; verschachtelter Sammlungskontext wird nur bei freigegebener Quelle geliefert.
++- `dotnet test VideoWebPlayer.Tests/VideoWebPlayer.Tests.csproj --filter FullyQualifiedName~SeasonalHomeServiceTests --disable-build-servers`: unabhängig 8/8 bestanden.
++- Gegenbeispiel Quellenberechtigung: in der eigenen Prüfkopie den Film-Quellenfilter vor `db.MovieGenres.Any` entfernt. Der unveränderte Test `Service_FiltersSourcesEmptyGenresAndMapsGroupedSortedWatchedMedia` schlug mit zusätzlichem unerlaubtem Film `Secret` fehl (Exitcode 1). Produktdatei danach mit Git wiederhergestellt.
++- Gegenbeispiel Saisonende: ausschließlich in der Prüfkopie `end.AddDays(1)` durch `end.AddDays(2)` ersetzt. Die unveränderten Saison-Tests schlugen fünfmal wegen des falschen Ablaufdatums fehl (Exitcode 1). Produktdatei danach mit Git wiederhergestellt.
++- Anschließender unveränderter Lauf: `dotnet test VideoWebPlayer.Tests/VideoWebPlayer.Tests.csproj --no-restore --filter "FullyQualifiedName~SeasonalHomeServiceTests|FullyQualifiedName~SeasonalGenresE2ETests" --disable-build-servers`: 12/12 bestanden, keine Skips, Dauer 28 s. Darunter alle vier echten Playwright-/Kestrel-/SQLite-Flüsse: Anmeldung/Filter/Watched, Film-/Sammlungs-/Seriennavigation, authentifizierte HTTP-API samt 401 und leerer Antwort, Ablauf bei geöffneter Seite und Reload.
++- Browserpfad: `PLAYWRIGHT_BROWSERS_PATH` zeigt auf die installierten Browser in `.work/seasonal-server/.playwright-browsers`.
++- Nach Mutationen ist `git diff` der Prüfkopie leer. Keine Produktkorrektur durch den Prüfer, keine Tests abgeschwächt und keine Produktcommits erzeugt.
++- Die vorhandene fehlende Filmroute ist im tatsächlichen Diff und im getrennten Begleitcommit `6b819d9` geprüft; sie verwendet die bestehende Detailansicht und lädt sowohl einzelne Filme ohne Sammlung als auch Filme mit Sammlung.
++- Keine `RaiseUiActionRequested`-Aufrufe im betroffenen Backend/UI oder Mobile-Diff vorhanden; somit keine fehlenden Aktionshandler aus diesem Mechanismus.
++- Der eigenständige Lifecycle-Testschritt führt anschließend die breiten Abschlussprüfungen aus. Der vorherige Implementierungsbericht dokumentiert Debug/Release und volle Suite; diese Selbstangaben ersetzen die hier selbst ausgeführten 12 Tests nicht.
+diff --git a/docs/projects/saisonlisten/handover.md b/docs/projects/saisonlisten/handover.md
+new file mode 100644
+index 0000000..408965f
+--- /dev/null
++++ b/docs/projects/saisonlisten/handover.md
+@@ -0,0 +1,25 @@
++# Übergabe Saisonlisten
++
++## Bearbeiter
++
++| Schritt | Bearbeiter | Status | Branch |
++|---|---|---|---|
++| 1 API und Web | Codex dokumentation | pausiert | docs/saisonlisten-hilfe |
++
++## Schritt 1
++
++Basis: eae60a6003ac0619958331351d21c5d983cb175f. Isolierter Finalklon `.work/seasonal-server-final` im Mobile-Workspace; Ursprungsrepo und Implementierungscheckout unverändert.
++
++Auftrag: authentifizierte saisonale Home-API mit Ablaufzeitpunkt, Webumstellung, Tests. Keine Schemaänderung.
++
++Implementierung abgeschlossen: API und Web, Debug-/Release-Builds grün, vollständige Suite 2358 bestanden (0 Fehler, 2 bestehende Skips); zwölf neue saisonale Tests einschließlich vier echter Web-E2E grün. Unabhängige Abnahme `acceptance-schritt-1.md` mit Status Erfüllt übernommen. Quellenfilter- und Ablaufmutationen wurden unabhängig durch Tests erkannt und zurückgestellt. Es gibt keine offenen Produktbefunde.
++
++Notwendige Begleitkorrektur: die bereits verlinkte, aber fehlende Route `/movie/{id}` wurde über die vorhandene Detailkomponente ergänzt; eigener Zwischencommit 6b819d9. Die unabhängige Abnahme hat diesen Diff geprüft.
++
++Der finale API-/Weblieferstand wird mit einem Feature-Commit festgeschrieben. Patch und Bundle unter `docs/integration/seasonal-genres/` des Mobile-Repositories sind daraus neu zu erzeugen. Keine Schemaänderung, kein Push und keine Änderung am Ursprungscheckout.
++
++Hilfe-, README- und Release-Notes-Abschluss im separaten Klon `.work/seasonal-server-docs` erledigt. Der Server-Dokumentationsbranch basiert auf dem finalen Produktcommit `a36d2db5272b122dff0b7f54e3b9d8ff29309438`; der Dokumentationscommit enthält ausschließlich Hilfeseiten, API-Dokumentation, README, Release Notes und diesen Handover/Status. Es gab keine Produktänderungen und keine erneuten Tests. Der Mobile-Lifecycle pflegt Patch und Bundle nach diesem Dokumentationscommit in seiner Integrationskopie.
++
++Der Mobile-Gesamtstatus bleibt laut Mobile-`continue.md` offen: zwei fremd-fokussierte Such-E2E und ein WinRT-Finalizerrest sind nicht abschließend geklärt. Das berührt die abgeschlossene saisonale Serverabnahme nicht und wird nicht als vollständig grüne Mobile-Suite dargestellt.
++
++Prüfbefehle stehen in `implementation-results.md`, `acceptance-schritt-1.md` und `docs/api/seasonal-genres.md`. Für erneute Web-E2E `PLAYWRIGHT_BROWSERS_PATH` auf die Browser im ursprünglichen isolierten Implementierungscheckout setzen. Der Server-Prüfstatus bleibt 2358 bestanden und zwei schon zuvor vorhandene Skips; keine Servertests wurden im Dokumentationsschritt erneut ausgeführt.
+diff --git a/docs/projects/saisonlisten/implementation-results.md b/docs/projects/saisonlisten/implementation-results.md
+new file mode 100644
+index 0000000..743b9a1
+--- /dev/null
++++ b/docs/projects/saisonlisten/implementation-results.md
+@@ -0,0 +1,46 @@
++# Implementierungsnachweis Saisonlisten (vor unabhängiger Abnahme)
++
++## Stand
++
++Serverbasis: `eae60a6003ac0619958331351d21c5d983cb175f`.
++Isolierter Branch: `task/38598ab90d844bb0bbc42a195643b6e3-saisonlisten-schritt-1-api-web`.
++Das Ursprungsrepository wurde einschließlich `.git` nicht verändert.
++
++Implementiert sind API-Vertrag, Quellenfilterung, Sammlungsgroupierung, Gesehenstatus,
++UTC-Ablauf, Web-HTTP-Anbindung und aktive Entfernung abgelaufener Sektionen.
++
++Für den geforderten Filmkartenfluss musste die vorhandene, bisher nicht implementierte
++Webroute `/movie/{id}` ergänzt werden. Sie verwendet die vorhandene Filmdetailkomponente
++und unterstützt auch Filme ohne Sammlung. Diese notwendige Begleitkorrektur wird in
++einem separaten Zwischencommit ausgewiesen; keine anderen Funktionen wurden erweitert.
++
++## Prüfungen des Implementierers
++
++- `dotnet build VideoPlayer.sln -c Debug --no-restore`: erfolgreich, 0 Fehler.
++- `dotnet build VideoPlayer.sln -c Release --no-restore`: erfolgreich, 0 Fehler (bestehende Warnungen).
++- `SeasonalHomeServiceTests`: 8 bestanden, 0 Fehler, 0 übersprungen.
++- `SeasonalGenresE2ETests`: 4 bestanden, 0 Fehler, 0 übersprungen, echter Headless-Chromium gegen Kestrel/SQLite.
++- Vollständige Server-Testsuite: 2358 bestanden, 0 Fehler, 2 bestehende Skips, gesamt 2360, Dauer 5m23s.
++
++Beim ersten E2E-Vorlauf fehlte der zur installierten Playwright-Version gehörige Browser.
++Er wurde anschließend in `.playwright-browsers/` im isolierten Checkout installiert.
++Die ersten tatsächlichen Browserläufe deckten statisches SSR (Ablauftimer war nicht
++interaktiv), fehlenden Test-API-Key und die nicht existierende Filmroute auf; nach
++Korrektur liefen sämtliche vier Browserflüsse erfolgreich. Kein Test abgeschwächt.
++
++Für Folgeläufe `PLAYWRIGHT_BROWSERS_PATH` auf den absoluten Ordner
++`.work/seasonal-server/.playwright-browsers` im Mobile-Workspace setzen.
++Der neue E2E-Test behandelt fehlende Browser als Fehler (kein stiller Erfolg).
++
++## Unabhängige Abnahme
++
++Noch offen. Der Implementierer erstellt keinen eigenen Abnahmebericht.
++Der Prüfer benötigt eigenen Checkout, Builds/volle Suite, Gegenbeispiele und
++Mutation für die Quellenfilterung bzw. Ablaufprüfung nach `AGENTS.md`.
++Kein finaler Feature-Commit und kein Push durch den Implementierer.
++
++Die beiden unverändert vorhandenen Skips betreffen Unix-Dateirechte unter Windows und
++einen bereits auf der Serverbasis explizit deaktivierten ContinueWatching-Test für Filme
++ohne Sammlung (bestehender serverseitiger HTTP-500-Befund, nicht dieser Auftrag).
++Keiner der zwölf neuen saisonalen Tests wurde übersprungen.
++
+diff --git a/docs/projects/saisonlisten/steps.md b/docs/projects/saisonlisten/steps.md
+new file mode 100644
+index 0000000..25e02d8
+--- /dev/null
++++ b/docs/projects/saisonlisten/steps.md
+@@ -0,0 +1,5 @@
++# Schritte
++
++| Schritt | Beschreibung | Status |
++|---|---|---|
++| 1 | Saisonlisten API und Web | Fertig |

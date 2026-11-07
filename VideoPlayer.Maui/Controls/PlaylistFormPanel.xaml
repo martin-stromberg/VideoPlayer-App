@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentView xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:mvu="clr-namespace:VideoPlayer.Mvu;assembly=VideoPlayer.Mvu"
+             x:Class="VideoPlayer.Maui.Controls.PlaylistFormPanel"
+             x:Name="Root">
+
+    <!-- Zentriertes Dialog-Panel der Playlist-Anlage/-Bearbeitung:
+         Name (Pflicht), Beschreibung, Sortiermodus (nur bei Neuanlage
+         wählbar) sowie Speichern/Abbrechen — bindet an das
+         PlaylistForm-Feld des MvuHost-BindingContext. -->
+    <Grid IsVisible="{Binding Source={x:Reference Root}, Path=IsOpen}">
+        <BoxView Color="{StaticResource VpOverlay}" />
+        <Border Style="{StaticResource Card}"
+                Padding="20"
+                WidthRequest="420"
+                HorizontalOptions="Center"
+                VerticalOptions="Center">
+            <VerticalStackLayout Spacing="12">
+                <Label Text="Playlist"
+                       FontSize="18"
+                       FontFamily="InterSemiBold"
+                       TextColor="{StaticResource VpText}" />
+
+                <VerticalStackLayout Spacing="4">
+                    <Label Text="Name" Style="{StaticResource Caption}" />
+                    <Entry x:Name="NameEntry"
+                           AutomationId="PlaylistFormNameEntry"
+                           Placeholder="Name der Playlist"
+                           TextChanged="OnNameChanged" />
+                </VerticalStackLayout>
+
+                <VerticalStackLayout Spacing="4">
+                    <Label Text="Beschreibung" Style="{StaticResource Caption}" />
+                    <Entry x:Name="DescriptionEntry"
+                           AutomationId="PlaylistFormDescriptionEntry"
+                           Placeholder="Beschreibung (optional)"
+                           TextChanged="OnDescriptionChanged" />
+                </VerticalStackLayout>
+
+                <HorizontalStackLayout Spacing="12">
+                    <Button x:Name="SortModeManualButton"
+                            AutomationId="PlaylistFormSortManualButton"
+                            Text="Manuell"
+                            Clicked="OnSortManualClicked"
+                            IsEnabled="{Binding Source={x:Reference Root}, Path=CanChooseSortMode}" />
+                    <Button x:Name="SortModeByReleaseDateButton"
+                            AutomationId="PlaylistFormSortByReleaseDateButton"
+                            Text="Erscheinungsdatum"
+                            Clicked="OnSortByReleaseDateClicked"
+                            IsEnabled="{Binding Source={x:Reference Root}, Path=CanChooseSortMode}" />
+                </HorizontalStackLayout>
+
+                <Label x:Name="FormErrorLabel"
+                       AutomationId="PlaylistFormErrorLabel"
+                       Style="{StaticResource ErrorText}"
+                       Text="{Binding Source={x:Reference Root}, Path=Error}"
+                       IsVisible="{Binding Source={x:Reference Root}, Path=HasError}" />
+
+                <HorizontalStackLayout Spacing="12"
+                                       HorizontalOptions="End">
+                    <Button x:Name="CancelButton"
+                            AutomationId="PlaylistFormCancelButton"
+                            Text="Abbrechen"
+                            Style="{StaticResource SecondaryButton}"
+                            Clicked="OnCancelClicked" />
+                    <Button x:Name="SaveButton"
+                            AutomationId="PlaylistFormSaveButton"
+                            Text="Speichern"
+                            Clicked="OnSaveClicked" />
+                </HorizontalStackLayout>
+            </VerticalStackLayout>
+        </Border>
+    </Grid>
+</ContentView>
