@@ -1100,4 +1100,33 @@ public class AutoDownloadServiceTests : IDisposable
             && e.Category.Contains(nameof(AutoDownloadService), StringComparison.Ordinal)
             && e.Message.Contains("Mindestabstand", StringComparison.Ordinal));
     }
+
+    /// <summary>Prüft den Ablauf-Pass mit Auto-Download-Schutz: der Service komponiert Kandidatenermittlung und Abgleich — der abgelaufene Kandidat wird verlängert, der Nicht-Kandidat entfernt.</summary>
+    [Fact]
+    public async Task ReconcileWithExpiryProtection_ExtendsCandidate_RemovesNonCandidate()
+    {
+        var expired = DateTime.UtcNow.AddDays(-1);
+        await ManifestTestHelpers.InsertCompletedAsync(cache, layout, 42, expired, "manual");
+        var protectedPath = Path.Combine(layout.VideosDirectory, "movie_42.mp4");
+        var removedPath = (await ManifestTestHelpers.InsertCompletedAsync(cache, layout, 43, expired, "manual")).FilePath;
+        await CacheContinueWatchingAsync(
+            new ContinueWatchingEntry
+            {
+                MediaType = "movie",
+                PositionSeconds = 60,
+                Entry = new Movie { Id = 42, Name = "Film Zweiundvierzig" }
+            });
+
+        var result = await service.ReconcileWithExpiryProtectionAsync(settings);
+
+        Assert.Equal(1, result.ExtendedExpiryCount);
+        Assert.Equal(1, result.RemovedExpiredCount);
+        var extended = await ManifestTestHelpers.ReadEntryAsync(cache, "movie", 42);
+        Assert.NotNull(extended);
+        Assert.Equal("auto", extended!.Origin);
+        Assert.True(extended.ExpiresAtUtc > DateTime.UtcNow);
+        Assert.True(File.Exists(protectedPath));
+        Assert.Null(await ManifestTestHelpers.ReadEntryAsync(cache, "movie", 43));
+        Assert.False(File.Exists(removedPath));
+    }
 }
