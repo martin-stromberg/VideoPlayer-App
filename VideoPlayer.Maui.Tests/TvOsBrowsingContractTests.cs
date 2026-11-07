@@ -95,15 +95,16 @@ public class TvOsBrowsingContractTests
     }
 
     /// <summary>
-    /// Prüft: die Startseite zeigt die Quellen-Sektion mit Auswahl,
+    /// Prüft: die Quellen-Seite zeigt die Quellen-Übersicht mit Auswahl,
     /// Lade-/Leer-/Fehlerzustand und Neuversuch.
     /// </summary>
     [Fact]
-    public void HomePage_ShowsSourceSectionWithStates()
+    public void SourcesPage_ShowsSourcesWithStates()
     {
-        var page = TvOsFile("Ui", "HomePageViewController.cs");
+        var page = TvOsFile("Ui", "SourcesPageViewController.cs");
 
-        Assert.Contains("SourceCarouselView", page, StringComparison.Ordinal);
+        Assert.Contains("UITableView", page, StringComparison.Ordinal);
+        Assert.Contains("ServerListTableSource", page, StringComparison.Ordinal);
         Assert.Contains("SourcesOverview", page, StringComparison.Ordinal);
         Assert.Contains("Quellen", page, StringComparison.Ordinal);
         Assert.Contains("SourceSelectedMessage", page, StringComparison.Ordinal);
@@ -112,19 +113,21 @@ public class TvOsBrowsingContractTests
     }
 
     /// <summary>
-    /// Prüft: Quellen- und Genre-Karten sind fokussierbare
+    /// Prüft: Quellen-Zeilen sind fokussierbare UITableView-Einträge
+    /// (tvOS-Fokus liegt auf der Zeile), Genre-Karten fokussierbare
     /// UICollectionView-Zellen mit Wiederverwendungs-Kennung.
     /// </summary>
     [Fact]
     public void SourceCells_AreFocusableCards()
     {
-        var sourceCell = TvOsFile("Ui", "SourceItemCell.cs");
-        Assert.Contains("UICollectionViewCell", sourceCell, StringComparison.Ordinal);
-        Assert.Contains("CanBecomeFocused", sourceCell, StringComparison.Ordinal);
-        Assert.Contains("DidUpdateFocus", sourceCell, StringComparison.Ordinal);
-        Assert.Contains("PrepareForReuse", sourceCell, StringComparison.Ordinal);
-        Assert.Contains("const string ReuseId", sourceCell, StringComparison.Ordinal);
-        Assert.Contains("GetSourceIconAsync", sourceCell, StringComparison.Ordinal);
+        var sourcePage = TvOsFile("Ui", "SourcesPageViewController.cs");
+        Assert.Contains("UITableView", sourcePage, StringComparison.Ordinal);
+        Assert.Contains("ServerListTableSource", sourcePage, StringComparison.Ordinal);
+
+        var tableSource = TvOsFile("Ui", "ServerListTableSource.cs");
+        Assert.Contains("UITableViewSource", tableSource, StringComparison.Ordinal);
+        Assert.Contains("RowSelected", tableSource, StringComparison.Ordinal);
+        Assert.Contains("DequeueReusableCell", tableSource, StringComparison.Ordinal);
 
         var genreCell = TvOsFile("Ui", "SourceGenreCell.cs");
         Assert.Contains("UICollectionViewCell", genreCell, StringComparison.Ordinal);

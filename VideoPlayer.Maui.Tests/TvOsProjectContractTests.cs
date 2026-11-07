@@ -42,12 +42,15 @@ public class TvOsProjectContractTests
             .OrderBy(value => value)
             .ToArray();
 
+        // Die e_sqlite3-Stub-Referenz ist der Workaround für das
+        // fehlerhafte tvOS-RID-Mapping des SQLitePCLRaw-Pakets.
         Assert.Equal(
             [
                 @"..\msTools.DeveloperApi\msTools.DeveloperApi.csproj",
                 @"..\VideoPlayer.ApiClient\VideoPlayer.ApiClient.csproj",
                 @"..\VideoPlayer.Mvu\VideoPlayer.Mvu.csproj",
-                @"..\VideoPlayer.Storage\VideoPlayer.Storage.csproj"
+                @"..\VideoPlayer.Storage\VideoPlayer.Storage.csproj",
+                @"..\VideoPlayer.TvOS.EsqliteStub\VideoPlayer.TvOS.EsqliteStub.csproj"
             ],
             references);
     }
