@@ -166,7 +166,7 @@ runs:
           -p:ApplicationDisplayVersion="$DISPLAY_VERSION" \
           -p:ApplicationVersion=$BUILD_NUMBER \
           --configuration Release --framework net10.0-tvos \
-          -p:RuntimeIdentifier=tvos-arm64 \
+          -p:RuntimeIdentifiers=tvos-arm64 \
           -p:ArchiveOnBuild=true \
           -p:IncludeTvOsTarget=true \
           -p:CodesignKey="${{ inputs.codesign-key }}" \
