@@ -649,4 +649,56 @@ public class AppUpdateTests_Downloads
         Assert.Contains(transition.Effects, e =>
             e is ExpireWatchedDownloadEffect d && d.MediaId == 33 && d.Delay == TimeSpan.Zero);
     }
+
+    /// <summary>Prüft App-Aktivierung: verbunden → Wiederaufnahme-Effekt (Abgleich + Neu-Einplanung verwaister Aufträge im selben Lauf).</summary>
+    [Fact]
+    public void AppActivated_Connected_EmitsResumeEffect()
+    {
+        var transition = AppUpdate.Update(ConnectedModel(), new AppActivatedMessage());
+
+        Assert.Contains(transition.Effects, e => e is ResumeDownloadsEffect);
+        Assert.DoesNotContain(transition.Effects, e => e is ReconcileDownloadsEffect);
+    }
+
+    /// <summary>Prüft App-Aktivierung: offline → nur der lokale Ablauf-/Abgleichslauf (keine verfrühte Wiederaufnahme mit Verbindungsfehlern).</summary>
+    [Fact]
+    public void AppActivated_Offline_EmitsReconcileOnly()
+    {
+        var model = ConnectedModel() with
+        {
+            ConnectionState = ConnectionState.Offline,
+            IsOnline = false
+        };
+
+        var transition = AppUpdate.Update(model, new AppActivatedMessage());
+
+        Assert.Contains(transition.Effects, e => e is ReconcileDownloadsEffect);
+        Assert.DoesNotContain(transition.Effects, e => e is ResumeDownloadsEffect);
+    }
+
+    /// <summary>Prüft App-Aktivierung: im Verbindungsaufbau (Start) → nur der lokale Abgleich.</summary>
+    [Fact]
+    public void AppActivated_Connecting_EmitsReconcileOnly()
+    {
+        var transition = AppUpdate.Update(new AppModel(), new AppActivatedMessage());
+
+        Assert.Contains(transition.Effects, e => e is ReconcileDownloadsEffect);
+        Assert.DoesNotContain(transition.Effects, e => e is ResumeDownloadsEffect);
+    }
+
+    /// <summary>Prüft App-Aktivierung: der Abgleichseffekt trägt die aktuellen Einstellungen (Aufbewahrungszeit des Ablauf-Passes).</summary>
+    [Fact]
+    public void AppActivated_CarriesSettings()
+    {
+        var model = ConnectedModel() with
+        {
+            Settings = new AppSettings { DownloadRetentionDays = 21 }
+        };
+
+        var transition = AppUpdate.Update(model, new AppActivatedMessage());
+
+        var effect = Assert.IsType<ResumeDownloadsEffect>(
+            Assert.Single(transition.Effects));
+        Assert.Equal(21, effect.Settings.DownloadRetentionDays);
+    }
 }

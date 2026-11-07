@@ -5,14 +5,14 @@ namespace VideoPlayer.Maui.Tests;
 /// <summary>Tests für <c>AppRoutes</c>.</summary>
 public class AppRoutesTests
 {
-    /// <summary>Prüft MenuPages: enthält alle sechs Menüeinträge in definierter Reihenfolge.</summary>
+    /// <summary>Prüft MenuPages: enthält alle sieben Menüeinträge in definierter Reihenfolge.</summary>
     [Fact]
     public void MenuPages_ContainsAllMenuEntriesInOrder()
     {
-        // Die Quellen sind dynamische Menüeinträge (je freigegebener
-        // Quelle) und keine eigene Menüseite mehr.
+        // Die Quellen-Übersicht ist eine eigene Menüseite — einzelne
+        // Quellen sind Einträge innerhalb dieser Seite.
         Assert.Equal(
-            [AppPage.Home, AppPage.Favorites, AppPage.Playlists, AppPage.Downloads, AppPage.Profile, AppPage.Settings],
+            [AppPage.Home, AppPage.Sources, AppPage.Favorites, AppPage.Playlists, AppPage.Downloads, AppPage.Profile, AppPage.Settings],
             AppRoutes.MenuPages);
     }
 
@@ -60,9 +60,8 @@ public class AppRoutesTests
     [InlineData(null)]
     [InlineData("")]
     [InlineData("//unknown")]
-    // Die ehemalige Menü-Route „sources" existiert nicht mehr — die
-    // Quellen sind dynamische Menüeinträge ohne eigene Seite.
-    [InlineData("//sources/SourcesPage")]
+    // Kein Segment des Pfads ist eine bekannte Route.
+    [InlineData("//quellen/SourcesPage")]
     public void TryGetPage_UnknownLocation_ReturnsFalse(string? location)
     {
         Assert.False(AppRoutes.TryGetPage(location, out _));

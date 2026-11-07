@@ -331,6 +331,7 @@ public sealed class MediaDetailsService
             BannerPictureId = episode.GeneratedBackgroundPictureId ?? episode.BannerPictureId ?? episode.PosterPictureId,
             PosterPictureId = episode.PosterPictureId,
             IsFavorite = episode.IsFavorite,
+            WatchedAt = episode.WatchedAt,
             SelectedEpisodeId = episode.Id
         };
     }
@@ -553,7 +554,8 @@ public sealed class MediaDetailsService
             ReleaseYear = movie.ReleaseDate?.Year,
             BannerPictureId = movie.BannerPictureId ?? movie.FanartPictureId ?? movie.PosterPictureId,
             PosterPictureId = movie.PosterPictureId,
-            IsFavorite = movie.IsFavorite
+            IsFavorite = movie.IsFavorite,
+            WatchedAt = movie.WatchedAt
         };
     }
 
@@ -582,6 +584,7 @@ public sealed class MediaDetailsService
             BannerPictureId = collection.BannerPictureId ?? collection.FanartPictureId ?? collection.PosterPictureId,
             PosterPictureId = collection.PosterPictureId,
             IsFavorite = collection.IsFavorite,
+            WatchedAt = collection.WatchedAt,
             Movies = movies
         };
     }

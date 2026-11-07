@@ -12,6 +12,9 @@ public enum AppPage
     /// <summary>Startseite mit den Listen „Weiterschauen", „Favoriten" und „Neu im Programm".</summary>
     Home,
 
+    /// <summary>Menüseite „Quellen" (freigegebene Medienbereiche des Servers als Liste).</summary>
+    Sources,
+
     /// <summary>Menüseite „Favoriten".</summary>
     Favorites,
 

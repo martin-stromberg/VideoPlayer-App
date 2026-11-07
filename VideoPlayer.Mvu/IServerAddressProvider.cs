@@ -1,4 +1,4 @@
-namespace VideoPlayer.Maui.Services;
+namespace VideoPlayer.Mvu;
 
 /// <summary>Liefert die Basisadresse des VideoPlayer-Servers.</summary>
 public interface IServerAddressProvider

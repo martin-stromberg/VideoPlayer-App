@@ -11,6 +11,7 @@ public static class AppRoutes
         new Dictionary<AppPage, string>
         {
             [AppPage.Home] = "home",
+            [AppPage.Sources] = "sources",
             [AppPage.Favorites] = "favorites",
             [AppPage.Playlists] = "playlists",
             [AppPage.Downloads] = "downloads",
@@ -34,6 +35,7 @@ public static class AppRoutes
     public static IReadOnlyList<AppPage> MenuPages { get; } =
     [
         AppPage.Home,
+        AppPage.Sources,
         AppPage.Favorites,
         AppPage.Playlists,
         AppPage.Downloads,

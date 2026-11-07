@@ -3,6 +3,11 @@ name: PR Checks
 on:
   pull_request:
     branches: [main, staging]
+  # Laufende tvOS-Verifikation waehrend des Projekts: der tvOS-Build kann
+  # unter Windows nicht kompiliert werden, deshalb laeuft der Check bei
+  # jedem Push auf die Projekt-Branches mit (Job build-tvos, macOS).
+  push:
+    branches: ['task/issue-86-**']
 
 permissions:
   contents: read
@@ -43,3 +48,44 @@ jobs:
           Write-Error 'Pull requests to main must originate from the staging branch.'
           exit 1
         shell: pwsh
+
+  # tvOS-Kompilierbarkeit fortlaufend sichern: das tvOS-Projekt kann
+  # unter Windows nicht gebaut werden — der Simulator-Build ohne
+  # Codesignierung laeuft deshalb bei jedem PR auf macOS.
+  build-tvos:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      # SDK-Band 10.0.1xx pinnen (Muster build-ios in main-merge.yml):
+      # unter Band 10.0.400 wuerde das Rollback nach manifest-10.0.400
+      # aufloesen - dieses Paket existiert nicht auf nuget.org; die
+      # Manifeste liegen im 10.0.100-Feed.
+      - name: Pin SDK band for this job
+        run: |
+          echo '{"sdk":{"version":"10.0.100","rollForward":"latestPatch","allowPrerelease":false}}' > global.json
+          dotnet --version
+
+      # tvOS-Manifest pinnen (analog dem iOS-Rollback in main-merge.yml):
+      # 'workload install' laedt sonst das neueste Manifest, das Packs
+      # verlangen kann, die noch nicht publiziert sind. 26.5.10318 ist
+      # deckungsgleich mit dem iOS-Rollback und liefert den Xcode-26-
+      # Pack (macos-latest traegt Release-Xcode 26.x). Bei einem Runner-
+      # Wechsel auf Xcode 27 ist die Version auf ein 27.0.x-Manifest
+      # anzuheben (verfuegbar z. B. 27.0.10742).
+      - name: Install tvOS workload
+        run: |
+          printf '{"microsoft.net.sdk.tvos": "26.5.10318"}' > "$RUNNER_TEMP/workload-rollback.json"
+          dotnet workload update --from-rollback-file "$RUNNER_TEMP/workload-rollback.json"
+          dotnet workload install tvos --skip-manifest-update
+
+      # EnableCodeSigning=false: der Runner hat keine Zertifikate im
+      # Keychain; Simulator-Builds werden ohnehin ad-hoc signiert.
+      - name: Build tvOS (simulator)
+        run: dotnet build VideoPlayer.TvOS/VideoPlayer.TvOS.csproj --configuration Release --framework net10.0-tvos --runtime tvossimulator-arm64 -p:EnableCodeSigning=false
