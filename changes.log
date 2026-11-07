@@ -1,5 +1,269 @@
 # Änderungsprotokoll
 
+## 2026-11-08 — tvOS-App: Manuelle Downloads über Hintergrund-URL-Session mit Ablauf, Abgleich und Quota
+
+- **Transfer-Backend (`TvosBackgroundDownloadBackend`):** neues
+  tvOS-Backend hinter `IDownloadBackend` — Port des iOS-`IosBackgroundDownloadBackend`;
+  der Dateitransfer läuft über eine `NSUrlSession`-Hintergrund-Session
+  (Kennung `videoplayer.downloads`, `TaskDescription` als Medien-Key),
+  sodass Downloads bei suspendierter App weiterlaufen. Abschlüsse ohne
+  aktiven `TransferAsync`-Aufruf (System-Neustart für Hintergrund-Events)
+  meldet der `CompletionSink` an `DownloadService.CompleteExternalTransferAsync`;
+  die App-Delegate-Verdrahtung `handleEventsForBackgroundURLSession`
+  reicht die System-Events weiter, `EnsureSession()` bei Start und
+  Aktivierung stellt die Zustellung ausstehender Delegate-Rückrufe
+  sicher. `HttpDownloadBackend` bleibt Fallback/Test-Referenz.
+- **Aktivierungs-Message (`AppActivatedMessage`):** neue
+  plattformneutrale Message im Update-Fluss — der tvOS-Lebenszyklus
+  (`OnActivated`) dispatcht sie bei jedem Vordergrund-Eintritt;
+  verbunden löst sie `ResumeDownloadsEffect` (Abgleich +
+  Neu-Einplanung verwaister Aufträge über `ResumeInterruptedAsync`),
+  ohne Verbindung den neuen `ReconcileDownloadsEffect` (reiner lokaler
+  Ablauf-/Abgleichslauf — Teildateien, `missing_file`-Korrektur,
+  Waisen, Ablauf) aus.
+- **Download-Einstieg:** `EnqueueDownloadEffect` ist jetzt real im
+  `TvosAppEffectHandler` verdrahtet (statt vorbereitetem Hinweis) —
+  `DownloadService.EnqueueAsync` mit `DownloadOrigin.Manual` und
+  Serienkontext der Detailseite; Quota-Überschreitung wird vor der
+  Einplanung als verständlicher Hinweis gemeldet.
+- **Download-Liste (`DownloadsPageViewController`):** neue Menüseite
+  „Downloads" statt Platzhalter — `UITableView` mit Vorschaubild
+  (`DownloadTableCell`), Zustand, Fortschrittsbalken, Größen- und
+  Ablaufdatum-Angabe sowie Fehlerhinweis; Kontingent-Belegung und
+  Restdaten-Hinweis im Kopf; Zeilenauswahl öffnet ein Aktionsmenü
+  (Abbrechen/Erneut versuchen/Löschen je Zustand), die Kopf-Aktion
+  „Fehlerhafte löschen" entfernt fehlgeschlagene und abgebrochene
+  Einträge gesammelt.
+- **Verdrahtung:** `AppComposition` injiziert das Backend in den
+  `DownloadService` und setzt den `CompletionSink`; alle manuellen
+  Download-Effekte (Laden, Einreihen, Abbrechen, Löschen einzeln/
+  gesamt/fehlgeschlagen, Restdaten-Bereinigung, Wiederaufnahme,
+  Abgleich) sind im `TvosAppEffectHandler` verdrahtet — Auto-Download
+  bleibt auf tvOS nicht verdrahtet, „nach dem Abspielen löschen" wird
+  nicht angeboten.
+- **Tests:** neue `AppActivatedMessage`-Übergangstests
+  (`AppUpdateTests_Downloads`) sowie tvOS-Contract-Tests der
+  Download-Verdrahtung und des Hintergrund-Backends
+  (`TvOsAppContractTests`).
+
+## 2026-11-08 — tvOS-App: Playlists — lesender Zugriff und Wiedergabe
+
+- **Übersicht (`PlaylistsPageViewController`):** neue Menüseite
+  „Playlists" statt Platzhalter — gruppierte `UITableView` mit den
+  Sektionen „Meine Playlists"/„Öffentliche Playlists" (aus der flachen
+  `PlaylistOverviewItem`-Liste), Zeilen mit Cover
+  (`api/playlists/{id}/cover`, neuer `GetPlaylistCoverAsync`-Pfad im
+  `TvosPosterImageService` mit eigenem Cache-Schlüsselraum), Name,
+  Sortiermodus und Genres; reines Online-Feature mit Lade-/Leer-/
+  Fehlerzustand und Wiederholmöglichkeit (`PlaylistsPageOpenedMessage`
+  beim Erscheinen, `PlaylistSelectedMessage` bei Auswahl).
+- **Detailseite (`PlaylistDetailsViewController`):** modal vom
+  `TvosNavigator` (`PresentPlaylistDetails`, Singleton mit
+  Duplikat-Guard und Freigabe-Callback) — Kopf mit Cover, Name,
+  Zusammenfassung, Genres, Beschreibung und „Abspielen"
+  (`PlaylistPlaybackStartRequestedMessage`); Eintragsraster
+  (`PlaylistEntryCell`: Poster über `ResolvedPictureId`, Titel,
+  `Subtitle`-Elternkontext, `IsAccessible`-Abdunklung) mit
+  `WillDisplayCell`-Lookahead-Paging
+  (`PlaylistEntriesNextPageRequestedMessage`), Retry
+  (`PlaylistEntriesRetryRequestedMessage`), Identitäts-Guard und
+  `PlaylistDetailsOpenedMessage`-Wiederherstellungspfad; Menü-Taste
+  schließt die Seite.
+- **Verdrahtung:** `TvosAppEffectHandler` führt jetzt
+  `LoadPlaylistsEffect` (`PlaylistsLoadedMessage`),
+  `NavigateToPlaylistDetailsEffect` (Hauptthread → Navigator),
+  `LoadPlaylistDetailsEffect` (`PlaylistDetailsLoadedMessage` inkl.
+  nicht-fataler `IsCurrentUserAdminAsync`-Lesung) und
+  `LoadPlaylistEntriesEffect` (`PlaylistEntriesLoadedMessage`) aus —
+  Muster und Fehlerkonstanten des `ShellAppEffectHandler`.
+  Wiedergabe mit Playlist-Kontext (Positionsanzeige,
+  next/previous, advance-Auto-Fortsetzung) nutzt die
+  Schritt-7-Verdrahtung; Verwaltung bleibt ohne Oberfläche und ohne
+  Effekt-Verdrahtung.
+- **Absicherung:** neue `TvOsPlaylistsContractTests` (6 Contract-Tests
+  inkl. Verwaltungs-Negativprüfung); Gesamtsuite
+  `VideoPlayer.Maui.Tests`: 1498/1498 grün. tvOS-Kompiliernachweis
+  über den macOS-CI-Job `build-tvos` (Run 42131194033).
+
+## 2026-11-08 — tvOS-App: Videowiedergabe mit Fortschritts-Tracking, Auto-Fortsetzung und Spurwahl
+
+- **Nativer Player (`TvosPlayerViewController`):** `AVPlayerViewController`-
+  Vollbildansicht mit System-Transport-UI als reiner Ereignis-Übersetzer
+  in den MVU-Zyklus — Quellanwendung aus `PlayerState.Source`
+  (`appliedLocation`/`appliedMediaId`/`sourceApplyFailed`-Muster der
+  MAUI-`PlayerPage`), Fortsetzungs-Seek bei `ReadyToPlay`, 5-s-Takt per
+  `AddPeriodicTimeObserver` → `PlaybackProgressMessage`, Ende/Fehler über
+  `DidPlayToEndTime`/`FailedToPlayToEndTime`/Item-`status` →
+  `PlaybackEndedMessage`/`PlaybackFailedMessage`;
+  `PlayerPageOpenedMessage`/`PlayerClosedMessage` im Lebenszyklus.
+  Takt-, Schwellen- und Fortsetzungslogik bleiben im plattformneutralen
+  `AppUpdate` (Endfenster/`EndWindowStreak`, Ende-Toleranz,
+  Auto-Fortsetzung).
+- **Playlist-Kontext:** next/previous als
+  `TransportBarCustomMenuItems` (`CanNavigate*`); Titel,
+  `PlaylistLabel` und Gesehen-Hinweis im Info-Tab
+  (`CustomInfoViewControllers`, tvOS 15); die systemeigene Spurwahl
+  greift, wenn der Stream `AVMediaSelectionGroup`s anbietet — sonst
+  entfällt sie ersatzlos.
+- **Verdrahtung:** `TvosAppEffectHandler` führt jetzt
+  `NavigateToPlayerEffect` (`TvosNavigator.PresentPlayer`),
+  `ResolvePlaybackSourceEffect` (`PlaybackSourceService`, offline nur
+  lokale Dateien), `LoadUpcomingEpisodesEffect`,
+  `ReportPlaybackProgressEffect` (`pending_progress`-Queue),
+  `StartPlaylistPlaybackEffect` und die Playlist-Navigation
+  (next/previous/advance) sowie `ProtectDownloadExpiryEffect`/
+  `ExpireWatchedDownloadEffect` (`DownloadService`) echt aus;
+  `AppComposition` hält die neuen Singletons.
+  `PreparedTargetViewController`/`PresentPreparedTarget` entfernt —
+  alle Navigationsziele sind real.
+- **Absicherung:** neue `TvOsPlaybackContractTests` (5 Contract-Tests),
+  bestehende tvOS-Contract-Tests angepasst; Gesamtsuite
+  `VideoPlayer.Maui.Tests`: 1492/1492 grün. tvOS-Kompiliernachweis über
+  den macOS-CI-Job `build-tvos`.
+
+## 2026-11-07 — tvOS-App: Browsing und Suche als Lean-back-Oberfläche
+
+- **Quellen-Auswahl auf der Startseite:** neue „Quellen"-Reihe
+  (`SourceCarouselView`/`SourceItemCell`) aus dem Modellstand
+  `AppModel.SourcesOverview` — mit Server-Icons über
+  `api/sourceicons/{id}` (`TvosPosterImageService.GetSourceIconAsync`,
+  eigener Schlüsselraum `.sourceicon`) sowie Lade-, Leer- und
+  Fehlerzustand mit „Erneut versuchen" (`SourcesReloadRequestedMessage`).
+- **Modale Browsing-Seite (`SourceBrowserViewController`):** Auswahl
+  einer Quelle (`SourceSelectedMessage` → `NavigateToSourceOverviewEffect`)
+  öffnet die Seite über `TvosNavigator.PresentSourceBrowser` —
+  Genre-Filterleiste inklusive „Alle" (`SourceGenreCell` mit
+  Auswahlzustand, ausgeblendet ohne Server-Genres), Suchfeld per
+  tvOS-Systemtastatur (Diktat/Continuity-Tastatur; der eingegebene Text
+  bleibt über einen Spiegel-Guard sichtbar) und vertikal scrollendes
+  Poster-Raster mit Nachladen am Listenende
+  (`SourceItemsNextPageRequestedMessage`). Lade-, Leer- und
+  Fehlerzustände mit Wiederholmöglichkeit
+  (`SourceItemsRetryRequestedMessage`); die Menü-Taste schließt zurück
+  zum Menürahmen.
+- **Verdrahtung:** `TvosAppEffectHandler` führt jetzt
+  `LoadSourcesEffect`, `LoadSourceGenresEffect`, `LoadSourceItemsEffect`
+  (über `SourceBrowserService`/`api/Sources`, `api/SourceGenres`,
+  `api/items` — rein lesend) und `NavigateToSourceOverviewEffect` aus;
+  `AppComposition` hält den `SourceBrowserService`-Singleton.
+  `PresentPreparedTarget` stapelt auf dem obersten präsentierten
+  Controller — Eintrags-Auswahl im Browser öffnet das vorbereitete
+  Navigationsziel ohne Fehler (Detailansicht folgt im Detailseiten-Schritt).
+- **Absicherung:** neue `TvOsBrowsingContractTests` (8 Quell-Contract-
+  Tests); Gesamtsuite `VideoPlayer.Maui.Tests`: 1480/1480 grün. Der
+  tvOS-Kompiliernachweis erfolgt über den macOS-CI-Job `build-tvos`.
+
+## 2026-11-06 — tvOS-App: Fix nativer Linkfehler `e_sqlite3` unter `tvossimulator-arm64`
+
+- **Befund:** `SQLitePCLRaw.lib.e_sqlite3.tvos` (transitiv via
+  `bundle_green`, alle Versionen bis einschließlich 2.1.14) bettet ein
+  `e_sqlite3.a` ein, das nur `tvos-arm64` (Gerät) und `tvossimulator-x64`
+  enthält — die `tvossimulator-arm64`-Slice fehlt, der `build-tvos`-Job
+  scheiterte beim Linken (`ld: ... built for 'tvOS'`).
+- **Fix:** Die `e_sqlite3.a` aus `SQLitePCLRaw.lib.e_sqlite3` 3.53.3
+  (iOS/ios-simulator) unterscheidet sich von einem tvOS-Build nur im
+  Plattform-Tag der Mach-O-Objekte — `scripts/Retag-Esqlite3-For-Tvos.py`
+  schreibt `LC_BUILD_VERSION` (7→8) bzw. `LC_VERSION_MIN_IPHONEOS`
+  (0x25→0x2f) um und erzeugt die eingecheckten Archive
+  `VideoPlayer.TvOS/NativeLibs/e_sqlite3.tvossimulator.a`
+  (x86_64+arm64-Simulator) und `e_sqlite3.tvos-arm64.a` (Gerät):
+  - `VideoPlayer.TvOS.csproj` unterdrückt das transitive
+    `SQLitePCLRaw.lib.e_sqlite3.tvos` per `ExcludeAssets="all"` (nur unter
+    `IncludeTvOsTarget=true`) und linkt die retaggten Archive als
+    `NativeReference` RID-konditioniert (`Static`, `ForceLoad`).
+  - `SqliteBootstrap`/Storage bleiben unverändert: der upstream-Pfad
+    `Batteries_V2.Init()` → `provider.internal` → `__Internal` löst die
+    Symbole aus der gelinkten `e_sqlite3.a` — keine Auswirkung auf
+    iOS/Android/Windows/macOS.
+  - Verworfen: Provider-Wechsel auf System-`libsqlite3.dylib` (tvOS
+    exportiert `sqlite3_load_extension`/`sqlite3_enable_load_extension`
+    nicht; `-U`-Linkerflags erwiesen sich als Sackgasse) — Details in
+    `docs/help/tv-app/installation.md`.
+- **Contract-Test:** `TvOsProject_HasNoPackageReferencesOrMaui` lässt
+  jetzt wirkungslose Unterdrückungs-Referenzen (`ExcludeAssets="all"`)
+  zu und blockiert weiterhin jede Paket-Referenz mit beitragenden
+  Assets.
+- **Absicherung:** `dotnet build VideoPlayer.App.sln` grün,
+  `VideoPlayer.Maui.Tests` 1472/1472 grün; tvOS-Link verifiziert über
+  den macOS-CI-Job `build-tvos` (Run 42110023939 — beide Jobs grün).
+  Details: `docs/help/tv-app/installation.md` (Paketkompatibilität).
+
+## 2026-11-06 — tvOS-App: Serververbindung — Einrichtung, Pairing und Anmeldung
+
+- **Einrichtungsseite (`ServerSetupViewController`):** vollständige
+  fernbedienungstaugliche Serververbindung — Liste bekannter Server,
+  Netzwerk-Erkennung (mDNS + UDP) mit Auswahl, manuelle Adresseingabe,
+  Ticket-/Kurzcode-Kopplung, Geräte-Pairing per Einmal-Code und
+  Zugangsdaten-Anmeldung, jeweils mit Lauf-, Leer- und Inline-
+  Fehlerzuständen (ungültiger/abgelaufener Code, Versuchssperre,
+  unerreichbarer Server, abgelehnte Anmeldung, verworfenes Geräte-Token)
+  sowie „Erneut prüfen".
+- **Anmeldemaske (`LoginViewController`):** Benutzername/Passwort mit
+  einmaliger Vorbefüllung, Kurzcode-Alternative und Ausstieg zur
+  Servereinrichtung.
+- **Menü-Einstiege:** „Server wechseln" auf der Einstellungsseite,
+  „Abmelden" auf der Profilseite (`LogoutRequestedMessage` +
+  `LogoutEffect` nun im `TvosAppEffectHandler` verdrahtet); bei
+  bestehender Verbindung führt die Menü-Taste der Siri Remote bzw.
+  „Zurück zum Menü" zurück in den Tab-Rahmen.
+- **Eingaben:** alle Textfelder nutzen die tvOS-Systemtastatur
+  (Diktat/Continuity-Tastatur); kein QR-Scan (keine Kamera).
+- **Absicherung:** neue `TvOsConnectionContractTests` (7 Quell-Contract-
+  Tests); Gesamtsuite `VideoPlayer.Maui.Tests`: 1460/1460 grün. Der
+  tvOS-Kompiliernachweis erfolgt über den macOS-CI-Job `build-tvos`.
+
+## 2026-11-06 — tvOS-App: MVU-Grundgerüst, Plattform-Anbindung, Navigation und Fokus
+
+- **MVU-Verdrahtung:** `MvuHost` + `AppUpdate` laufen in der tvOS-App; der
+  neue `TvosAppEffectHandler` führt die Effekte des Start- und
+  Verbindungs-Workflows aus (Ablage, Einstellungen, Serververwaltung,
+  Erreichbarkeitsprüfung, Pairing/Bootstrap, Anmeldung, Netzwerk-Monitoring,
+  Server-Ereignisse, Synchronisation, Startseiten-Listen, Navigation).
+  Nicht für tvOS vorgesehene Effekte laufen protokolliert ins Leere —
+  kein Schreibzugriff auf verwaltete Inhalte.
+- **Plattform-Adapter:** `NSUserDefaultsSettingsStore` (ISettingsStore),
+  `KeychainSecretStore` (ISecretStore via Schlüsselbund),
+  `TvosStorageLayoutProvider` (`Library/Caches`-Wurzeln) und
+  `TvosNetworkStatusMonitor` (`NWPathMonitor`) ersetzen die MAUI-Pendants.
+- **Plattformneutrale Dienste nach `VideoPlayer.Mvu` verschoben:**
+  `ServerAddressProvider`/`IServerAddressProvider`, `ServerHealthProbe`/
+  `IServerHealthProbe`, `SignalRServerEventsConnection` inkl.
+  `Microsoft.AspNetCore.SignalR.Client` — beide Apps teilen sich nun
+  denselben Code.
+- **Lean-back-Navigation:** `UITabBarController`-Seitenrahmen (Startseite,
+  Favoriten, Playlists, Downloads, Profil, Einstellungen) per Siri Remote
+  fokussierbar; modellgetriebene Zustandsseiten (Ladeanzeige, Server
+  einrichten, Anmelden) mit „Erneut prüfen"-Aktion.
+- **Tests:** neue `TvOsAppContractTests` sichern Adapter, Effekt-Abdeckung,
+  Komposition und Navigation über Quell-Assertions ab (1421/1421 grün);
+  tvOS-Kompiliernachweis weiterhin über macOS-CI-Job `build-tvos`.
+
+## 2026-11-05 — tvOS-Projektgerüst mit macOS-CI-Build-Validierung
+
+- **Neues App-Projekt `VideoPlayer.TvOS`:** eigenständige .NET-for-tvOS-App
+  (`net10.0-tvos`, UIKit) als minimale Programmhülle — Fenster mit dunkler
+  Startansicht „Heimkino TV", ohne fachliche Funktion. Referenziert
+  ausschließlich die plattformneutralen `net10.0`-Bibliotheken
+  (`VideoPlayer.Mvu`, `VideoPlayer.Storage`, `VideoPlayer.ApiClient`,
+  `msTools.DeveloperApi`); in `VideoPlayer.App.sln` aufgenommen.
+- **`IncludeTvOsTarget`-Schalter:** das tvOS-TFM ist nur unter macOS aktiv;
+  auf anderen Systemen degradiert das Projekt zu einer leeren
+  `net10.0`-Bibliothek, damit Solution-Restore/-Build/-Tests unter Windows
+  weiter laufen (Muster der `Include*Target`-Schalter in
+  `VideoPlayer.Maui.csproj`).
+- **Neuer CI-Job `build-tvos`** in `pr-checks.yml` auf `macos-latest`:
+  SDK-Band-Pin, tvOS-Workload-Rollback `26.5.10318` (analog dem iOS-Pfad)
+  und Simulator-Build ohne Codesignierung — sichert die tvOS-
+  Kompilierbarkeit fortlaufend ab.
+- **Paketkompatibilität geprüft und dokumentiert:** SQLite-Stack
+  (`SQLitePCLRaw.*`, `sqlite-net-pcl`) unter `net10.0-tvos` kompatibel;
+  `Zeroconf` (mDNS) kompilierbar mit dokumentiertem
+  Multicast-Entitlement-Risiko und UDP-only-Ausweich
+  (`UdpServerDiscovery`). Details: `docs/help/tv-app/`.
+- **Tests:** Neue Contract-Tests `TvOsProjectContractTests` sichern
+  Solution-Mitgliedschaft, Referenzmenge, TFM-Schalter und die
+  CI-Job-Konfiguration ab (1446/1446 Tests grün).
+
 ## 2026-10-27 — Downloadbereinigung: Ablaufdatum, Herkunft und automatische Entfernung von Downloads
 
 - **Ablaufdatum je Download:** Jeder fertiggestellte Download trägt jetzt `ExpiresAtUtc` (`DownloadManifestEntry`, neue Spalte via `EnsureColumnAsync`) = Fertigstellungszeitpunkt + „Aufbewahrungszeit für Downloads" (neue Einstellung `AppSettings.DownloadRetentionDays`, 1–365 Tage, Standard 7). Wartende und laufende Aufträge haben kein Ablaufdatum — die Frist beginnt erst mit `completed`; ein erneutes Einreihen („Erneut versuchen") setzt es zurück. Geänderte Einstellungen wirken nur auf neu gesetzte Ablaufdaten. Der Altbestand ohne `ExpiresAtUtc` gilt im ersten Bereinigungslauf als abgelaufen.

@@ -322,6 +322,9 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
             case ResumeDownloadsEffect resume:
                 await ResumeDownloadsAsync(resume.Settings, cancellationToken);
                 break;
+            case ReconcileDownloadsEffect reconcile:
+                await ReconcileDownloadsAsync(reconcile.Settings, cancellationToken);
+                break;
             case RunAutoDownloadsEffect autoRun:
                 await RunAutoDownloadsAsync(autoRun, cancellationToken);
                 break;
@@ -1482,7 +1485,7 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
             // ausgewiesen; abgelaufene Downloads werden entfernt bzw.
             // als Auto-Download-Kandidat verlängert (offline ermittelte
             // Kandidatenmenge des Vorlaufs).
-            orphanedBytes = (await ReconcileWithExpiryPassAsync(settings, cancellationToken)).OrphanedBytes;
+            orphanedBytes = (await autoDownloads.ReconcileWithExpiryProtectionAsync(settings, cancellationToken)).OrphanedBytes;
             items = await downloads.LoadItemsAsync();
             usedBytes = downloads.GetUsedBytes();
         }
@@ -1676,7 +1679,7 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
             // werden gezählt, abgelaufene Downloads werden entfernt bzw.
             // als Auto-Download-Kandidat verlängert — ein Fehler des
             // Abgleichs unterbricht die Wiederaufnahme nicht.
-            await ReconcileWithExpiryPassAsync(settings, cancellationToken);
+            await autoDownloads.ReconcileWithExpiryProtectionAsync(settings, cancellationToken);
             await downloads.ResumeInterruptedAsync(settings, cancellationToken);
             // Der Wiederaufnahme-Eintrag mit der Anzahl obliegt
             // DownloadService (eine Schicht pro Ereignis) — hier nur
@@ -1689,19 +1692,23 @@ public sealed class ShellAppEffectHandler : IAppEffectHandler
     }
 
     /// <summary>
-    /// Bereinigungslauf mit Ablauf-Pass: ermittelt zuerst die
-    /// Auto-Download-Kandidatenmenge und führt den Abgleich damit
-    /// aus — die Kandidatenmenge steuert den Verlängerungs-Pass,
-    /// das gekoppelte Aufrufpaar bleibt an einer Stelle.
+    /// Reiner Ablauf-/Abgleichslauf (<see cref="ReconcileDownloadsEffect"/>):
+    /// identisch zum Abgleich-Anteil der Wiederaufnahme — ein Fehler
+    /// wird protokolliert und unterbricht den Zyklus nicht.
     /// </summary>
-    /// <param name="settings">Aktuelle App-Einstellungen (Aufbewahrungszeit der Verlängerung).</param>
+    /// <param name="settings">Aktuelle App-Einstellungen (Aufbewahrungszeit des Ablauf-Passes).</param>
     /// <param name="cancellationToken">Bricht die Operation ab.</param>
-    /// <returns>Das Abgleichsergebnis.</returns>
-    private async Task<DownloadReconcileResult> ReconcileWithExpiryPassAsync(
-        AppSettings settings, CancellationToken cancellationToken)
+    /// <returns>Eine abgeschlossene Aufgabe nach dem Abgleich.</returns>
+    private async Task ReconcileDownloadsAsync(AppSettings settings, CancellationToken cancellationToken)
     {
-        var candidateKeys = await autoDownloads.GetAutoDownloadCandidateKeysAsync(settings, cancellationToken);
-        return await downloads.ReconcileAsync(settings, candidateKeys, cancellationToken);
+        try
+        {
+            await autoDownloads.ReconcileWithExpiryProtectionAsync(settings, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Download-Abgleich fehlgeschlagen");
+        }
     }
 
     private async Task RunAutoDownloadsAsync(RunAutoDownloadsEffect autoRun, CancellationToken cancellationToken)

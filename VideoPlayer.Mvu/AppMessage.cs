@@ -218,6 +218,16 @@ public sealed record HomeListsReloadRequestedMessage : AppMessage;
 public sealed record HomeRefreshRequestedMessage : AppMessage;
 
 /// <summary>
+/// Die App wurde aktiviert bzw. trat in den Vordergrund (z. B. nach
+/// Suspension) — löst den Ablauf-/Abgleichslauf des Download-Manifests
+/// aus (neben den Triggern App-Start, Online-Rückkehr und
+/// Seitenaufruf) sowie bei bestehender Verbindung die Neu-Einplanung
+/// verwaister Download-Aufträge über den Unterbrechungspfad. Der
+/// tvOS-Lebenszyklus (<c>OnActivated</c>) dispatcht diese Nachricht.
+/// </summary>
+public sealed record AppActivatedMessage : AppMessage;
+
+/// <summary>
 /// Der Abruf des servergenerierten Hero-Hintergrundbilds
 /// (<c>api/pictures/hero-background</c>) ist abgeschlossen (Antwort auf
 /// <c>LoadHeroBackgroundEffect</c>). <paramref name="ImageBytes"/> ist

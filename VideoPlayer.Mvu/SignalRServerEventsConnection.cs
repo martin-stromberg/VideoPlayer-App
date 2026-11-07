@@ -2,7 +2,7 @@ using Microsoft.AspNetCore.SignalR.Client;
 using Microsoft.Extensions.Logging;
 using VideoPlayer.Mvu;
 
-namespace VideoPlayer.Maui.Services;
+namespace VideoPlayer.Mvu;
 
 /// <summary>
 /// Echtzeit-Verbindung zum SignalR-Hub <c>hubs/mediaupdate</c> des

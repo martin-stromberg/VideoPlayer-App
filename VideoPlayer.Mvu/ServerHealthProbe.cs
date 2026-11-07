@@ -2,7 +2,7 @@ using Microsoft.Extensions.Logging;
 using VideoPlayer.ApiClient;
 using VideoPlayer.Storage;
 
-namespace VideoPlayer.Maui.Services;
+namespace VideoPlayer.Mvu;
 
 /// <summary>
 /// Führt die Erreichbarkeitsprüfung über den plattformneutralen
