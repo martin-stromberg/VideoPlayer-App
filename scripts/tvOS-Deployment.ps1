@@ -193,7 +193,9 @@ function Sync-RemoteCheckout {
         exit 1
     }
     Write-Host "Synchronisiere Remote-Checkout $RemoteRepoPath auf $sha ..." -ForegroundColor Cyan
-    $check = Invoke-OnMac -Script "test -d '$RemoteRepoPath/.git'" -Description "Remote-Repo pruefen" -ReturnExitCode
+    # Doppelte Quotes: $HOME darf remote expandiert werden — der
+    # Standardwert '$HOME/VideoPlayer-App' ist bewusst nicht aufgeloest.
+    $check = Invoke-OnMac -Script "test -d `"$RemoteRepoPath/.git`"" -Description "Remote-Repo pruefen" -ReturnExitCode
     if ($check -ne 0) {
         Write-Host "Fehler: Kein Repo-Checkout unter $RemoteRepoPath auf dem Mac gefunden." -ForegroundColor Red
         Write-Host "Lege dort einen Clone an (z. B. git clone <url> $RemoteRepoPath) oder" -ForegroundColor Yellow
