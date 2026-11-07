@@ -703,7 +703,12 @@ function Invoke-Build {
     $repoDir = Get-MacRepoDir
     $workload = Get-WorkloadScript
 
-    if ($hasCodesigning) {
+    # Simulator-Apps laufen ohne Signatur (simctl signiert lokal ad-hoc) —
+    # publish erfordert zwingend eine Device-RID und bricht bei
+    # Simulator-RIDs mit 'A runtime identifier for a device
+    # architecture must be specified'. Auch mit versehentlich
+    # gesetzten Signatur-Env-Vars bleibt der Simulator-Pfad bei build.
+    if ($hasCodesigning -and $Action -ne "simulator") {
         $verb = "publish"
         $signProps = "-p:CodesignKey=`"$CodesignKey`" -p:CodesignProvision=`"$CodesignProvision`" -p:ArchiveOnBuild=true"
         if ($CodesignEntitlements) { $signProps += " -p:CodesignEntitlements=`"$CodesignEntitlements`"" }
