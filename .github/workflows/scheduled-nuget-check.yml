@@ -1,0 +1,40 @@
+name: Scheduled NuGet Check
+
+on:
+  schedule:
+    # Woechentlich montags, 05:00 UTC (Cron laeuft in UTC).
+    - cron: '0 5 * * 1'
+  # Manueller Probelauf ohne Warten auf den Cron-Zeitpunkt.
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+# Verhindert parallele Laeufe (Cron + manueller Dispatch): ein
+# gleichzeitiger Zweitlauf koennte zwischen Duplikatpruefung und
+# Erstellung ein Doppel-Issue erzeugen.
+concurrency:
+  group: scheduled-nuget-check.yml
+
+jobs:
+  create-issue:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Gemeinsame Ablauflogik (Label sicherstellen, Duplikatpruefung,
+      # Issue anlegen) liegt in der Composite Action, damit sie nicht
+      # je Workflow gepflegt werden muss.
+      - name: Review-Issue erstellen
+        uses: ./.github/actions/create-review-issue
+        with:
+          label: review-nuget
+          label-description: Automatically created issues for the weekly NuGet package check
+          title-prefix: NuGet-Prüfung
+          # ISO-Jahr (%G) statt Kalenderjahr, damit der Titel am
+          # Jahreswechsel zur ISO-Kalenderwoche (%V) passt.
+          title-date-format: '+%G-W%V'
+          body-file: .github/issue-bodies/nuget-check.md
+          gh-token: ${{ secrets.GITHUB_TOKEN }}

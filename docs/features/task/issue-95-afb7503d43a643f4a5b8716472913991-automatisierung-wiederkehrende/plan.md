@@ -44,7 +44,8 @@ konkretisiert aus dem Abschnitt `Fachlicher Scope` der
 |----------------------|-----------------|------------|
 | Duplikaterkennung | Dediziertes Label je Prüfungsart (`review-architektur-sicherheit`, `review-nuget`, `review-compliance`) plus `gh issue list --state open --label "<label>" --limit 1`; Label wird je Lauf vorab per `gh label create --force` idempotent sichergestellt. | Es existiert noch kein Review-Label — die Festlegung liegt beim Plan. Label-Suche ist robust gegen Titelvariationen (Zeitraum im Titel würde eine Titelsuche pro Zyklus treffen); `--force` macht den ersten Lauf ohne manuelle Label-Anlage möglich. Label-Namen ASCII-transliteriert analog zur Umlaut-Umschrift-Konvention. |
 | Ablage der Issue-Bodies | Separate UTF-8-Markdown-Dateien unter `.github/issue-bodies/` (`architecture-security-review.md`, `nuget-check.md`, `compliance-review.md`), Erstellung via `gh issue create --body-file`. | Der in Issue #95 exakt vorgegebene Prüfungstext bleibt eigenständig diff- und reviewbar statt in YAML-Blöcken eingebettet; Umlaute bleiben als UTF-8 lesbar. Preis: `actions/checkout` und `contents: read` — bewusst akzeptiert. |
-| Ausführungswerkzeug | `gh` CLI in `bash`-Schritten mit `GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}` (statt `actions/github-script`). | Konsistent zu den bestehenden Workflows (`gh pr create`, `gh release upload`); keine zusätzliche Action-Abhängigkeit. |
+| Ausführungswerkzeug | `gh` CLI in `bash`-Schritten (statt `actions/github-script`); `GH_TOKEN` wird den Schritten aus dem Input `gh-token` gesetzt. | Konsistent zu den bestehenden Workflows (`gh pr create`, `gh release upload`); keine zusätzliche Action-Abhängigkeit. Composite Actions können keine `secrets` lesen, daher erfolgt die Token-Übergabe als Input. |
+| Gemeinsame Ablauflogik | Composite Action `.github/actions/create-review-issue/` mit den Inputs `label`, `label-description`, `title-prefix`, `title-date-format`, `body-file` und `gh-token`; die drei Workflows rufen sie nach `actions/checkout` per `uses:` mit ihren jeweiligen Parametern auf. | Die drei Workflow-Dateien waren bis auf Cron, Label, Titelschema und Body-Datei identisch — fachliche Änderungen an der Ablauflogik müssten sonst dreifach gepflegt werden (Review-Befund). Composite Action statt Reusable Workflow (`workflow_call`), damit die Schritte im Job des Aufrufers sichtbar bleiben und keine zweite Job-/Permissions-Ebene nötig ist; entspricht der bestehenden Konvention unter `.github/actions/`. |
 | Cron-Zeitpunkte | 05:00 UTC für alle drei Workflows; Wochentag Montag für die wöchentliche Prüfung. | GitHub Actions wertet Cron in UTC aus; 05:00 UTC entspricht ca. 06:00/07:00 Uhr deutscher Zeit — früher Morgen, bevor der Arbeitstag beginnt. Annahme aus `requirement.md` (Offene Frage 1). |
 | Zusätzlicher Trigger | `workflow_dispatch` in allen drei Workflows. | Ermöglicht Probeläufe und sofortige Auslösung ohne Warten auf den Cron-Zeitpunkt; Annahme aus `requirement.md` (Offene Frage 3). Wirkung erst ab Default-Branch. |
 | Laufzeitumgebung | `ubuntu-latest`, ein Job `create-issue` je Workflow. | Wie die Release-Workflows; `gh` und `bash` sind vorinstalliert. |
@@ -56,30 +57,41 @@ konkretisiert aus dem Abschnitt `Fachlicher Scope` der
 ### Gemeinsamer Ablauf (alle drei Workflows)
 
 1. Der Trigger feuert (`schedule`-Cron oder `workflow_dispatch`); der
-   Job `create-issue` startet auf `ubuntu-latest` mit `env:
-   GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}`.
-2. Schritt `Checkout`: `actions/checkout@v4` stellt die Issue-Body-Datei
-   bereit.
-3. Schritt „Review-Label sicherstellen": `gh label create "<label>"
-   --color ededed --description "..." --force` — idempotent, legt das
+   Job `create-issue` startet auf `ubuntu-latest`.
+2. Schritt `Checkout`: `actions/checkout@v4` stellt die
+   Issue-Body-Datei und die lokale Composite Action bereit.
+3. Schritt „Review-Issue erstellen": `uses:
+   ./.github/actions/create-review-issue` mit den `with:`-Parametern
+   `label`, `label-description`, `title-prefix`, `title-date-format`,
+   `body-file` und `gh-token: ${{ secrets.GITHUB_TOKEN }}`.
+4. Innerhalb der Composite Action — Schritt „Review-Label
+   sicherstellen": `gh label create "$REVIEW_LABEL" --color ededed
+   --description "$LABEL_DESCRIPTION" --force` — idempotent, legt das
    Label beim ersten Lauf an bzw. aktualisiert es.
-4. Schritt „Duplikatprüfung": `gh issue list --state open --label
-   "<label>" --limit 1 --json number` liefert die Trefferzahl.
-5. Bei mindestens einem Treffer: Protokollzeile „Offenes Issue #N
+5. Schritt „Duplikatprüfung": `gh issue list --state open --label
+   "$REVIEW_LABEL" --limit 1 --json number` liefert die Trefferzahl.
+6. Bei mindestens einem Treffer: Protokollzeile „Offenes Issue #N
    existiert bereits — kein neues Issue" ausgeben und der Lauf endet
    erfolgreich (kein Issue).
-6. Schritt „Issue-Titel bestimmen": Zeitraum über `date` berechnen
-   (Monat `%Y-%m`, ISO-Kalenderwoche `%G-W%V` bzw. Jahr `%Y`) und den
-   vollständigen Titel zusammensetzen.
-7. Schritt „Issue erstellen": `gh issue create --title "<titel>"
-   --label "<label>" --body-file ".github/issue-bodies/<datei>.md"`;
-   die URL des neuen Issues wird ins Lauf-Protokoll geschrieben.
-8. Schlägt ein `gh`-Aufruf fehl (z. B. fehlende Rechte), endet der
+7. Schritt „Issue-Titel bestimmen": Zeitraum über `date` mit dem
+   übergebenen `title-date-format` berechnen (Monat `%Y-%m`,
+   ISO-Kalenderwoche `%G-W%V` bzw. Jahr `%Y`) und den vollständigen
+   Titel aus `title-prefix` und Zeitraum zusammensetzen.
+8. Schritt „Issue erstellen": `gh issue create --title "$TITLE"
+   --label "$REVIEW_LABEL" --body-file "$BODY_FILE"`; die URL des
+   neuen Issues wird ins Lauf-Protokoll geschrieben.
+9. Schlägt ein `gh`-Aufruf fehl (z. B. fehlende Rechte), endet der
    Schritt nicht-null und der Workflow-Lauf ist als fehlgeschlagen
    sichtbar — kein stilles Überspringen.
 
+Alle Expressions werden in der Composite Action ausschließlich über
+`env:`-Variablen an die `run:`-Blöcke übergeben und dort als `"$VAR"`
+referenziert — keine `${{ ... }}`-Interpolation im Shell-Code.
+
 Beteiligte Klassen/Komponenten: Workflow-Datei unter
-`.github/workflows/`, `actions/checkout@v4`, `gh` CLI (`label create`,
+`.github/workflows/`, Composite Action
+`.github/actions/create-review-issue/action.yml`,
+`actions/checkout@v4`, `gh` CLI (`label create`,
 `issue list`, `issue create`), `.github/issue-bodies/*.md`,
 GitHub-Issues- und -Labels-API.
 
@@ -116,6 +128,7 @@ Dokumentationsdateien (siehe „Neue Dateien").
 | `.github/workflows/scheduled-architecture-security-review.yml` | Workflow | Monatlicher Cron + Dispatch, Duplikatprüfung, Issue-Erstellung (Architektur/Sicherheit) |
 | `.github/workflows/scheduled-nuget-check.yml` | Workflow | Wöchentlicher Cron + Dispatch, Duplikatprüfung, Issue-Erstellung (NuGet) |
 | `.github/workflows/scheduled-compliance-review.yml` | Workflow | Jährlicher Cron + Dispatch, Duplikatprüfung, Issue-Erstellung (Compliance) |
+| `.github/actions/create-review-issue/action.yml` | Composite Action | Gemeinsame Ablauflogik Label-Sicherstellung → Duplikatprüfung → Titelermittlung → Issue-Erstellung, parametrisiert über `with:`-Inputs |
 | `.github/issue-bodies/architecture-security-review.md` | Issue-Vorlage | Vorgegebener Prüfungstext aus Issue #95, erste Zeile `@softwarewerkstatt` |
 | `.github/issue-bodies/nuget-check.md` | Issue-Vorlage | Vorgegebener Prüfungstext aus Issue #95 |
 | `.github/issue-bodies/compliance-review.md` | Issue-Vorlage | Vorgegebener Prüfungstext aus Issue #95 |
@@ -171,8 +184,8 @@ Workflow-Dateien hinterlegte Konstanten:
 | Cron NuGet-Prüfung | `schedule`-Cron | `0 5 * * 1` | Wöchentlich montags, 05:00 UTC |
 | Cron Compliance-Review | `schedule`-Cron | `0 5 1 1 *` | Jährlich am 1. Januar, 05:00 UTC |
 | `permissions` | Workflow-Block | `contents: read`, `issues: write` | Checkout für Body-Datei sowie Label-/Issue-Verwaltung; minimal wie bisherige Workflows |
-| `GH_TOKEN` | Env auf Job-Ebene | `${{ secrets.GITHUB_TOKEN }}` | Authentifizierung der `gh`-Aufrufe |
-| Label-Namen | Konstante je Workflow | `review-architektur-sicherheit`, `review-nuget`, `review-compliance` | Duplikat-Merkmal und Issue-Markierung |
+| `GH_TOKEN` | `with:`-Input `gh-token`, je Schritt als Env gesetzt | `${{ secrets.GITHUB_TOKEN }}` | Authentifizierung der `gh`-Aufrufe; Composite Actions lesen keine `secrets` |
+| Label-Namen | `with:`-Input `label` je Workflow | `review-architektur-sicherheit`, `review-nuget`, `review-compliance` | Duplikat-Merkmal und Issue-Markierung; je Workflow nur einmal als Input-Wert hinterlegt |
 
 Keine Secrets über `GITHUB_TOKEN` hinaus erforderlich; Änderungen an
 Cron-Zeitpunkten erfolgen per Commit.
@@ -212,38 +225,54 @@ Cron-Zeitpunkten erfolgen per Commit.
      Body — erste Zeile `@softwarewerkstatt`, danach der
      Prüfungsauftrag mit Aufzählung exakt wie in Issue #95.
 
-2. **Workflow `scheduled-architecture-security-review.yml` anlegen**
-   - Voraussetzungen: Body-Datei aus Schritt 1.
+2. **Composite Action `.github/actions/create-review-issue/action.yml` anlegen**
+   - Voraussetzungen: Body-Dateien aus Schritt 1 (die Pfade werden als
+     `with:`-Input referenziert).
+   - Beschreibung: `runs: using: composite` mit den Inputs `label`,
+     `label-description`, `title-prefix`, `title-date-format`,
+     `body-file` und `gh-token` sowie der gemeinsamen Schrittfolge
+     Label sicherstellen → Duplikatprüfung → Titel bestimmen → `gh
+     issue create`. Alle Expressions werden per `env:` an die
+     `run:`-Blöcke übergeben (keine `${{ ... }}`-Interpolation im
+     Shell-Code); `GH_TOKEN` wird je Schritt aus dem Input gesetzt.
+     Kommentare deutsch im Projektstil (ASCII-Umschrift ae/oe/ue/ss).
+
+3. **Workflow `scheduled-architecture-security-review.yml` anlegen**
+   - Voraussetzungen: Body-Datei aus Schritt 1, Composite Action aus
+     Schritt 2.
    - Beschreibung: `on: schedule` (`0 5 1 * *`) plus
      `workflow_dispatch`, `permissions` (`contents: read`,
      `issues: write`), `concurrency`-Gruppe, Job `create-issue` auf
-     `ubuntu-latest` mit den Schritten Checkout → Label sicherstellen →
-     Duplikatprüfung → Titel bestimmen → `gh issue create`.
-     Kommentare deutsch im Projektstil (ASCII-Umschrift ae/oe/ue/ss).
+     `ubuntu-latest` mit den Schritten `actions/checkout` → `uses:
+     ./.github/actions/create-review-issue` mit den `with:`-Parametern
+     für das Architektur-/Sicherheitsreview (Label
+     `review-architektur-sicherheit`, Titel-Format `+%Y-%m`).
 
-3. **Workflow `scheduled-nuget-check.yml` anlegen**
-   - Voraussetzungen: Body-Datei aus Schritt 1; Schritt 2 als
-     Strukturvorlage.
-   - Beschreibung: Analog Schritt 2 mit Cron `0 5 * * 1`, Label
-     `review-nuget`, Titel mit ISO-Kalenderwoche (`date +%G-W%V`).
+4. **Workflow `scheduled-nuget-check.yml` anlegen**
+   - Voraussetzungen: Body-Datei aus Schritt 1; Composite Action aus
+     Schritt 2; Schritt 3 als Strukturvorlage.
+   - Beschreibung: Analog Schritt 3 mit Cron `0 5 * * 1`, Label
+     `review-nuget`, Titel mit ISO-Kalenderwoche (`+%G-W%V`).
 
-4. **Workflow `scheduled-compliance-review.yml` anlegen**
-   - Voraussetzungen: Body-Datei aus Schritt 1; Schritt 2 als
-     Strukturvorlage.
-   - Beschreibung: Analog Schritt 2 mit Cron `0 5 1 1 *`, Label
-     `review-compliance`, Titel mit Jahreszahl (`date +%Y`).
+5. **Workflow `scheduled-compliance-review.yml` anlegen**
+   - Voraussetzungen: Body-Datei aus Schritt 1; Composite Action aus
+     Schritt 2; Schritt 3 als Strukturvorlage.
+   - Beschreibung: Analog Schritt 3 mit Cron `0 5 1 1 *`, Label
+     `review-compliance`, Titel mit Jahreszahl (`+%Y`).
 
-5. **YAML-/Syntax-Verifikation der Workflows**
-   - Voraussetzungen: Schritte 2–4; lokal verfügbares Prüfwerkzeug
+6. **YAML-/Syntax-Verifikation der Workflows**
+   - Voraussetzungen: Schritte 2–5; lokal verfügbares Prüfwerkzeug
      (z. B. `actionlint`, alternativ YAML-Parse + `gh workflow view`
      nach Push).
-   - Beschreibung: Alle drei Workflow-Dateien statisch prüfen; die
-     `gh`-Kommandos für Label-/Issue-Abfrage lokal gegen das Repository
-     trocken ausführen (nur lesende `gh issue list`-Prüfung), um
-     Parameter und Label-Filter zu verifizieren.
+   - Beschreibung: Alle drei Workflow-Dateien und die `action.yml` der
+     Composite Action statisch prüfen (`yaml.safe_load`, `bash -n` auf
+     die `run:`-Inhalte); die `gh`-Kommandos für die Issue-Abfrage
+     lokal gegen das Repository trocken ausführen (nur lesende `gh
+     issue list`-Prüfung), um Parameter und Label-Filter zu
+     verifizieren.
 
-6. **Hilfeseite `docs/help/review-automatisierung.md` und Index-Eintrag**
-   - Voraussetzungen: Schritte 2–4 (Workflow-Namen und Cron-Ausdrücke
+7. **Hilfeseite `docs/help/review-automatisierung.md` und Index-Eintrag**
+   - Voraussetzungen: Schritte 3–5 (Workflow-Namen und Cron-Ausdrücke
      stehen final fest).
    - Beschreibung: Deutsche Hilfeseite mit den drei Workflows,
      Zeitpunkten, Duplikatlogik (Label-basiert, Blockade durch offenes
@@ -251,13 +280,13 @@ Cron-Zeitpunkten erfolgen per Commit.
      auf die Default-Branch-Aktivierung; Eintrag unter „Infrastruktur"
      in `docs/help/index.md`.
 
-7. **README-, Release-Notes- und changes.log-Einträge**
-   - Voraussetzungen: Schritte 1–6.
+8. **README-, Release-Notes- und changes.log-Einträge**
+   - Voraussetzungen: Schritte 1–7.
    - Beschreibung: Kurzer Hinweis in `README.md` (Abschnitt „Branching
      und CI"), englischer Bullet in `docs/RELEASE_NOTES.md`, deutscher
      Eintrag in `changes.log` — jeweils gemäß Projektprozess.
 
-8. **Probelauf nach Erreichen des Default-Branches**
+9. **Probelauf nach Erreichen des Default-Branches**
    - Voraussetzungen: Merge/Promotion der Workflows nach `main`
      (`staging`-Pfad); `gh`-Zugang zum Repository.
    - Beschreibung: Je Workflow einmal `workflow_dispatch` auslösen,

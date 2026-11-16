@@ -28,3 +28,4 @@
 - [Windows-End-to-End-Tests](e2e-tests.md) — FlaUI-Testprojekt, das die echte `VideoPlayer.Maui.exe` mit isoliertem Profil startet und Setup, Pairing, Anmeldung, den Serverwechsel sowie den Wiedergabestart gegen einen lokalen Mock-Server durchspielt.
 - [OsInterface-Tests und Flake-Quarantäne](stabilitaet/index.md) — Lane-Trennung umgebungssensitiver Tests per `Category=OsInterface`-Trait: blockierende `verify`-Lane vs. Best-Effort-Lane `test-os-interface` mit Einmal-Re-Run, TRX-Artefakten und deduplizierter Quarantäne-Auswertung.
 - [Staging-Branch](staging-branch.md) — Branching- und Release-Prozess.
+- [Review-Automatisierung](review-automatisierung.md) — drei zeitgesteuerte Workflows, die periodisch Review-Issues mit `@softwarewerkstatt`-Erwähnung anlegen (monatliches Architektur- und Sicherheitsreview, wöchentliche NuGet-Prüfung, jährliches Compliance-Review) inklusive Label-basierter Duplikatvermeidung.
