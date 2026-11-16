@@ -86,6 +86,7 @@ Der Debug-Build startet einen lokalen Mini-HTTP-Server auf `127.0.0.1` (`GET /mo
 
 - `staging` ist der Integrationsbranch; Pull Requests gegen `staging` laufen durch Build-, Test- und Lint-Prüfungen.
 - `main` wird ausschließlich aus `staging` über PRs aktualisiert. Nach dem Merge entsteht ein Prerelease bzw. Semantic Release; der iOS-Build legt neben der `.ipa` das Symbolarchiv `release-ios-dsym.zip` am Release ab, damit TestFlight-Crash-Reports symbolisierbar bleiben.
+- Drei zeitgesteuerte Workflows erzeugen periodisch Review-Issues mit `@softwarewerkstatt`-Erwähnung (monatliches Architektur- und Sicherheitsreview, wöchentliche NuGet-Prüfung, jährliches Compliance- und Copyright-Review) — jeweils nur, wenn kein offenes Issue desselben Typs existiert. Aktiv werden sie erst auf dem Default-Branch. Details: `docs/help/review-automatisierung.md`.
 - Details: `docs/help/staging-branch.md`.
 
 ## Dokumentation

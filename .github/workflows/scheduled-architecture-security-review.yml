@@ -1,0 +1,38 @@
+name: Scheduled Architecture Security Review
+
+on:
+  schedule:
+    # Monatlich am 1. Tag des Monats, 05:00 UTC (Cron laeuft in UTC).
+    - cron: '0 5 1 * *'
+  # Manueller Probelauf ohne Warten auf den Cron-Zeitpunkt.
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+# Verhindert parallele Laeufe (Cron + manueller Dispatch): ein
+# gleichzeitiger Zweitlauf koennte zwischen Duplikatpruefung und
+# Erstellung ein Doppel-Issue erzeugen.
+concurrency:
+  group: scheduled-architecture-security-review.yml
+
+jobs:
+  create-issue:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Gemeinsame Ablauflogik (Label sicherstellen, Duplikatpruefung,
+      # Issue anlegen) liegt in der Composite Action, damit sie nicht
+      # je Workflow gepflegt werden muss.
+      - name: Review-Issue erstellen
+        uses: ./.github/actions/create-review-issue
+        with:
+          label: review-architektur-sicherheit
+          label-description: Automatically created issues for the monthly architecture and security review
+          title-prefix: Architektur- und Sicherheitsreview
+          title-date-format: '+%Y-%m'
+          body-file: .github/issue-bodies/architecture-security-review.md
+          gh-token: ${{ secrets.GITHUB_TOKEN }}

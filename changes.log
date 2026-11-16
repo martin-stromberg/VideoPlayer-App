@@ -1,5 +1,39 @@
 # Änderungsprotokoll
 
+## 2026-11-16 — Automatisierung wiederkehrender Architektur-, Sicherheits- und Compliance-Reviews (Issue #95)
+
+- **Drei zeitgesteuerte Workflows (`scheduled-architecture-security-review.yml`,
+  `scheduled-nuget-check.yml`, `scheduled-compliance-review.yml`):**
+  neue GitHub-Actions-Workflows unter `.github/workflows/`, die
+  periodisch Issues im Repository-Tracker anlegen und darin
+  `@softwarewerkstatt` erwähnen — monatliches Architektur- und
+  Sicherheitsreview (1. des Monats, 05:00 UTC), wöchentliche
+  NuGet-Prüfung (montags, 05:00 UTC) und jährliches Compliance- und
+  Copyright-Review (1. Januar, 05:00 UTC); zusätzlich jeweils per
+  `workflow_dispatch` manuell auslösbar.
+- **Gemeinsame Ablauflogik:** die eigentliche Schrittfolge (Label
+  sicherstellen, Duplikatprüfung, Titelermittlung, Issue-Erstellung)
+  liegt in der neuen Composite Action
+  `.github/actions/create-review-issue/`, die alle drei Workflows mit
+  ihren jeweiligen Parametern (Label, Titelschema, Body-Datei)
+  aufrufen.
+- **Duplikatvermeidung:** jeder Lauf stellt zunächst sein dediziertes
+  Review-Label (`review-architektur-sicherheit`, `review-nuget`,
+  `review-compliance`) idempotent per `gh label create --force` sicher
+  und prüft dann per `gh issue list --state open --label`, ob bereits
+  ein offenes Issue desselben Typs existiert — in diesem Fall endet
+  der Lauf erfolgreich ohne neue Erstellung. Eine `concurrency`-Gruppe
+  je Workflow verhindert Doppel-Issues durch parallele Läufe.
+- **Issue-Inhalte:** Titel mit Zeitraumsangabe (`YYYY-MM`, ISO-
+  Kalenderwoche `G-WV` bzw. `YYYY`), Body aus den neuen
+  Textdateien unter `.github/issue-bodies/` mit `@softwarewerkstatt`
+  als erster Zeile — exakt der in Issue #95 vorgegebene Prüfungstext.
+- **Dokumentation:** neue Hilfeseite `docs/help/review-automatisierung.md`
+  (Ablauf, Duplikatlogik, Aktivierungshinweis) mit Index-Eintrag sowie
+  Hinweis im README-Abschnitt „Branching und CI". Die Workflows werden
+  erst aktiv, wenn sie über `staging` → `main` den Default-Branch
+  erreichen.
+
 ## 2026-11-08 — tvOS-App: Manuelle Downloads über Hintergrund-URL-Session mit Ablauf, Abgleich und Quota
 
 - **Transfer-Backend (`TvosBackgroundDownloadBackend`):** neues

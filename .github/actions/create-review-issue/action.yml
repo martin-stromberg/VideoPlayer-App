@@ -1,0 +1,86 @@
+name: Create Review Issue
+description: >-
+  Stellt ein Review-Label sicher, prueft ueber das Label auf ein
+  bereits offenes Issue desselben Typs und legt sonst ein neues
+  Review-Issue an. Wird von den drei scheduled-*-Workflows mit
+  jeweils eigenem Label, Titelschema und Body-Datei aufgerufen.
+
+inputs:
+  label:
+    description: Review-Label fuer die Duplikatpruefung und die Markierung des neuen Issues.
+    required: true
+  label-description:
+    description: Beschreibung, mit der das Label bei der ersten Anlage erzeugt wird.
+    required: true
+  title-prefix:
+    description: Fester Titelteil vor dem Zeitraum (z. B. "Architektur- und Sicherheitsreview").
+    required: true
+  title-date-format:
+    description: date-Format fuer den Zeitraum im Issue-Titel (z. B. "+%Y-%m" oder "+%G-W%V").
+    required: true
+  body-file:
+    description: Pfad zur Issue-Body-Datei relativ zum Repository-Root.
+    required: true
+  gh-token:
+    description: Token fuer die gh-Aufrufe; der Aufrufer uebergibt secrets.GITHUB_TOKEN, da Composite Actions keine secrets lesen.
+    required: true
+
+runs:
+  using: composite
+  steps:
+    # Label idempotent sicherstellen, damit die Duplikatsuche und die
+    # Issue-Markierung auch beim ersten Lauf funktionieren.
+    - name: Review-Label sicherstellen
+      env:
+        REVIEW_LABEL: ${{ inputs.label }}
+        LABEL_DESCRIPTION: ${{ inputs.label-description }}
+        GH_TOKEN: ${{ inputs.gh-token }}
+      run: |
+        gh label create "$REVIEW_LABEL" \
+          --color ededed \
+          --description "$LABEL_DESCRIPTION" \
+          --force
+      shell: bash
+
+    # Duplikatpruefung ueber das dedizierte Label: existiert bereits
+    # ein offenes Issue dieses Typs, endet der Lauf erfolgreich ohne
+    # neue Erstellung.
+    - name: Offenes Issue desselben Typs suchen
+      id: duplicate
+      env:
+        REVIEW_LABEL: ${{ inputs.label }}
+        GH_TOKEN: ${{ inputs.gh-token }}
+      run: |
+        number=$(gh issue list --state open --label "$REVIEW_LABEL" --limit 1 --json number --jq '.[0].number // empty')
+        if [ -n "$number" ]; then
+          echo "Offenes Issue #$number existiert bereits - kein neues Issue."
+          echo "exists=true" >> "$GITHUB_OUTPUT"
+        else
+          echo "exists=false" >> "$GITHUB_OUTPUT"
+        fi
+      shell: bash
+
+    - name: Issue-Titel bestimmen
+      id: title
+      if: steps.duplicate.outputs.exists != 'true'
+      env:
+        TITLE_PREFIX: ${{ inputs.title-prefix }}
+        TITLE_DATE_FORMAT: ${{ inputs.title-date-format }}
+      run: |
+        period="$(date "$TITLE_DATE_FORMAT")"
+        echo "title=$TITLE_PREFIX $period" >> "$GITHUB_OUTPUT"
+      shell: bash
+
+    - name: Issue erstellen
+      if: steps.duplicate.outputs.exists != 'true'
+      env:
+        TITLE: ${{ steps.title.outputs.title }}
+        REVIEW_LABEL: ${{ inputs.label }}
+        BODY_FILE: ${{ inputs.body-file }}
+        GH_TOKEN: ${{ inputs.gh-token }}
+      run: |
+        gh issue create \
+          --title "$TITLE" \
+          --label "$REVIEW_LABEL" \
+          --body-file "$BODY_FILE"
+      shell: bash
