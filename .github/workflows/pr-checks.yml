@@ -35,8 +35,11 @@ jobs:
       - name: Install .NET MAUI workload
         run: dotnet workload install maui --skip-manifest-update
 
+      # Runtime-Packs (z. B. Mono win-x64) liegen nicht auf nuget.org,
+      # sondern im offiziellen dotnet10-Band-Feed --source ueberschreibt
+      # die NuGet.config-Sources, darum nuget.org explizit mitfuehren.
       - name: Restore
-        run: dotnet restore
+        run: dotnet restore --source https://api.nuget.org/v3/index.json --source https://pkgs.dev.azure.com/dnceng/public/_packaging/dotnet10/nuget/v3/index.json
 
       - name: Build Tests
         run: dotnet build VideoPlayer.Maui.Tests/VideoPlayer.Maui.Tests.csproj --no-restore --configuration Release
@@ -97,8 +100,9 @@ jobs:
       - name: Install .NET MAUI workload
         run: dotnet workload install maui --skip-manifest-update
 
+      # Restore-Quellen wie im verify-Job (Runtime-Packs aus dotnet10-Feed).
       - name: Restore
-        run: dotnet restore
+        run: dotnet restore --source https://api.nuget.org/v3/index.json --source https://pkgs.dev.azure.com/dnceng/public/_packaging/dotnet10/nuget/v3/index.json
 
       - name: Build Tests
         run: dotnet build VideoPlayer.Maui.Tests/VideoPlayer.Maui.Tests.csproj --no-restore --configuration Release
