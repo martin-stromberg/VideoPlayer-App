@@ -24,6 +24,14 @@ jobs:
         with:
           dotnet-version: '10.0.x'
 
+      # SDK-Band 10.0.x pinnen (Muster build-tvos unten): windows-latest
+      # traegt mittlerweile SDK 11.x vorinstalliert; ohne Pin loest dotnet
+      # auf 11.x auf und NETSDK1147 (maui-android) bricht den Restore.
+      - name: Pin SDK band for this job
+        run: |
+          echo '{"sdk":{"version":"10.0.100","rollForward":"latestFeature","allowPrerelease":false}}' > global.json
+          dotnet --version
+
       - name: Install .NET MAUI workload
         run: dotnet workload install maui --skip-manifest-update
 
@@ -79,6 +87,12 @@ jobs:
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '10.0.x'
+
+      # SDK-Band-Pin wie im verify-Job (NETSDK1147 unter SDK 11.x).
+      - name: Pin SDK band for this job
+        run: |
+          echo '{"sdk":{"version":"10.0.100","rollForward":"latestFeature","allowPrerelease":false}}' > global.json
+          dotnet --version
 
       - name: Install .NET MAUI workload
         run: dotnet workload install maui --skip-manifest-update
