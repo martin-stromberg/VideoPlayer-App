@@ -102,8 +102,8 @@ elseif (-not [string]::IsNullOrWhiteSpace($env:GH_TOKEN)) {
 
     $runListJson = gh run list --workflow $Workflow --limit $RunLimit --json databaseId
     if ($LASTEXITCODE -ne 0) {
-        Write-Host ("::warning::gh run list fuer Workflow '{0}' fehlgeschlagen " +
-            "(Exit {1}) — es werden keine Artefakte ausgewertet.") -f $Workflow, $LASTEXITCODE
+        Write-Host (("::warning::gh run list fuer Workflow '{0}' fehlgeschlagen " +
+            "(Exit {1}) — es werden keine Artefakte ausgewertet.") -f $Workflow, $LASTEXITCODE)
         $runs = @()
     }
     else {
@@ -113,9 +113,9 @@ elseif (-not [string]::IsNullOrWhiteSpace($env:GH_TOKEN)) {
         $target = Join-Path $downloadRoot ([string]$run.databaseId)
         gh run download $run.databaseId --name $ArtifactName --dir $target 2>$null
         if ($LASTEXITCODE -ne 0) {
-            Write-Host ("::warning::gh run download fuer Lauf {0} (Artefakt '{1}') " +
+            Write-Host (("::warning::gh run download fuer Lauf {0} (Artefakt '{1}') " +
                 "fehlgeschlagen (Exit {2}).") -f `
-                $run.databaseId, $ArtifactName, $LASTEXITCODE
+                $run.databaseId, $ArtifactName, $LASTEXITCODE)
         }
         if (Test-Path -LiteralPath (Join-Path $target "os-main") -PathType Container) {
             $runDirs.Add($target)
@@ -181,8 +181,8 @@ if ($candidates.Count -gt 0 -and $isCi) {
     $labelReady = $false
     $labelListJson = gh label list --search $label --json name
     if ($LASTEXITCODE -ne 0) {
-        Write-Host ("::warning::gh label list fehlgeschlagen (Exit {0}) — " +
-            "Quarantaene-Issues werden nicht angelegt.") -f $LASTEXITCODE
+        Write-Host (("::warning::gh label list fehlgeschlagen (Exit {0}) — " +
+            "Quarantaene-Issues werden nicht angelegt.") -f $LASTEXITCODE)
     }
     else {
         $existing = @($labelListJson | ConvertFrom-Json)
@@ -196,9 +196,9 @@ if ($candidates.Count -gt 0 -and $isCi) {
                 $labelReady = $true
             }
             else {
-                Write-Host ("::warning::Label '{0}' konnte nicht angelegt werden " +
+                Write-Host (("::warning::Label '{0}' konnte nicht angelegt werden " +
                     "(Exit {1}) — Quarantaene-Issues werden nicht angelegt.") -f `
-                    $label, $LASTEXITCODE
+                    $label, $LASTEXITCODE)
             }
         }
     }
@@ -209,8 +209,8 @@ if ($candidates.Count -gt 0 -and $isCi) {
             $issueListJson = gh issue list --label $label --state open `
                 --search "in:title `"$title`"" --json number
             if ($LASTEXITCODE -ne 0) {
-                Write-Host ("::warning::gh issue list fuer '{0}' fehlgeschlagen " +
-                    "(Exit {1}) — Issue wird nicht angelegt.") -f $entry.Key, $LASTEXITCODE
+                Write-Host (("::warning::gh issue list fuer '{0}' fehlgeschlagen " +
+                    "(Exit {1}) — Issue wird nicht angelegt.") -f $entry.Key, $LASTEXITCODE)
                 continue
             }
 
@@ -233,8 +233,8 @@ Dokumentation: docs/help/stabilitaet/os-interface-tests.md
                 Write-Host "Quarantaene-Issue angelegt: $title"
             }
             else {
-                Write-Host ("::warning::Quarantaene-Issue '{0}' konnte nicht " +
-                    "angelegt werden (Exit {1}).") -f $title, $LASTEXITCODE
+                Write-Host (("::warning::Quarantaene-Issue '{0}' konnte nicht " +
+                    "angelegt werden (Exit {1}).") -f $title, $LASTEXITCODE)
             }
         }
     }
