@@ -9,6 +9,7 @@ namespace VideoPlayer.Maui.Tests;
 /// Tabellenanlage, Roundtrips und Ablageorte der beiden Datenbanken.
 /// </summary>
 [Collection("SqliteDatabase")]
+[Trait("Category", "OsInterface")]
 public class LocalDatabaseTests : IDisposable
 {
     private readonly string root;

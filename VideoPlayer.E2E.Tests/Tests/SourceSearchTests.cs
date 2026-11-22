@@ -10,6 +10,7 @@ namespace VideoPlayer.E2E.Tests.Tests;
 /// Trefferliste ab der ersten Seite, und der abgeschickte Suchtext bleibt
 /// bei Rückkehr auf die Seite als aktiver Filter sichtbar.
 /// </summary>
+[Trait("Category", "OsInterface")]
 public sealed class SourceSearchTests : E2ETestBase
 {
     private const long SourceId = 41;

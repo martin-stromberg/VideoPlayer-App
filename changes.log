@@ -1,5 +1,47 @@
 # Änderungsprotokoll
 
+## 2026-11-22 — Flaky-Test-Härtung: OsInterface-Lane, Einmal-Re-Run und Quarantäne-Auswertung
+
+- **Lane-Trennung (`pr-checks.yml`):** Umgebungssensitive Tests tragen
+  `[Trait("Category", "OsInterface")]` — in `VideoPlayer.Maui.Tests`
+  24 Klassen auf Klassenebene plus die drei `DiscoverAsync_*`-Methoden
+  in `UdpServerDiscoveryTests` auf Methodenebene, in
+  `VideoPlayer.E2E.Tests` alle 19 Testklassen. Die blockierende
+  `verify`-Lane filtert sie per `--filter "Category!=OsInterface"`
+  heraus und lädt ihre TRX-Ergebnisse als `verify-trx` hoch; der neue,
+  nicht blockierende Job `test-os-interface` (`continue-on-error:
+  true`, `timeout-minutes: 30`, Release) führt sie mit
+  `--filter "Category=OsInterface"` aus.
+- **Einmal-Re-Run und Flake-Auswertung:** `scripts/Retry-FlakyTests.ps1`
+  wiederholt im Job genau die im Hauptlauf fehlgeschlagenen Tests
+  einmal — als Fehlschlag zählt die explizite Outcome-Menge
+  `Failed`/`Error`/`Timeout`, zentral in `scripts/FlakyTestTrx.ps1`
+  geteilt. `scripts/Analyze-FlakyTestResults.ps1` wertet die
+  `os-interface-trx`-Artefakte der letzten Läufe (`-RunLimit` 10) aus,
+  meldet Tests mit „Hauptlauf fehlgeschlagen, Re-Run grün" ab
+  `-FlakeThreshold` 2 per `::warning`/Step-Summary und legt
+  deduplizierte Quarantäne-Issues mit Label `flaky-test` an
+  (job-eigene `permissions`: `actions: read`, `issues: write`).
+- **E2E-Härtung:** `AppInstance.StartAsync` teilt ein gemeinsames
+  Startup-Budget (Standard 45 s) auf devapi-Poll, Fenster-Attach und
+  erstes Modell — Kind-Wartezeiten erhalten das Restbudget statt
+  eigener Vollbudgets. `DeleteProfileDirectory` löscht Profilreste neu
+  über `TempDirectoryCleanup.DeleteWithRetry` (bis zu 3 Versuche,
+  Backoff 200/500/1000 ms, Restfehler protokolliert statt
+  kommentarlos geschluckt).
+- **Konvention per Meta-Test:** `OsInterfaceConventionTests` (in
+  `VideoPlayer.Maui.Tests`, blockierende Lane) erzwingt per
+  Quelltext-Scan, dass `[Trait("Flaky", "true")]` nur zusammen mit
+  `OsInterface` vergeben wird und jede E2E-Testklasse das Trait trägt.
+- **E2E bleibt lokal:** `VideoPlayer.E2E.Tests` läuft bewusst nicht in
+  der CI (keine interaktive Desktop-Session auf gehosteten Runnern);
+  die Markierung dient lokalen gefilterten Läufen. Debug-gegatete
+  DevApi-Tests (`#if DEBUG || DEV_API`) kompilieren in den
+  Release-Lanes nicht mit und bleiben ebenfalls ein lokaler Lauf.
+- **Doku:** neue Hilfeseite `docs/help/stabilitaet/`
+  (Lane-Regeln, Trait-, Re-Run- und Quarantäne-Konvention);
+  `docs/help/index.md` und `docs/help/e2e-tests.md` ergänzt.
+
 ## 2026-11-08 — tvOS-App: Manuelle Downloads über Hintergrund-URL-Session mit Ablauf, Abgleich und Quota
 
 - **Transfer-Backend (`TvosBackgroundDownloadBackend`):** neues

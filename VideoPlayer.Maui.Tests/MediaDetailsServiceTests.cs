@@ -16,6 +16,7 @@ namespace VideoPlayer.Maui.Tests;
 /// SQLite-Ablage (Manifest, Serienstruktur, Favoriten-Kopie).
 /// </summary>
 [Collection("SqliteDatabase")]
+[Trait("Category", "OsInterface")]
 public class MediaDetailsServiceTests : IDisposable
 {
     private static readonly Uri Server = new("http://testserver/videoplayer/");

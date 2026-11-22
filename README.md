@@ -45,6 +45,8 @@ dotnet restore VideoPlayer.App.sln
 dotnet test VideoPlayer.Maui.Tests/VideoPlayer.Maui.Tests.csproj
 ```
 
+Umgebungssensitive Tests (echte Prozesse, UI-Automation, Sockets/Listener, Dateisystem) sind per `[Trait("Category", "OsInterface")]` markiert und lassen sich lokal filtern — die blockierende Teilmenge entsprechend der CI per `--filter "Category!=OsInterface"`. Details: [OsInterface-Tests und Flake-Quarantäne](docs/help/stabilitaet/os-interface-tests.md).
+
 Windows-App:
 
 ```powershell
@@ -64,7 +66,7 @@ dotnet build .\VideoPlayer.Maui\VideoPlayer.Maui.csproj -f net10.0-windows10.0.1
 | `msTools.DeveloperApi.Maui` | MAUI-Handler der Developer-API (`/tree`, `/invoke`, `/set-text`, Elementbaum) — baut auf `msTools.DeveloperApi` auf |
 | `VideoPlayer.Maui.Tests` | Testprojekt (Contract-Tests der MAUI-Oberfläche, MVU-Verhalten, API-Client) |
 | `VideoPlayer.E2E.Tests` | Windows-End-to-End-Tests (FlaUI/UI-Automation gegen die echte App + lokalen Mock-Server, inkl. Wiedergabestart) |
-| `scripts/` | Deployment-Skripte (`iOS-Deployment.ps1` für iOS-Simulator-/Geräte-/Store-Builds, `tvOS-Deployment.ps1` als tvOS-Pendant — Build, Simulator/Gerät, Store-Upload; unter Windows via SSH auf einen Mac-Checkout) |
+| `scripts/` | Deployment-Skripte (`iOS-Deployment.ps1` für iOS-Simulator-/Geräte-/Store-Builds, `tvOS-Deployment.ps1` als tvOS-Pendant — Build, Simulator/Gerät, Store-Upload; unter Windows via SSH auf einen Mac-Checkout) sowie Test-CI-Skripte (`Retry-FlakyTests.ps1` für den Einmal-Re-Run fehlgeschlagener OsInterface-Tests, `Analyze-FlakyTestResults.ps1` für die Flake-Auswertung der TRX-Artefakte) |
 
 ## Secrets und Client-Gate
 
@@ -84,13 +86,13 @@ Der Debug-Build startet einen lokalen Mini-HTTP-Server auf `127.0.0.1` (`GET /mo
 
 ## Branching und CI
 
-- `staging` ist der Integrationsbranch; Pull Requests gegen `staging` laufen durch Build-, Test- und Lint-Prüfungen.
+- `staging` ist der Integrationsbranch; Pull Requests gegen `staging` laufen durch Build-, Test- und Lint-Prüfungen. Die Tests laufen in zwei Lanes: `verify` (blockierend, `--filter "Category!=OsInterface"`) und `test-os-interface` (best effort, `continue-on-error`, mit Einmal-Re-Run fehlgeschlagener Tests, TRX-Artefakten und Flake-Auswertung inkl. Quarantäne-Issues).
 - `main` wird ausschließlich aus `staging` über PRs aktualisiert. Nach dem Merge entsteht ein Prerelease bzw. Semantic Release; der iOS-Build legt neben der `.ipa` das Symbolarchiv `release-ios-dsym.zip` am Release ab, damit TestFlight-Crash-Reports symbolisierbar bleiben.
 - Details: `docs/help/staging-branch.md`.
 
 ## Dokumentation
 
-Ausführliche fachliche Dokumentation liegt unter `docs/help/` — u. a. zu [Serververwaltung & Erststart](docs/help/serververwaltung-erststart.md), [Verbindung & Anmeldung](docs/help/verbindung-anmeldung.md), [Wiedergabe & PiP](docs/help/wiedergabe-pip.md), [Downloads](docs/help/downloads.md), [Offline-Betrieb](docs/help/offline-wiederherstellung.md), [Saisonlisten](docs/help/saisonale-startseitenlisten.md) und [E2E-Tests](docs/help/e2e-tests.md).
+Ausführliche fachliche Dokumentation liegt unter `docs/help/` — u. a. zu [Serververwaltung & Erststart](docs/help/serververwaltung-erststart.md), [Verbindung & Anmeldung](docs/help/verbindung-anmeldung.md), [Wiedergabe & PiP](docs/help/wiedergabe-pip.md), [Downloads](docs/help/downloads.md), [Offline-Betrieb](docs/help/offline-wiederherstellung.md), [Saisonlisten](docs/help/saisonale-startseitenlisten.md), [E2E-Tests](docs/help/e2e-tests.md) und [OsInterface-Tests & Flake-Quarantäne](docs/help/stabilitaet/os-interface-tests.md).
 
 ## Changelog
 

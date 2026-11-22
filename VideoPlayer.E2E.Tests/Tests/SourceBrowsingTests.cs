@@ -11,6 +11,7 @@ namespace VideoPlayer.E2E.Tests.Tests;
 /// bleibt die Leiste ausgeblendet — keine funktionslose
 /// „Alle"-nur-Zeile.
 /// </summary>
+[Trait("Category", "OsInterface")]
 public sealed class SourceBrowsingTests : E2ETestBase
 {
     private const long SourceId = 41;

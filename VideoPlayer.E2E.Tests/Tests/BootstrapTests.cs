@@ -9,6 +9,7 @@ namespace VideoPlayer.E2E.Tests.Tests;
 /// Erreichbarkeitsprüfung) und Kurzcode gegen den verbundenen Server —
 /// bis zum direkten Einstieg auf die Startseite ohne Anmeldemaske.
 /// </summary>
+[Trait("Category", "OsInterface")]
 public sealed class BootstrapTests : E2ETestBase
 {
     /// <summary>Initialisiert die Testklasse.</summary>

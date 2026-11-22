@@ -61,6 +61,7 @@ public class UdpServerDiscoveryTests
 
     /// <summary>Prüft DiscoverAsync: bei <c>ResponderReplies</c> → gibt Server zurück.</summary>
     [Fact]
+    [Trait("Category", "OsInterface")]
     public async Task DiscoverAsync_ResponderReplies_ReturnsServer()
     {
         // Lokaler Responder, der das Protokoll beantwortet.
@@ -89,6 +90,7 @@ public class UdpServerDiscoveryTests
 
     /// <summary>Prüft DiscoverAsync: der Responder ignoriert fremde Datagramme.</summary>
     [Fact]
+    [Trait("Category", "OsInterface")]
     public async Task DiscoverAsync_ResponderIgnoresForeignDatagrams()
     {
         using var responder = new UdpClient(new IPEndPoint(IPAddress.Loopback, 0));
@@ -114,6 +116,7 @@ public class UdpServerDiscoveryTests
 
     /// <summary>Prüft DiscoverAsync: ohne Responder → gibt eine leere Liste zurück.</summary>
     [Fact]
+    [Trait("Category", "OsInterface")]
     public async Task DiscoverAsync_NoResponder_ReturnsEmpty()
     {
         var discovery = new UdpServerDiscovery(

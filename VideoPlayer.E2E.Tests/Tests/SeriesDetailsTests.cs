@@ -10,6 +10,7 @@ namespace VideoPlayer.E2E.Tests.Tests;
 /// die Detailseite, die Episodenliste ist befüllt, der Staffel-Picker
 /// listet aufsteigend und ein Staffelwechsel bleibt bestehen.
 /// </summary>
+[Trait("Category", "OsInterface")]
 public sealed class SeriesDetailsTests : E2ETestBase
 {
     private const long ShowId = 8401;

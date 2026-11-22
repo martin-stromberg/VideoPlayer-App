@@ -49,7 +49,7 @@ Die Test-Infrastruktur wird nach der Blaupause `martin-stromberg/Softwareschmied
 5. Schritt **Upload**: `actions/upload-artifact` (`if: always()`, Name `os-interface-trx`, beide Ergebnisverzeichnisse + E2E-/Prozesslogs falls vorhanden).
 6. Schritt **Auswertung**: `pwsh scripts/Analyze-FlakyTestResults.ps1` mit `env: GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}` — lädt die `os-interface-trx`-Artefakte der letzten 10 `test-os-interface`-Läufe (`gh run list`/`gh run download`), berechnet pro Test die Flake-Rate, schreibt Step-Summary + `::warning` und erzeugt bei Schwellwert-Überschreitung deduplizierte Quarantäne-Issues (`gh issue create --label flaky-test`).
 
-Beteiligte Komponenten: `.github/workflows/pr-checks.yml`, `scripts/Retry-FlakyTests.ps1`, `scripts/Analyze-FlakyTestResults.ps1`, `actions/upload-artifact`.
+Beteiligte Komponenten: `.github/workflows/pr-checks.yml`, `scripts/Retry-FlakyTests.ps1`, `scripts/Analyze-FlakyTestResults.ps1`, `scripts/FlakyTestTrx.ps1` (gemeinsamer TRX-/Outcome-Helfer), `actions/upload-artifact`.
 
 ### Lokale gefilterte Läufe
 

@@ -3,6 +3,7 @@ using VideoPlayer.Storage;
 namespace VideoPlayer.Maui.Tests;
 
 /// <summary>Tests für <c>AppStorageLayout</c>.</summary>
+[Trait("Category", "OsInterface")]
 public class AppStorageLayoutTests : IDisposable
 {
     private readonly string root;

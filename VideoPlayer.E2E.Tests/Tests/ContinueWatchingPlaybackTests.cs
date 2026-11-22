@@ -14,6 +14,7 @@ namespace VideoPlayer.E2E.Tests.Tests;
 /// Auswahl-Pfad nutzt <c>/invoke</c> mit <c>itemIndex</c> auf dem
 /// BindableLayout-Karussell (dieselbe Ereigniskette wie Fingertipp).
 /// </summary>
+[Trait("Category", "OsInterface")]
 public sealed class ContinueWatchingPlaybackTests : E2ETestBase
 {
     private const long MovieId = 8001;

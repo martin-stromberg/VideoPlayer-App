@@ -26,4 +26,5 @@
 - [API: Saisonale Startseitenlisten](api/seasonal-genres.md) — Authentifizierter Endpunkt, Antwortformat und Ablaufgrenze.
 - [Developer-API für UI-Automatisierung](developer-api.md) — lokaler Mini-HTTP-Server (nur Debug/Opt-in) mit `GET /model`, `GET /tree`, `POST /invoke` und `POST /set-text` für automatisierte UI-Tests.
 - [Windows-End-to-End-Tests](e2e-tests.md) — FlaUI-Testprojekt, das die echte `VideoPlayer.Maui.exe` mit isoliertem Profil startet und Setup, Pairing, Anmeldung, den Serverwechsel sowie den Wiedergabestart gegen einen lokalen Mock-Server durchspielt.
+- [OsInterface-Tests und Flake-Quarantäne](stabilitaet/index.md) — Lane-Trennung umgebungssensitiver Tests per `Category=OsInterface`-Trait: blockierende `verify`-Lane vs. Best-Effort-Lane `test-os-interface` mit Einmal-Re-Run, TRX-Artefakten und deduplizierter Quarantäne-Auswertung.
 - [Staging-Branch](staging-branch.md) — Branching- und Release-Prozess.

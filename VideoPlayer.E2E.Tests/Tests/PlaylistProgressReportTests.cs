@@ -12,6 +12,7 @@ namespace VideoPlayer.E2E.Tests.Tests;
 /// dieser Weg belegt die komplette Kette inklusive App-Rand
 /// (<c>ShellAppEffectHandler</c>) und realem HTTP-Versand.
 /// </summary>
+[Trait("Category", "OsInterface")]
 public sealed class PlaylistProgressReportTests : E2ETestBase
 {
     private const long PlaylistId = 701;

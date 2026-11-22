@@ -10,6 +10,7 @@ namespace VideoPlayer.E2E.Tests.Tests;
 /// Wiedergabe läuft bzw. ein Stream-Fehlschlag landet als sichtbarer
 /// Fehler im Modell — in beiden Fällen darf der Prozess nicht enden.
 /// </summary>
+[Trait("Category", "OsInterface")]
 public sealed class PlaybackTests : E2ETestBase
 {
     /// <summary>Initialisiert die Testklasse.</summary>
@@ -64,6 +65,8 @@ public sealed class PlaybackTests : E2ETestBase
     }
 
     /// <summary>Mock-Server mit konfiguriertem Wiedergabefluss (Opt-in).</summary>
+    /// <param name="streamFails"><c>true</c>: der Videostream-Endpunkt liefert einen Fehler.</param>
+    /// <returns>Der konfigurierte, noch nicht gestartete Mock-Server.</returns>
     private static MockVideoServer NewServer(bool streamFails)
     {
         var videoPath = Path.Combine(AppContext.BaseDirectory, "Assets", "testvideo.mp4");
@@ -79,6 +82,8 @@ public sealed class PlaybackTests : E2ETestBase
     }
 
     /// <summary>Führt den Einrichtungsfluss bis zur befüllten Startseite aus.</summary>
+    /// <param name="app">Die gestartete App-Instanz.</param>
+    /// <param name="server">Der Mock-Server, an den gekoppelt und angemeldet wird.</param>
     private static async Task LoginOnHomeAsync(AppInstance app, MockVideoServer server)
     {
         await ConnectToPairingRequiredAsync(app, server);
@@ -98,6 +103,8 @@ public sealed class PlaybackTests : E2ETestBase
     /// im UIA-Baum — gleiche Lücke wie bei CollectionView) und löst auf
     /// der Detailseite „Abspielen" aus.
     /// </summary>
+    /// <param name="app">Die gestartete App-Instanz mit befüllter Startseite.</param>
+    /// <param name="server">Der Mock-Server mit dem konfigurierten Testfilm.</param>
     private static async Task OpenDetailsAndPlayAsync(AppInstance app, MockVideoServer server)
     {
         var tree = await app.DevApi.GetTreeAsync(Ct);

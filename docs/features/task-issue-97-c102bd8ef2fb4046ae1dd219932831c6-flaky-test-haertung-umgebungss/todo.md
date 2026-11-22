@@ -16,16 +16,16 @@ Devin-Umgebung nicht zur Verfügung; als Ersatz werden die Profile
 | [x] | 5 | Umsetzungsplanung (Unteragent) | `plan.md` |
 | [x] | 5a | Offene Punkte prüfen und ggf. Planung wiederholen (keine offenen Punkte; Ausschlüsse bestätigt) | `plan.md` (aktualisiert) |
 | [x] | 5b | Plan gegen Anforderung und Testbedarf prüfen (Unteragent) | `plan-check.md` |
-| [ ] | 5c | Planungscommit | – |
-| [ ] | 6 | Implementierung (Unteragent) | Codeänderungen |
-| [ ] | 7 | Plan-Review (Unteragent, bedingt) | `review.md` |
-| [ ] | 8 | Usability-Review (Unteragent, bei UI-Änderungen) | `review-usability.md` |
-| [ ] | 9 | Code-Review (Unteragent) | `review-code.md` |
-| [ ] | 10 | Tests ausführen inkl. Sichtprüfung der Abnahme-Screenshots (Unteragent) | `test-results.md` |
-| [ ] | – | Iteration oder Abschluss entscheiden | – |
-| [ ] | 11 | Folgeaufgaben dokumentieren (bei Schleifenabbruch) | `continue.md` |
-| [ ] | 12 | Dokumentation erstellen (Unteragent) | `docs/help/` |
-| [ ] | 12b | README aktualisieren (Unteragent) | `README.md` |
-| [ ] | 12c | Release Notes aktualisieren (Unteragent) | `docs/RELEASE_NOTES.md` |
-| [ ] | – | Feature-Verzeichnis löschen | – |
+| [x] | 5c | Planungscommit | – |
+| [x] | 6 | Implementierung (Unteragent, 3 Iterationen) | Codeänderungen |
+| [x] | 7 | Plan-Review (Unteragent, bedingt) | `review.md` (Vollständig umgesetzt) |
+| [x] | 8 | Usability-Review (nicht anwendbar, keine UI-Änderungen) | `review-usability.md` |
+| [x] | 9 | Code-Review (Unteragent, 5 Durchläufe bis Konvergenz) | `review-code.md` (Keine Befunde) |
+| [x] | 10 | Tests ausführen inkl. Sichtprüfung der Abnahme-Screenshots (Unteragent) | `test-results.md` |
+| [x] | – | Iteration oder Abschluss entscheiden (alle Prüfungen grün; Task 27 CI-Nachweis ausstehend → extern) | – |
+| [x] | 11 | Folgeaufgaben dokumentieren (nicht erforderlich — Schleife konvergiert) | `continue.md` |
+| [x] | 12 | Dokumentation erstellen (Unteragent) | `docs/help/` |
+| [x] | 12b | README aktualisieren (Unteragent) | `README.md` |
+| [x] | 12c | Release Notes aktualisieren (Unteragent — keine Änderung, interne CI-/Test-Infra nicht eintragspflichtig) | `docs/RELEASE_NOTES.md` |
+| [ ] | – | Feature-Verzeichnis löschen (offen — CI-Nachweis Task 27 steht noch aus) | – |
 | [ ] | – | Commit durchführen | – |

@@ -14,6 +14,7 @@ namespace VideoPlayer.E2E.Tests.Tests;
 /// Halten); die Dialog-Schaltflächen werden per Klartext-Name
 /// angesprochen.
 /// </summary>
+[Trait("Category", "OsInterface")]
 public sealed class ContinueWatchingContextMenuTests : E2ETestBase
 {
     private const long MovieId = 8501;
