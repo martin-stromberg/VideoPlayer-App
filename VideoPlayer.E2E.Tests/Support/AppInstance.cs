@@ -33,7 +33,8 @@ public sealed class AppInstance : IDisposable
     private bool disposed;
 
     private AppInstance(Process process, string exeDirectory, string profile, int devApiPort,
-        Task<string> standardOutput, Task<string> standardError, Action<Exception> reportShutdownFailure)
+        Task<string> standardOutput, Task<string> standardError, Action<Exception> reportShutdownFailure,
+        DateTime deadline)
     {
         this.process = process;
         this.exeDirectory = exeDirectory;
@@ -42,7 +43,7 @@ public sealed class AppInstance : IDisposable
         this.standardError = standardError;
         this.reportShutdownFailure = reportShutdownFailure;
         DevApi = new DevApiClient(devApiPort);
-        Ui = new UiDriver(automation, WaitForMainWindow(automation, process));
+        Ui = new UiDriver(automation, WaitForMainWindow(automation, process, deadline));
     }
 
     /// <summary>Der verwendete Profilname.</summary>
@@ -77,10 +78,14 @@ public sealed class AppInstance : IDisposable
         string? profile = null,
         Action<Exception>? reportShutdownFailure = null)
     {
-        var timeout = startupTimeout ?? TimeSpan.FromSeconds(45);
+        // Ein gemeinsames Startup-Budget für devapi-Poll, Fenster-Attach
+        // und erstes Modell — kein Schritt darf ein eigenes Vollbudget
+        // aufaddieren (Host-Deadline gilt für alle Phasen).
+        var startupBudget = startupTimeout ?? TimeSpan.FromSeconds(45);
+        var deadline = DateTime.UtcNow + startupBudget;
         var exeDirectory = Path.GetDirectoryName(exePath)!;
         var metadataPath = Path.Combine(exeDirectory, "devapi.json");
-        TryDelete(metadataPath);
+        TryDelete(metadataPath, Console.Error.WriteLine);
 
         var resolvedProfile = profile ?? $"e2e-{Sanitize(testName)}-{Guid.NewGuid():N}";
 
@@ -103,15 +108,26 @@ public sealed class AppInstance : IDisposable
 
         try
         {
-            var port = await WaitForDevApiPortAsync(metadataPath, process, timeout, cancellationToken);
+            var port = await WaitForDevApiPortAsync(metadataPath, process, deadline, cancellationToken);
             var instance = new AppInstance(process, exeDirectory, resolvedProfile, port,
-                standardOutput, standardError, reportShutdownFailure ?? (error => throw error));
+                standardOutput, standardError, reportShutdownFailure ?? (error => throw error),
+                deadline);
 
             // Die API meldet sich, sobald das Fenster steht — bis der
             // erste Modell-Snapshot lesbar ist, kann noch etwas Zeit
-            // vergehen (Startup-Workflow).
+            // vergehen (Startup-Workflow). Gilt das Restbudget der
+            // Startup-Deadline, nicht erneut das volle Timeout.
+            var remaining = deadline - DateTime.UtcNow;
+            if (remaining <= TimeSpan.Zero)
+            {
+                throw new TimeoutException(
+                    $"Startup-Budget von {startupBudget.TotalSeconds:0.#} s erschöpft: "
+                    + "devapi-Poll und Fenster-Attach haben die Startup-Deadline bereits "
+                    + "aufgebraucht — der erste Modell-Snapshot wurde nicht mehr abgewartet.");
+            }
+
             await instance.DevApi.WaitForModelAsync(
-                _ => true, timeout, "Developer-API erreichbar", cancellationToken);
+                _ => true, remaining, "Developer-API erreichbar", cancellationToken);
             return instance;
         }
         catch
@@ -177,7 +193,7 @@ public sealed class AppInstance : IDisposable
             shutdownFailure = WriteProcessDiagnostics(process, Profile, standardOutput, standardError,
                 killAttempted, killRequestSucceeded, killError, exitedBeforeShutdown, shutdownStartedAtUtc);
             process.Dispose();
-            TryDelete(Path.Combine(exeDirectory, "devapi.json"));
+            TryDelete(Path.Combine(exeDirectory, "devapi.json"), Console.Error.WriteLine);
             if (deleteProfile)
             {
                 DeleteProfileDirectory();
@@ -319,17 +335,10 @@ public sealed class AppInstance : IDisposable
 
         foreach (var dir in candidates)
         {
-            try
-            {
-                if (Directory.Exists(dir))
-                {
-                    Directory.Delete(dir, recursive: true);
-                }
-            }
-            catch (Exception)
-            {
-                // Reste eines Testprofils sind unkritisch.
-            }
+            // Gesperrte Handles (z. B. SQLite) lösen sich oft in
+            // Millisekunden — Retry/Backoff mit Protokollspur statt
+            // kommentarlosem Schlucken; Reste bleiben best-effort.
+            TempDirectoryCleanup.DeleteWithRetry(dir, log: Console.Error.WriteLine);
         }
     }
 
@@ -362,10 +371,9 @@ public sealed class AppInstance : IDisposable
     }
 
     private static async Task<int> WaitForDevApiPortAsync(
-        string metadataPath, Process process, TimeSpan timeout,
+        string metadataPath, Process process, DateTime deadline,
         CancellationToken cancellationToken)
     {
-        var deadline = DateTime.UtcNow + timeout;
         while (DateTime.UtcNow < deadline)
         {
             if (process.HasExited)
@@ -397,10 +405,9 @@ public sealed class AppInstance : IDisposable
         throw new TimeoutException("devapi.json der gestarteten App erschien nicht rechtzeitig.");
     }
 
-    private static Window WaitForMainWindow(UIA3Automation automation, Process process)
+    private static Window WaitForMainWindow(UIA3Automation automation, Process process, DateTime deadline)
     {
         var app = FlaUI.Core.Application.Attach(process.Id);
-        var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(30);
         while (DateTime.UtcNow < deadline)
         {
             var window = app.GetMainWindow(automation, TimeSpan.FromSeconds(2));
@@ -419,9 +426,14 @@ public sealed class AppInstance : IDisposable
         return chars.Length == 0 ? "test" : new string(chars).ToLowerInvariant();
     }
 
-    private static void TryDelete(string path)
+    private static void TryDelete(string path, Action<string>? log = null)
     {
         try { if (File.Exists(path)) { File.Delete(path); } }
-        catch (Exception) { /* best effort */ }
+        catch (Exception error)
+        {
+            // Best effort, aber mit Protokollspur statt kommentarlos.
+            log?.Invoke($"[cleanup] {path}: Löschen fehlgeschlagen "
+                + $"({error.GetType().Name}: {error.Message})");
+        }
     }
 }

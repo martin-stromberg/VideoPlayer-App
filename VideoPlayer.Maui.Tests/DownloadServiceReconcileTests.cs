@@ -14,6 +14,7 @@ namespace VideoPlayer.Maui.Tests;
 /// mit echter SQLite-Ablage und Temp-Verzeichnissen.
 /// </summary>
 [Collection("SqliteDatabase")]
+[Trait("Category", "OsInterface")]
 public class DownloadServiceReconcileTests : IDisposable
 {
     private static readonly Uri Server = new("http://testserver/videoplayer/");

@@ -214,6 +214,7 @@ public static class AppUpdate
             HomeRefreshRequestedMessage => model.ConnectionState == ConnectionState.Connected && !model.IsSyncRunning
                 ? new AppTransition(model with { IsSyncRunning = true }, [new RunFullSyncEffect()])
                 : new AppTransition(model, [new LoadHomeListsEffect()]),
+            AppActivatedMessage => UpdateAppActivated(model),
             HeroBackgroundLoadedMessage loaded => UpdateHeroBackgroundLoaded(model, loaded),
             StorageRecoveredMessage recovered => UpdateStorageRecovered(model, recovered),
             MediaItemSelectedMessage selected => UpdateMediaItemSelected(model, selected),
@@ -4197,6 +4198,24 @@ public static class AppUpdate
     }
 
     // --- Downloads (Schritt 11) -------------------------------------------
+
+    /// <summary>
+    /// App-Aktivierung (Vordergrund-Eintritt, z. B. nach Suspension):
+    /// der Ablauf-/Abgleichslauf des Download-Manifests läuft in jedem
+    /// Verbindungszustand — die Daten liegen lokal vor. Bei bestehender
+    /// Verbindung deckt der Wiederaufnahme-Effekt Abgleich und
+    /// Neu-Einplanung verwaister Aufträge im selben Lauf ab; ohne
+    /// Verbindung läuft nur der lokale Abgleich, damit wartende
+    /// Aufträge nicht verfrüht als verbindungslos fehlschlagen.
+    /// </summary>
+    /// <param name="model">Das aktuelle App-Model.</param>
+    /// <returns>Der Übergang mit dem passenden Download-Effekt.</returns>
+    private static AppTransition UpdateAppActivated(AppModel model)
+    {
+        return model.ConnectionState == ConnectionState.Connected
+            ? new AppTransition(model, [new ResumeDownloadsEffect(model.Settings)])
+            : new AppTransition(model, [new ReconcileDownloadsEffect(model.Settings)]);
+    }
 
     private static AppTransition UpdateDownloadsPageOpened(AppModel model)
     {

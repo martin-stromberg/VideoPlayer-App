@@ -160,16 +160,21 @@ public class DownloadsContractTests
         Assert.Contains("videos", code, StringComparison.Ordinal);
     }
 
-    /// <summary>Prüft DownloadService: Abgleich Ablageort ↔ Manifest ist implementiert und verdrahtet.</summary>
+    /// <summary>Prüft DownloadService: Abgleich Ablageort ↔ Manifest ist implementiert und verdrahtet — der Ablauf-Pass mit Auto-Download-Schutz liegt als einziger Einstiegspunkt im AutoDownloadService (Issue #88).</summary>
     [Fact]
     public void DownloadService_Reconcile_WiredInHandler()
     {
         var service = Read("VideoPlayer.Mvu", "DownloadService.cs");
+        var autoDownloads = Read("VideoPlayer.Mvu", "AutoDownloadService.cs");
         var handler = Read("VideoPlayer.Maui", "Services", "ShellAppEffectHandler.cs");
 
         Assert.Contains("ReconcileAsync", service, StringComparison.Ordinal);
         Assert.Contains("ErrorMissingFile", service, StringComparison.Ordinal);
-        Assert.Contains("downloads.ReconcileAsync", handler, StringComparison.Ordinal);
+        // Komposition des Geschäftsvorgangs liegt im Service, nicht im Handler.
+        Assert.Contains("GetAutoDownloadCandidateKeysAsync", autoDownloads, StringComparison.Ordinal);
+        Assert.Contains("downloads.ReconcileAsync", autoDownloads, StringComparison.Ordinal);
+        Assert.Contains("autoDownloads.ReconcileWithExpiryProtectionAsync", handler, StringComparison.Ordinal);
+        Assert.DoesNotContain("downloads.ReconcileAsync", handler, StringComparison.Ordinal);
     }
 
     /// <summary>Prüft DownloadsPage: Aktion „Alle Fehler löschen" ist verdrahtet (Schalter, Rückfrage, Message, Sichtbarkeit, Effekt-Handler).</summary>

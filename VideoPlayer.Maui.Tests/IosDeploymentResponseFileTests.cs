@@ -12,6 +12,7 @@ namespace VideoPlayer.Maui.Tests;
 /// Quelltext-Pin. Ohne verfügbares pwsh werden die Ausführungstests
 /// übersprungen, die Quelltext-Pins bleiben bestehen.
 /// </summary>
+[Trait("Category", "OsInterface")]
 public class IosDeploymentResponseFileTests
 {
     private static readonly string Root = RepositoryRoot.Find();
@@ -210,6 +211,8 @@ public class IosDeploymentResponseFileTests
     /// verständlicher Meldung abgelehnt — statt MSB1006/MSB4177/MSB1008
     /// beim dotnet-Aufruf.
     /// </summary>
+    /// <param name="valueArgument">Das PowerShell-Literal des <c>-Value</c>-Arguments mit dem verbotenen Zeichen.</param>
+    /// <param name="expectedCharName">Der erwartete Zeichenname in der Fehlermeldung.</param>
     [Theory]
     [InlineData("-Value 'sec\"ret'", "Anfuehrungszeichen")]
     [InlineData("-Value 'sec#ret'", "Raute")]

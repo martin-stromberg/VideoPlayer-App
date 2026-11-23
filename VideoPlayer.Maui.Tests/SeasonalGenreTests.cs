@@ -12,6 +12,7 @@ namespace VideoPlayer.Maui.Tests;
 
 /// <summary>Serververtrag, exklusive Ablaufgrenzen und die saisonale Cache-Projektion.</summary>
 [Collection("SqliteDatabase")]
+[Trait("Category", "OsInterface")]
 public sealed class SeasonalGenreTests : IDisposable
 {
     private readonly string root = Path.Combine(Path.GetTempPath(), "seasonal-mobile", Guid.NewGuid().ToString("N"));

@@ -1,0 +1,108 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <!-- tvOS-TFM nur auf macOS aktiv (bzw. explizit per
+         -p:IncludeTvOsTarget=true erzwingbar): die tvOS-Workload ist
+         unter Windows nicht installierbar; ein festes net10.0-tvos-TFM
+         wuerde 'dotnet restore'/'build'/'test' der gesamten Solution
+         unter Windows (lokale Entwicklung und der verify-Job in
+         .github/workflows/pr-checks.yml) mit NETSDK1147 brechen. Bei
+         deaktiviertem Ziel degradiert das Projekt zu einer leeren
+         net10.0-Bibliothek — gleiches Schalter-Muster wie die
+         Include*Target-Properties in VideoPlayer.Maui.csproj. -->
+    <IncludeTvOsTarget Condition="'$(IncludeTvOsTarget)' == ''">$([MSBuild]::IsOSPlatform('osx'))</IncludeTvOsTarget>
+    <TargetFramework Condition="'$(IncludeTvOsTarget)' == 'true'">net10.0-tvos</TargetFramework>
+    <TargetFramework Condition="'$(IncludeTvOsTarget)' != 'true'">net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <WarningsAsErrors>CS1591</WarningsAsErrors>
+    <RootNamespace>VideoPlayer.TvOS</RootNamespace>
+    <PackageLicenseFile>LICENSE</PackageLicenseFile>
+    <Copyright>Copyright (c) Martin Stromberg</Copyright>
+    <Authors>Martin Stromberg</Authors>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(IncludeTvOsTarget)' == 'true'">
+    <OutputType>Exe</OutputType>
+    <!-- Bundle-ID: Arbeitsannahme nach dem bestehenden
+         de.martinstromberg.videos-Schema; die endgueltige tvOS-Bundle-ID
+         wird im Apple-Developer-Account eingerichtet (manueller Vorlauf,
+         siehe Projektschritt 11 / Deployment-Pfad). -->
+    <ApplicationId>de.martinstromberg.videos.tv</ApplicationId>
+    <ApplicationDisplayVersion>0.1</ApplicationDisplayVersion>
+    <ApplicationVersion>1</ApplicationVersion>
+    <SupportedOSPlatformVersion>15.0</SupportedOSPlatformVersion>
+    <RuntimeIdentifiers>tvossimulator-x64;tvossimulator-arm64;tvos-arm64</RuntimeIdentifiers>
+    <!-- Keychain-Entitlement (SecItem in KeychainSecretStore): ohne
+         keychain-access-groups schlaegt jeder Schlüsselbund-Zugriff mit
+         errSecMissingEntitlement fehl — Token-Persistenz
+         (Pairing/Login) waere dann ohne Wirkung. Wirkt bei aktiver
+         Signierung; der adhoc-Simulatorpfad loest die Platzhalter im
+         Deployment-Skript auf. -->
+    <CodesignEntitlements>Entitlements.plist</CodesignEntitlements>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(IncludeTvOsTarget)' != 'true'">
+    <!-- Degradierte Huelle fuer Nicht-macOS-Hosts: keine Quelldateien
+         und eine leere Bibliothek, damit Solution-Restore/-Build/-Tests
+         ohne tvOS-Workload fehlerfrei durchlaufen. -->
+    <OutputType>Library</OutputType>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- Ausschliesslich plattformneutrale net10.0-Bibliotheken — keine
+         MAUI-Projekte (msTools.DeveloperApi.Maui, VideoPlayer.Maui),
+         da MAUI tvOS nicht unterstuetzt. -->
+    <ProjectReference Include="..\msTools.DeveloperApi\msTools.DeveloperApi.csproj" />
+    <ProjectReference Include="..\VideoPlayer.ApiClient\VideoPlayer.ApiClient.csproj" />
+    <ProjectReference Include="..\VideoPlayer.Mvu\VideoPlayer.Mvu.csproj" />
+    <ProjectReference Include="..\VideoPlayer.Storage\VideoPlayer.Storage.csproj" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(IncludeTvOsTarget)' == 'true'">
+    <!-- SQLitePCLRaw.lib.e_sqlite3.tvos kommt transitiv ueber
+         bundle_green (Dependency-Gruppe net6.0-tvos) herein und bettet
+         e_sqlite3.a in der verwalteten Assembly ein. Das Archiv enthaelt
+         nur tvos-arm64 (Geraet) + tvossimulator-x64 — keine
+         tvossimulator-arm64-Slice — womit der Simulator-Link auf
+         Apple-Silicon fehlschlaegt (ld: object file built for 'tvOS').
+         Auch das neueste Paket 2.1.14 hat diese Luecke. Die Direktreferenz
+         mit ExcludeAssets unterdrueckt das native Archiv; ersetzt wird es
+         unten durch RID-passende, selbst retaggte Archive (siehe
+         scripts/Retag-Esqlite3-For-Tvos.py und
+         docs/help/tv-app/installation.md). -->
+    <PackageReference Include="SQLitePCLRaw.lib.e_sqlite3.tvos" Version="2.1.11" ExcludeAssets="all" />
+    <!-- Stub fuer die gleichnamige Managed-Assembly: batteries_v2 referenziert
+         sie statisch, der Provider kommt ueber provider.internal. -->
+    <ProjectReference Include="..\VideoPlayer.TvOS.EsqliteStub\VideoPlayer.TvOS.EsqliteStub.csproj" />
+    <!-- Retaggte e_sqlite3-Archive aus SQLitePCLRaw.lib.e_sqlite3 3.53.3:
+         das Plattform-Tag (LC_BUILD_VERSION/LC_VERSION_MIN) wurde von
+         ios/iossimulator auf tvos/tvossimulator umgeschrieben — Inhalt
+         und Slices sind unveraendert, damit bleibt der upstream-
+         vorgesehene Provider-Pfad (Batteries_V2/internal -> __Internal)
+         auf allen RIDs funktionsfaehig. -->
+    <NativeReference Include="NativeLibs\e_sqlite3.tvos-arm64.a"
+                     Condition="'$(RuntimeIdentifier)' == 'tvos-arm64'">
+      <Kind>Static</Kind>
+      <ForceLoad>true</ForceLoad>
+      <SmartLink>false</SmartLink>
+    </NativeReference>
+    <NativeReference Include="NativeLibs\e_sqlite3.tvossimulator.a"
+                     Condition="'$(RuntimeIdentifier)' != 'tvos-arm64'">
+      <Kind>Static</Kind>
+      <ForceLoad>true</ForceLoad>
+      <SmartLink>false</SmartLink>
+    </NativeReference>
+    <!-- Privacy-Manifest in den Bundle-Root packen: die App nutzt
+         Required-Reason-APIs (ueber .NET-Laufzeit/SDK); ohne
+         PrivacyInfo.xcprivacy meldet die App-Store-Verarbeitung
+         ITMS-91053. Inhalt deckungsgleich mit dem iOS-Manifest. -->
+    <BundleResource Include="PrivacyInfo.xcprivacy" />
+    <!-- App-Icon + Top-Shelf-Assets (App-Store-Pflicht, sonst
+         STATE_ERROR.VALIDATION_ERROR: CFBundleIcons.CFBundlePrimaryIcon
+         bzw. TVTopShelfImage.TVTopShelfPrimaryImageWide fehlt).
+         actool erzeugt daraus die Info.plist-Keys beim Compile. -->
+    <ImageAsset Include="Assets.xcassets\**\*.json" />
+    <ImageAsset Include="Assets.xcassets\**\*.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="../LICENSE" Pack="true" PackagePath="\" />
+  </ItemGroup>
+</Project>

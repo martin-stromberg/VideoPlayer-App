@@ -161,6 +161,17 @@ public sealed record MediaDetailsView
     public bool IsFavorite { get; init; }
 
     /// <summary>
+    /// Gesehen-Zeitpunkt des navigierten Mediums, wie ihn der Server
+    /// mitliefert (<c>MediaEntry.WatchedAt</c>); <c>null</c> = ungesehen
+    /// bzw. nicht bekannt (Offline-Snapshot, Serien-/Staffel-Kontext —
+    /// dort tragen die <see cref="EpisodeItem"/> den Stand).
+    /// </summary>
+    public DateTime? WatchedAt { get; init; }
+
+    /// <summary>Das navigierte Medium wurde als gesehen markiert (Angesehen-Badge).</summary>
+    public bool IsWatched => WatchedAt.HasValue;
+
+    /// <summary>
     /// Eine lokale Download-Datei des navigierten Mediums liegt vor
     /// (nur im Offline-Snapshot gesetzt) — Grundlage des Abspielen-Schalters
     /// ohne Serververbindung.

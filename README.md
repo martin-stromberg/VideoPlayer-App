@@ -26,6 +26,7 @@ Die App koppelt sich beim Erststart über einen vom Server erzeugten Einmal-QR-C
 |-----------|--------|
 | Windows | Unterstützt (primäres Entwicklungsziel, E2E-getestet) |
 | iOS | Unterstützt (Geräte-Deployment via Pair-to-Mac) |
+| tvOS | Eigenständige App `VideoPlayer.TvOS` (nativ, kein MAUI) — MVU-Grundgerüst mit fernbedienbarer Tab-Navigation, vollständiger Serververbindung (Erkennung, Pairing-/Kurzcode-Kopplung, Anmeldung, Serverwechsel), Lean-back-Startseite mit fokussierbaren Karussells (Cache-First), Browsing und Suche (Quellen-Auswahl, Genre-Filter, seitenweises Poster-Raster, Suche per Diktat/Continuity-Tastatur) sowie Detailansichten für Film/Sammlung/Serie/Staffel/Episode (Staffel- und Episodenauswahl, Gesehen-/lokale-Datei-Kennzeichnung, Favoriten-Umschaltung, Offline-Snapshot) sowie vollständige Videowiedergabe im nativen AVPlayer-Vollbildplayer (Fortsetzungsposition, 5-s-Fortschrittstakt an den Server bzw. die Offline-Warteschlange, plausibilisiertes Ende, Auto-Fortsetzung über Serien- und Playlist-Kontext, Fehler-Rückfall, native Spurwahl, Wiedergabe-Schutz heruntergeladener Dateien) sowie lesender Playlist-Zugriff (Übersicht eigener und öffentlicher Playlists, Detailseite mit seitenweisen Einträgen, Wiedergabe ganzer Listen bzw. ab gewähltem Eintrag mit Playlist-Kontext — Verwaltung bewusst ausgeschlossen) sowie manuelle Downloads über die suspensionstaugliche `NSUrlSession`-Hintergrund-Session (Einplanung von der Detailseite inkl. Serienkontext, Download-Liste mit Zustand/Fortschritt, Abbrechen, Wiederholen, Löschen einzeln und fehlgeschlagene gesammelt, Ablaufdatum gemäß Aufbewahrungszeit, Quota-Obergrenze mit Hinweis vor Einplanung, Abgleich von Teildateien/fehlenden Dateien/Waisen bei Start, Online-Rückkehr, Seitenaufruf und App-Aktivierung — ohne Auto-Download und ohne „nach dem Abspielen löschen") sowie einem schlanken, fernbedienungstauglichen Einstellungsbereich (Aufbewahrungszeit und Speicherplatzkontingent der Downloads, Auto-Fortsetzung und „angesehen"-Endfenster der Wiedergabe über Wert-Auswahllisten, Konto-Anzeige mit Abmeldung, Serverstatus mit Serverwechsel — ohne Auto-Download/Vorlauf, nach-Abspielen-löschen, Nur-WLAN und Protokollversand); Kompilierbarkeit via macOS-CI-Job `build-tvos` gesichert; signierter Release-Pfad (`package-tvos`-Action mit TestFlight-Upload) hinter Gate `TVOS_SIGNING_ENABLED` vorbereitet — manueller Vorlauf im Apple-Developer-Account |
 | MacCatalyst | Baubar, nicht aktiv gepflegt |
 | Android | Build möglich, **nicht offiziell unterstützt** — kein Test-/CI-Gate |
 
@@ -34,6 +35,7 @@ Die App koppelt sich beim Erststart über einen vom Server erzeugten Einmal-QR-C
 - [.NET 10 SDK](https://dotnet.microsoft.com/download) und die MAUI-Workload: `dotnet workload install maui`
 - Windows-Ziel: Windows App SDK
 - iOS/MacCatalyst: macOS mit Xcode (lokales Deployment über `scripts/iOS-Deployment.ps1` und Pair-to-Mac)
+- tvOS: macOS mit Xcode 26.x und der tvOS-Workload (Manifest-Pinning siehe `docs/help/tv-app/installation.md`); unter Windows baut `VideoPlayer.TvOS` als leere `net10.0`-Bibliothek
 - Ein laufender [VideoPlayer-Server](https://github.com/martin-stromberg/VideoPlayer) mit der öffentlichen API
 
 ## Bauen und Testen
@@ -42,6 +44,8 @@ Die App koppelt sich beim Erststart über einen vom Server erzeugten Einmal-QR-C
 dotnet restore VideoPlayer.App.sln
 dotnet test VideoPlayer.Maui.Tests/VideoPlayer.Maui.Tests.csproj
 ```
+
+Umgebungssensitive Tests (echte Prozesse, UI-Automation, Sockets/Listener, Dateisystem) sind per `[Trait("Category", "OsInterface")]` markiert und lassen sich lokal filtern — die blockierende Teilmenge entsprechend der CI per `--filter "Category!=OsInterface"`. Details: [OsInterface-Tests und Flake-Quarantäne](docs/help/stabilitaet/os-interface-tests.md).
 
 Windows-App:
 
@@ -54,6 +58,7 @@ dotnet build .\VideoPlayer.Maui\VideoPlayer.Maui.csproj -f net10.0-windows10.0.1
 | Projekt | Zweck |
 |---------|-------|
 | `VideoPlayer.Maui` | Die App (MVU-Architektur): Seitenmenü, Serververwaltung, Startseite, Quellen-Browsing, Detailseiten, Wiedergabe/PiP, Downloads, Offline-Modus |
+| `VideoPlayer.TvOS` | Eigenständige Apple-TV-App (`net10.0-tvos`, UIKit): Lean-back-Player auf dem plattformneutralen MVU-Kern — Effekt-Handler, Plattform-Adapter (Einstellungen, Schlüsselbund, Ablage, Netzwerk), `UITabBarController`-Navigation, Startseiten-Karussells (`UICollectionView`, Poster-Cache), Quellen-Browsing mit Suche (Genre-Filter, seitenweises Poster-Raster, Systemtastatur/Diktat) und modal gestapelte Detailansichten aller Medientypen (Favoriten-Toggle, Staffel-/Episoden-Fokus, Offline-Snapshot), lesende Playlist-Ansichten (gruppierte Übersicht, Detailseite mit Paging) und Playlist-Wiedergabe über den in den Player integrierten Kontext sowie schlanker Einstellungsbereich (vier freigegebene Werte per Wert-Auswahlliste, Konto/Abmeldung, Serverwechsel); TFM nur unter macOS aktiv (`IncludeTvOsTarget`-Schalter, sonst leere `net10.0`-Bibliothek) |
 | `VideoPlayer.Mvu` | Plattformneutrale MVU-Schicht: Modell, Update, Effekte; Authentifizierung, Synchronisation, Ereignisverbindung, Pairing-Flows |
 | `VideoPlayer.ApiClient` | Zugriff auf die öffentliche Server-API: Pairing/Bootstrap (ECDH-nistP256 + AES-256-GCM), Refresh/Logout, Server-Discovery |
 | `VideoPlayer.Storage` | Lokale Datenhaltung: SQLite-Cache, Einstellungen, Geheimnis-Ablage (`SecureStorage`), Download-Manifest, schaltbares Programmprotokoll (Datei-Logging mit Ablauf-Einträgen, Token-Maskierung und Rotation) |
@@ -61,7 +66,7 @@ dotnet build .\VideoPlayer.Maui\VideoPlayer.Maui.csproj -f net10.0-windows10.0.1
 | `msTools.DeveloperApi.Maui` | MAUI-Handler der Developer-API (`/tree`, `/invoke`, `/set-text`, Elementbaum) — baut auf `msTools.DeveloperApi` auf |
 | `VideoPlayer.Maui.Tests` | Testprojekt (Contract-Tests der MAUI-Oberfläche, MVU-Verhalten, API-Client) |
 | `VideoPlayer.E2E.Tests` | Windows-End-to-End-Tests (FlaUI/UI-Automation gegen die echte App + lokalen Mock-Server, inkl. Wiedergabestart) |
-| `scripts/` | Deployment-Skripte (u. a. `iOS-Deployment.ps1` für Simulator-, Geräte- und Store-Builds) |
+| `scripts/` | Deployment-Skripte (`iOS-Deployment.ps1` für iOS-Simulator-/Geräte-/Store-Builds, `tvOS-Deployment.ps1` als tvOS-Pendant — Build, Simulator/Gerät, Store-Upload; unter Windows via SSH auf einen Mac-Checkout) sowie Test-CI-Skripte (`Retry-FlakyTests.ps1` für den Einmal-Re-Run fehlgeschlagener OsInterface-Tests, `Analyze-FlakyTestResults.ps1` für die Flake-Auswertung der TRX-Artefakte) |
 
 ## Secrets und Client-Gate
 
@@ -81,13 +86,13 @@ Der Debug-Build startet einen lokalen Mini-HTTP-Server auf `127.0.0.1` (`GET /mo
 
 ## Branching und CI
 
-- `staging` ist der Integrationsbranch; Pull Requests gegen `staging` laufen durch Build-, Test- und Lint-Prüfungen.
+- `staging` ist der Integrationsbranch; Pull Requests gegen `staging` laufen durch Build-, Test- und Lint-Prüfungen. Die Tests laufen in zwei Lanes: `verify` (blockierend, `--filter "Category!=OsInterface"`) und `test-os-interface` (best effort, `continue-on-error`, mit Einmal-Re-Run fehlgeschlagener Tests, TRX-Artefakten und Flake-Auswertung inkl. Quarantäne-Issues).
 - `main` wird ausschließlich aus `staging` über PRs aktualisiert. Nach dem Merge entsteht ein Prerelease bzw. Semantic Release; der iOS-Build legt neben der `.ipa` das Symbolarchiv `release-ios-dsym.zip` am Release ab, damit TestFlight-Crash-Reports symbolisierbar bleiben.
 - Details: `docs/help/staging-branch.md`.
 
 ## Dokumentation
 
-Ausführliche fachliche Dokumentation liegt unter `docs/help/` — u. a. zu [Serververwaltung & Erststart](docs/help/serververwaltung-erststart.md), [Verbindung & Anmeldung](docs/help/verbindung-anmeldung.md), [Wiedergabe & PiP](docs/help/wiedergabe-pip.md), [Downloads](docs/help/downloads.md), [Offline-Betrieb](docs/help/offline-wiederherstellung.md), [Saisonlisten](docs/help/saisonale-startseitenlisten.md) und [E2E-Tests](docs/help/e2e-tests.md).
+Ausführliche fachliche Dokumentation liegt unter `docs/help/` — u. a. zu [Serververwaltung & Erststart](docs/help/serververwaltung-erststart.md), [Verbindung & Anmeldung](docs/help/verbindung-anmeldung.md), [Wiedergabe & PiP](docs/help/wiedergabe-pip.md), [Downloads](docs/help/downloads.md), [Offline-Betrieb](docs/help/offline-wiederherstellung.md), [Saisonlisten](docs/help/saisonale-startseitenlisten.md), [E2E-Tests](docs/help/e2e-tests.md) und [OsInterface-Tests & Flake-Quarantäne](docs/help/stabilitaet/os-interface-tests.md).
 
 ## Changelog
 

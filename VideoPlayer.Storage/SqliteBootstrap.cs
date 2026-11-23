@@ -13,7 +13,20 @@ public static class SqliteBootstrap
     {
         if (Interlocked.Exchange(ref initialized, 1) == 0)
         {
-            SQLitePCL.Batteries_V2.Init();
+            if (OperatingSystem.IsTvOS())
+            {
+                // Batteries_V2.Init() wuerde die Managed-Assembly
+                // SQLitePCLRaw.lib.e_sqlite3.tvos laden, die im tvOS-Projekt
+                // wegen fehlender tvossimulator-arm64-Slice ihrer eingebetteten
+                // e_sqlite3.a unterdrueckt wird (ExcludeAssets). Der interne
+                // Provider bindet direkt gegen __Internal — das tvOS-Projekt
+                // linkt e_sqlite3 selbst (retaggte Archive).
+                SQLitePCL.raw.SetProvider(new SQLitePCL.SQLite3Provider_internal());
+            }
+            else
+            {
+                SQLitePCL.Batteries_V2.Init();
+            }
         }
     }
 }

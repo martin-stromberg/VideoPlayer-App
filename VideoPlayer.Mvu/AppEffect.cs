@@ -763,6 +763,20 @@ public sealed record DeleteFailedDownloadsEffect(AppSettings Settings) : AppEffe
 public sealed record ResumeDownloadsEffect(AppSettings Settings) : AppEffect;
 
 /// <summary>
+/// Ablauf-/Abgleichslauf des Download-Manifests ohne Neu-Laden der
+/// Liste: überholte Teildateien entfernen, als abgeschlossen markierte
+/// Einträge ohne lokale Datei auf den Fehlerzustand für fehlende
+/// Dateien korrigieren, Restdaten ohne Manifest-Bezug erkennen und
+/// abgelaufene Downloads entfernen (Zustands-/Entfernungsmeldungen
+/// laufen über <c>DownloadItemChangedMessage</c>/<c>DownloadDeletedMessage</c>).
+/// Läuft ohne Serverkontakt — Auslöser ist die App-Aktivierung
+/// (<c>AppActivatedMessage</c>) im nicht verbundenen Zustand.
+/// </summary>
+/// <param name="Settings">Aktuelle App-Einstellungen (Aufbewahrungszeit des Ablauf-Passes).</param>
+/// <returns>Effekt-Datensatz für den Abgleichslauf.</returns>
+public sealed record ReconcileDownloadsEffect(AppSettings Settings) : AppEffect;
+
+/// <summary>
 /// Automatischen Vorlauf der Weiterschauen-Liste ausführen
 /// (<see cref="AutoDownloadService"/>): die nächsten Episoden je
 /// Weiterschauen-Eintrag einreihen, gedrosselt auf

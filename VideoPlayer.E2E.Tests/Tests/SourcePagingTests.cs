@@ -11,6 +11,7 @@ namespace VideoPlayer.E2E.Tests.Tests;
 /// ScrollViewers der <c>ItemsCollection</c> (Listeneinträge fehlen
 /// unter Windows im UIA-Baum — die Position ist nur dort ablesbar).
 /// </summary>
+[Trait("Category", "OsInterface")]
 public sealed class SourcePagingTests : E2ETestBase
 {
     private const long SourceId = 41;

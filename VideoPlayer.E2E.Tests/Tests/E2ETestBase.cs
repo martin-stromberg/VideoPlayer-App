@@ -11,6 +11,7 @@ namespace VideoPlayer.E2E.Tests.Tests;
 /// sequentiellen <c>E2E</c>-Collection.
 /// </summary>
 [Collection("E2E")]
+[Trait("Category", "OsInterface")]
 public abstract class E2ETestBase : IAsyncLifetime
 {
     private readonly AppFixture fixture;

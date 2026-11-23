@@ -11,6 +11,7 @@ namespace VideoPlayer.Maui.Tests;
 /// Datenbankverbindung auf derselben Datei).
 /// </summary>
 [Collection("SqliteDatabase")]
+[Trait("Category", "OsInterface")]
 public class PendingProgressSyncServiceTests : IDisposable
 {
     private readonly string root;

@@ -17,6 +17,7 @@ namespace VideoPlayer.Maui.Tests;
 /// Eintrag lokal aus dem Cache-Eintrag entfernt.
 /// </summary>
 [Collection("SqliteDatabase")]
+[Trait("Category", "OsInterface")]
 public class ContinueWatchingMutationServiceTests : IDisposable
 {
     private static readonly Uri Server = new("http://testserver/videoplayer/");

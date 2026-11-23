@@ -113,7 +113,7 @@ public class VideoPlayerMauiContractTests
     public void NewApp_HealthCheckWiredToApiClient()
     {
         var probe = File.ReadAllText(
-            Path.Combine(Root, "VideoPlayer.Maui", "Services", "ServerHealthProbe.cs"));
+            Path.Combine(Root, "VideoPlayer.Mvu", "ServerHealthProbe.cs"));
         var effectHandler = File.ReadAllText(
             Path.Combine(Root, "VideoPlayer.Maui", "Services", "ShellAppEffectHandler.cs"));
 

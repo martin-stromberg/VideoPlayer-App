@@ -11,6 +11,7 @@ namespace VideoPlayer.E2E.Tests.Tests;
 /// Windows-UIA nicht zuverlässig adressierbar sind; die echten
 /// UI-Aktionen (Flyout, Buttons, Eingaben) laufen über FlaUI.
 /// </summary>
+[Trait("Category", "OsInterface")]
 public sealed class ServerSwitchTests : E2ETestBase
 {
     /// <summary>Initialisiert die Testklasse.</summary>

@@ -8,6 +8,7 @@ namespace VideoPlayer.E2E.Tests.Tests;
 /// falscher Code (Server-401) und der erfolgreiche Austausch bis zur
 /// Anmeldemaske.
 /// </summary>
+[Trait("Category", "OsInterface")]
 public sealed class PairingTests : E2ETestBase
 {
     /// <summary>Initialisiert die Testklasse.</summary>

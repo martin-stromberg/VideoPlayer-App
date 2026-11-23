@@ -16,6 +16,7 @@ namespace VideoPlayer.Maui.Tests;
 /// mit echter SQLite-Ablage.
 /// </summary>
 [Collection("SqliteDatabase")]
+[Trait("Category", "OsInterface")]
 public class OfflineContinueWatchingServiceTests : IDisposable
 {
     private readonly string root;

@@ -12,6 +12,7 @@ namespace VideoPlayer.Maui.Tests;
 /// (<see cref="DevApiServer"/>): Port-Vergabe und Ablage der
 /// Metadatendatei <c>devapi.json</c> im Primär- bzw. Fallback-Verzeichnis.
 /// </summary>
+[Trait("Category", "OsInterface")]
 public class DevApiServerTests_Metadata
 {
     private static DevApiServer StartServer(string metadataDirectory, string? fallbackDirectory = null)

@@ -8,6 +8,7 @@ namespace VideoPlayer.E2E.Tests.Tests;
 /// über die echte UIA-Eingabekette, die Zustands-Assertions über die
 /// Developer-API (<c>GET /model</c>).
 /// </summary>
+[Trait("Category", "OsInterface")]
 public sealed class ServerSetupTests : E2ETestBase
 {
     /// <summary>Initialisiert die Testklasse.</summary>
@@ -155,6 +156,8 @@ public sealed class ServerSetupTests : E2ETestBase
     }
 
     /// <summary>Sammelt alle Texte eines Baumknotens inklusive Kinder.</summary>
+    /// <param name="node">Der Wurzelknoten des auszuwertenden Teilbaums.</param>
+    /// <returns>Liste aller nicht leeren <c>Text</c>-Werte des Knotens und seiner Kinder.</returns>
     private static List<string> CollectTexts(DevApiTreeNode node)
     {
         var texts = new List<string>();

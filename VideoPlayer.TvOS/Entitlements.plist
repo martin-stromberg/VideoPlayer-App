@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- ISecretStore (KeychainSecretStore) nutzt auf tvOS die Keychain;
+	     ohne diese Entitlement schlaegt der Zugriff mit
+	     errSecMissingEntitlement fehl — auch auf dem Simulator.
+	     $(AppIdentifierPrefix) loesen die Codesign-Tasks von .NET for
+	     tvOS aus dem Provisioning-Profil auf; der adhoc-Simulatorpfad in
+	     scripts/tvOS-Deployment.ps1 loest die Platzhalter selbst auf. -->
+	<key>keychain-access-groups</key>
+	<array>
+		<string>$(AppIdentifierPrefix)$(CFBundleIdentifier)</string>
+	</array>
+</dict>
+</plist>

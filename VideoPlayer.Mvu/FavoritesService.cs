@@ -48,7 +48,17 @@ public sealed class FavoritesService
 
         // Lokale Kopie autoritativ vom Serverstand erneuern — damit sind
         // Favoriten-Liste und Detail-Markierung nach Neustart konsistent.
-        await syncService.SyncFavoritesAsync(cancellationToken);
+        // Best-effort: ein Cache-Fehler darf das Toggle-Ergebnis nicht
+        // verwerfen (sonst bleibt der Stern leer, obwohl der Server
+        // die Markierung bereits gesetzt hat).
+        try
+        {
+            await syncService.SyncFavoritesAsync(cancellationToken);
+        }
+        catch
+        {
+            // Cache-Stand veraltet — der Serverstand gilt dennoch.
+        }
 
         return isFavorite;
     }

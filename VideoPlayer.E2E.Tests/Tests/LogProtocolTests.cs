@@ -13,6 +13,7 @@ namespace VideoPlayer.E2E.Tests.Tests;
 /// wird geprüft, dass die App weiterläuft und kein Fehlerhinweis im
 /// Modell steht.
 /// </summary>
+[Trait("Category", "OsInterface")]
 public sealed class LogProtocolTests : E2ETestBase
 {
     /// <summary>Initialisiert die Testklasse.</summary>

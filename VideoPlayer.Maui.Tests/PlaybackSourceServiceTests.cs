@@ -15,6 +15,7 @@ namespace VideoPlayer.Maui.Tests;
 /// aus dem Download-Manifest.
 /// </summary>
 [Collection("SqliteDatabase")]
+[Trait("Category", "OsInterface")]
 public class PlaybackSourceServiceTests : IDisposable
 {
     private static readonly Uri Server = new("http://testserver/videoplayer/");

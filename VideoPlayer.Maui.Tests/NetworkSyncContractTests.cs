@@ -32,11 +32,11 @@ public class NetworkSyncContractTests
         Assert.Contains("ServerSyncService", program, StringComparison.Ordinal);
     }
 
-    /// <summary>Prüft Csproj: referenziert den SignalR-Client.</summary>
+    /// <summary>Prüft Mvu-Csproj: referenziert den SignalR-Client (SignalRServerEventsConnection liegt plattformneutral in VideoPlayer.Mvu, damit auch die tvOS-App ihn nutzt).</summary>
     [Fact]
     public void Csproj_ReferencesSignalRClient()
     {
-        var csproj = MauiFile("VideoPlayer.Maui.csproj");
+        var csproj = File.ReadAllText(Path.Combine(Root, "VideoPlayer.Mvu", "VideoPlayer.Mvu.csproj"));
 
         Assert.Contains("Microsoft.AspNetCore.SignalR.Client", csproj, StringComparison.Ordinal);
     }
@@ -72,7 +72,7 @@ public class NetworkSyncContractTests
     [Fact]
     public void SignalRConnection_MapsServerHubEvents()
     {
-        var connection = MauiFile("Services", "SignalRServerEventsConnection.cs");
+        var connection = File.ReadAllText(Path.Combine(Root, "VideoPlayer.Mvu", "SignalRServerEventsConnection.cs"));
 
         // Ereignisnamen des Server-Hubs (VideoWebPlayer/Hubs/MediaUpdateHub)
         Assert.Contains("\"ContinueWatchingUpdated\"", connection, StringComparison.Ordinal);

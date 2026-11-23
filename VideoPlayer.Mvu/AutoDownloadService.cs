@@ -52,7 +52,7 @@ public sealed class AutoDownloadService
     /// <summary>Erstellt den Dienst.</summary>
     /// <param name="authSession">Sitzungsdienst mit dem angemeldeten API-Client.</param>
     /// <param name="homeLists">Lesedienst der gecachten Startseiten-Listen (Weiterschauen-Stand).</param>
-    /// <param name="downloads">Download-Verwaltung (Einreihen/Dedup).</param>
+    /// <param name="downloads">Download-Verwaltung (Einreihen/Dedup/Abgleich).</param>
     /// <param name="networkMonitor">Netzwerkstatus-Erkennung (WLAN-Bedingung).</param>
     /// <param name="cache">Cache-Ablage für die Serienstruktur (Offline-Serienkontext).</param>
     /// <param name="logger">Optionaler Logger für das Programmprotokoll.</param>
@@ -70,7 +70,7 @@ public sealed class AutoDownloadService
     /// <summary>Erstellt den Dienst mit injizierbarer Zeitquelle (für Tests).</summary>
     /// <param name="authSession">Sitzungsdienst mit dem angemeldeten API-Client.</param>
     /// <param name="homeLists">Lesedienst der gecachten Startseiten-Listen.</param>
-    /// <param name="downloads">Download-Verwaltung (Einreihen/Dedup).</param>
+    /// <param name="downloads">Download-Verwaltung (Einreihen/Dedup/Abgleich).</param>
     /// <param name="networkMonitor">Netzwerkstatus-Erkennung (WLAN-Bedingung).</param>
     /// <param name="cache">Cache-Ablage für die Serienstruktur.</param>
     /// <param name="utcNow">Zeitquelle für den Throttle; <c>null</c> = <see cref="DateTime.UtcNow"/>.</param>
@@ -194,6 +194,27 @@ public sealed class AutoDownloadService
         {
             Interlocked.Exchange(ref runInProgress, 0);
         }
+    }
+
+    /// <summary>
+    /// Ablauf-/Bereinigungslauf mit Auto-Download-Schutz als einziger
+    /// Einstiegspunkt des Geschäftsvorgangs: ermittelt zuerst die
+    /// Kandidatenmenge (<see cref="GetAutoDownloadCandidateKeysAsync"/>)
+    /// und führt den Abgleich damit aus — abgelaufene Downloads werden
+    /// entfernt, weiterhin schutzwürdige Kandidaten verlängert und auf
+    /// die Herkunft <c>auto</c> gestellt. Das gekoppelte Aufrufpaar
+    /// liegt hier, damit kein Aufrufer den Abgleich ohne die
+    /// vorherige Kandidatenermittlung fahren kann.
+    /// </summary>
+    /// <param name="settings">Aktuelle App-Einstellungen (Aufbewahrungszeit der Verlängerung).</param>
+    /// <param name="cancellationToken">Bricht die Operation ab.</param>
+    /// <returns>Das Abgleichsergebnis mit den erkannten und entfernten Datenmengen.</returns>
+    public async Task<DownloadReconcileResult> ReconcileWithExpiryProtectionAsync(
+        AppSettings settings,
+        CancellationToken cancellationToken = default)
+    {
+        var candidateKeys = await GetAutoDownloadCandidateKeysAsync(settings, cancellationToken);
+        return await downloads.ReconcileAsync(settings, candidateKeys, cancellationToken);
     }
 
     /// <summary>

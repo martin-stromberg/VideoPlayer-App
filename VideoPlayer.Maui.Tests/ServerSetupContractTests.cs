@@ -180,7 +180,7 @@ public class ServerSetupContractTests
         Assert.Contains("ServerCheckCompletedMessage", handler, StringComparison.Ordinal);
         // Nur nach erfolgreicher Prüfung wird gespeichert (PersistActiveServerEffect
         // wird ausschließlich aus dem Erfolgszweig des MVU-Updates erzeugt).
-        Assert.Contains("CheckHealthAsync", MauiFile("Services", "ServerHealthProbe.cs"), StringComparison.Ordinal);
+        Assert.Contains("CheckHealthAsync", File.ReadAllText(Path.Combine(Root, "VideoPlayer.Mvu", "ServerHealthProbe.cs")), StringComparison.Ordinal);
     }
 
     /// <summary>Prüft Discovery: verwendet das dokumentierte Protokoll.</summary>

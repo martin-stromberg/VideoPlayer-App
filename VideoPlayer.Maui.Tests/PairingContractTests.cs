@@ -180,8 +180,8 @@ public class PairingContractTests
     [Fact]
     public void ServerHealthProbe_ReturnsHealthCheckResult()
     {
-        var probe = MauiFile("Services", "ServerHealthProbe.cs");
-        var contract = MauiFile("Services", "IServerHealthProbe.cs");
+        var probe = File.ReadAllText(Path.Combine(Root, "VideoPlayer.Mvu", "ServerHealthProbe.cs"));
+        var contract = File.ReadAllText(Path.Combine(Root, "VideoPlayer.Mvu", "IServerHealthProbe.cs"));
 
         Assert.Contains("Task<HealthCheckResult>", contract, StringComparison.Ordinal);
         Assert.Contains("CheckHealthAsync", probe, StringComparison.Ordinal);
@@ -224,7 +224,7 @@ public class PairingContractTests
     [Fact]
     public void ServerHealthProbe_ResolvesGateKeyPerAddress()
     {
-        var probe = MauiFile("Services", "ServerHealthProbe.cs");
+        var probe = File.ReadAllText(Path.Combine(Root, "VideoPlayer.Mvu", "ServerHealthProbe.cs"));
 
         Assert.Contains("GetDeviceTokenAsync", probe, StringComparison.Ordinal);
         Assert.Contains("ClientGate.ResolveStatic()", probe, StringComparison.Ordinal);

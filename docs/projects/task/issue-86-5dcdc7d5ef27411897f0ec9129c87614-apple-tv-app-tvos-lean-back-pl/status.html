@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Apple TV-App (tvOS) — Lean-back-Player via .NET for tvOS, Deployment nach App Store Connect — Projektstatus</title>
+<style>
+  :root {
+    color-scheme: light;
+    --bg: #f7f7f8; --card: #ffffff; --text: #1a1a1a; --muted: #6b6b6b; --border: #e3e3e6;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 2.5rem 1.5rem; background: var(--bg); color: var(--text);
+    font-family: -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+  }
+  .card {
+    max-width: 860px; margin: 0 auto; background: var(--card); border: 1px solid var(--border);
+    border-radius: 12px; padding: 2rem 2.25rem; box-shadow: 0 1px 3px rgba(0,0,0,.04);
+  }
+  h1 { margin: 0 0 .25rem; font-size: 1.6rem; }
+  .meta { color: var(--muted); font-size: .85rem; margin-bottom: 1.5rem; }
+  .overview { font-size: 1rem; line-height: 1.5; margin-bottom: 1.5rem; }
+  .progress-wrap { margin-bottom: 1.25rem; }
+  .progress-label { display: flex; justify-content: space-between; font-size: .85rem; color: var(--muted); margin-bottom: .35rem; }
+  .progress-bar { height: 10px; border-radius: 6px; background: #e9e9ec; overflow: hidden; }
+  .progress-fill { height: 100%; background: #2e7d32; border-radius: 6px; }
+  .badges { display: flex; flex-wrap: wrap; gap: .75rem 1.25rem; margin-bottom: 1.75rem; }
+  .badge { font-size: .85rem; color: var(--muted); display: flex; align-items: center; gap: .4rem; }
+  .dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
+  table { width: 100%; border-collapse: collapse; font-size: .9rem; }
+  th { text-align: left; font-size: .75rem; text-transform: uppercase; letter-spacing: .03em; color: var(--muted); padding: .5rem .6rem; border-bottom: 1px solid var(--border); }
+  td { padding: .65rem .6rem; border-bottom: 1px solid var(--border); vertical-align: top; }
+  td.num { color: var(--muted); width: 2rem; }
+  td.deps { color: var(--muted); }
+  .pill { color: #fff; padding: .15rem .6rem; border-radius: 999px; font-size: .78rem; white-space: nowrap; }
+  .alert { background: #fdecea; border: 1px solid #f5c6c2; color: #7a1a13; border-radius: 8px; padding: .85rem 1rem; margin-bottom: 1.5rem; font-size: .9rem; }
+  .alert p { margin: .3rem 0 0; }
+  .pending { background: #fff8e1; border: 1px solid #f0dfa8; color: #6b5308; border-radius: 8px; padding: .85rem 1rem; margin-bottom: 1.5rem; font-size: .9rem; }
+  .pending pre { margin: .5rem 0 0; white-space: pre-wrap; font-family: inherit; font-size: .85rem; }
+  @media (prefers-color-scheme: dark) {
+    .pending { background: #2c2410; border-color: #5a4a1c; color: #e6d38a; }
+  }
+  .footer { margin-top: 1.75rem; font-size: .78rem; color: var(--muted); }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #16171a; --card: #1e1f23; --text: #e8e8ea; --muted: #9a9a9e; --border: #303136; }
+    .progress-bar { background: #2b2c30; }
+  }
+</style>
+</head>
+<body>
+  <div class="card">
+    <h1>Apple TV-App (tvOS) — Lean-back-Player via .NET for tvOS, Deployment nach App Store Connect</h1>
+    <div class="meta">Branch <code>task/issue-86-5dcdc7d5ef27411897f0ec9129c87614-apple-tv-app-tvos-lean-back-pl</code> · Stand 06.11.2026 02:27</div>
+    <p class="overview">Neben der bestehenden MAUI-App (Windows/iOS/Android/MacCatalyst) wird eine eigenständige App für Apple TV (tvOS) als Lean-back-Player mit dem Kern-Funktionsumfang gebaut: Serververbindung per Pairing-Code-Flow, Startseiten-Karussells, Quellen-/Genre-Browsing und Suche, Detailseiten, Wiedergabe mit Fortschritts-Tracking und Auto-Fortsetzung, lesender Playlist-Zugriff sowie manuelle Downloads über eine suspensionstaugliche Hintergrund-URL-Session mit Ablaufdatum und Quota. Umsetzung mit .NET for tvOS (`net10.0-tvos`) und tvOS-nativem UI (Focus-Engine für die Siri Remote); die plattformneutralen Schichten (`net10.0`: MVU-Kern, Storage, API-Client, Domain-Logik) werden wiederverwendet. Da Build und Signierung von tvOS zwingend macOS erfordern, der Entwicklungsrechner aber Windows ist, werden tvOS-spezifische Validierungen früh und laufend über einen macOS-CI-Pfad abgesichert; alle plattformneutralen Anteile (inkl. neuer MVU-Messages) bleiben unter Windows mit der bestehenden Testsuite entwickel- und prüfbar. Abschließend baut, signiert und lädt ein CI-Workflow den Release-Kandidaten nach App Store Connect.</p>
+    
+    
+        <div class="pending">
+          <strong>⏳ Ausstehende externe Verifikationen</strong>
+          <pre>Register aller Anforderungspunkte, deren Nachweis in der aktuellen Umgebung (Windows-Entwicklungsrechner, kein Push durchgeführt) nicht geführt werden kann. Eintrag bleibt bis zum erbrachten Nachweis bestehen; Projektabschluss erfordert leeres Register oder dokumentiertes Sign-off.
+
+| Schritt | Kriterium | Benötigte Voraussetzung | Stand |
+|---------|-----------|--------------------------|-------|
+| 1–laufend | `net10.0-tvos` kompiliert auf macOS; CI-Job `build-tvos` läuft erfolgreich (Simulator-Build ohne Signierung) | Push der Branches → CI-Lauf auf GitHub-macos-Runner | **FEHLGESCHLAGEN (Run 42103098219, 2026-11-05):** C# kompiliert sauber, aber nativer Linker-Fehler — `ld: building for &#x27;tvOS-simulator&#x27;, but linking in object file (e_sqlite3.a[arm64](sqlite3.o)) built for &#x27;tvOS&#x27;`. `SQLitePCLRaw.lib.e_sqlite3` 3.53.3 hat keine tvossimulator-Slice. Fix auf eigenem Branch in Arbeit |
+| 2–laufend | App startet auf tvOS-Simulator; UI/Focus-Navigation funktioniert tatsächlich (Runtime-Verhalten jenseits von Kompilierung) | tvOS-Simulator/-Gerät oder CI-Testlauf | Ausstehend |
+| 11 | Release-Kandidat landet automatisiert in App Store Connect | Apple-Account-Artefakte (Bundle-ID, Provisioning-Profil, Zertifikate — manueller Vorlauf Kontoinhaber) + Secrets + Push | Ausstehend; Gate-Ansatz hält Pipeline bis dahin grün |
+
+**Benötigte Entscheidung/Autorisierung:** Push der Branches nach `origin` (github.com/martin-stromberg/VideoPlayer-App) autorisieren, damit `build-tvos` real läuft — oder dedizierten Verifikationsschritt nach Bereitstellung eines macOS-Zugangs.</pre>
+        </div>
+        
+    <div class="progress-wrap">
+      <div class="progress-label"><span>Fortschritt</span><span>11/11 Schritte abgeschlossen (100%)</span></div>
+      <div class="progress-bar"><div class="progress-fill" style="width:100%"></div></div>
+    </div>
+    <div class="badges"><div class="badge"><span class="dot" style="background:#2e7d32"></span>Fertig: 11</div><div class="badge"><span class="dot" style="background:#1565c0"></span>In Arbeit: 0</div><div class="badge"><span class="dot" style="background:#616161"></span>Offen: 0</div><div class="badge"><span class="dot" style="background:#c62828"></span>Blockiert: 0</div></div>
+    <table>
+      <thead><tr><th>#</th><th>Titel</th><th>Abhängigkeiten</th><th>Status</th></tr></thead>
+      <tbody><tr><td class="num">1</td><td>tvOS-Projektgerüst und frühe Build-Validierung über macOS-CI</td><td class="deps">Keine</td><td><span class="pill" style="background:#2e7d32">Fertig</span></td></tr><tr><td class="num">2</td><td>MVU-Grundgerüst, Plattform-Anbindung, Navigation und Fokus</td><td class="deps">1</td><td><span class="pill" style="background:#2e7d32">Fertig</span></td></tr><tr><td class="num">3</td><td>Serververbindung — Einrichtung, Pairing und Anmeldung</td><td class="deps">2</td><td><span class="pill" style="background:#2e7d32">Fertig</span></td></tr><tr><td class="num">4</td><td>Startseite mit fokussierbaren Karussells</td><td class="deps">3</td><td><span class="pill" style="background:#2e7d32">Fertig</span></td></tr><tr><td class="num">5</td><td>Quellen- und Genre-Browsing sowie Suche</td><td class="deps">3</td><td><span class="pill" style="background:#2e7d32">Fertig</span></td></tr><tr><td class="num">6</td><td>Detailseiten für Film, Sammlung, Serie, Staffel und Episode</td><td class="deps">4, 5</td><td><span class="pill" style="background:#2e7d32">Fertig</span></td></tr><tr><td class="num">7</td><td>Wiedergabe mit Fortschritts-Tracking, Auto-Fortsetzung und Spurwahl</td><td class="deps">6</td><td><span class="pill" style="background:#2e7d32">Fertig</span></td></tr><tr><td class="num">8</td><td>Playlists — lesender Zugriff und Wiedergabe</td><td class="deps">7</td><td><span class="pill" style="background:#2e7d32">Fertig</span></td></tr><tr><td class="num">9</td><td>Manuelle Downloads über suspensionstaugliche Hintergrund-URL-Session mit Ablaufdatum, Reconcile und Quota</td><td class="deps">6, 7</td><td><span class="pill" style="background:#2e7d32">Fertig</span></td></tr><tr><td class="num">10</td><td>Schlanker Einstellungsbereich</td><td class="deps">7, 9</td><td><span class="pill" style="background:#2e7d32">Fertig</span></td></tr><tr><td class="num">11</td><td>Signiertes Release-Paket und automatisierter Upload nach App Store Connect</td><td class="deps">1</td><td><span class="pill" style="background:#2e7d32">Fertig</span></td></tr></tbody>
+    </table>
+    <div class="footer">Automatisch generiert aus steps.md — kein manuell zu pflegendes Dokument.</div>
+  </div>
+</body>
+</html>

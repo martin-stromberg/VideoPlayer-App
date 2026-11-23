@@ -16,6 +16,7 @@ namespace VideoPlayer.Maui.Tests;
 /// systemvergebenem Port, JSON-Roundtrip, Statuscodes und mehrere
 /// sequentielle Verbindungen.
 /// </summary>
+[Trait("Category", "OsInterface")]
 public class DevApiHttpServerTests
 {
     private static DevApiHttpServer StartServer(out List<DevApiRequest> received)

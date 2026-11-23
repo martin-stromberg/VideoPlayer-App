@@ -19,6 +19,62 @@ public class MediaSource : MediaEntry
 
     /// <summary>ID des Quellen-Icons, falls vorhanden.</summary>
     public long? IconPictureId { get; set; }
+
+    /// <summary>
+    /// Serialisierte Felder ohne Property-Mapping — die Serverversionen
+    /// melden die Menü-Sichtbarkeit („Im Menü ausblenden") unter
+    /// wechselnden Feldnamen.
+    /// </summary>
+    [System.Text.Json.Serialization.JsonExtensionData]
+    public System.Collections.Generic.Dictionary<string, System.Text.Json.JsonElement>? ExtensionData { get; set; }
+
+    /// <summary>
+    /// Die Quelle ist im Menü ausgeblendet: Versteck-Flags
+    /// (<c>hidden</c>, <c>hide…</c>, <c>…InMenu</c>-Versteckvarianten)
+    /// auf <c>true</c> oder Sichtbarkeits-Flags
+    /// (<c>showInMenu</c>, <c>visibleInMenu</c>, <c>inMenu</c>) auf
+    /// <c>false</c>. Nur exakte Feldnamen — kein Contains-Match
+    /// auf unbekannte Felder.
+    /// </summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public bool IsMenuHidden
+    {
+        get
+        {
+            if (ExtensionData is null)
+            {
+                return false;
+            }
+
+            foreach (var (key, value) in ExtensionData)
+            {
+                if (value.ValueKind is not (System.Text.Json.JsonValueKind.True or System.Text.Json.JsonValueKind.False))
+                {
+                    continue;
+                }
+
+                var flag = value.ValueKind == System.Text.Json.JsonValueKind.True;
+                switch (key.ToLowerInvariant())
+                {
+                    case "hidden" or "ishidden" or "hideinmenu" or "hiddeninmenu"
+                        or "menuhidden" or "hiddenfrommenu" or "hidefrommenu":
+                        if (flag)
+                        {
+                            return true;
+                        }
+                        break;
+                    case "showinmenu" or "visibleinmenu" or "inmenu" or "menuvisible":
+                        if (!flag)
+                        {
+                            return true;
+                        }
+                        break;
+                }
+            }
+
+            return false;
+        }
+    }
 }
 
 /// <summary>
