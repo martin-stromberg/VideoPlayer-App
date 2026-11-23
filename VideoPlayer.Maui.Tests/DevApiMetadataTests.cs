@@ -11,6 +11,7 @@ namespace VideoPlayer.Maui.Tests;
 /// Einzeltests der Metadatendatei <c>devapi.json</c>
 /// (<see cref="DevApiMetadata"/>): camelCase-Felder port/pid/startedUtc.
 /// </summary>
+[Trait("Category", "OsInterface")]
 public class DevApiMetadataTests
 {
     /// <summary>Die geschriebene Datei enthält port, pid und startedUtc in camelCase.</summary>

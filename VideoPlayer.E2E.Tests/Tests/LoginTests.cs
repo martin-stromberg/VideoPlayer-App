@@ -7,6 +7,7 @@ namespace VideoPlayer.E2E.Tests.Tests;
 /// Anmeldemaske; falsche Zugangsdaten zeigen den Inline-Fehler,
 /// richtige führen auf die Startseite.
 /// </summary>
+[Trait("Category", "OsInterface")]
 public sealed class LoginTests : E2ETestBase
 {
     /// <summary>Initialisiert die Testklasse.</summary>

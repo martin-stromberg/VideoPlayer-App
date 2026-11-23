@@ -4,6 +4,7 @@ using VideoPlayer.E2E.Tests.Support;
 namespace VideoPlayer.E2E.Tests.Tests;
 
 /// <summary>Exakte saisonale Benutzerflüsse gegen die echte Windows-App.</summary>
+[Trait("Category", "OsInterface")]
 public sealed class SeasonalGenresTests : E2ETestBase
 {
     private const long MovieId = 8701;

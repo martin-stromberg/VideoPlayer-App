@@ -4,6 +4,7 @@ using VideoPlayer.Storage;
 namespace VideoPlayer.Maui.Tests;
 
 /// <summary>Tests für <c>AppLogService</c> (schaltbares Datei-Protokoll).</summary>
+[Trait("Category", "OsInterface")]
 public class AppLogServiceTests : IDisposable
 {
     private readonly string root;

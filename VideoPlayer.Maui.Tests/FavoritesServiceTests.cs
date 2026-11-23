@@ -16,6 +16,7 @@ namespace VideoPlayer.Maui.Tests;
 /// stimmen Favoriten-Liste und Detail-Markierung auch nach Neustart.
 /// </summary>
 [Collection("SqliteDatabase")]
+[Trait("Category", "OsInterface")]
 public class FavoritesServiceTests : IDisposable
 {
     private static readonly Uri Server = new("http://testserver/videoplayer/");

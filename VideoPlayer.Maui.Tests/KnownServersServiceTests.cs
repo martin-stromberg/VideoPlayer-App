@@ -11,6 +11,7 @@ namespace VideoPlayer.Maui.Tests;
 /// Dispose nicht parallel zu anderen Datenbank-Tests ausgeführt wird.
 /// </summary>
 [Collection("SqliteDatabase")]
+[Trait("Category", "OsInterface")]
 public class KnownServersServiceTests : IDisposable
 {
     private readonly string root;

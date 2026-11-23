@@ -11,6 +11,7 @@ namespace VideoPlayer.E2E.Tests.Tests;
 /// Weiterschauen-Eintrag, dessen Folgevideo der Playlist-Reihenfolge
 /// folgt — nicht der Serienreihenfolge.
 /// </summary>
+[Trait("Category", "OsInterface")]
 public sealed class PlaylistPlaybackTests : E2ETestBase
 {
     private const long PlaylistId = 701;

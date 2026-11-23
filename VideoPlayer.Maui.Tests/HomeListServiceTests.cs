@@ -15,6 +15,7 @@ namespace VideoPlayer.Maui.Tests;
 /// beim erneuten Öffnen der App.
 /// </summary>
 [Collection("SqliteDatabase")]
+[Trait("Category", "OsInterface")]
 public class HomeListServiceTests : IDisposable
 {
     private readonly string root;

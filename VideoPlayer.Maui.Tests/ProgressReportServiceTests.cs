@@ -14,6 +14,7 @@ namespace VideoPlayer.Maui.Tests;
 /// permanente Clientfehler werden verworfen.
 /// </summary>
 [Collection("SqliteDatabase")]
+[Trait("Category", "OsInterface")]
 public class ProgressReportServiceTests : IDisposable
 {
     private static readonly Uri Server = new("http://testserver/videoplayer/");

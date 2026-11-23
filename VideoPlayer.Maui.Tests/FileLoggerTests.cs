@@ -4,6 +4,7 @@ using VideoPlayer.Storage;
 namespace VideoPlayer.Maui.Tests;
 
 /// <summary>Tests für <c>FileLogger</c> und <c>FileLoggerProvider</c>.</summary>
+[Trait("Category", "OsInterface")]
 public class FileLoggerTests : IDisposable
 {
     private readonly string root;

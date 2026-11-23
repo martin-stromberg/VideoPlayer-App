@@ -17,6 +17,7 @@ namespace VideoPlayer.Maui.Tests;
 /// Weiterschauen und Favoriten landen in der Cache-Ablage.
 /// </summary>
 [Collection("SqliteDatabase")]
+[Trait("Category", "OsInterface")]
 public class ServerSyncServiceTests : IDisposable
 {
     private static readonly Uri Server = new("http://testserver/videoplayer/");

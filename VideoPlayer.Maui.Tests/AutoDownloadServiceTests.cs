@@ -16,6 +16,7 @@ namespace VideoPlayer.Maui.Tests;
 /// Dedup und Throttling — mit echter SQLite-Ablage.
 /// </summary>
 [Collection("SqliteDatabase")]
+[Trait("Category", "OsInterface")]
 public class AutoDownloadServiceTests : IDisposable
 {
     private static readonly Uri Server = new("http://testserver/videoplayer/");

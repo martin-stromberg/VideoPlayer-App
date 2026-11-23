@@ -12,6 +12,7 @@ namespace VideoPlayer.E2E.Tests.Tests;
 /// Rückfrage ist der Eintrag entfernt und der Schalter wieder
 /// ausgeblendet — ohne fehlerhafte Einträge ist er nicht sichtbar.
 /// </summary>
+[Trait("Category", "OsInterface")]
 public sealed class DownloadsTests : E2ETestBase
 {
     /// <summary>Initialisiert die Testklasse.</summary>

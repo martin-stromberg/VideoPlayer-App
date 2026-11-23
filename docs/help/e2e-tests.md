@@ -24,9 +24,21 @@ mitlaufender lokaler Mock-Server — kein reales Server-Deployment nötig.
 dotnet test VideoPlayer.E2E.Tests/VideoPlayer.E2E.Tests.csproj
 ```
 
-Erwartetes Ergebnis: 19 Tests, alle bestanden (Laufzeit ca. 20–25 min,
-geprägt von App-Starts und echten Wartezeiten, u. a. beim
-nicht-erreichbaren Server und dem Wiedergabestart).
+Erwartetes Ergebnis: 74 Testfälle in 19 Testklassen, alle bestanden
+(Laufzeit ca. 20–25 min, geprägt von App-Starts und echten
+Wartezeiten, u. a. beim nicht-erreichbaren Server und dem
+Wiedergabestart).
+
+Die gesamte Suite ist umgebungssensitiv (Prozesse, UI-Automation,
+Sockets, Dateisystem) und trägt deshalb klassenweise das Trait
+`[Trait("Category", "OsInterface")]` — sie läuft bewusst **nicht** in
+der CI (gehostete Runner haben keine interaktive Desktop-Session).
+Gefilterte Läufe und die Lane-Trennung der Unit-Tests beschreibt
+[OsInterface-Tests und Flake-Quarantäne](stabilitaet/os-interface-tests.md):
+
+```bash
+dotnet test VideoPlayer.E2E.Tests/VideoPlayer.E2E.Tests.csproj --filter "Category=OsInterface"
+```
 
 ## Architektur
 
@@ -36,7 +48,13 @@ nicht-erreichbaren Server und dem Wiedergabestart).
   Token-Verzeichnis), entfernt geerbtes `VIDEOWEBPLAYER_MAUI_API_TOKEN`,
   wartet auf `devapi.json` mit passender PID, attacht FlaUI.UIA3 auf
   das Hauptfenster und räumt in `Dispose` Prozess (Kill-Baum nach
-  `CloseMainWindow`), Metadatei und Profilverzeichnisse auf.
+  `CloseMainWindow`), Metadatei und Profilverzeichnisse auf. Das
+  Löschen der Profilverzeichnisse läuft über
+  `TempDirectoryCleanup.DeleteWithRetry` — bis zu drei Versuche mit
+  gestaffeltem Backoff (200/500/1000 ms) bei gesperrten Handles
+  (`IOException`/`UnauthorizedAccessException`); jeder Versuch und
+  ein verbleibender Restfehler werden protokolliert statt
+  kommentarlos geschluckt.
 - **`DevApiClient`** — `GET /model`-Polling mit Timeout und Letztstand
   im Fehlertext, `GET /tree`, `POST /invoke` (inkl. `itemIndex` für
   `CollectionView` und `BindableLayout`-Container), `POST /set-text`.
@@ -68,7 +86,7 @@ nicht-erreichbaren Server und dem Wiedergabestart).
   Dialog-Schaltflächen wie das `DisplayActionSheet`) — bewusst ohne
   Koordinatenklicks.
 
-## Szenarien (25 Tests)
+## Szenarien (74 Tests in 19 Klassen)
 
 - **Server-Einrichtung** (5): Erststart zeigt die Einrichtungsseite
   (inkl. `ConnectCard` im Elementbaum); ungültige Adresse →
@@ -112,6 +130,56 @@ nicht-erreichbaren Server und dem Wiedergabestart).
   und der Eintrag verschwindet, „Überspringen" entsprechend den
   skip-Endpunkt, „Abbrechen" löst keinen Request aus und lässt den
   Eintrag bestehen.
+- **Playlists-Übersicht** (4, `PlaylistsTests`): Menüeintrag zeigt
+  eigene und öffentliche Playlists; Auswahl zeigt die Einträge in
+  Server-Reihenfolge; Cover werden über den Cover-Endpunkt
+  angefordert; Serverfehler → verständliche Fehleranzeige mit
+  „Erneut versuchen".
+- **Playlist-Verwaltung** (11, `PlaylistManagementTests`): Anlage per
+  Formular erscheint in der Übersicht und wird an den Server gemeldet;
+  Bearbeiten und Löschen über das Verwaltungsmenü; Medium zur Playlist
+  hinzufügen; Eintrag entfernen inklusive Konflikt-Dialog
+  (Bestätigen wiederholt mit Flag, Abbrechen behält den Eintrag);
+  Einträge umsortieren; Sortiermodus-Änderung mit Konflikt-
+  Bestätigung; Genres setzen/zurücksetzen; Öffentlich-Schalter für
+  Admin-Benutzer; fremde öffentliche Playlists zeigen keine
+  Verwaltungsaktionen.
+- **Playlist-Wiedergabe** (6, `PlaylistPlaybackTests`): „Abspielen"
+  startet beim ersten abspielbaren Eintrag; Eintragsauswahl startet
+  gezielt; Next-/Previous-Navigation; Wiedergabeende und
+  Stream-Fehlschlag springen zum nächsten Eintrag;
+  Weiterschauen-Einträge folgen der Playlist-Reihenfolge, nicht der
+  Serienfolge.
+- **Playlist-Fortschrittsmeldung** (2, `PlaylistProgressReportTests`):
+  Fortschritt aus Playlist-Wiedergabe trägt die Playlist-ID, ohne
+  Playlist-Kontext `null`.
+- **Serien-Detailseite** (3, `SeriesDetailsTests`): Episoden und
+  Staffeln in aufsteigender Reihenfolge; Staffelwechsel mit erhaltener
+  Auswahl; Rückkehr aus Episoden-Details zeigt die gewählte Staffel.
+- **Quellen-Browsing, -Paging und -Suche** (7, `SourceBrowsingTests`/
+  `SourcePagingTests`/`SourceSearchTests`): Genre-Filterleiste sichtbar
+  und filtert, „Alle" setzt zurück; Leiste ausgeblendet ohne
+  Server-Genres und höhenbegrenzt, damit das Poster-Raster sichtbar
+  bleibt; Nachladen der nächsten Seite hält die Scrollposition;
+  uneingereichte Sucheingabe übersteht Modelltakte, Enter filtert ab
+  der ersten Seite, der eingereichte Text bleibt nach Rückkehr
+  sichtbar.
+- **Saisonale Genres** (6, `SeasonalGenresTests`): Filmkarte öffnet
+  den exakten Film; mehrere Genre-Sektionen halten Reihenfolge und
+  Kollektions-Navigation; eine erfolgreiche leere Antwort entfernt die
+  Sektion; Fehlschlag + Neustart bewahrt den noch gültigen Cache;
+  keine saisonalen Genres → kein leeres Karussell; Ablauf bei
+  geöffneter Seite plus Neustart blendet den abgelaufenen Cache aus.
+- **Downloads** (3, `DownloadsTests`): „Fehlerhafte löschen" entfernt
+  den fehlgeschlagenen Eintrag; ein Auto-Download trägt die
+  „Cache"-Kennzeichnung; ein angesehener Download wird nach Ablauf der
+  Löschverzögerung bereinigt.
+- **Programmprotokoll** (7, `LogProtocolTests`): deaktiviertes
+  Protokoll blendet die Versand-Schaltfläche aus und schreibt keine
+  Datei; Aktivierung zeigt den Versand und legt die Logdatei an;
+  die Einstellung übersteht einen App-Neustart; „Protokoll senden"
+  ruft Teilen/E-Mail ohne Absturz auf; echte Abläufe (Anmeldung,
+  Abmeldung, PiP, Wiedergabefehler) schreiben Diagnose-Einträge.
 
 ## Grenzen und Hinweise
 
@@ -122,5 +190,7 @@ nicht-erreichbaren Server und dem Wiedergabestart).
 - `devapi.json` liegt neben der Exe — parallel gestartete App-Instanzen
   aus demselben Verzeichnis würden sich die Metadatei überbieten;
   die sequentielle Collection verhindert das innerhalb der Suite.
-- CI-Ausführung ist optional und nicht vorkonfiguriert: gehostete
-  Runner haben keinen zuverlässigen interaktiven Desktop.
+- CI-Ausführung ist nicht vorgesehen: gehostete Runner haben keine
+  interaktive Desktop-Session (Entscheidung in Issue #97). Die
+  Trait-Markierung dient lokalen gefilterten Läufen — Details in
+  [OsInterface-Tests und Flake-Quarantäne](stabilitaet/os-interface-tests.md).

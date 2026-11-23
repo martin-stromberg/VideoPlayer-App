@@ -12,6 +12,7 @@ namespace VideoPlayer.E2E.Tests.Tests;
 /// (Setzen/Zurücksetzen), Öffentlich-Schalter für Administrator:innen
 /// sowie der schreibgeschützte Blick auf fremde öffentliche Playlists.
 /// </summary>
+[Trait("Category", "OsInterface")]
 public sealed class PlaylistManagementTests : E2ETestBase
 {
     private const long OwnPlaylistId = 711;

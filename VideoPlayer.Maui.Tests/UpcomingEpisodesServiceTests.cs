@@ -15,6 +15,7 @@ namespace VideoPlayer.Maui.Tests;
 /// Episode, kein Serienkontext) — mit echter SQLite-Ablage.
 /// </summary>
 [Collection("SqliteDatabase")]
+[Trait("Category", "OsInterface")]
 public class UpcomingEpisodesServiceTests : IDisposable
 {
     private static readonly Uri Server = new("http://testserver/videoplayer/");

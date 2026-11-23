@@ -13,6 +13,7 @@ namespace VideoPlayer.Maui.Tests;
 /// × Restdauer) und die <c>UpdatedAtUtc</c>-Schreibstempel.
 /// </summary>
 [Collection("SqliteDatabase")]
+[Trait("Category", "OsInterface")]
 public class DownloadServiceTests_Expiry : IDisposable
 {
     private readonly string root;

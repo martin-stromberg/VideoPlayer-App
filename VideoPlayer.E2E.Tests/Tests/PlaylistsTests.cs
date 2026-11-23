@@ -11,6 +11,7 @@ namespace VideoPlayer.E2E.Tests.Tests;
 /// ausgefallener Playlist-Bereich zeigt eine verständliche
 /// Fehleranzeige mit funktionierendem Neuversuch — ohne Absturz.
 /// </summary>
+[Trait("Category", "OsInterface")]
 public sealed class PlaylistsTests : E2ETestBase
 {
     private const long OwnPlaylistId = 701;
