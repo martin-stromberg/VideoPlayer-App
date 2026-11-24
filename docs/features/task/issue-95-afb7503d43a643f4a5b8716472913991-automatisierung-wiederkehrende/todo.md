@@ -17,11 +17,11 @@ Branch: `task/issue-95-afb7503d43a643f4a5b8716472913991-automatisierung-wiederke
 | [x] | 7 | Plan-Review (Unteragent, bedingt) | `review.md` |
 | [x] | 8 | Usability-Review (Unteragent, bei UI-Änderungen) | `review-usability.md` |
 | [x] | 9 | Code-Review (Unteragent) | `review-code.md` |
-| [ ] | 10 | Tests ausführen (Unteragent) | `test-results.md` |
-| [ ] | – | Iteration oder Abschluss entscheiden | – |
-| [ ] | 11 | Folgeaufgaben dokumentieren (bei Schleifenabbruch) | `continue.md` |
+| [x] | 10 | Tests ausführen (Unteragent) — nicht durchführbare Abnahme per Anwender-Verzicht 2026-11-23 dokumentiert | `test-results.md` |
+| [x] | – | Iteration oder Abschluss entscheiden — alle Prüfungen grün, Abschluss | – |
+| [x] | 11 | Folgeaufgaben dokumentieren (bei Schleifenabbruch) — nicht erforderlich, kein Abbruch | `continue.md` |
 | [x] | 12 | Dokumentation erstellen (Unteragent) | `docs/help/` |
 | [x] | 12b | README aktualisieren (Unteragent) | `README.md` |
 | [x] | 12c | Release Notes aktualisieren (Unteragent) | `docs/RELEASE_NOTES.md` |
-| [ ] | – | Feature-Verzeichnis löschen | – |
-| [ ] | – | Commit durchführen | – |
+| [x] | – | Feature-Verzeichnis löschen | – |
+| [x] | – | Commit durchführen | – |

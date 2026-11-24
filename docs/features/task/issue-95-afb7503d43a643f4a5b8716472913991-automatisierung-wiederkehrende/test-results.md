@@ -4,38 +4,37 @@ Datum: 2026-11-16 — Branch `task/issue-95-afb7503d43a643f4a5b8716472913991-aut
 
 ## Ergebnis
 
-**Status:** Fehler vorhanden
+**Status:** Keine Fehler
 
 Hinweis zum Status: Alle ausgeführten automatisierten Tests sind ohne
 Fehlschlag durchgelaufen (1484 Unit-Tests + 74 E2E-Tests, 0 fehlgeschlagen,
-0 übersprungen). Der Status `Fehler vorhanden` ergibt sich ausschließlich
-aus der unvollständigen realen End-to-End-Abnahme: 5 von 6
-Akzeptanzszenarien konnten nicht real durchgespielt werden
-(`Nicht durchführbar`, siehe unten). `Nicht durchführbar` gilt nicht als
-Erfolg — die betroffenen Szenarien bleiben offen, bis der Anwender sie
-manuell abnimmt oder ausdrücklich dokumentiert verzichtet.
+0 übersprungen). Die 5 vor dem Merge nicht durchführbaren
+Akzeptanzszenarien der realen End-to-End-Abnahme wurden am 2026-11-23
+per dokumentiertem Anwender-Verzicht abgeschlossen (Issue-Kommentar
+`#issuecomment-7113314858` an Issue #95 — Option „Dokumentierter
+Verzicht" aus der Eskalation, siehe Abschnitt `Reale End-to-End-Abnahme`).
 
 ## Fehlgeschlagene Tests
 
-Keine fehlgeschlagenen automatisierten Tests. Nach dem Kommando-Verfahren
-werden hier die offenen Szenarien der realen Abnahme geführt (wie
-fehlgeschlagene Tests behandelt, bis eine Anwender-Entscheidung vorliegt):
+Keine. Die zuvor als offen geführten Szenarien der realen
+End-to-End-Abnahme (1–5) sind durch den dokumentierten Anwender-Verzicht
+vom 2026-11-23 abgeschlossen:
 
-### Reale End-to-End-Abnahme (offene Szenarien)
+### Reale End-to-End-Abnahme (durch Verzicht abgeschlossene Szenarien)
 
-- **Szenario 1: Happy Path monatlich** — Nicht durchführbar: Workflow liegt uncommitted im Arbeitsbaum, nicht auf dem Default-Branch `main`; `workflow_dispatch` ist nicht auslösbar (`gh workflow list` zeigt den Workflow nicht). Ein echter Lauf würde zudem ein reales Issue mit `@softwarewerkstatt`-Erwähnung erzeugen und ist untersagt.
-- **Szenario 2: Duplikatvermeidung** — Nicht durchführbar: erfordert einen echten Workflow-Lauf auf GitHub (siehe Szenario 1).
-- **Szenario 3: Wöchentliche Prüfung** — Nicht durchführbar: wie Szenario 1.
-- **Szenario 4: Jährliches Review** — Nicht durchführbar: wie Szenario 1.
-- **Szenario 5: Fehlgeschlagener Lauf** — Nicht durchführbar: erfordert einen realen, fehlschlagenden Lauf auf GitHub (siehe Szenario 1).
+- **Szenario 1: Happy Path monatlich** — Verzichtet (Anwender, 2026-11-23, dokumentierter Verzicht auf die reale Vorab-Abnahme: Workflow nicht auf dem Default-Branch `main`, `workflow_dispatch` nicht auslösbar; statisch vollständig verifiziert).
+- **Szenario 2: Duplikatvermeidung** — Verzichtet (Anwender, 2026-11-23, wie Szenario 1).
+- **Szenario 3: Wöchentliche Prüfung** — Verzichtet (Anwender, 2026-11-23, wie Szenario 1).
+- **Szenario 4: Jährliches Review** — Verzichtet (Anwender, 2026-11-23, wie Szenario 1).
+- **Szenario 5: Fehlgeschlagener Lauf** — Verzichtet (Anwender, 2026-11-23, wie Szenario 1; statisch abgesichert — keine Fehlerunterdrückung in den `run:`-Blöcken).
 
 ## E2E-Abdeckung
 
 | Szenario | Test / Testklasse | Ergebnis |
 |----------|-------------------|----------|
-| Zeitgesteuerte Issue-Erstellung (monatlich/wöchentlich/jährlich) — geplanter Nachweis via `workflow_dispatch`-Probelauf + Tracker-Sichtprüfung | kein automatisierter Test möglich (Systemablauf auf GitHub, nicht app-seitig beobachtbar) | Nicht ausgeführt — Workflows nicht auf Default-Branch; realer Lauf würde echte Issues erzeugen (untersagt) |
-| Duplikatvermeidung — geplanter Nachweis via Zweitlauf | wie oben | Nicht ausgeführt — wie oben |
-| Fehlerfall (fehlende Body-Datei, `gh`-Fehler) — geplanter Nachweis als roter Workflow-Lauf | wie oben | Nicht ausgeführt — wie oben; statischer Gegenbeweis: kein `continue-on-error`, kein `|| true` in den `run:`-Blöcken — `gh`-Fehler propagieren als Exit ≠ 0 |
+| Zeitgesteuerte Issue-Erstellung (monatlich/wöchentlich/jährlich) — geplanter Nachweis via `workflow_dispatch`-Probelauf + Tracker-Sichtprüfung | kein automatisierter Test möglich (Systemablauf auf GitHub, nicht app-seitig beobachtbar) | Verzichtet (Anwender, 2026-11-23, dokumentierter Verzicht — Workflows nicht auf Default-Branch; realer Lauf würde echte Issues erzeugen (untersagt)) |
+| Duplikatvermeidung — geplanter Nachweis via Zweitlauf | wie oben | Verzichtet (Anwender, 2026-11-23, wie oben) |
+| Fehlerfall (fehlende Body-Datei, `gh`-Fehler) — geplanter Nachweis als roter Workflow-Lauf | wie oben | Verzichtet (Anwender, 2026-11-23, wie oben; statischer Gegenbeweis: kein `continue-on-error`, kein `|| true` in den `run:`-Blöcken — `gh`-Fehler propagieren als Exit ≠ 0) |
 | Bestehende E2E-Suite (Regressionssicherung, kein App-Code geändert) | `VideoPlayer.E2E.Tests` (FlaUI, 74 Tests) | Bestanden |
 
 ## Reale End-to-End-Abnahme
@@ -49,12 +48,28 @@ wurden ausgeführt und sind unten aufgeführt.
 
 | Szenario | Durchgeführt über | Ergebnis |
 |----------|-------------------|----------|
-| 1. Happy Path monatlich (Issue „Architektur- und Sicherheitsreview YYYY-MM") | Workflow-Lauf auf GitHub | Nicht durchführbar — Workflow nicht auf `main`; `gh workflow run` nicht möglich; echter Lauf würde reales Issue mit `@softwarewerkstatt`-Erwähnung erzeugen (untersagt) |
-| 2. Duplikatvermeidung (Zweitlauf ohne neues Issue) | Zweitlauf desselben Workflows | Nicht durchführbar — erfordert echten Lauf nach Szenario 1 |
-| 3. Wöchentliche Prüfung (Issue „NuGet-Prüfung ISOJahr-WKW") | Workflow-Lauf auf GitHub | Nicht durchführbar — wie Szenario 1 |
-| 4. Jährliches Review (Issue „Compliance- und Copyright-Review YYYY") | Workflow-Lauf auf GitHub | Nicht durchführbar — wie Szenario 1 |
-| 5. Fehlgeschlagener Lauf (roter Lauf, kein Issue) | Workflow-Lauf mit `gh`-Fehler | Nicht durchführbar — erfordert realen Lauf; statisch abgesichert (keine Fehlerunterdrückung in den `run:`-Blöcken) |
+| 1. Happy Path monatlich (Issue „Architektur- und Sicherheitsreview YYYY-MM") | Workflow-Lauf auf GitHub | Verzichtet (Anwender, 2026-11-23, dokumentierter Verzicht — Workflow nicht auf `main`; `gh workflow run` nicht möglich; echter Lauf würde reales Issue mit `@softwarewerkstatt`-Erwähnung erzeugen (untersagt)) |
+| 2. Duplikatvermeidung (Zweitlauf ohne neues Issue) | Zweitlauf desselben Workflows | Verzichtet (Anwender, 2026-11-23, wie Szenario 1) |
+| 3. Wöchentliche Prüfung (Issue „NuGet-Prüfung ISOJahr-WKW") | Workflow-Lauf auf GitHub | Verzichtet (Anwender, 2026-11-23, wie Szenario 1) |
+| 4. Jährliches Review (Issue „Compliance- und Copyright-Review YYYY") | Workflow-Lauf auf GitHub | Verzichtet (Anwender, 2026-11-23, wie Szenario 1) |
+| 5. Fehlgeschlagener Lauf (roter Lauf, kein Issue) | Workflow-Lauf mit `gh`-Fehler | Verzichtet (Anwender, 2026-11-23, wie Szenario 1; statisch abgesichert — keine Fehlerunterdrückung in den `run:`-Blöcken) |
 | 6. Vor Default-Branch-Erreichung (kein Lauf, kein Issue) | `gh workflow list`, `gh run list` gegen das echte Repo | Bestanden — die drei `scheduled-*`-Workflows sind nicht registriert und haben keine Läufe; kein Issue wurde erzeugt |
+
+### Anwender-Entscheidung zur nicht durchführbaren Vorab-Abnahme
+
+- Datum: 2026-11-23 — Issue-Kommentar `#issuecomment-7113314858` an Issue #95
+  („@softwarewerkstatt Verzicht") als Antwort auf die Eskalation vom 2026-11-16.
+- Entscheidung: **Dokumentierter Verzicht** auf die reale End-to-End-Vorab-Abnahme
+  der Szenarien 1–5 (die angebotene Option „Dokumentierter Verzicht").
+- Begründung: Die Workflows sind statisch vollständig verifiziert
+  (YAML-Parse, Bash-Syntax, Cron-Ausdrücke, Permissions) und die realen
+  Teilnachweise zu Label-Anlage und Duplikatlogik sind erfolgreich
+  gelaufen; ein echter Lauf ist vor Erreichen des Default-Branch `main`
+  technisch nicht möglich. Der erste reale Lauf erfolgt planmäßig zum
+  nächsten Cron-Termin (NuGet-Prüfung: montags 05:00 UTC;
+  Architektur-Review: 1.12.; Compliance-Review: 1.1.). Die nach dem Merge
+  fällige Kontrolle des ersten realen Laufs bleibt als Nachzug in der
+  Tasks-Datei vermerkt (Tasks 21–22).
 
 ### Ausgeführte reale Teilnachweise (nicht-destruktiv)
 
